@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useState, useEffect } from 'react';
 import {
   Zap,
   Droplets,
@@ -10,6 +10,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { PlusIcon, CloseIcon, UploadIcon } from '../../admin/components';
+import { employeeApi } from '../../employee/api/employeeApi';
 import {
   EXPENSE_CATEGORY_LABELS,
   type CreateExpenseRequest,
@@ -18,12 +19,15 @@ import {
 } from '../types/expense.types';
 import { MoneyInput } from '../../../components/common/MoneyInput';
 import { formatMoney } from '../../finance/utils/formatters';
+import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 
 interface CreateExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: CreateExpenseRequest) => Promise<void>;
   isSubmitting?: boolean;
+  branches?: { id: string; name: string }[];
+  defaultBranchId?: string;
 }
 
 interface QuickOption {
@@ -38,58 +42,58 @@ interface QuickOption {
 
 const QUICK_OPTIONS: QuickOption[] = [
   {
-    category: 'Maintenance',
-    vendorName: 'Nhà cung cấp Phụ tùng xe máy',
-    label: 'Tiền phụ tùng',
-    sub: 'Nhông sên, dầu nhớt, lốp',
-    icon: Wrench,
-    color: '#0F766E',
-    bg: '#CCFBF1',
-  },
-  {
-    category: 'Rent',
-    vendorName: 'Chủ nhà cho thuê mặt bằng',
-    label: 'Mặt bằng',
-    sub: 'Tiền thuê cửa hàng định kỳ',
-    icon: Home,
-    color: '#7C3AED',
-    bg: '#EDE9FE',
-  },
-  {
     category: 'Electricity',
     vendorName: 'Điện lực EVN',
-    label: 'Tiền điện',
-    sub: 'Hóa đơn điện lực sinh hoạt/KD',
+    label: 'Tiền điện kho lạnh',
+    sub: 'Điện kho lạnh bảo quản thực phẩm & chiếu sáng',
     icon: Zap,
     color: '#D97706',
     bg: '#FEF3C7',
   },
   {
+    category: 'Rent',
+    vendorName: 'Chủ nhà cho thuê mặt bằng',
+    label: 'Tiền thuê mặt bằng cửa hàng',
+    sub: 'Tiền thuê mặt bằng cửa hàng định kỳ',
+    icon: Home,
+    color: '#7C3AED',
+    bg: '#EDE9FE',
+  },
+  {
+    category: 'Maintenance',
+    vendorName: 'Đơn vị cơ điện lạnh',
+    label: 'Bảo trì tủ đông mát',
+    sub: 'Bảo trì tủ đông mát, điều hòa quầy kệ',
+    icon: Wrench,
+    color: '#0F766E',
+    bg: '#CCFBF1',
+  },
+  {
+    category: 'Other',
+    vendorName: 'Nhà cung cấp bao bì & ấn phẩm',
+    label: 'Bao bì & Cuộn in bill',
+    sub: 'Mua bao bì túi ni lông & cuộn in bill',
+    icon: Package,
+    color: '#475569',
+    bg: '#F1F5F9',
+  },
+  {
     category: 'Water',
     vendorName: 'Công ty Cấp nước Sawaco',
     label: 'Tiền nước',
-    sub: 'Nước rửa xe, sinh hoạt',
+    sub: 'Nước sơ chế thực phẩm & vệ sinh quầy kệ',
     icon: Droplets,
     color: '#0284C7',
     bg: '#E0F2FE',
   },
   {
     category: 'Internet',
-    vendorName: 'Nhân viên & Thợ sửa xe',
-    label: 'Lương & Phụ cấp',
-    sub: 'Ứng lương, phụ cấp ca',
+    vendorName: 'Nhà mạng Viettel / VNPT',
+    label: 'Internet & Phần mềm',
+    sub: 'Cáp quang POS & phần mềm bán lẻ',
     icon: Users,
     color: '#15803D',
     bg: '#DCFCE7',
-  },
-  {
-    category: 'Other',
-    vendorName: 'Nhà cung cấp lẻ',
-    label: 'Chi phí khác',
-    sub: 'Vệ sinh, rác, lặt vặt',
-    icon: Package,
-    color: '#475569',
-    bg: '#F1F5F9',
   },
 ];
 
@@ -98,12 +102,32 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
   onClose,
   onSubmit,
   isSubmitting = false,
+  branches,
+  defaultBranchId,
 }) => {
   const [activeTab, setActiveTab] = useState<'quick' | 'detail'>('quick');
+  const [internalBranches, setInternalBranches] = useState<{ id: string; name: string }[]>([]);
+
+  // Tự động tải danh sách chi nhánh nếu component cha không truyền xuống
+  useEffect(() => {
+    if (!branches || branches.length === 0) {
+      let isMounted = true;
+      employeeApi.getBranches().then((list) => {
+        if (isMounted && list && list.length > 0) {
+          setInternalBranches(list);
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [branches]);
+
+  const activeBranches = branches && branches.length > 0 ? branches : internalBranches;
 
   // Poka-yoke: Do NOT pre-select category. User must explicitly choose one.
   const [formData, setFormData] = useState(() => ({
-    branchId: 'BR-01',
+    branchId: defaultBranchId && defaultBranchId !== 'ALL' ? defaultBranchId : '',
     category: '' as unknown as ExpenseCategory,
     amount: '',
     expenseDate: new Date().toISOString().split('T')[0],
@@ -118,8 +142,21 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
     note: '',
   }));
 
+  // Cập nhật branchId nếu defaultBranchId hoặc danh sách chi nhánh sẵn sàng
+  useEffect(() => {
+    const validDefault = defaultBranchId && defaultBranchId !== 'ALL' ? defaultBranchId : '';
+    const fallbackId = validDefault || activeBranches[0]?.id || '';
+    if ((!formData.branchId || formData.branchId === 'ALL') && fallbackId) {
+      setFormData((prev) => ({
+        ...prev,
+        branchId: fallbackId,
+      }));
+    }
+  }, [defaultBranchId, activeBranches, formData.branchId]);
+
   const [attachMode, setAttachMode] = useState<'upload' | 'url'>('upload');
   const [uploadedFile, setUploadedFile] = useState<{ name: string; size: string } | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   if (!isOpen) return null;
@@ -140,14 +177,17 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
+    // Reset input target value để có thể chọn lại file cùng tên nếu muốn
+    e.target.value = '';
+
+    if (file.size > 5 * 1024 * 1024) {
       setErrors((prev) => ({
         ...prev,
-        attachedBillUrl: 'Kích thước tệp không được vượt quá 10MB',
+        attachedBillUrl: 'Kích thước tệp không được vượt quá 5MB theo giới hạn Cloudinary',
       }));
       return;
     }
@@ -157,20 +197,27 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
         ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
         : `${Math.round(file.size / 1024)} KB`;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setFormData((prev) => ({ ...prev, attachedBillUrl: result }));
+    setIsUploadingImage(true);
+    setErrors((prev) => {
+      const updated = { ...prev };
+      delete updated.attachedBillUrl;
+      return updated;
+    });
+
+    try {
+      // Tải hình ảnh hóa đơn lên Cloudinary lưu trữ an toàn, nhận về đường dẫn HTTPS
+      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/expenses');
+      setFormData((prev) => ({ ...prev, attachedBillUrl: secureUrl }));
       setUploadedFile({ name: file.name, size: fileSizeStr });
-      if (errors.attachedBillUrl) {
-        setErrors((prev) => {
-          const updated = { ...prev };
-          delete updated.attachedBillUrl;
-          return updated;
-        });
-      }
-    };
-    reader.readAsDataURL(file);
+    } catch (uploadErr: unknown) {
+      const err = uploadErr as { message?: string };
+      setErrors((prev) => ({
+        ...prev,
+        attachedBillUrl: err?.message || 'Không thể tải ảnh chứng từ lên Cloudinary',
+      }));
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleRemoveFile = () => {
@@ -198,9 +245,15 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
       return;
     }
 
+    const targetBranchId =
+      formData.branchId && formData.branchId !== 'ALL'
+        ? formData.branchId
+        : (defaultBranchId && defaultBranchId !== 'ALL' ? defaultBranchId : activeBranches[0]?.id) || '';
+
     const parsedAmount = Number(formData.amount);
     const result = createExpenseSchema.safeParse({
       ...formData,
+      branchId: targetBranchId,
       amount: parsedAmount,
     });
 
@@ -216,7 +269,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
 
     try {
       await onSubmit({
-        branchId: formData.branchId,
+        branchId: targetBranchId,
         category: formData.category,
         amount: parsedAmount,
         expenseDate: formData.expenseDate,
@@ -477,6 +530,28 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                   </div>
                 )}
 
+                {/* Branch Selector */}
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label" style={{ fontWeight: 700 }}>
+                    Chi nhánh hạch toán <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
+                  <select
+                    value={formData.branchId}
+                    onChange={(e) => handleChange('branchId', e.target.value)}
+                    className={`form-select ${errors.branchId ? 'error' : ''}`}
+                  >
+                    {activeBranches.length === 0 && (
+                      <option value="">-- Đang tải chi nhánh... --</option>
+                    )}
+                    {activeBranches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.branchId && <p className="form-error">{errors.branchId}</p>}
+                </div>
+
                 {/* MoneyInput */}
                 <div className="form-group" style={{ marginBottom: 16 }}>
                   <label className="form-label" style={{ fontWeight: 700 }}>
@@ -515,9 +590,14 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                       onChange={(e) => handleChange('branchId', e.target.value)}
                       className={`form-select ${errors.branchId ? 'error' : ''}`}
                     >
-                      <option value="BR-01">Quận 1 (Trụ sở chính)</option>
-                      <option value="BR-02">Bình Thạnh</option>
-                      <option value="BR-03">Thủ Đức</option>
+                      {activeBranches.length === 0 && (
+                        <option value="">-- Đang tải chi nhánh... --</option>
+                      )}
+                      {activeBranches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
                     </select>
                     {errors.branchId && <p className="form-error">{errors.branchId}</p>}
                   </div>
@@ -709,7 +789,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                               {uploadedFile?.name || 'chung_tu_hoa_don.png'}
                             </span>
                             <span className="expense-upload-file-size">
-                              {uploadedFile?.size || 'Ảnh chứng từ đã tải lên'}
+                              {uploadedFile?.size || 'Ảnh chứng từ Cloudinary'}
                             </span>
                           </div>
                           <button
@@ -719,6 +799,13 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                           >
                             Xóa tệp
                           </button>
+                        </div>
+                      ) : isUploadingImage ? (
+                        <div className="expense-upload-dropzone" style={{ cursor: 'wait', padding: '24px 16px' }}>
+                          <div className="expense-upload-spinner" />
+                          <span className="expense-upload-dropzone-text" style={{ color: '#0F766E', fontWeight: 600 }}>
+                            Đang tải ảnh lên Cloudinary... Vui lòng chờ
+                          </span>
                         </div>
                       ) : (
                         <label className="expense-upload-dropzone">
@@ -730,7 +817,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                           />
                           <UploadIcon size={24} color="#0F766E" />
                           <span className="expense-upload-dropzone-text">
-                            Kéo thả hoặc <strong>chọn ảnh hóa đơn</strong>
+                            Kéo thả hoặc <strong>chọn ảnh hóa đơn</strong> (Cloudinary)
                           </span>
                         </label>
                       )}
@@ -775,7 +862,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !isFormValid}
+              disabled={isSubmitting || isUploadingImage || !isFormValid}
               className="btn-primary-pill"
               style={{
                 minWidth: '160px',
@@ -784,14 +871,16 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                background: isFormValid ? 'var(--brand-700, #115E59)' : '#CBD5E1',
-                cursor: isFormValid ? 'pointer' : 'not-allowed',
+                background: isFormValid && !isUploadingImage ? 'var(--brand-700, #115E59)' : '#CBD5E1',
+                cursor: isFormValid && !isUploadingImage ? 'pointer' : 'not-allowed',
                 fontWeight: 700,
               }}
             >
               <CheckCircle size={18} />
               <span>
-                {isSubmitting
+                {isUploadingImage
+                  ? 'Đang tải ảnh...'
+                  : isSubmitting
                   ? 'Đang lưu...'
                   : parsedAmount > 0
                   ? `Chi ${formatMoney(parsedAmount)}`

@@ -61,8 +61,9 @@ export function useCustomerCrm() {
       customerApi.getCustomers({
         search: searchTerm,
         tier: selectedTier,
-        debtStatus: selectedDebtStatus,
+        debtStatus: selectedDebtStatus === 'DEBT' ? undefined : selectedDebtStatus,
       }),
+    select: (data) => (selectedDebtStatus === 'DEBT' ? data.filter((c) => c.currentDebtAR > 0) : data),
   });
 
   // Query KPI summary

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -8,45 +8,18 @@ import {
   Save,
   AlertTriangle,
 } from 'lucide-react';
-import { INITIAL_TRANSFERS } from '../services/mockData';
 import type { TransferOrder, TransferItem } from '../types';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { transferService } from '../services/transferService';
 import '../transfer.css';
 
 export const ReceiveTransferPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const foundTransfer = INITIAL_TRANSFERS.find((t) => t.id === id) || INITIAL_TRANSFERS[0];
-  const [transfer, setTransfer] = useState<TransferOrder>(foundTransfer);
-  const [items, setItems] = useState<TransferItem[]>([
-    {
-      id: 'ti-1',
-      productId: 'prod-102',
-      productCode: 'SP000063',
-      productName: 'Bộ 3 bình gốm sứ - Gốm sứ',
-      unitName: 'Chiếc',
-      onHandSender: 10,
-      onHandReceiver: 0,
-      sentQty: 5,
-      receivedQty: 5,
-      unitPrice: 1600000,
-      amount: 8000000,
-    },
-    {
-      id: 'ti-2',
-      productId: 'prod-101',
-      productCode: 'SP652379',
-      productName: 'Bình hoa decor',
-      unitName: 'Cái',
-      onHandSender: 18,
-      onHandReceiver: 0,
-      sentQty: 10,
-      receivedQty: 9, // Lệch 1 theo đúng ảnh wireframe
-      unitPrice: 200000,
-      amount: 1800000,
-    },
-  ]);
+  const [transfer, setTransfer] = useState<TransferOrder | null>(null);
+  const [items, setItems] = useState<TransferItem[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Tab filter: 'all' | 'match' | 'mismatch' | 'unreceived'
   const [activeTab, setActiveTab] = useState<'all' | 'match' | 'mismatch' | 'unreceived'>('all');
@@ -61,6 +34,16 @@ export const ReceiveTransferPage: React.FC = () => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  useEffect(() => {
+    if (!id) return;
+    transferService.get(id).then((result) => {
+      setTransfer(result);
+      setItems(result.items.map((item) => ({ ...item, receivedQty: item.sentQty })));
+    }).catch(() => showToast('Không tải được phiếu nhận hàng.', 'warning'));
+  }, [id]);
+
+  if (!transfer) return <div className="transfer-container">Đang tải phiếu chuyển hoặc không tìm thấy phiếu.</div>;
 
   const handleUpdateReceivedQty = (itemId: string, qty: number) => {
     setItems(
@@ -105,28 +88,21 @@ export const ReceiveTransferPage: React.FC = () => {
   const countMismatch = items.filter((it) => (it.receivedQty ?? it.sentQty) < it.sentQty).length;
   const countUnreceived = items.filter((it) => (it.receivedQty ?? it.sentQty) === 0).length;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (!transfer || !id) return;
     if (totalDifference > 0 && !receiveNote.trim()) {
       showToast('Bắt buộc nhập lý do chênh lệch nhận hàng vào ô "Ghi chú nhận"!', 'warning');
       return;
     }
 
-    const updated: TransferOrder = {
-      ...transfer,
-      status: 'Received',
-      receiveDate: receiveTime,
-      discrepancyNote: receiveNote.trim(),
-      items,
-    };
-
-    setTransfer(updated);
-    showToast(
-      `Xác nhận nhận hàng thành công cho phiếu ${transfer.transferCode}! Tồn kho chi nhánh nhận đã được tự động cộng thêm.`
-    );
-
-    setTimeout(() => {
-      navigate(`/store-owner/transfers/${transfer.id}`);
-    }, 1200);
+    setIsSaving(true);
+    try {
+      await transferService.receive(id, items, receiveNote.trim());
+      showToast(`Đã nhận hàng cho phiếu ${transfer.transferCode}.`);
+      setTimeout(() => navigate(`/store-owner/transfers/${transfer.id}`), 500);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể xác nhận nhận hàng.', 'warning');
+    } finally { setIsSaving(false); }
   };
 
   return (
@@ -524,6 +500,7 @@ export const ReceiveTransferPage: React.FC = () => {
               type="button"
               className="btn-primary-teal"
               onClick={handleConfirm}
+              disabled={isSaving}
               style={{ justifyContent: 'center' }}
             >
               <Check size={15} /> Nhận hàng

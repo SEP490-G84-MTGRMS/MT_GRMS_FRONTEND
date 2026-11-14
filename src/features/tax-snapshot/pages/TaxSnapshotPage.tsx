@@ -16,7 +16,7 @@ import {
 import { AdminToast, type ToastState } from '../../admin/components';
 import { useTaxSnapshots } from '../hooks/useTaxSnapshots';
 import { TaxKPICards } from '../components/TaxKPICards';
-import { TaxSnapshotTable } from '../components/TaxSnapshotTable';
+import { TaxSnapshotsHistoryView } from '../components/TaxSnapshotsHistoryView';
 import { CreateTaxSnapshotModal } from '../components/CreateTaxSnapshotModal';
 import { TaxRateConfigModal } from '../components/TaxRateConfigModal';
 import { TaxSnapshotDetailDrawer } from '../components/TaxSnapshotDetailDrawer';
@@ -100,7 +100,7 @@ export const TaxSnapshotPage: FC = () => {
   };
 
   const handlePeriodTypeChange = (pType: TaxPeriodType) => {
-    const defaultNumber = pType === TaxPeriodType.Month ? 1 : pType === TaxPeriodType.Quarter ? 1 : 2026;
+    const defaultNumber = pType === TaxPeriodType.Month ? 1 : pType === TaxPeriodType.Quarter ? 1 : filterParams.year;
     setPeriod(pType, defaultNumber);
   };
 
@@ -108,7 +108,7 @@ export const TaxSnapshotPage: FC = () => {
     setPeriod(filterParams.periodType, num);
   };
 
-  const handleCreateSnapshot = async (req: CreateTaxSnapshotRequest) => {
+  const handleCreateSnapshot = async (req: CreateTaxSnapshotRequest): Promise<HouseholdTaxSnapshotDto> => {
     console.info('[TaxSnapshot] Dispatching finalization payload:', {
       year: req.year,
       periodType: req.periodType,
@@ -126,6 +126,7 @@ export const TaxSnapshotPage: FC = () => {
         message: `Chốt kỳ tính thuế thành công! Mã tham chiếu: ${result.id}`,
       });
       setActiveTab('history');
+      return result;
     } catch (err: any) {
       setToast({
         id: `toast-${Date.now()}`,
@@ -375,7 +376,7 @@ export const TaxSnapshotPage: FC = () => {
                   className="btn-primary-pill"
                 >
                   <Plus size={16} />
-                  <span>Chốt số kỳ {periodLabel}</span>
+                  <span>🔐 Chốt kỳ sổ {periodLabel} (3 bước)</span>
                 </button>
               )}
             </div>
@@ -425,10 +426,7 @@ export const TaxSnapshotPage: FC = () => {
           </div>
         )}
 
-        {/* 1. Top 5 KPI Cards (Placed immediately below Header per design convention) */}
-        <TaxKPICards summary={summary} isLoading={isSummaryLoading} />
-
-        {/* 2. 1 Billion Revenue Ruler (Compact status tracker directly below KPIs) */}
+        {/* 1. Thước đo ngưỡng 1 tỷ đồng/năm (Threshold Ruler đặt ở đầu trang theo quy định BTC) */}
         <ThresholdRuler
           currentYtdRevenue={summary?.annualAccumulatedRevenue ?? 0}
           threshold={summary?.taxExemptionThreshold ?? 1_000_000_000}
@@ -438,7 +436,10 @@ export const TaxSnapshotPage: FC = () => {
           householdGroup={summary?.householdGroup}
         />
 
-        {/* 3. Segmented Pill Tabs */}
+        {/* 2. Top 5 KPI Cards */}
+        <TaxKPICards summary={summary} isLoading={isSummaryLoading} />
+
+        {/* 3. 4 Standardized TT152 Segmented Tabs */}
         <div className="tax-segmented-tabs">
           <button
             type="button"
@@ -446,7 +447,7 @@ export const TaxSnapshotPage: FC = () => {
             onClick={() => setActiveTab('declaration')}
           >
             <Calculator size={16} />
-            <span>Tờ khai & Phương pháp tính</span>
+            <span>Tờ khai 01/CNKD</span>
           </button>
 
           <button
@@ -455,7 +456,7 @@ export const TaxSnapshotPage: FC = () => {
             onClick={() => setActiveTab('books')}
           >
             <BookOpen size={16} />
-            <span>Sổ kế toán HKD</span>
+            <span>7 Sổ kế toán TT152</span>
           </button>
 
           <button
@@ -464,7 +465,7 @@ export const TaxSnapshotPage: FC = () => {
             onClick={() => setActiveTab('history')}
           >
             <History size={16} />
-            <span>Lịch sử các kỳ đã chốt ({snapshots.length})</span>
+            <span>Chốt sổ bất biến (HMAC) ({snapshots.length})</span>
           </button>
 
           <button
@@ -473,7 +474,7 @@ export const TaxSnapshotPage: FC = () => {
             onClick={() => setActiveTab('analytics')}
           >
             <BarChart3 size={16} />
-            <span>Phân tích & Tiến độ năm</span>
+            <span>Phân tích 4 Quý</span>
           </button>
         </div>
 
@@ -484,9 +485,9 @@ export const TaxSnapshotPage: FC = () => {
             calculationMethod={filterParams.calculationMethod}
             onSelectCalculationMethod={setCalculationMethod}
             applyVatReduction={Boolean(filterParams.applyVatReduction2026)}
-          customVatRate={filterParams.customVatRate}
-          customPitRate={filterParams.customPitRate}
-          vatReductionPercentage={filterParams.vatReductionPercentage}
+            customVatRate={filterParams.customVatRate}
+            customPitRate={filterParams.customPitRate}
+            vatReductionPercentage={filterParams.vatReductionPercentage}
             onOpenRateConfig={() => setIsRateConfigOpen(true)}
             onToggleVatReduction={setApplyVatReduction}
             isLoading={isSummaryLoading}
@@ -503,11 +504,12 @@ export const TaxSnapshotPage: FC = () => {
           />
         )}
 
-        {/* Tab 3: Historical Snapshots Table */}
+        {/* Tab 3: Historical Snapshots Table (Bản chụp chốt sổ bất biến HMAC-SHA256) */}
         {activeTab === 'history' && (
-          <TaxSnapshotTable
+          <TaxSnapshotsHistoryView
             snapshots={snapshots as any}
             isLoading={isSnapshotsLoading}
+            onOpenSealWizard={() => setIsCreateOpen(true)}
             onViewDetail={(snap: any) => {
               setSelectedSnapshot(snap);
               setIsDrawerOpen(true);
@@ -516,9 +518,6 @@ export const TaxSnapshotPage: FC = () => {
               setSelectedSnapshot(snap);
               setIsExportOpen(true);
             }}
-            onFinalize={() => {}}
-            onMarkPaid={() => {}}
-            onDelete={() => {}}
           />
         )}
 
@@ -583,6 +582,10 @@ export const TaxSnapshotPage: FC = () => {
           setSelectedSnapshot(null);
         }}
         snapshot={selectedSnapshot}
+        onExport={(snap) => {
+          setSelectedSnapshot(snap);
+          setIsExportOpen(true);
+        }}
       />
 
       {/* Export Modal */}

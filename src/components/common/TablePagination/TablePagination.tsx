@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import { type FC, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { generatePaginationRange } from './pagination.utils';
 import './TablePagination.css';
@@ -30,9 +30,17 @@ export const TablePagination: FC<TablePaginationProps> = ({
   className = '',
 }) => {
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  const fromItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const toItem = Math.min(currentPage * pageSize, totalItems);
-  const paginationRange = generatePaginationRange(currentPage, totalPages);
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const fromItem = totalItems === 0 ? 0 : Math.min((safeCurrentPage - 1) * pageSize + 1, totalItems);
+  const toItem = Math.min(safeCurrentPage * pageSize, totalItems);
+  const paginationRange = generatePaginationRange(safeCurrentPage, totalPages);
+
+  // Automatically reset to last valid page if out of bounds due to external filter changes
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages >= 1) {
+      onPageChange(totalPages);
+    }
+  }, [currentPage, totalPages, onPageChange]);
 
   const handlePageChange = (targetPage: number) => {
     if (targetPage >= 1 && targetPage <= totalPages && targetPage !== currentPage && !isLoading) {

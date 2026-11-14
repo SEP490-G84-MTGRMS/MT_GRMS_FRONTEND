@@ -1,6 +1,7 @@
 import type { FC } from 'react';
-import { Lock, Store, Building2 } from 'lucide-react';
+import { Lock, Store, Building2, Check, ArrowRight } from 'lucide-react';
 import type { CashAccount } from '../types/cashbook.types';
+import { formatMoney } from '../../finance/utils/formatters';
 
 interface CashAccountsCardSectionProps {
   accounts: CashAccount[];
@@ -19,28 +20,34 @@ export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
     <div className="cash-accounts-grid">
       {accounts.map((acc) => {
         const isSelected = selectedAccountId === acc.id;
-        const isSafe = acc.isSafeDeposit || acc.id === 'ACC-SAFE';
+        const isSafe = acc.isSafeDeposit || acc.id === 'ACC-SAFE' || acc.accountName.includes('Két sắt');
         const isCash = acc.accountType === 'CASH' && !isSafe;
         const isBank = acc.accountType === 'BANK';
 
         let badgeBg = '#E0F2FE';
         let badgeColor = '#0369A1';
-        let badgeLabel = 'Két tiền quầy';
-        let badgeIcon = <Store size={14} />;
+        let badgeLabel = 'Két quầy thu ngân';
+        let badgeIcon = <Store size={15} />;
         let borderHighlight = isSelected ? '#0284C7' : '#E2E8F0';
+        let statusText = 'Đang hoạt động (Thu ngân)';
+        let statusDotColor = '#10B981';
 
         if (isSafe) {
           badgeBg = '#FEF3C7';
           badgeColor = '#B45309';
-          badgeLabel = 'Két sắt của chủ shop';
-          badgeIcon = <Lock size={14} />;
+          badgeLabel = 'Két sắt chủ shop';
+          badgeIcon = <Lock size={15} />;
           if (isSelected) borderHighlight = '#D97706';
+          statusText = 'Bảo mật (Chủ shop & KTT)';
+          statusDotColor = '#F59E0B';
         } else if (isBank) {
           badgeBg = '#CCFBF1';
           badgeColor = '#0F766E';
-          badgeLabel = acc.isDefault ? 'TK chính (VietQR)' : 'Tài khoản ngân hàng phụ';
-          badgeIcon = <Building2 size={14} />;
+          badgeLabel = acc.isDefault ? 'Ngân hàng VietQR' : 'Tài khoản ngân hàng';
+          badgeIcon = <Building2 size={15} />;
           if (isSelected) borderHighlight = '#0D9488';
+          statusText = 'Online Banking 24/7 (Sẵn sàng)';
+          statusDotColor = '#0F766E';
         }
 
         return (
@@ -52,150 +59,165 @@ export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
             tabIndex={0}
             style={{
               borderColor: borderHighlight,
-              boxShadow: isSelected ? '0 4px 12px rgba(0, 0, 0, 0.08)' : undefined,
+              boxShadow: isSelected
+                ? '0 6px 16px rgba(15, 118, 110, 0.12)'
+                : '0 1px 3px rgba(0, 0, 0, 0.04)',
               position: 'relative',
-              background: isSafe ? 'linear-gradient(180deg, #FFFFFF 0%, #FFFDF7 100%)' : '#FFFFFF',
+              background: isSelected
+                ? '#FFFFFF'
+                : isSafe
+                ? 'linear-gradient(180deg, #FFFFFF 0%, #FFFDF7 100%)'
+                : '#FFFFFF',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
             }}
           >
+            {/* Header: Type Badge & Active Filter Indicator */}
             <div className="account-card-header">
               <span
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '5px',
+                  gap: '6px',
                   backgroundColor: badgeBg,
                   color: badgeColor,
-                  padding: '4px 10px',
+                  padding: '4px 12px',
                   borderRadius: '9999px',
-                  fontSize: '0.75rem',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
                 }}
               >
                 {badgeIcon}
                 <span>{badgeLabel}</span>
               </span>
-              <span className="account-branch-name">{acc.branchName}</span>
+
+              {isSelected ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    backgroundColor: '#CCFBF1',
+                    color: '#0F766E',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                  }}
+                >
+                  <Check size={12} strokeWidth={3} />
+                  <span>Đang lọc</span>
+                </span>
+              ) : (
+                <span className="account-branch-name" style={{ fontSize: '11.5px', color: '#64748B' }}>
+                  {acc.branchName}
+                </span>
+              )}
             </div>
 
+            {/* Account Title & Bank/Safe Details */}
             <div>
-              <h3 className="account-card-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>{acc.accountName}</span>
+              <h3 className="account-card-name" style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 4px' }}>
+                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1E293B' }}>{acc.accountName}</span>
               </h3>
               {acc.bankName && acc.accountNumber && (
-                <p className="account-card-detail">
-                  {acc.bankName} - <span style={{ fontFamily: 'monospace' }}>{acc.accountNumber}</span>
+                <p className="account-card-detail" style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
+                  {acc.bankName} - <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{acc.accountNumber}</span>
                 </p>
               )}
               {isSafe && (
-                <p className="account-card-detail" style={{ color: '#92400E' }}>
-                  Phân quyền: Chỉ chủ shop & kế toán trưởng
+                <p className="account-card-detail" style={{ margin: 0, fontSize: '11.5px', color: '#92400E' }}>
+                  Chi nhánh: {acc.branchName}
+                </p>
+              )}
+              {isCash && (
+                <p className="account-card-detail" style={{ margin: 0, fontSize: '11.5px', color: '#475569' }}>
+                  Chi nhánh: {acc.branchName}
                 </p>
               )}
             </div>
 
-            <div className="account-card-balance-block">
-              <span className="account-balance-label">Số dư khả dụng</span>
+            {/* Balance Block */}
+            <div className="account-card-balance-block" style={{ marginTop: 'auto', paddingTop: 6 }}>
+              <span className="account-balance-label" style={{ fontSize: '11.5px', color: '#64748B', fontWeight: 600 }}>
+                Số dư khả dụng
+              </span>
               <span
-                className="account-balance-amount"
-                style={{ color: isSafe ? '#B45309' : isBank ? '#0F766E' : '#0284C7' }}
+                className="account-balance-amount tabular-nums"
+                style={{
+                  fontSize: '1.45rem',
+                  fontWeight: 800,
+                  color: isSafe ? '#B45309' : isBank ? '#0F766E' : '#0284C7',
+                }}
               >
-                {acc.currentBalance.toLocaleString('vi-VN')} {acc.currency}
+                {formatMoney(acc.currentBalance)}
               </span>
             </div>
 
-            {/* Executive monitoring indicators for Store Owner */}
-            {isCash && (
-              <div
-                style={{
-                  marginTop: '10px',
-                  paddingTop: '8px',
-                  borderTop: '1px dashed #E2E8F0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: '11px',
-                  color: '#64748B',
-                }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  <span
-                    style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      backgroundColor: '#10B981',
-                      display: 'inline-block',
+            {/* Bottom Status & Quick Reconcile */}
+            <div
+              style={{
+                marginTop: '8px',
+                paddingTop: '8px',
+                borderTop: '1px dashed #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                fontSize: '11px',
+                color: '#64748B',
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: statusDotColor,
+                    display: 'inline-block',
+                  }}
+                />
+                <span style={{ fontWeight: 500 }}>{statusText}</span>
+              </span>
+
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                {isCash && onOpenReconcileModal && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenReconcileModal(acc);
                     }}
-                  />
-                  <span>Thu ngân chi nhánh</span>
+                    style={{
+                      background: '#F0FDFA',
+                      border: '1px solid #99F6E4',
+                      color: '#0F766E',
+                      borderRadius: '6px',
+                      padding: '2px 8px',
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                    title="Đối soát kiểm đếm tiền mặt thực tế tại két"
+                  >
+                    Kiểm kê
+                  </button>
+                )}
+                <span
+                  style={{
+                    color: isSelected ? '#0F766E' : '#64748B',
+                    fontWeight: 600,
+                    fontSize: '11px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 2,
+                  }}
+                >
+                  <span>{isSelected ? 'Bỏ lọc' : 'Lọc sổ'}</span>
+                  <ArrowRight size={11} />
                 </span>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  {onOpenReconcileModal && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenReconcileModal(acc);
-                      }}
-                      style={{
-                        background: '#EFF6FF',
-                        border: '1px solid #BFDBFE',
-                        color: '#1D4ED8',
-                        borderRadius: '6px',
-                        padding: '2px 8px',
-                        fontSize: '10.5px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                      }}
-                      title="Đối soát kiểm đếm tiền mặt thực tế tại két"
-                    >
-                      Kiểm kê két
-                    </button>
-                  )}
-                  <span style={{ color: '#0284C7', fontWeight: 600 }}>Xem sổ quầy →</span>
-                </div>
               </div>
-            )}
-            {isSafe && (
-              <div
-                style={{
-                  marginTop: '10px',
-                  paddingTop: '8px',
-                  borderTop: '1px dashed #FDE68A',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: '11px',
-                  color: '#92400E',
-                }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  <Lock size={12} />
-                  <span>Két tổng chủ hộ</span>
-                </span>
-                <span style={{ fontWeight: 600 }}>Chủ shop quản lý</span>
-              </div>
-            )}
-            {isBank && (
-              <div
-                style={{
-                  marginTop: '10px',
-                  paddingTop: '8px',
-                  borderTop: '1px dashed #CCFBF1',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  fontSize: '11px',
-                  color: '#0F766E',
-                }}
-              >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  <Building2 size={12} />
-                  <span>Online Banking</span>
-                </span>
-                <span style={{ fontWeight: 600 }}>Chi / Nộp thuế</span>
-              </div>
-            )}
+            </div>
           </div>
         );
       })}

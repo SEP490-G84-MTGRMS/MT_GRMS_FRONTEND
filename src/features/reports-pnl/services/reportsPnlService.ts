@@ -43,12 +43,116 @@ export const MOCK_BRANCHES: BranchOption[] = [
   { id: '01a188b1-f1b0-7640-ad7c-a1dc16e62220', code: 'CN-03', name: 'Chi nhánh Thủ Đức' },
 ];
 
+export const TAX_RATE_STORAGE_KEY = 'mt_grms_tax_rate_config';
+
+export interface StoredTaxRates {
+  customVatRate?: number | null;
+  customPitRate?: number | null;
+  vatReductionPercentage?: number | null;
+  applyVatReduction2026?: boolean;
+}
+
+export interface PnlTaxRateConfig {
+  customVatRate: number;
+  customPitRate: number;
+  applyVatReduction2026: boolean;
+  vatReductionPercentage: number;
+  effectiveVatRate: number;
+  effectiveTotalRatePct: number;
+}
+
+/**
+ * Loads raw tax rate configuration from localStorage (shared with Tax Snapshot).
+ * @returns Stored tax rates object or empty object on failure.
+ */
+export function loadStoredTaxRates(): StoredTaxRates {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem(TAX_RATE_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    }
+  } catch (err) {
+    console.warn('Failed to parse tax rate config from localStorage:', err);
+  }
+  return {};
+}
+
+/**
+ * Saves tax rate configuration to localStorage.
+ * @param rates - Configuration object containing tax rates and reduction flags.
+ */
+export function saveStoredTaxRates(rates: StoredTaxRates): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(TAX_RATE_STORAGE_KEY, JSON.stringify(rates));
+    }
+  } catch (err) {
+    console.warn('Failed to save tax rate config to localStorage:', err);
+  }
+}
+
+/**
+ * Clears custom tax rate configuration from localStorage.
+ */
+export function clearStoredTaxRates(): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(TAX_RATE_STORAGE_KEY);
+    }
+  } catch (err) {
+    console.warn('Failed to clear tax rate config from localStorage:', err);
+  }
+}
+
+/**
+ * Resolves effective tax rates for household business (HKD).
+ * Default rates: VAT 1.0%, PIT 0.5% (Total 1.5%).
+ * When applyVatReduction2026 is true (Resolution 204/2025/QH15 & Decree 141/2026/ND-CP),
+ * VAT is reduced by vatReductionPercentage (default 20%), yielding effective VAT 0.8% and total 1.3%.
+ * @returns Fully computed effective tax configuration.
+ */
+export function getTaxRateConfig(): PnlTaxRateConfig {
+  const stored = loadStoredTaxRates();
+  const customVatRate =
+    typeof stored.customVatRate === 'number' && !isNaN(stored.customVatRate)
+      ? stored.customVatRate
+      : 1.0;
+  const customPitRate =
+    typeof stored.customPitRate === 'number' && !isNaN(stored.customPitRate)
+      ? stored.customPitRate
+      : 0.5;
+  const applyVatReduction2026 = Boolean(stored.applyVatReduction2026);
+  const vatReductionPercentage =
+    typeof stored.vatReductionPercentage === 'number' && !isNaN(stored.vatReductionPercentage)
+      ? stored.vatReductionPercentage
+      : 20;
+
+  const effectiveVatRate = applyVatReduction2026
+    ? Math.round(customVatRate * (1 - vatReductionPercentage / 100) * 10000) / 10000
+    : customVatRate;
+  const effectiveTotalRatePct = Math.round((effectiveVatRate + customPitRate) * 10000) / 10000;
+
+  return {
+    customVatRate,
+    customPitRate,
+    applyVatReduction2026,
+    vatReductionPercentage,
+    effectiveVatRate,
+    effectiveTotalRatePct,
+  };
+}
+
 /**
  * Builds P&L tree dynamically from financial figures and real expense categories.
+ * @param kpi - Aggregated KPI summary figures.
+ * @param liveCategories - Raw list of operating expense categories.
+ * @param taxConfig - Dynamic tax configuration (defaults to getTaxRateConfig()).
+ * @returns Hierarchical P&L statement line items.
  */
 export function buildPnlStatementTree(
   kpi: KpiSummaryData,
-  liveCategories: Array<{ category: string; amount: number; percentageOfRevenue?: number }> = []
+  liveCategories: Array<{ category: string; amount: number; percentageOfRevenue?: number }> = [],
+  taxConfig: PnlTaxRateConfig = getTaxRateConfig()
 ): PnlLineItem[] {
   const rev = kpi.netRevenue;
 
@@ -120,7 +224,7 @@ export function buildPnlStatementTree(
             {
               id: 'item-1-2-2',
               code: '1.2.b',
-              title: 'Hàng bán bị trả lại & Hoàn tiền (FE-13)',
+              title: 'Hàng bán bị trả lại & Hoàn tiền',
               level: 3,
               amount: kpi.returns,
               percentageOfNetRevenue: calculateMarginPct(kpi.returns, rev),
@@ -161,8 +265,8 @@ export function buildPnlStatementTree(
     },
     {
       id: 'total-gross-profit',
-      code: 'GP',
-      title: 'LỢI NHUẬN GỘP VỀ BÁN HÀNG (DOANH THU THUẦN - COGS)',
+      code: 'III',
+      title: 'III. LỢI NHUẬN GỘP VỀ BÁN HÀNG (DOANH THU THUẦN - COGS)',
       level: 1,
       amount: kpi.grossProfit,
       percentageOfNetRevenue: kpi.grossMarginPct,
@@ -170,8 +274,8 @@ export function buildPnlStatementTree(
     },
     {
       id: 'sec-3',
-      code: 'III',
-      title: 'III. CHI PHÍ VẬN HÀNH & HAO HỤT',
+      code: 'IV',
+      title: 'IV. CHI PHÍ HOẠT ĐỘNG & HAO HỤT',
       level: 1,
       amount: kpi.operatingExpenses + kpi.shrinkageLoss,
       percentageOfNetRevenue: calculateMarginPct(kpi.operatingExpenses + kpi.shrinkageLoss, rev),
@@ -180,7 +284,7 @@ export function buildPnlStatementTree(
         {
           id: 'item-3-1',
           code: '3.1',
-          title: 'Tổn thất xóa nợ xấu / Hao hụt kho (FE-06 / FE-08)',
+          title: 'Tổn thất xóa nợ xấu / Hao hụt kho',
           level: 2,
           amount: kpi.shrinkageLoss,
           percentageOfNetRevenue: calculateMarginPct(kpi.shrinkageLoss, rev),
@@ -189,7 +293,7 @@ export function buildPnlStatementTree(
         {
           id: 'item-3-2',
           code: '3.2',
-          title: 'Chi phí dịch vụ vận hành ngoài (FE-07)',
+          title: 'Chi phí dịch vụ vận hành ngoài',
           level: 2,
           amount: kpi.operatingExpenses,
           percentageOfNetRevenue: calculateMarginPct(kpi.operatingExpenses, rev),
@@ -200,8 +304,8 @@ export function buildPnlStatementTree(
     },
     {
       id: 'total-net-profit',
-      code: 'EBT',
-      title: 'III. LỢI NHUẬN VẬN HÀNH TRƯỚC THUẾ (LÃI GỘP - CHI PHÍ VẬN HÀNH)',
+      code: 'V',
+      title: 'V. LỢI NHUẬN THUẦN TRƯỚC THUẾ (LÃI GỘP - CHI PHÍ HOẠT ĐỘNG)',
       level: 1,
       amount: kpi.netProfit,
       percentageOfNetRevenue: kpi.netMarginPct,
@@ -209,37 +313,41 @@ export function buildPnlStatementTree(
     },
     {
       id: 'sec-4-tax',
-      code: 'IV',
-      title: 'IV. NGHĨA VỤ THUẾ HỘ KINH DOANH (THÔNG TƯ 40 & TT 152/2025/TT-BTC)',
+      code: 'VI',
+      title: taxConfig.applyVatReduction2026
+        ? `VI. NGHĨA VỤ THUẾ HỘ KINH DOANH (THÔNG TƯ 40 & NĐ 141/2026/NĐ-CP GIẢM ${taxConfig.vatReductionPercentage}% VAT)`
+        : 'VI. NGHĨA VỤ THUẾ HỘ KINH DOANH (THÔNG TƯ 40 & TT 152/2025/TT-BTC)',
       level: 1,
       amount: kpi.estimatedTaxAmount,
-      percentageOfNetRevenue: rev > 0 ? 1.5 : 0,
+      percentageOfNetRevenue: rev > 0 ? taxConfig.effectiveTotalRatePct : 0,
       isNegative: true,
       children: [
         {
           id: 'item-4-1',
           code: '4.1',
-          title: 'Thuế Giá trị gia tăng (VAT 1.0% phân phối hàng hóa)',
+          title: taxConfig.applyVatReduction2026
+            ? `Thuế Giá trị gia tăng (VAT ${taxConfig.effectiveVatRate % 1 === 0 ? taxConfig.effectiveVatRate.toFixed(1) : taxConfig.effectiveVatRate}% phân phối hàng hóa - đã giảm ${taxConfig.vatReductionPercentage}%)`
+            : `Thuế Giá trị gia tăng (VAT ${taxConfig.effectiveVatRate % 1 === 0 ? taxConfig.effectiveVatRate.toFixed(1) : taxConfig.effectiveVatRate}% phân phối hàng hóa)`,
           level: 2,
-          amount: Math.round(rev * 0.01),
-          percentageOfNetRevenue: rev > 0 ? 1.0 : 0,
+          amount: Math.round(rev * (taxConfig.effectiveVatRate / 100)),
+          percentageOfNetRevenue: rev > 0 ? taxConfig.effectiveVatRate : 0,
           isNegative: true,
         },
         {
           id: 'item-4-2',
           code: '4.2',
-          title: 'Thuế Thu nhập cá nhân (PIT 0.5% hộ kinh doanh)',
+          title: `Thuế Thu nhập cá nhân (PIT ${taxConfig.customPitRate % 1 === 0 ? taxConfig.customPitRate.toFixed(1) : taxConfig.customPitRate}% hộ kinh doanh)`,
           level: 2,
-          amount: Math.round(rev * 0.005),
-          percentageOfNetRevenue: rev > 0 ? 0.5 : 0,
+          amount: Math.round(rev * (taxConfig.customPitRate / 100)),
+          percentageOfNetRevenue: rev > 0 ? taxConfig.customPitRate : 0,
           isNegative: true,
         },
       ],
     },
     {
       id: 'total-final-net-profit',
-      code: 'NP-AT',
-      title: 'V. LỢI NHUẬN RÒNG SAU THUẾ THỰC NHẬN CỦA CHỦ TIỆM',
+      code: 'VII',
+      title: 'VII. LỢI NHUẬN RÒNG SAU THUẾ THỰC NHẬN CỦA CHỦ TIỆM',
       level: 1,
       amount: kpi.netProfitAfterTax,
       percentageOfNetRevenue: kpi.netProfitAfterTaxMarginPct,
@@ -399,8 +507,11 @@ export const reportsPnlService = {
           financeHttpClient.get('/finance/reports/pnl/comparison', { params: queryParams }).catch(() => null),
         ]);
 
-        if (summaryRes.data?.data) {
-          const s = summaryRes.data.data;
+        if (!summaryRes.data?.data) {
+          throw new Error('Dữ liệu báo cáo Lãi Lỗ trả về không hợp lệ từ máy chủ.');
+        }
+
+        const s = summaryRes.data.data;
           const grossSales = Number(s.grossRevenue || 0);
           const discounts = Number(s.discounts || 0);
           const returns = Number(s.salesReturns || 0);
@@ -413,7 +524,8 @@ export const reportsPnlService = {
           const netProfit = Number(s.netProfit || 0);
           const netMarginPct = Number(s.netMarginPercentage || 0);
 
-          const estimatedTaxAmount = Math.round(netRevenue * 0.015);
+          const taxConfig = getTaxRateConfig();
+          const estimatedTaxAmount = Math.round(netRevenue * (taxConfig.effectiveTotalRatePct / 100));
           const netProfitAfterTax = netProfit - estimatedTaxAmount;
           const netProfitAfterTaxMarginPct = calculateMarginPct(netProfitAfterTax, netRevenue);
 
@@ -512,7 +624,7 @@ export const reportsPnlService = {
           };
 
           const rawCategories = s.operatingExpenses?.categories || [];
-          const pnlTree = buildPnlStatementTree(liveKpiSummary, rawCategories);
+          const pnlTree = buildPnlStatementTree(liveKpiSummary, rawCategories, taxConfig);
           const expenseBreakdown = buildLiveExpenseBreakdown(rawCategories, operatingExpenses, shrinkageLoss);
 
           let trendData: PnlTrendPoint[] = [];
@@ -554,7 +666,6 @@ export const reportsPnlService = {
             expenseBreakdown,
             topProducts,
           };
-        }
       } catch (err) {
         console.error('[reportsPnlService] Lỗi khi tải dữ liệu P&L từ API Backend:', err);
         throw new Error('Không thể tải báo cáo Lãi Lỗ từ máy chủ. Vui lòng kiểm tra kết nối hoặc thử lại sau.');
@@ -594,7 +705,8 @@ export const reportsPnlService = {
     const totalOrders = Math.round(netRevenue / 285000);
     const averageOrderValue = totalOrders > 0 ? Math.round(netRevenue / totalOrders) : 0;
 
-    const estimatedTaxAmount = Math.round(netRevenue * 0.015);
+    const taxConfig = getTaxRateConfig();
+    const estimatedTaxAmount = Math.round(netRevenue * (taxConfig.effectiveTotalRatePct / 100));
     const netProfitAfterTax = netProfit - estimatedTaxAmount;
     const netProfitAfterTaxMarginPct = calculateMarginPct(netProfitAfterTax, netRevenue);
 
@@ -652,7 +764,7 @@ export const reportsPnlService = {
       },
     ];
 
-    const pnlTree = buildPnlStatementTree(kpiSummary, testCategories);
+    const pnlTree = buildPnlStatementTree(kpiSummary, testCategories, taxConfig);
     const expenseBreakdown = buildLiveExpenseBreakdown(testCategories, operatingExpenses, shrinkageLoss);
 
     const trendPointsCount = daysCount === 1 ? 7 : Math.min(daysCount, 14);

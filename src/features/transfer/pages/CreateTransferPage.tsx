@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,7 +11,8 @@ import {
   Save,
 } from 'lucide-react';
 import type { TransferItem, BatchItem } from '../types';
-import { INITIAL_BRANCHES, AVAILABLE_TRANSFER_PRODUCTS } from '../services/mockData';
+import type { Branch } from '../types';
+import { getTransferErrorMessage, transferService } from '../services/transferService';
 import { SelectBatchModal } from '../components/SelectBatchModal';
 import { ImportTransferExcelModal } from '../components/ImportTransferExcelModal';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -21,39 +22,14 @@ export const CreateTransferPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Branch Selection
-  const [fromBranchId, setFromBranchId] = useState('1'); // Kho chính (Trung tâm)
-  const [toBranchId, setToBranchId] = useState('2'); // Chi nhánh HCM
-  const [transferCode] = useState(''); // Tự động
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [products, setProducts] = useState<TransferItem[]>([]);
+  const [fromBranchId, setFromBranchId] = useState('');
+  const [toBranchId, setToBranchId] = useState('');
   const [note, setNote] = useState('');
 
   // Items in current transfer order
-  const [items, setItems] = useState<TransferItem[]>([
-    {
-      ...AVAILABLE_TRANSFER_PRODUCTS[0],
-      productCode: 'SP652379',
-      productName: 'Bình hoa decor',
-      unitName: 'Cái',
-      onHandSender: 23,
-      onHandReceiver: 0,
-      sentQty: 5,
-      unitPrice: 200000,
-      amount: 1000000,
-    },
-    {
-      ...AVAILABLE_TRANSFER_PRODUCTS[2],
-      productCode: 'SP000093',
-      productName: 'Sữa tươi tiệt trùng',
-      unitName: 'Thùng',
-      onHandSender: 10,
-      onHandReceiver: 0,
-      sentQty: 10,
-      unitPrice: 200000,
-      amount: 2000000,
-      hasBatchManagement: true,
-      batchNumber: 'SX010925',
-      expiryDate: '02/03/2026',
-    },
-  ]);
+  const [items, setItems] = useState<TransferItem[]>([]);
 
   // Product Search to add
   const [searchKw, setSearchKw] = useState('');
@@ -62,6 +38,48 @@ export const CreateTransferPage: React.FC = () => {
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    transferService.branches().then((result) => {
+      setBranches(result);
+      if (result.length > 0) setFromBranchId(result[0].id);
+      if (result.length > 1) setToBranchId(result[1].id);
+    }).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không tải được chi nhánh.', 'warning'));
+  }, []);
+
+  useEffect(() => {
+    if (!fromBranchId) { setProducts([]); return; }
+    transferService.products(fromBranchId).then(setProducts).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không tải được tồn kho chi nhánh.', 'warning'));
+  }, [fromBranchId]);
+
+  useEffect(() => {
+    if (!fromBranchId || !products.length) return;
+    transferService.batches(fromBranchId).then((batches) => {
+      const withBatches = (product: TransferItem): TransferItem => {
+        const ownBatches = batches.filter((batch) => batch.productId === product.productId);
+        return {
+          ...product,
+          hasBatchManagement: ownBatches.some((batch) => Boolean(batch.batchNumber)),
+          batches: ownBatches.map((batch) => ({
+            id: batch.id,
+            batchNumber: batch.batchNumber,
+            expiryDate: batch.expiryDate,
+            onHand: batch.onHand,
+          })),
+        };
+      };
+      setProducts((current) => current.map(withBatches));
+      setItems((current) => current.map((item) => {
+        const updated = withBatches(item);
+        return {
+          ...updated,
+          batchNumber: item.batchNumber,
+          expiryDate: item.expiryDate,
+        };
+      }));
+    }).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không tải được tồn kho theo lô.', 'warning'));
+  }, [fromBranchId, products.length]);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
@@ -69,7 +87,7 @@ export const CreateTransferPage: React.FC = () => {
   };
 
   // Filter available products to add
-  const searchResults = AVAILABLE_TRANSFER_PRODUCTS.filter(
+  const searchResults = products.filter(
     (p) =>
       p.productName.toLowerCase().includes(searchKw.trim().toLowerCase()) ||
       p.productCode.toLowerCase().includes(searchKw.trim().toLowerCase())
@@ -91,7 +109,8 @@ export const CreateTransferPage: React.FC = () => {
   };
 
   const handleUpdateQty = (id: string, qty: number) => {
-    if (qty < 1) return;
+    const item = items.find((line) => line.id === id);
+    if (qty < 1 || (item && qty > item.onHandSender)) { showToast('Số lượng chuyển vượt tồn khả dụng.', 'warning'); return; }
     setItems(
       items.map((it) =>
         it.id === id ? { ...it, sentQty: qty, amount: qty * it.unitPrice } : it
@@ -105,6 +124,7 @@ export const CreateTransferPage: React.FC = () => {
 
   const handleSelectBatch = (batch: BatchItem, qty: number) => {
     if (!batchModalItem) return;
+    if (qty < 1 || qty > batch.onHand) { showToast('Số lượng vượt tồn của lô đã chọn.', 'warning'); return; }
     setItems(
       items.map((it) =>
         it.id === batchModalItem.id
@@ -124,22 +144,40 @@ export const CreateTransferPage: React.FC = () => {
   const totalQty = items.reduce((sum, it) => sum + it.sentQty, 0);
   const totalAmount = items.reduce((sum, it) => sum + it.amount, 0);
 
-  const handleSubmit = (status: 'Draft' | 'In-Transit') => {
+  const handleSubmit = async (status: 'Draft' | 'In-Transit') => {
     if (items.length === 0) {
       showToast('Vui lòng thêm ít nhất một mặt hàng để tạo phiếu chuyển!', 'warning');
       return;
     }
-    if (fromBranchId === toBranchId) {
+    if (!fromBranchId || !toBranchId || fromBranchId === toBranchId) {
       showToast('Chi nhánh gửi và chi nhánh nhận không được trùng nhau!', 'warning');
       return;
     }
 
-    const actionText = status === 'Draft' ? 'Lưu tạm' : 'Hoàn thành và xuất chuyển';
-    showToast(`Đã ${actionText} phiếu chuyển hàng thành công!`);
+    if (status === 'In-Transit') {
+      const itemMissingBatch = items.find(
+        (item) => (item.hasBatchManagement || (item.batches && item.batches.length > 0)) && (!item.batchNumber?.trim() || !item.expiryDate?.trim())
+      );
+      if (itemMissingBatch) {
+        if (itemMissingBatch.batches?.length) setBatchModalItem(itemMissingBatch);
+        showToast(
+          `Vui lòng chọn lô hàng và hạn sử dụng chính xác cho "${itemMissingBatch.productName}" trước khi hoàn thành phiếu.`,
+          'warning',
+        );
+        return;
+      }
+    }
 
-    setTimeout(() => {
-      navigate('/store-owner/transfers');
-    }, 1200);
+    setIsSaving(true);
+    try {
+      await transferService.create({ fromBranchId, toBranchId, dispatchNow: status === 'In-Transit', note, items });
+      showToast(status === 'Draft' ? 'Đã lưu phiếu nháp.' : 'Đã xuất chuyển phiếu thành công.');
+      setTimeout(() => navigate('/store-owner/transfers'), 500);
+    } catch (error) {
+      showToast(getTransferErrorMessage(error), 'warning');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -341,7 +379,7 @@ export const CreateTransferPage: React.FC = () => {
                       </div>
 
                       {/* Thông tin Lô & Link chọn lô khác */}
-                      {it.hasBatchManagement && (
+                      {(it.hasBatchManagement || Boolean(it.batches?.length)) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                           <span
                             style={{
@@ -464,9 +502,9 @@ export const CreateTransferPage: React.FC = () => {
             <select
               className="filter-select"
               value={fromBranchId}
-              onChange={(e) => setFromBranchId(e.target.value)}
+              onChange={(e) => { setFromBranchId(e.target.value); setItems([]); }}
             >
-              {INITIAL_BRANCHES.map((b) => (
+              {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                 </option>
@@ -483,7 +521,7 @@ export const CreateTransferPage: React.FC = () => {
               type="text"
               className="filter-input"
               placeholder="Mã phiếu tự động"
-              value={transferCode}
+              value="Tự động cấp khi lưu"
               readOnly
               style={{ backgroundColor: '#f8fafc' }}
             />
@@ -511,7 +549,7 @@ export const CreateTransferPage: React.FC = () => {
               value={toBranchId}
               onChange={(e) => setToBranchId(e.target.value)}
             >
-              {INITIAL_BRANCHES.map((b) => (
+              {branches.filter((b) => b.id !== fromBranchId).map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                 </option>
@@ -558,6 +596,7 @@ export const CreateTransferPage: React.FC = () => {
             <button
               type="button"
               className="btn-secondary-white"
+              disabled={isSaving}
               onClick={() => handleSubmit('Draft')}
               style={{ justifyContent: 'center' }}
             >
@@ -567,6 +606,7 @@ export const CreateTransferPage: React.FC = () => {
             <button
               type="button"
               className="btn-primary-teal"
+              disabled={isSaving}
               onClick={() => handleSubmit('In-Transit')}
               style={{ justifyContent: 'center' }}
             >
@@ -592,8 +632,33 @@ export const CreateTransferPage: React.FC = () => {
       <ImportTransferExcelModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
-        onConfirmUpload={(fileName) => {
-          showToast(`Đã nạp thành công dữ liệu từ file Excel: ${fileName}`);
+        onConfirmUpload={(rows) => {
+          const additions: TransferItem[] = [];
+          const missing: string[] = [];
+          for (const row of rows) {
+            const product = products.find((candidate) => candidate.productCode.toLowerCase() === row.productCode.toLowerCase());
+            if (!product) { missing.push(row.productCode); continue; }
+            const existing = items.find((item) => item.productId === product.productId) ?? additions.find((item) => item.productId === product.productId);
+            if (existing) {
+              const quantity = existing.sentQty + row.quantity;
+              if (quantity > product.onHandSender) { missing.push(`${row.productCode} (vượt tồn)`); continue; }
+              existing.sentQty = quantity;
+              existing.amount = quantity * existing.unitPrice;
+            } else {
+              if (row.quantity > product.onHandSender) { missing.push(`${row.productCode} (vượt tồn)`); continue; }
+              additions.push({ ...product, sentQty: row.quantity, amount: row.quantity * product.unitPrice });
+            }
+          }
+          setItems((current) => {
+            const next = [...current];
+            for (const added of additions) {
+              const existing = next.find((item) => item.productId === added.productId);
+              if (existing) { existing.sentQty = added.sentQty; existing.amount = added.amount; }
+              else next.push(added);
+            }
+            return next;
+          });
+          showToast(missing.length ? `Đã nhập một phần. Không hợp lệ: ${missing.join(', ')}` : `Đã thêm ${rows.length} dòng sản phẩm từ Excel.`, missing.length ? 'warning' : 'success');
         }}
       />
     </div>

@@ -49,6 +49,24 @@ describe('customerApi Live Neon Integration Tests', () => {
       expect(result).toEqual(mockList);
     });
 
+    it('should omit debtStatus param when DEBT is specified to support client-side filtering', async () => {
+      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
+        data: { success: true, data: [] },
+      } as any);
+
+      await customerApi.getCustomers({
+        debtStatus: 'DEBT',
+      });
+
+      expect(financeHttpClient.get).toHaveBeenCalledWith('/customers', {
+        params: {
+          search: undefined,
+          tier: undefined,
+          debtStatus: undefined,
+        },
+      });
+    });
+
     it('should throw error when server returns success = false', async () => {
       vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
         data: { success: false, message: 'Server database error' },
@@ -320,6 +338,34 @@ describe('customerApi Live Neon Integration Tests', () => {
       expect(config.amount).toBe(500000);
       expect(config.description).toBe('THUNO 0901234567');
       expect(config.qrDataUrl).toContain('img.vietqr.io');
+    });
+  });
+
+  describe('getKpiSummary', () => {
+    it('should call /customers/debts/summary endpoint and return summary data', async () => {
+      const mockSummary = {
+        totalCustomers: 45,
+        totalDebtAR: 82700000,
+        overLimitCount: 3,
+        totalLoyaltyPoints: 12500,
+      };
+
+      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
+        data: { success: true, data: mockSummary },
+      } as any);
+
+      const res = await customerApi.getKpiSummary();
+
+      expect(financeHttpClient.get).toHaveBeenCalledWith('/customers/debts/summary');
+      expect(res).toEqual(mockSummary);
+    });
+
+    it('should throw error when getKpiSummary fails', async () => {
+      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
+        data: { success: false, message: 'Server down' },
+      } as any);
+
+      await expect(customerApi.getKpiSummary()).rejects.toThrow('Server down');
     });
   });
 });

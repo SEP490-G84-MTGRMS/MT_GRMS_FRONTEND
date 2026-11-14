@@ -57,13 +57,15 @@ function mapVoucherToExpenseDto(v: any): ServiceExpenseDto {
 
   return {
     expenseId: v.id || v.voucherCode,
-    branchId: v.branchId || 'BR-01',
+    voucherCode: v.voucherCode || v.id,
+    branchId: v.branchId || '',
     branchName: v.branchId ? `Chi nhánh ${String(v.branchId).substring(0, 8)}` : 'Toàn hệ thống',
     category: v.category || 'Other',
     amount: Number(v.amount || 0),
     status: statusStr,
+    approvalStatus: v.status || '',
     expenseDate: dateStr,
-    dueDate: dateStr,
+    dueDate: v.dueDate ? String(v.dueDate).substring(0, 10) : (v.paymentDueDate ? String(v.paymentDueDate).substring(0, 10) : ''),
     vendorName: v.beneficiaryName || 'Nhà cung cấp',
     cashBookId: v.paymentSourceAccountId || null,
     attachedBillUrl: v.evidenceAttachmentUrl || null,
@@ -101,16 +103,37 @@ export const getServiceExpenses = async (
   if (res.data?.data && Array.isArray(res.data.data)) {
     let items = res.data.data.map(mapVoucherToExpenseDto);
     if (params?.keyword) {
-      const q = params.keyword.toLowerCase();
+      const q = params.keyword.trim().toLowerCase();
       items = items.filter(
         (i) =>
+          (i.voucherCode && i.voucherCode.toLowerCase().includes(q)) ||
+          (i.invoiceNumber && i.invoiceNumber.toLowerCase().includes(q)) ||
+          i.expenseId.toLowerCase().includes(q) ||
           i.vendorName.toLowerCase().includes(q) ||
-          (i.note && i.note.toLowerCase().includes(q)) ||
-          i.expenseId.toLowerCase().includes(q)
+          (i.note && i.note.toLowerCase().includes(q))
       );
+    }
+    if (params?.category) {
+      const catLabel = EXPENSE_CATEGORY_LABELS[params.category] || params.category;
+      items = items.filter((i) => i.category === params.category || i.category === catLabel);
     }
     if (params?.status) {
       items = items.filter((i) => i.status === params.status);
+    }
+    if (params?.quickStatus && params.quickStatus !== 'ALL') {
+      if (params.quickStatus === 'PENDING_APPROVAL') {
+        items = items.filter(
+          (i) =>
+            i.approvalStatus === 'PendingApproval' ||
+            (i.status === 'Pending' && Boolean(i.isFlaggedAsSuspiciousSplit))
+        );
+      } else if (params.quickStatus === 'PENDING_PAYMENT') {
+        items = items.filter((i) => i.status === 'Pending');
+      } else if (params.quickStatus === 'PAID') {
+        items = items.filter((i) => i.status === 'Paid');
+      } else if (params.quickStatus === 'SUSPICIOUS') {
+        items = items.filter((i) => Boolean(i.isFlaggedAsSuspiciousSplit));
+      }
     }
     return {
       items,
@@ -156,7 +179,9 @@ export const getExpenseSummary = async (
         totalExpenseThisMonth: Number(s.totalAmount || 0),
         totalPendingAmount: Number(s.pendingApprovalAmount || 0),
         totalPaidAmount: Number(s.paidAmount || 0),
-        overdueCount: Number(s.suspiciousCount || 0),
+        overdueCount: 0,
+        suspiciousAmount: Number(s.suspiciousAmount || 0),
+        suspiciousCount: Number(s.suspiciousCount || 0),
       };
     }
   } catch {
@@ -168,6 +193,8 @@ export const getExpenseSummary = async (
     totalPendingAmount: 0,
     totalPaidAmount: 0,
     overdueCount: 0,
+    suspiciousAmount: 0,
+    suspiciousCount: 0,
   };
 };
 
@@ -224,13 +251,23 @@ export const payServiceExpense = async (
 ): Promise<ServiceExpenseDto> => {
   const idempotencyKey = typeof generateUuidV7 === 'function' ? generateUuidV7() : ('idemp-' + Date.now());
 
-  // Tự động approve nếu đang chờ duyệt
-  await financeHttpClient
-    .post(`/expenses/${expenseId}/approve`, {
+  // Poka-yoke: Phê duyệt phiếu chi trước khi xuất quỹ, bắt buộc xử lý lỗi rõ ràng không nuốt lỗi
+  try {
+    await financeHttpClient.post(`/expenses/${expenseId}/approve`, {
       expenseId,
-      note: 'Duyệt tự động trước khi xuất quỹ chi tiền',
-    })
-    .catch(() => null);
+      note: data.approvalNote || data.note || 'Duyệt phiếu chi vận hành trước khi xuất quỹ',
+    });
+  } catch (approveErr: any) {
+    const errData = approveErr?.response?.data;
+    const errMsg = errData?.message || approveErr?.message || '';
+    // Nếu phiếu chi đã được duyệt từ trước, backend có thể báo INVALID_STATUS
+    const isAlreadyApproved =
+      errData?.code === 'INVALID_STATUS' &&
+      (errMsg.toLowerCase().includes('approved') || errMsg.toLowerCase().includes('đã duyệt'));
+    if (!isAlreadyApproved) {
+      throw new Error(errMsg || 'Lỗi khi phê duyệt phiếu chi phí nghi vấn');
+    }
+  }
 
   // Xác định PaymentSourceType chuẩn enum Backend FinanceAccountType (Till = 1, Safe = 2, Bank = 3)
   let paymentSourceType = data.paymentMethod === 'Cash' ? 1 : 3;

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Search,
@@ -49,6 +49,8 @@ import '../pos.css';
 export const InvoiceManagementPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const urlSearch = searchParams.get('search') || searchParams.get('keyword') || searchParams.get('orderId') || '';
 
   // Route gốc quay lại POS
   const salesPath = location.pathname.startsWith('/employee/pos')
@@ -444,6 +446,22 @@ export const InvoiceManagementPage: FC = () => {
   // Phân trang Đơn đặt trước
   const [preOrderPage, setPreOrderPage] = useState(1);
   const [preOrderPageSize, setPreOrderPageSize] = useState(10);
+
+  // Đồng bộ tham số tìm kiếm từ URL (khi điều hướng từ trang Khách nợ CRM hoặc Sổ quỹ sang)
+  useEffect(() => {
+    if (urlSearch) {
+      setSearchQuery(urlSearch);
+      if (urlSearch.startsWith('PO') || urlSearch.startsWith('PRE-')) {
+        setActiveTab('preorders');
+        setPreOrderPage(1);
+      } else {
+        setActiveTab('invoices');
+        setInvoicePage(1);
+      }
+      setStatusFilter('ALL');
+      setPaymentMethodFilter('ALL');
+    }
+  }, [urlSearch]);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);

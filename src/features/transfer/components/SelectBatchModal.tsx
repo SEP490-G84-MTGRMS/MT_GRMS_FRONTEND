@@ -20,50 +20,15 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Default sample batches if not provided or empty (khớp đúng 4 dòng mẫu trong Ảnh 4: Select batch)
-  const defaultBatches: BatchItem[] = [
-    {
-      id: 'b-1',
-      batchNumber: 'SX010525',
-      expiryDate: '01/10/2025',
-      onHand: 0.083,
-      isExpired: true,
-    },
-    {
-      id: 'b-2',
-      batchNumber: 'SX010825',
-      expiryDate: '31/01/2026',
-      onHand: 2,
-      isExpired: false,
-    },
-    {
-      id: 'b-3',
-      batchNumber: 'SX010925',
-      expiryDate: '02/03/2026',
-      onHand: 10,
-      isExpired: false,
-    },
-    {
-      id: 'b-4',
-      batchNumber: 'SX011025',
-      expiryDate: '31/03/2026',
-      onHand: 20,
-      isExpired: false,
-    },
-  ];
-
-  const sourceBatches = batches && batches.length > 0 ? batches : defaultBatches;
+  const sourceBatches = batches;
 
   // Selected batch and quantities map
   const [chosenBatchId, setChosenBatchId] = useState<string>(
-    sourceBatches.find((b) => b.batchNumber === selectedBatchNumber)?.id || 'b-3'
+    sourceBatches.find((b) => b.batchNumber === selectedBatchNumber)?.id || sourceBatches[0]?.id || ''
   );
 
   const [quantities, setQuantities] = useState<Record<string, number>>({
-    'b-1': 0,
-    'b-2': 0,
-    'b-3': 10,
-    'b-4': 0,
+    ...(sourceBatches[0] ? { [sourceBatches[0].id]: 1 } : {}),
   });
 
   if (!isOpen) return null;
@@ -84,7 +49,8 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
   const handleConfirm = () => {
     const active = sourceBatches.find((b) => b.id === chosenBatchId);
     if (!active || active.isExpired) return;
-    const qty = quantities[active.id] || 1;
+    const qty = quantities[active.id] || 0;
+    if (qty <= 0 || qty > active.onHand) return;
     onSelectBatch(active, qty);
     onClose();
   };
@@ -264,6 +230,7 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
             type="button"
             className="btn-primary-teal"
             onClick={handleConfirm}
+            disabled={!chosenBatchId || (quantities[chosenBatchId] ?? 0) <= 0 || (quantities[chosenBatchId] ?? 0) > (sourceBatches.find((batch) => batch.id === chosenBatchId)?.onHand ?? 0)}
             style={{ padding: '5px 16px', borderRadius: 4, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
             <Save size={14} /> Lưu
