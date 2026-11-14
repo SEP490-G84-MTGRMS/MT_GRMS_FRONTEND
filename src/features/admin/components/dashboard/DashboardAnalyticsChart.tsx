@@ -48,26 +48,6 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
   const latest = data[data.length - 1] || data[0];
   const labels = useMemo(() => data.map((d) => d.shortMonth), [data]);
 
-  // Tổng hợp chỉ số tài chính 6 tháng
-  const stats = useMemo(() => {
-    const totalMrr6M = data.reduce((sum, d) => sum + d.mrr, 0);
-    const totalOrders6M = data.reduce((sum, d) => sum + d.totalOrders, 0);
-    const totalNewTenants6M = data.reduce((sum, d) => sum + d.newTenants, 0);
-    const avgGrowth = (
-      data
-        .map((d) => parseFloat(d.growthRate.replace('%', '')))
-        .filter((n) => !isNaN(n))
-        .reduce((a, b) => a + b, 0) / (data.length || 1)
-    ).toFixed(1);
-
-    return {
-      totalMrr6M: totalMrr6M.toFixed(1),
-      totalOrders6M: (totalOrders6M / 1000).toFixed(0) + 'K',
-      totalNewTenants6M,
-      avgGrowth,
-    };
-  }, [data]);
-
   /* ─────────────────────────────────────────────────────────────
      1. LINE CHART DATA: MRR Doanh thu định kỳ
   ───────────────────────────────────────────────────────────── */
@@ -156,8 +136,7 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
         border: { display: false },
       },
       y: {
-        min: 100,
-        max: 160,
+        beginAtZero: true,
         grid: {
           color: 'rgba(226, 232, 240, 0.75)',
         },
@@ -242,8 +221,7 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
         border: { display: false },
       },
       y: {
-        min: 0,
-        max: 26,
+        beginAtZero: true,
         grid: {
           color: 'rgba(226, 232, 240, 0.75)',
         },
@@ -353,8 +331,7 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
       },
       y: {
         stacked: true,
-        min: 0,
-        max: 160,
+        beginAtZero: true,
         grid: {
           color: 'rgba(226, 232, 240, 0.75)',
         },
@@ -440,8 +417,7 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
         border: { display: false },
       },
       y: {
-        min: 100,
-        max: 220,
+        beginAtZero: true,
         grid: {
           color: 'rgba(226, 232, 240, 0.75)',
         },
@@ -462,9 +438,9 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
       {/* ── HEADER & BỘ CHỌN CHẾ ĐỘ XEM TRỰC QUAN ── */}
       <div className="ac-header">
         <div>
-          <div className="ac-title">Phân tích Doanh thu & Thống kê Tăng trưởng Nền tảng</div>
+          <div className="ac-title">Doanh thu và tăng trưởng</div>
           <div className="ac-sub">
-            Theo dõi dòng doanh thu định kỳ (MRR/ARR), cơ cấu phân bổ theo gói dịch vụ và quy mô giao dịch POS toàn sàn.
+            Số liệu theo tháng trên toàn hệ thống.
           </div>
         </div>
 
@@ -479,7 +455,7 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
               <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
               <polyline points="16 7 22 7 22 13" />
             </svg>
-            <span>Tổng hợp Doanh thu & Chuỗi</span>
+            <span>Tổng quan</span>
           </button>
           <button
             type="button"
@@ -490,7 +466,7 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
               <rect x="3" y="3" width="7" height="18" rx="1.5" />
               <rect x="14" y="9" width="7" height="12" rx="1.5" />
             </svg>
-            <span>Cơ cấu theo Gói cước</span>
+            <span>Theo gói</span>
           </button>
           <button
             type="button"
@@ -501,47 +477,8 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            <span>Giao dịch POS & ARPU</span>
+            <span>Giao dịch POS</span>
           </button>
-        </div>
-      </div>
-
-      {/* ── BẢNG CHỈ SỐ THỐNG KÊ TÀI CHÍNH & VẬN HÀNH (FINANCIAL KPI CARDS) ── */}
-      <div className="ac-kpi-grid">
-        <div className="ac-kpi-card">
-          <div className="ac-kpi-top">
-            <span className="ac-kpi-label">Doanh thu MRR tháng này</span>
-            <span className="ac-kpi-tag ac-tag-up">▲ {latest.growthRate}</span>
-          </div>
-          <div className="ac-kpi-val ac-blue">{latest.mrrFormatted}</div>
-          <div className="ac-kpi-desc">So với tháng trước: +7.5M đ</div>
-        </div>
-
-        <div className="ac-kpi-card">
-          <div className="ac-kpi-top">
-            <span className="ac-kpi-label">Dự phóng năm (ARR)</span>
-            <span className="ac-kpi-period">Quy đổi 12T</span>
-          </div>
-          <div className="ac-kpi-val ac-indigo">{latest.arrFormatted}</div>
-          <div className="ac-kpi-desc">Duy trì tốc độ: +11.8%/tháng</div>
-        </div>
-
-        <div className="ac-kpi-card">
-          <div className="ac-kpi-top">
-            <span className="ac-kpi-label">Tổng Doanh thu 6 tháng</span>
-            <span className="ac-kpi-period">T5 - T10</span>
-          </div>
-          <div className="ac-kpi-val ac-green">{stats.totalMrr6M}M đ</div>
-          <div className="ac-kpi-desc">Tăng trưởng bình quân: +{stats.avgGrowth}%</div>
-        </div>
-
-        <div className="ac-kpi-card">
-          <div className="ac-kpi-top">
-            <span className="ac-kpi-label">Giao dịch POS toàn sàn</span>
-            <span className="ac-kpi-tag ac-tag-up">+{latest.ordersFormatted}</span>
-          </div>
-          <div className="ac-kpi-val ac-dark">{stats.totalOrders6M} đơn</div>
-          <div className="ac-kpi-desc">ARPU: {latest.arpuFormatted} / chuỗi</div>
         </div>
       </div>
 
@@ -633,27 +570,6 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
         )}
       </div>
 
-      {/* ── FOOTER INSIGHTS: THÔNG ĐIỆP TỔNG KẾT HỆ THỐNG ── */}
-      <div className="ac-footer-insights">
-        <div className="ac-insight-item">
-          <span className="ac-dot ac-dot-blue" />
-          <span>
-            <strong>Gói Nâng Cao (Advanced)</strong> chiếm tỷ trọng lớn nhất với <strong>45.2%</strong> tổng doanh thu nền tảng.
-          </span>
-        </div>
-        <div className="ac-insight-item">
-          <span className="ac-dot ac-dot-green" />
-          <span>
-            Tỷ lệ duy trì khách hàng <strong>(Retention Rate)</strong> đạt <strong>96.4%</strong>, tỷ lệ rời bỏ (Churn) duy trì ở mức tối ưu <strong>0.6%</strong>.
-          </span>
-        </div>
-        <div className="ac-insight-item">
-          <span className="ac-dot ac-dot-indigo" />
-          <span>
-            Tăng trưởng đều đặn <strong>+11.8%/tháng</strong>, dự phóng cán mốc <strong>2.0 Tỷ ARR</strong> trong Quý 1/2027.
-          </span>
-        </div>
-      </div>
     </div>
   );
 };

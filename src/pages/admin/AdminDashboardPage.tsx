@@ -2,12 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type { FC } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  mockKpiMetrics,
-  mockUrgentAlertTenants,
-  mockTenants,
-  mockMonthlyAnalytics,
-} from "../../features/admin/data/mockAdminData";
-import {
   KpiCard,
   UrgentAlertTable,
   DashboardAnalyticsChart,
@@ -17,7 +11,6 @@ import {
   AdminToast,
   type ToastState,
   RefreshIcon,
-  ExportIcon,
 } from "../../features/admin/components";
 import type {
   Tenant,
@@ -31,11 +24,12 @@ import { dashboardApi, tenantApi, mapBackendTenantDetailToFrontend } from "../..
 export const AdminDashboardPage: FC = () => {
   const navigate = useNavigate();
 
-  // Real Dashboard State (with mock fallbacks)
-  const [kpiMetrics, setKpiMetrics] = useState<KpiMetric[]>(mockKpiMetrics);
-  const [analyticsData, setAnalyticsData] = useState<MonthlyAnalyticsData[]>(mockMonthlyAnalytics);
-  const [urgentAlerts, setUrgentAlerts] = useState<UrgentAlertTenant[]>(mockUrgentAlertTenants);
+  const [kpiMetrics, setKpiMetrics] = useState<KpiMetric[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<MonthlyAnalyticsData[]>([]);
+  const [urgentAlerts, setUrgentAlerts] = useState<UrgentAlertTenant[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [kpiError, setKpiError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -55,28 +49,35 @@ export const AdminDashboardPage: FC = () => {
   };
 
   const loadDashboardData = useCallback(async () => {
+    setIsRefreshing(true);
+    setKpiError(null);
     try {
-      setIsRefreshing(true);
-      const [kpisRes, analyticsRes, alertsRes] = await Promise.allSettled([
-        dashboardApi.getKpis(),
+      const kpisRes = await dashboardApi.getKpis();
+      if (!kpisRes.success || !kpisRes.data) {
+        throw new Error("Dashboard KPI response is invalid");
+      }
+      setKpiMetrics(kpisRes.data);
+    } catch {
+      setKpiMetrics([]);
+      setKpiError("Không thể tải số liệu vận hành SaaS. Vui lòng thử lại.");
+    }
+
+    const [analyticsRes, alertsRes] = await Promise.allSettled([
         dashboardApi.getMonthlyAnalytics(),
         dashboardApi.getUrgentAlerts(),
-      ]);
-
-      if (kpisRes.status === "fulfilled" && kpisRes.value.success && kpisRes.value.data) {
-        setKpiMetrics(kpisRes.value.data);
-      }
-      if (analyticsRes.status === "fulfilled" && analyticsRes.value.success && analyticsRes.value.data) {
-        setAnalyticsData(analyticsRes.value.data);
-      }
-      if (alertsRes.status === "fulfilled" && alertsRes.value.success && alertsRes.value.data) {
-        setUrgentAlerts(alertsRes.value.data);
-      }
-    } catch {
-      showToast("Không thể tải một số dữ liệu Dashboard từ Backend", "warning");
-    } finally {
-      setIsRefreshing(false);
-    }
+    ]);
+    setAnalyticsData(
+      analyticsRes.status === "fulfilled" && analyticsRes.value.success
+        ? analyticsRes.value.data ?? []
+        : [],
+    );
+    setUrgentAlerts(
+      alertsRes.status === "fulfilled" && alertsRes.value.success
+        ? alertsRes.value.data ?? []
+        : [],
+    );
+    setLastUpdated(new Date());
+    setIsRefreshing(false);
   }, []);
 
   useEffect(() => {
@@ -92,11 +93,8 @@ export const AdminDashboardPage: FC = () => {
         return;
       }
     } catch {
-      // fallback to mock
+      showToast("Không thể tải chi tiết tenant từ Backend", "warning");
     }
-    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
-    setSelectedTenant(found);
-    setIsDetailOpen(true);
   };
 
   const handleOpenGraceBySubdomain = async (subdomain: string) => {
@@ -108,11 +106,8 @@ export const AdminDashboardPage: FC = () => {
         return;
       }
     } catch {
-      // fallback
+      showToast("Không thể tải tenant để gia hạn", "warning");
     }
-    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
-    setSelectedTenant(found);
-    setIsGraceOpen(true);
   };
 
   const handleOpenLockBySubdomain = async (subdomain: string) => {
@@ -124,11 +119,8 @@ export const AdminDashboardPage: FC = () => {
         return;
       }
     } catch {
-      // fallback
+      showToast("Không thể tải tenant để áp dụng khóa", "warning");
     }
-    const found = mockTenants.find((t) => t.subdomain === subdomain) || mockTenants[0];
-    setSelectedTenant(found);
-    setIsLockOpen(true);
   };
 
   const handleExtendGraceSubmit = async (tenant: Tenant, days: number, reason?: string) => {
@@ -170,90 +162,83 @@ export const AdminDashboardPage: FC = () => {
   };
 
   return (
-    <div>
+    <div className="admin-dashboard-page">
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
       {/* Page Header */}
-      <div className="admin-page-header">
+      <div className="admin-page-header admin-dashboard-hero">
         <div>
-          <h1>Tổng quan Nền tảng</h1>
+          <span className="admin-dashboard-eyebrow">TỔNG QUAN NỀN TẢNG</span>
+          <h1>Tình hình kinh doanh</h1>
+          <p>Toàn hệ thống · Cửa hàng, gói dịch vụ và doanh thu</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <select
-            style={{
-              height: 34,
-              padding: "0 28px 0 12px",
-              borderRadius: 6,
-              border: "1px solid #d1d5db",
-              backgroundColor: "#ffffff",
-              color: "#1e293b",
-              fontFamily: "inherit",
-              fontSize: 13,
-              cursor: "pointer",
-              outline: "none",
-            }}
-          >
-            <option>30 ngày gần nhất</option>
-            <option>Tháng 10/2026</option>
-            <option>Quý 4/2026</option>
-            <option>Năm 2026</option>
-          </select>
+        <div className="admin-dashboard-actions">
+          <button type="button" className="admin-btn admin-btn-secondary" onClick={() => navigate("/admin/tenants")}>Quản lý cửa hàng</button>
           <button
             type="button"
             className="admin-btn admin-btn-secondary"
             onClick={() => {
-              loadDashboardData();
-              showToast("Dữ liệu hệ thống đã được đồng bộ mới nhất từ Backend!");
+              void loadDashboardData();
             }}
             disabled={isRefreshing}
           >
-            <RefreshIcon size={14} className={isRefreshing ? "animate-spin" : ""} />
+            <RefreshIcon size={14} />
             <span>{isRefreshing ? "Đang làm mới..." : "Làm mới"}</span>
-          </button>
-          <button
-            type="button"
-            className="admin-btn admin-btn-primary"
-            onClick={() =>
-              showToast(
-                "Đang kết xuất báo cáo tổng quan ra tệp Excel (.xlsx)...",
-              )
-            }
-          >
-            <ExportIcon size={14} />
-            <span>Xuất báo cáo</span>
           </button>
         </div>
       </div>
 
-      {/* 4 KPI CARDS */}
-      <div className="admin-kpi-grid">
-        {kpiMetrics.map((metric) => (
-          <KpiCard
-            key={metric.id}
-            metric={metric}
-            onClick={() => {
-              if (metric.id === "active_tenants" || metric.id === "urgent_alerts" || metric.id === "kpi-tenants") {
-                navigate("/admin/tenants");
-              } else if (metric.id === "mrr" || metric.id === "kpi-revenue") {
-                navigate("/admin/subscriptions");
-              }
-            }}
-          />
-        ))}
+      <div className="admin-dashboard-meta">
+        <span>Dữ liệu toàn hệ thống{lastUpdated ? ` · Cập nhật lúc ${lastUpdated.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} ${lastUpdated.toLocaleDateString("vi-VN")}` : ""}</span>
       </div>
 
+      {kpiError ? (
+        <div className="admin-card" role="alert" style={{ padding: 24, textAlign: "center" }}>
+          <p style={{ margin: "0 0 14px", color: "#475569" }}>{kpiError}</p>
+          <button type="button" className="admin-btn admin-btn-primary" onClick={() => void loadDashboardData()}>
+            Tải lại
+          </button>
+        </div>
+      ) : isRefreshing && kpiMetrics.length === 0 ? (
+        <div className="admin-card" aria-busy="true" style={{ padding: 24, textAlign: "center", color: "#64748B" }}>
+          Đang tải số liệu vận hành SaaS...
+        </div>
+      ) : kpiMetrics.length === 0 ? (
+        <div className="admin-card" style={{ padding: 24, textAlign: "center", color: "#64748B" }}>
+          Chưa có dữ liệu thống kê.
+        </div>
+      ) : (
+        <div className="admin-kpi-grid">
+          {kpiMetrics.map((metric) => (
+            <KpiCard
+              key={metric.id}
+              metric={metric}
+              onClick={() => {
+                if (metric.id === "total_tenants") {
+                  navigate("/admin/tenants");
+                } else if (metric.id === "mrr" || metric.id === "successful_upgrades") {
+                  navigate("/admin/subscriptions");
+                }
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       {/* BIỂU ĐỒ PHÂN TÍCH TĂNG TRƯỞNG NỀN TẢNG */}
-      <DashboardAnalyticsChart data={analyticsData} />
+      {analyticsData.length > 0 && <DashboardAnalyticsChart data={analyticsData} />}
 
       {/* URGENT ALERTS TABLE */}
-      <UrgentAlertTable
-        tenants={urgentAlerts}
-        onViewAll={() => navigate("/admin/tenants")}
-        onDetail={handleOpenDetailBySubdomain}
-        onExtendGrace={handleOpenGraceBySubdomain}
-        onLock={handleOpenLockBySubdomain}
-      />
+      {urgentAlerts.length > 0 && (
+        <UrgentAlertTable
+          tenants={urgentAlerts}
+          onViewAll={() => navigate("/admin/tenants")}
+          onDetail={handleOpenDetailBySubdomain}
+          onExtendGrace={handleOpenGraceBySubdomain}
+          onLock={handleOpenLockBySubdomain}
+        />
+      )}
 
       {/* Modals */}
       <TenantDetailModal

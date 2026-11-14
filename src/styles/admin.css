@@ -616,6 +616,133 @@
   gap: 6px;
 }
 
+/* Admin dashboard: keep the shared admin styles intact on other pages. */
+.admin-dashboard-page {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 4px 0 48px;
+  color: #14253e;
+}
+
+.admin-dashboard-hero {
+  padding: 24px 28px;
+  border: 1px solid #e5edf1;
+  border-radius: 24px;
+  background: #fff;
+  margin-bottom: 0;
+}
+
+.admin-dashboard-eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.admin-dashboard-hero h1 {
+  font-size: clamp(22px, 2vw, 29px);
+  margin-bottom: 8px;
+}
+
+.admin-dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-dashboard-meta {
+  padding: 15px 4px 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admin-dashboard-page .admin-btn {
+  height: 38px;
+  padding-inline: 18px;
+  border-radius: 9999px;
+  font-weight: 700;
+}
+
+.admin-dashboard-page .admin-kpi-grid {
+  gap: 14px;
+  margin: 10px 0 16px;
+}
+
+.admin-dashboard-page .admin-kpi-card {
+  min-width: 0;
+  min-height: 165px;
+  padding: 19px 20px;
+  border-color: #e5edf1;
+  border-radius: 22px;
+  box-shadow: 0 3px 14px rgba(22, 46, 63, 0.035);
+}
+
+.admin-dashboard-page .admin-kpi-title {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.admin-dashboard-page .admin-kpi-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #e8f5f3 !important;
+  color: #0f766e !important;
+  border: 0 !important;
+}
+
+.admin-dashboard-page .admin-kpi-val {
+  margin: 12px 0 7px;
+  color: #12263f !important;
+  font-size: clamp(18px, 1.7vw, 25px);
+}
+
+.admin-dashboard-page .ac-root,
+.admin-dashboard-page .admin-table-card {
+  border-color: #e5edf1;
+  border-radius: 22px;
+  box-shadow: 0 3px 14px rgba(22, 46, 63, 0.035);
+}
+
+.admin-dashboard-page .ac-root {
+  padding: 22px;
+}
+
+.admin-dashboard-page .ac-header {
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e8eef2;
+}
+
+.admin-dashboard-page .ac-title { font-size: 16px; font-weight: 800; }
+.admin-dashboard-page .ac-tab-btn.active { color: #0f766e; }
+.admin-dashboard-page .ac-panel {
+  background: #fff;
+  border-color: #e5edf1;
+  border-radius: 18px;
+}
+.admin-dashboard-page .ac-panel-title svg { color: #0f766e; }
+.admin-dashboard-page .admin-table-card { overflow-x: auto; }
+.admin-dashboard-page .admin-data-table { min-width: 880px; }
+
+.admin-dashboard-page .admin-kpi-card:hover { border-color: #0f766e; }
+.admin-dashboard-page .admin-btn-secondary:hover { border-color: #0f766e; color: #0f766e; }
+
+@media (max-width: 1200px) {
+  .admin-dashboard-page .admin-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard-hero { padding: 22px; }
+  .admin-dashboard-actions { width: 100%; }
+  .admin-dashboard-page .admin-kpi-grid { grid-template-columns: 1fr; }
+}
+
 /* ════════════════════════════════════════════════════════════
    Platform Analytics Chart — (ac-* namespace)
    ════════════════════════════════════════════════════════════ */
