@@ -247,6 +247,10 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/cash-control",
           },
           {
+            label: "Lịch sử giao ca bán hàng",
+            to: "/store-owner/shifts",
+          },
+          {
             label: "Chi phí & hóa đơn phải trả",
             to: "/store-owner/expenses",
           },

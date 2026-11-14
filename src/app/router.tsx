@@ -646,7 +646,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'shifts',
-            element: <Navigate to="/store-owner/cash-control?tab=history" replace />,
+            element: <PosShiftPage />,
           },
     ],
   },
@@ -1020,6 +1020,14 @@ export const router = createBrowserRouter([
   {
     path: '/pos-cash-control',
     element: <Navigate to="/store-owner/cash-control" replace />,
+  },
+  {
+    path: '/shifts',
+    element: <Navigate to="/store-owner/shifts" replace />,
+  },
+  {
+    path: '/shifts/*',
+    element: <Navigate to="/store-owner/shifts" replace />,
   },
 
   // Promotions
