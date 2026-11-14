@@ -81,21 +81,34 @@ export const PromotionTable: FC<PromotionTableProps> = ({
     }
   };
 
+  const thStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '8px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+    boxSizing: 'border-box',
+  };
+
   return (
-    <div className="promotion-card">
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
       <div className="table-responsive">
-        <table className="promotion-table">
+        <table className="so-list-table promotion-table">
           <thead>
             <tr>
-              <th style={{ width: 44 }}></th>
-              <th style={{ width: 120 }}>Mã CTKM</th>
-              <th style={{ minWidth: 200 }}>Tên chương trình</th>
-              <th style={{ width: 140 }}>Hình thức</th>
-              <th style={{ width: 185 }}>Thời gian hiệu lực</th>
-              <th style={{ width: 165 }}>Chi nhánh áp dụng</th>
-              <th style={{ minWidth: 155, width: 165 }}>Lượt & Ngân sách</th>
-              <th style={{ width: 140 }}>Trạng thái</th>
-              <th style={{ width: 90, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
+              <th style={{ ...thStyle, width: 120 }}>Mã CTKM</th>
+              <th style={{ ...thStyle, minWidth: 200 }}>Tên chương trình</th>
+              <th style={{ ...thStyle, width: 140 }}>Hình thức</th>
+              <th style={{ ...thStyle, width: 185 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 165 }}>Chi nhánh áp dụng</th>
+              <th style={{ ...thStyle, minWidth: 155, width: 165 }}>Lượt & Ngân sách</th>
+              <th style={{ ...thStyle, width: 140 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 90, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -110,8 +123,20 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                 const isExpanded = expandedId === item.id;
                 return (
                   <Fragment key={item.id}>
-                    <tr className={isExpanded ? 'row-expanded' : ''}>
-                      <td>
+                    <tr
+                      className={`so-list-row ${isExpanded ? 'row-expanded' : ''}`}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        backgroundColor: isExpanded ? '#f0fdfa' : '#ffffff',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isExpanded) e.currentTarget.style.backgroundColor = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isExpanded) e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
+                    >
+                      <td className="so-list-td" style={{ textAlign: 'center' }}>
                         <button
                           onClick={() => toggleExpand(item.id)}
                           className="btn-table-icon"
@@ -124,19 +149,19 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           )}
                         </button>
                       </td>
-                      <td>
-                        <span className="promo-code-text">{item.code}</span>
+                      <td className="so-list-td">
+                        <span className="so-list-code">{item.code}</span>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-title-box">
-                          <span className="promo-title-main">{item.name}</span>
+                          <span className="promo-title-main so-list-name">{item.name}</span>
                           {item.description && (
                             <span className="promo-title-sub">{item.description}</span>
                           )}
                         </div>
                       </td>
-                      <td>{renderTypeBadge(item.type)}</td>
-                      <td>
+                      <td className="so-list-td">{renderTypeBadge(item.type)}</td>
+                      <td className="so-list-td">
                         <div className="promo-date-badge">
                           <Calendar size={13} />
                           <span className="promo-date-text">{item.startDate}</span>
@@ -144,7 +169,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           <span className="promo-date-text">{item.endDate}</span>
                         </div>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         {(() => {
                           const displayBranches = item.branches.map((b) => branchMap?.get(b) || b);
                           const isAll = item.branches.includes('ALL') || item.branches.length === 0;
@@ -172,7 +197,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           );
                         })()}
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-usage-cell" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                             <span className="promo-usage-count" style={{ fontWeight: 700, color: '#0f172a' }}>
@@ -253,7 +278,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-status-cell">
                           <div
                             className="switch-container"
@@ -267,7 +292,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           {renderStatusBadge(item.status)}
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right' }}>
                         <div className="table-actions">
                           <button
                             onClick={() => onEdit(item)}
@@ -406,12 +431,12 @@ export const PromotionTable: FC<PromotionTableProps> = ({
         </table>
       </div>
 
-      {/* Shared Enterprise Pagination */}
+      {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
       <TablePagination
         currentPage={currentPage}
         pageSize={pageSize}
         totalItems={promotions.length}
-        pageSizeOptions={[5, 10, 20]}
+        pageSizeOptions={[10, 20, 50]}
         itemLabel="chương trình"
         onPageChange={setCurrentPage}
         onPageSizeChange={(newSize) => {
