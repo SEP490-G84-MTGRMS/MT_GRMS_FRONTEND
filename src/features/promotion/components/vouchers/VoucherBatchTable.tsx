@@ -92,13 +92,13 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   const renderBatchStatus = (status: VoucherBatchStatus) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="badge-status badge-active">● Đang lưu hành</span>;
+        return <span className="badge-status badge-active" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0 }}>● Đang lưu hành</span>;
       case 'EXPIRED':
-        return <span className="badge-status badge-expired">✕ Đã hết hạn</span>;
+        return <span className="badge-status badge-expired" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0 }}>✕ Đã hết hạn</span>;
       case 'PAUSED':
-        return <span className="badge-status badge-paused">⏸ Tạm dừng</span>;
+        return <span className="badge-status badge-paused" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0 }}>⏸ Tạm dừng</span>;
       case 'DEPLETED':
-        return <span className="badge-status badge-pill-neutral">Đã phát hết</span>;
+        return <span className="badge-status badge-pill-neutral" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0 }}>Đã phát hết</span>;
     }
   };
 
@@ -151,6 +151,9 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   };
 
   const thStyle: React.CSSProperties = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
     backgroundColor: '#f8fafc',
     padding: '8px 12px',
     fontSize: 12,
@@ -164,10 +167,10 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
-      <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1350, width: '100%', tableLayout: 'fixed' }}>
-          <thead>
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+      <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1390, width: '100%', tableLayout: 'fixed' }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
               <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
               <th style={{ ...thStyle, width: 120 }}>Mã đợt</th>
@@ -176,8 +179,8 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
               <th style={{ ...thStyle, width: 165 }}>Điều kiện áp dụng</th>
               <th style={{ ...thStyle, width: 150 }}>Đã dùng / Phát hành</th>
               <th style={{ ...thStyle, width: 160 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 150 }}>Trạng thái</th>
-              <th style={{ ...thStyle, width: 210, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 185 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 220, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -308,8 +311,8 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td className="so-list-td">
-                        <div className="promo-status-cell">
+                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
+                        <div className="promo-status-cell" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
                           <div
                             className="switch-container"
                             onClick={() => onToggleBatchStatus(batch.id)}
@@ -322,31 +325,33 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           {renderBatchStatus(batch.status)}
                         </div>
                       </td>
-                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right' }}>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden' }}>
                         <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', width: '100%' }}>
                           <button
                             onClick={() => onOpenGenerateCodes(batch)}
                             className="btn-secondary-pill"
-                            style={{ padding: '5px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            style={{ padding: '4px 8px', fontSize: '0.76rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                             title="Phát hành thêm mã cho đợt này"
                           >
-                            <PlusCircle size={14} color="#0F766E" />
+                            <PlusCircle size={13} color="#0F766E" />
                             <span>Tạo thêm mã</span>
                           </button>
                           <button
                             onClick={() => onEdit(batch)}
                             className="btn-table-icon"
+                            style={{ width: 28, height: 28 }}
                             title="Chỉnh sửa đợt voucher"
                           >
-                            <Edit2 size={14} />
+                            <Edit2 size={13} />
                           </button>
                           <button
                             onClick={() => onDelete(batch.id)}
                             className="btn-table-icon btn-danger-icon"
+                            style={{ width: 28, height: 28 }}
                             disabled={batch.status === 'ACTIVE'}
                             title={batch.status === 'ACTIVE' ? 'Hãy tạm dừng đợt voucher trước khi xóa' : 'Xóa đợt voucher'}
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </td>

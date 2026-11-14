@@ -221,7 +221,19 @@ export const VoucherListPage: FC = () => {
   };
 
   return (
-    <div className="promotion-page">
+    <div
+      className="promotion-page"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       {/* Shared AdminToast */}
       {toast && (
         <AdminToast
@@ -254,7 +266,8 @@ export const VoucherListPage: FC = () => {
       </div>
 
       {/* Filter Bar chuẩn StoreProductFilter */}
-      <div className="so-list-filter" style={{ marginBottom: 16 }}>
+      <div style={{ flexShrink: 0, marginBottom: 12 }}>
+        <div className="so-list-filter">
         <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
           <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
             <label className="so-list-filter-label">Tìm kiếm:</label>
@@ -346,6 +359,7 @@ export const VoucherListPage: FC = () => {
           </div>
         </div>
       </div>
+    </div>
 
       {/* Batch Table with Codes Accordion */}
       <VoucherBatchTable

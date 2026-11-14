@@ -136,7 +136,19 @@ export const LoyaltyConfigPage: FC = () => {
   };
 
   return (
-    <div className="promotion-page">
+    <div
+      className="promotion-page"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       {/* Shared AdminToast */}
       {toast && (
         <AdminToast
@@ -214,7 +226,7 @@ export const LoyaltyConfigPage: FC = () => {
 
         {/* Main Content Area based on Tab */}
         {activeTab === 'config' ? (
-          <>
+          <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>
             {validationErrors.length > 0 && (
               <div role="alert" className="promo-validation-summary">
                 <strong>Vui lòng kiểm tra lại thiết lập tích điểm:</strong>
@@ -231,7 +243,7 @@ export const LoyaltyConfigPage: FC = () => {
               }}
               onSave={handleSaveConfig}
             />
-          </>
+          </div>
         ) : (
           <LoyaltyLedgerTable
             ledger={ledger}

@@ -419,7 +419,19 @@ export const PromotionListPage: FC = () => {
   };
 
   return (
-    <div className="promotion-page">
+    <div
+      className="promotion-page"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       {/* Shared AdminToast */}
       {toast && (
         <AdminToast
@@ -451,11 +463,13 @@ export const PromotionListPage: FC = () => {
       </div>
 
       {/* Filter Bar */}
-      <PromotionFilterBar
-        filter={filter}
-        onFilterChange={setFilter}
-        onRefresh={loadPromotions}
-      />
+      <div style={{ flexShrink: 0 }}>
+        <PromotionFilterBar
+          filter={filter}
+          onFilterChange={setFilter}
+          onRefresh={loadPromotions}
+        />
+      </div>
 
       {/* Table */}
       <PromotionTable

@@ -74,6 +74,9 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
   };
 
   const thStyle: React.CSSProperties = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
     backgroundColor: '#f8fafc',
     padding: '8px 12px',
     fontSize: 12,
@@ -87,7 +90,7 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
       <div className="promotion-card-header">
         <h3 className="promotion-card-title">
           <span>Sổ cái lịch sử biến động điểm</span>
@@ -179,9 +182,9 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
         </div>
       </div>
 
-      <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
+      <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
         <table className="so-list-table promotion-table" style={{ minWidth: 1060, width: '100%', tableLayout: 'fixed' }}>
-          <thead>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
               <th style={{ ...thStyle, width: 135 }}>Mã GD</th>
               <th style={{ ...thStyle, width: 180 }}>Khách hàng</th>

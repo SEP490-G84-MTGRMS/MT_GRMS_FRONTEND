@@ -82,6 +82,9 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   };
 
   const thStyle: React.CSSProperties = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
     backgroundColor: '#f8fafc',
     padding: '8px 12px',
     fontSize: 12,
@@ -95,19 +98,19 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
-      <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1290, width: '100%', tableLayout: 'fixed' }}>
-          <thead>
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+      <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1320, width: '100%', tableLayout: 'fixed' }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
               <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
               <th style={{ ...thStyle, width: 120 }}>Mã CTKM</th>
               <th style={{ ...thStyle, width: 220 }}>Tên chương trình</th>
               <th style={{ ...thStyle, width: 140 }}>Hình thức</th>
-              <th style={{ ...thStyle, width: 165 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 170 }}>Chi nhánh áp dụng</th>
+              <th style={{ ...thStyle, width: 175 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 180 }}>Chi nhánh áp dụng</th>
               <th style={{ ...thStyle, width: 180 }}>Lượt &amp; Ngân sách</th>
-              <th style={{ ...thStyle, width: 150 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 160 }}>Trạng thái</th>
               <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
@@ -161,7 +164,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                         </div>
                       </td>
                       <td className="so-list-td">{renderTypeBadge(item.type)}</td>
-                      <td className="so-list-td">
+                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
                             <Calendar size={12} style={{ color: '#0f766e', flexShrink: 0 }} />
@@ -175,7 +178,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td className="so-list-td">
+                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         {(() => {
                           const displayBranches = item.branches.map((b) => branchMap?.get(b) || b);
                           const isAll = item.branches.includes('ALL') || item.branches.length === 0;
@@ -296,7 +299,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td className="so-list-td">
+                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         <div className="promo-status-cell">
                           <div
                             className="switch-container"
@@ -310,7 +313,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           {renderStatusBadge(item.status)}
                         </div>
                       </td>
-                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right' }}>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden' }}>
                         <div className="table-actions">
                           <button
                             onClick={() => onEdit(item)}

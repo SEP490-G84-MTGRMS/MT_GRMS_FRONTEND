@@ -18,6 +18,9 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
   const currentItems = shifts.slice(startIndex, startIndex + pageSize);
 
   const thStyle: React.CSSProperties = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
     backgroundColor: '#f8fafc',
     padding: '8px 12px',
     fontSize: 12,
@@ -31,17 +34,17 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
   };
 
   return (
-    <div className="so-list-table-card so-list-table-card--wrap">
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff' }}>
+    <div className="so-list-table-card so-list-table-card--wrap" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', flexShrink: 0 }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <History size={16} className="text-teal-700" />
           <span>Lịch Sử Chi Tiết Các Phiên Ca Bán Hàng &amp; Bàn Giao Quầy</span>
         </h3>
       </div>
 
-      <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
+      <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
         <table className="so-list-table" style={{ minWidth: 1100, width: '100%', tableLayout: 'fixed' }}>
-          <thead>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
               <th style={{ ...thStyle, textAlign: 'left', width: '130px' }}>Mã ca</th>
               <th style={{ ...thStyle, textAlign: 'left', width: '150px' }}>Chi nhánh</th>
