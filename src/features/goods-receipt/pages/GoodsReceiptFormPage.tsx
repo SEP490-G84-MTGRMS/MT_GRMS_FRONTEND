@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import {
@@ -7,7 +7,6 @@ import {
   Loader2,
 } from 'lucide-react';
 import type {
-  GrnCostSummary,
   GrnItemDetail,
   GrnStatus,
   PaymentMethod,
@@ -401,14 +400,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       cancelled = true;
     };
   }, [selectedPoId, isCreateMode, role, employeeBranchId, listPath, navigate]);
-
-  const costs: GrnCostSummary = useMemo(() => {
-    const goodsTotal = items.reduce((acc, it) => acc + it.lineTotal, 0);
-    const subtotalAfterDiscount = Math.max(0, goodsTotal - discountAmount);
-    const vatAmount = Math.round(subtotalAfterDiscount * (vatPercent / 100));
-    const grandTotal = subtotalAfterDiscount + vatAmount;
-    return { goodsTotal, landedCost: 0, discountAmount, vatPercent, vatAmount, grandTotal };
-  }, [items, discountAmount, vatPercent]);
 
   const handleItemChange = (itemId: string, field: keyof GrnItemDetail, value: any) => {
     setItems((prev) =>

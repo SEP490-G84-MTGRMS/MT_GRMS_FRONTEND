@@ -1239,7 +1239,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         allowedProducts,
         cells: importPreviewResult.cellsToApply.map((c) => ({
           productId: c.productId,
-          supplierId: c.supplierId,
+          supplierId: c.supplierId || selectedSupplierId || '',
           deliveryDate: c.deliveryDate,
           quantity: c.quantity,
           excelRow: c.row,

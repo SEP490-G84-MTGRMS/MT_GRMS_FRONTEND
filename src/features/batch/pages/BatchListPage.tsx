@@ -369,7 +369,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
           onClose={() => setRepackBatch(null)}
           onDone={() => {
             setRepackBatch(null);
-            setToast({ type: 'success', message: 'Chế biến khay thành công.' });
+            showToast('Chế biến khay thành công.');
             void loadBatches();
           }}
         />
