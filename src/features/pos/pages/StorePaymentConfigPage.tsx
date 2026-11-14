@@ -11,13 +11,19 @@ import {
   EyeOff,
   ExternalLink,
   Save,
-  ArrowRight,
   RefreshCw,
   ShieldAlert,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { httpClient } from '../../../api/httpClient';
 import { VIETNAMESE_BANKS } from '../components/modals/PaymentConfigModal';
+import { branchApi } from '../../purchase-order/api/branchApi';
+
+interface BranchOption {
+  id: string;
+  name: string;
+  code?: string;
+}
 
 interface SePayLinkedBankAccount {
   bankCode: string;
@@ -25,6 +31,13 @@ interface SePayLinkedBankAccount {
   bankAccountNumber: string;
   bankAccountName: string;
   label: string;
+}
+
+interface PaymentAccountAssignment {
+  paymentAccountId: string;
+  bankCode: string;
+  bankAccountNumber: string;
+  branchIds: string[];
 }
 
 export const StorePaymentConfigPage: FC = () => {
@@ -40,6 +53,11 @@ export const StorePaymentConfigPage: FC = () => {
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
   const [tenantPrefix, setTenantPrefix] = useState('');
+  const [paymentAccountId, setPaymentAccountId] = useState<string | null>(null);
+  const [savedAccountKey, setSavedAccountKey] = useState('');
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [paymentAccountAssignments, setPaymentAccountAssignments] = useState<PaymentAccountAssignment[]>([]);
 
   // Danh sách đa tài khoản ngân hàng liên kết trong SePay của Chủ cửa hàng
   const [linkedAccounts, setLinkedAccounts] = useState<SePayLinkedBankAccount[]>([]);
@@ -67,6 +85,10 @@ export const StorePaymentConfigPage: FC = () => {
     localStorage.removeItem(linkedKey);
     setLinkedAccounts([]);
 
+    branchApi.getBranches({ status: 'active', pageIndex: 1, pageSize: 100 })
+      .then(({ items }) => setBranches(items.map((item) => ({ id: item.id, name: item.name, code: item.code }))))
+      .catch(() => setBranches([]));
+
     // Tải cấu hình đã mã hóa AES-256 từ Backend API
     httpClient
       .get('/payments/config')
@@ -81,6 +103,14 @@ export const StorePaymentConfigPage: FC = () => {
         setMaskedApiKey(data.sepayApiKeyMasked || '');
         setIsRotatingKey(!data.hasApiKey);
         if (typeof data.isActive === 'boolean') setIsActive(data.isActive);
+        const accounts = Array.isArray(data.paymentAccounts) ? data.paymentAccounts : [];
+        setPaymentAccountAssignments(accounts);
+        const currentAccount = accounts.find(
+          (account: any) => account.bankCode === data.bankCode && account.bankAccountNumber === data.bankAccountNumber
+        ) || accounts[0];
+        setPaymentAccountId(currentAccount?.paymentAccountId || null);
+        setSavedAccountKey(currentAccount ? `${currentAccount.bankCode}|${currentAccount.bankAccountNumber}` : '');
+        setSelectedBranchIds(Array.isArray(currentAccount?.branchIds) ? currentAccount.branchIds : []);
       })
       .catch(() => {
         setSaveMessage('Không thể tải cấu hình từ máy chủ. Không sử dụng dữ liệu mẫu.');
@@ -114,34 +144,23 @@ export const StorePaymentConfigPage: FC = () => {
     }
   };
 
-  const handleSelectReceivingAccount = async (acc: SePayLinkedBankAccount) => {
+  const handleSelectReceivingAccount = (acc: SePayLinkedBankAccount) => {
     if (!isOwnerOrAdmin) return;
+    const existingAccount = paymentAccountAssignments.find(
+      (account) => account.bankCode === acc.bankCode &&
+        account.bankAccountNumber.trim() === acc.bankAccountNumber.trim()
+    );
+
     setBankCode(acc.bankCode);
     setBankAccountNumber(acc.bankAccountNumber);
     setBankAccountName(acc.bankAccountName);
-
-    const storageKey = `pos_payment_config_${currentTenantId}`;
-    const publicQrCache = {
-      tenantId: currentTenantId,
-      tenantPrefix,
-      bankCode: acc.bankCode,
-      bankName: acc.bankName,
-      bankAccountNumber: acc.bankAccountNumber.trim(),
-      bankAccountName: acc.bankAccountName.trim().toUpperCase(),
-      webhookUrl,
-      isActive,
-    };
-    try {
-      await httpClient.post('/payments/config', publicQrCache);
-      localStorage.setItem(storageKey, JSON.stringify(publicQrCache));
-      setSaveMessage(
-        `Đã chuyển tài khoản nhận tiền tại POS sang ${acc.bankCode} - ${acc.bankAccountNumber} (${acc.bankAccountName})!`
-      );
-    } catch (error: any) {
-      setSaveMessage(error?.response?.data?.message || 'Không thể lưu tài khoản nhận tiền lên máy chủ.');
-      return;
-    }
-    setTimeout(() => setSaveMessage(null), 4000);
+    setPaymentAccountId(existingAccount?.paymentAccountId || null);
+    setSelectedBranchIds(existingAccount?.branchIds || []);
+    setSaveMessage(
+      existingAccount
+        ? 'Đã mở cấu hình tài khoản. Hãy chọn các chi nhánh cần gán rồi bấm Lưu Cấu Hình.'
+        : 'Tài khoản này chưa gán chi nhánh. Hãy chọn chi nhánh cần gán rồi bấm Lưu Cấu Hình.'
+    );
   };
 
   const handleAddCurrentToLinkedList = () => {
@@ -176,6 +195,14 @@ export const StorePaymentConfigPage: FC = () => {
     setTimeout(() => setCopiedWebhook(false), 2000);
   };
 
+  const toggleBranch = (branchId: string) => {
+    setSelectedBranchIds((current) =>
+      current.includes(branchId)
+        ? current.filter((id) => id !== branchId)
+        : [...current, branchId]
+    );
+  };
+
   const handleSave = async () => {
     if (!isOwnerOrAdmin) return;
     if (!bankAccountNumber.trim() || !/^\d{6,30}$/.test(bankAccountNumber.trim())) {
@@ -186,9 +213,25 @@ export const StorePaymentConfigPage: FC = () => {
       setSaveMessage('Tên chủ tài khoản không được trống và không quá 150 ký tự.');
       return;
     }
+    if (selectedBranchIds.length === 0) {
+      setSaveMessage('Vui lòng chọn ít nhất một chi nhánh sử dụng tài khoản nhận tiền này.');
+      return;
+    }
     if (!hasApiKey && !newApiKeyInput.trim()) {
       setSaveMessage('Cấu hình lần đầu bắt buộc phải nhập SePay API Key thật.');
       return;
+    }
+    const nextAccountKey = `${bankCode}|${bankAccountNumber.trim()}`;
+    if (savedAccountKey && savedAccountKey !== nextAccountKey) {
+      const branchNames = branches
+        .filter((branch) => selectedBranchIds.includes(branch.id))
+        .map((branch) => branch.name)
+        .join(', ');
+      const confirmed = window.confirm(
+        `Bạn có chắc muốn thay tài khoản nhận tiền hiện tại bằng ${bankCode} - ${bankAccountNumber.trim()}` +
+        `${branchNames ? ` cho: ${branchNames}` : ''}?\n\nQR mới sẽ dùng tài khoản mới; giao dịch cũ không thay đổi.`
+      );
+      if (!confirmed) return;
     }
     setIsSaving(true);
     setSaveMessage(null);
@@ -207,6 +250,8 @@ export const StorePaymentConfigPage: FC = () => {
       bankAccountName: bankAccountName.trim().toUpperCase(),
       webhookUrl,
       isActive,
+      paymentAccountId,
+      branchIds: selectedBranchIds,
     };
     // 2. Gửi lên Backend để mã hóa AES-256 và lưu vào PostgreSQL
     try {
@@ -218,7 +263,29 @@ export const StorePaymentConfigPage: FC = () => {
         if (res.data.sepayApiKeyMasked) setMaskedApiKey(res.data.sepayApiKeyMasked);
         if (typeof res.data.hasApiKey === 'boolean') setHasApiKey(res.data.hasApiKey);
         if (res.data.tenantPrefix) setTenantPrefix(res.data.tenantPrefix);
+        if (res.data.paymentAccountId) setPaymentAccountId(res.data.paymentAccountId);
       }
+      setSavedAccountKey(nextAccountKey);
+      setPaymentAccountAssignments((current) => {
+        const savedId = res.data?.paymentAccountId || paymentAccountId || '';
+        const updated = current.map((account) => ({
+          ...account,
+          branchIds: account.branchIds.filter((id) => !selectedBranchIds.includes(id)),
+        }));
+        const existingIndex = updated.findIndex(
+          (account) => account.paymentAccountId === savedId ||
+            (account.bankCode === bankCode && account.bankAccountNumber === bankAccountNumber.trim())
+        );
+        const savedAccount: PaymentAccountAssignment = {
+          paymentAccountId: savedId,
+          bankCode,
+          bankAccountNumber: bankAccountNumber.trim(),
+          branchIds: selectedBranchIds,
+        };
+        if (existingIndex < 0) return [...updated, savedAccount];
+        updated[existingIndex] = savedAccount;
+        return updated;
+      });
       localStorage.setItem(storageKey, JSON.stringify(publicQrCache));
       setSaveMessage(
         res.data?.message ||
@@ -290,34 +357,10 @@ export const StorePaymentConfigPage: FC = () => {
             Thiết Lập Tài Khoản Thanh Toán & Cổng SePay (VietQR)
           </h1>
           <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>
-            Cấu hình tài khoản ngân hàng của Chủ cửa hàng để tự động nhận tiền và gạch nợ hóa đơn tại quầy POS
+            Cấu hình tài khoản nhận tiền và thanh toán VietQR tại quầy POS.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={isSaving || !isOwnerOrAdmin}
-            style={{
-              backgroundColor: isOwnerOrAdmin ? '#0f766e' : '#94a3b8',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: 8,
-              padding: '10px 22px',
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: isOwnerOrAdmin ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              boxShadow: '0 2px 6px rgba(15, 118, 110, 0.25)',
-            }}
-          >
-            <Save size={18} />
-            <span>{isSaving ? 'Đang lưu...' : 'Lưu Cấu Hình'}</span>
-          </button>
-        </div>
       </div>
 
       {/* Cảnh báo RBAC nếu không phải STORE_OWNER */}
@@ -340,7 +383,7 @@ export const StorePaymentConfigPage: FC = () => {
         >
           <ShieldAlert size={20} />
           <span>
-            Chế độ Bảo mật Phân quyền (RBAC): Chỉ tài khoản <b>Chủ cửa hàng (STORE_OWNER)</b> mới được phép thay đổi Số tài khoản nhận tiền hoặc xoay khóa SePay API Key. Nhân viên thu ngân chỉ được quyền sinh mã QR tại quầy bán hàng.
+            Bạn không có quyền thay đổi tài khoản nhận tiền hoặc SePay API Key.
           </span>
         </div>
       )}
@@ -402,21 +445,40 @@ export const StorePaymentConfigPage: FC = () => {
               }}
             >
               <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>
-                Thông Tin Tài Khoản Nhận Tiền & Khóa Đối Soát
+                Tài khoản nhận tiền & SePay
               </div>
-              <span
-                style={{
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  color: '#0f766e',
-                  backgroundColor: '#ccfbf1',
-                  padding: '3px 8px',
-                  borderRadius: 6,
-                }}
-                title="Tiền tố định tuyến đơn hàng riêng cho cửa hàng này"
-              >
-                Tiền tố QR: {tenantPrefix}_HDxxxx
-              </span>
+            </div>
+
+            <div style={{ padding: '12px 14px', backgroundColor: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#115e59' }}>Chi nhánh sử dụng tài khoản này</div>
+                  <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                    Chọn chi nhánh nhận tiền vào tài khoản này.
+                  </div>
+                </div>
+                {branches.length > 0 && (
+                  <button type="button" disabled={!isOwnerOrAdmin}
+                    onClick={() => setSelectedBranchIds(selectedBranchIds.length === branches.length ? [] : branches.map((branch) => branch.id))}
+                    style={{ border: 0, background: 'transparent', color: '#0f766e', fontSize: 11.5, fontWeight: 800, cursor: 'pointer' }}>
+                    {selectedBranchIds.length === branches.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 7 }}>
+                {branches.map((branch) => (
+                  <label key={branch.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 6,
+                    border: selectedBranchIds.includes(branch.id) ? '1px solid #14b8a6' : '1px solid #dbeafe',
+                    backgroundColor: selectedBranchIds.includes(branch.id) ? '#ccfbf1' : '#ffffff',
+                    cursor: isOwnerOrAdmin ? 'pointer' : 'default', fontSize: 12.5, color: '#334155',
+                  }}>
+                    <input type="checkbox" disabled={!isOwnerOrAdmin} checked={selectedBranchIds.includes(branch.id)} onChange={() => toggleBranch(branch.id)} />
+                    <span><b>{branch.code || 'CN'}</b> — {branch.name}</span>
+                  </label>
+                ))}
+                {branches.length === 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Không tải được danh sách chi nhánh.</div>}
+              </div>
             </div>
 
             {/* Danh sách Đa Tài Khoản Ngân Hàng Liên Kết SePay (Chủ cửa hàng chọn TK nhận tiền) */}
@@ -438,7 +500,7 @@ export const StorePaymentConfigPage: FC = () => {
                 }}
               >
                 <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0f172a' }}>
-                  Tài Khoản Ngân Hàng Liên Kết SePay (Chọn TK Nhận Tiền):
+                  Tài khoản liên kết SePay
                 </div>
                 {isOwnerOrAdmin && (
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -538,7 +600,7 @@ export const StorePaymentConfigPage: FC = () => {
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {isSelected ? 'Đang nhận tiền POS' : 'Chọn nhận tiền'}
+                        {isSelected ? 'Đang chọn' : 'Chọn tài khoản'}
                       </span>
                     </div>
                   );
@@ -676,7 +738,7 @@ export const StorePaymentConfigPage: FC = () => {
                         }}
                       >
                         <RefreshCw size={13} />
-                        <span>Đổi / Xoay khóa mới</span>
+                        <span>Đổi khóa</span>
                       </button>
 
                       <button
@@ -709,7 +771,7 @@ export const StorePaymentConfigPage: FC = () => {
                       value={newApiKeyInput}
                       disabled={!isOwnerOrAdmin}
                       onChange={(e) => setNewApiKeyInput(e.target.value)}
-                      placeholder="Dán SePay API Key mới từ my.sepay.vn (VD: sepay_apikey_...)"
+                      placeholder="Dán API Token từ SePay"
                       style={{
                         width: '100%',
                         height: 40,
@@ -756,7 +818,7 @@ export const StorePaymentConfigPage: FC = () => {
                           textDecoration: 'underline',
                         }}
                       >
-                        Hủy đổi khóa (Giữ nguyên Key hiện tại)
+                        Hủy đổi khóa
                       </button>
                     </div>
                   )}
@@ -767,7 +829,7 @@ export const StorePaymentConfigPage: FC = () => {
             {/* Webhook URL */}
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                5. Đường dẫn Webhook hệ thống (Copy dán sang SePay):
+                5. Đường dẫn Webhook (dán vào SePay):
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <div style={{ position: 'relative', flex: 1 }}>
@@ -824,7 +886,7 @@ export const StorePaymentConfigPage: FC = () => {
                 style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0f766e' }}
               />
               <label htmlFor="page-active-toggle" style={{ fontSize: 13, color: '#1e293b', cursor: 'pointer' }}>
-                <b>Kích hoạt cổng chuyển khoản VietQR tự động tại POS</b>
+                <b>Kích hoạt thanh toán VietQR tại POS</b>
               </label>
             </div>
 
@@ -859,10 +921,13 @@ export const StorePaymentConfigPage: FC = () => {
           </div>
         </div>
 
-        {/* CỘT PHẢI: CẨM NANG HƯỚNG DẪN 5 BƯỚC CÓ GIAO DIỆN MẪU SEPAY TRỰC QUAN */}
+        {/* CỘT PHẢI: CẨM NANG HƯỚNG DẪN CÓ GIAO DIỆN MẪU SEPAY TRỰC QUAN */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
-            Cẩm Nang Hướng Dẫn Đăng Ký SePay (Có Giao Diện Mẫu Trực Quan)
+            Hướng dẫn cấu hình SePay
+          </div>
+          <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a8a', fontSize: 12.5 }}>
+            Làm theo 5 bước bên dưới. Giao diện SePay có thể thay đổi theo phiên bản.
           </div>
 
           {/* Bước 1 & 2 */}
@@ -870,7 +935,7 @@ export const StorePaymentConfigPage: FC = () => {
             <div style={{ padding: 14, border: '1px solid #e2e8f0', borderRadius: 8, backgroundColor: '#ffffff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f766e' }}>
-                  Bước 1: Đăng ký tài khoản SePay
+                  ① Tạo và xác minh tài khoản SePay
                 </div>
                 <a
                   href="https://my.sepay.vn"
@@ -890,21 +955,21 @@ export const StorePaymentConfigPage: FC = () => {
                 </a>
               </div>
               <div style={{ fontSize: 12.5, color: '#475569', marginTop: 4 }}>
-                Truy cập <code>https://my.sepay.vn</code> và đăng ký bằng Số điện thoại hoặc Email của bạn (Miễn phí 100%).
+                Truy cập <code>my.sepay.vn</code>, đăng ký/đăng nhập và hoàn tất thông tin công ty. Không chia sẻ mật khẩu hoặc mã OTP cho người khác.
               </div>
             </div>
 
             <div style={{ padding: 14, border: '1px solid #e2e8f0', borderRadius: 8, backgroundColor: '#ffffff' }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f766e' }}>
-                Bước 2: Thêm tài khoản ngân hàng
+                ② Liên kết tài khoản ngân hàng nhận tiền
               </div>
               <div style={{ fontSize: 12.5, color: '#475569', marginTop: 4 }}>
-                Vào menu <b>Tài khoản ngân hàng</b> → Bấm <b>Thêm tài khoản</b> → Chọn ngân hàng (MB, VCB...) và nhập STK nhận tiền.
+                Vào <b>Ngân hàng → Thêm tài khoản</b>, chọn ngân hàng và làm theo hướng dẫn liên kết. Kiểm tra tài khoản có trạng thái <b>Hoạt động</b>.
               </div>
             </div>
           </div>
 
-          {/* Bước 3: Mockup UI Lấy API Key */}
+          {/* Bước 3: Ảnh thật trang API Access của SePay */}
           <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, overflow: 'hidden', backgroundColor: '#ffffff' }}>
             <div
               style={{
@@ -917,142 +982,31 @@ export const StorePaymentConfigPage: FC = () => {
               }}
             >
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f766e' }}>
-                Bước 3: Màn hình SePay - Lấy API Key (Quyền Read-Only)
+                ③ Tạo API Token để hệ thống đồng bộ tài khoản
               </div>
-              <span style={{ fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}>my.sepay.vn / userapi / keys</span>
+              <span style={{ fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}>Cấu hình Công ty / API Access</span>
             </div>
 
-            {/* Mockup Canvas */}
-            <div style={{ padding: 16, backgroundColor: '#f8fafc' }}>
-              <div
-                style={{
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 8,
-                  backgroundColor: '#ffffff',
-                  display: 'grid',
-                  gridTemplateColumns: '180px 1fr',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                }}
-              >
-                {/* Mockup Sidebar */}
-                <div style={{ backgroundColor: '#0f172a', color: '#94a3b8', padding: '14px 10px', fontSize: 11.5 }}>
-                  <div
-                    style={{
-                      color: '#38bdf8',
-                      fontWeight: 800,
-                      fontSize: 13,
-                      marginBottom: 14,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <div style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: '#38bdf8' }} />
-                    <span>SePay Dashboard</span>
-                  </div>
-                  <div style={{ padding: '4px 6px', color: '#64748b' }}>Tổng quan</div>
-                  <div style={{ padding: '4px 6px', color: '#64748b' }}>Tài khoản NH</div>
-                  <div style={{ padding: '4px 6px', color: '#64748b' }}>Giao dịch</div>
-                  <div
-                    style={{
-                      marginTop: 8,
-                      padding: '4px 6px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      borderRadius: 4,
-                      fontWeight: 700,
-                    }}
-                  >
-                    Tích hợp Web
-                  </div>
-                  <div style={{ padding: '4px 14px', color: '#38bdf8', fontWeight: 700 }}>• API Key</div>
-                  <div style={{ padding: '4px 14px', color: '#94a3b8' }}>• Webhooks</div>
-                </div>
-
-                {/* Mockup Content */}
-                <div style={{ padding: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>Danh sách API Keys</div>
-                    <button
-                      type="button"
-                      style={{
-                        backgroundColor: '#0284c7',
-                        color: '#ffffff',
-                        border: 'none',
-                        borderRadius: 4,
-                        padding: '4px 12px',
-                        fontSize: 12,
-                        fontWeight: 700,
-                      }}
-                    >
-                      + Tạo API Key
-                    </button>
-                  </div>
-
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '10px 12px', backgroundColor: '#f8fafc' }}>
-                    <div style={{ fontSize: 11.5, color: '#64748b' }}>Tên Key: Quầy POS MT-Mart</div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                      <code
-                        style={{
-                          fontSize: 12,
-                          color: '#0f766e',
-                          fontWeight: 700,
-                          backgroundColor: '#ecfdf5',
-                          padding: '3px 8px',
-                          borderRadius: 4,
-                        }}
-                      >
-                        sepay_apikey_••••••••••••8899
-                      </code>
-                      <button
-                        type="button"
-                        style={{
-                          backgroundColor: '#ffffff',
-                          border: '1px solid #0284c7',
-                          color: '#0284c7',
-                          borderRadius: 4,
-                          padding: '3px 10px',
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 3,
-                        }}
-                      >
-                        <Copy size={11} color="#0284c7" /> Sao chép
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Callout */}
-                  <div
-                    style={{
-                      marginTop: 12,
-                      padding: '10px 12px',
-                      backgroundColor: '#fef3c7',
-                      border: '1px solid #fde68a',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      color: '#92400e',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <ArrowRight size={16} className="text-amber-700 flex-shrink-0" />
-                    <span>
-                      <b>HƯỚNG DẪN:</b> Bấm <b>Tạo API Key</b> → Bấm <b>Sao chép</b> mã này → Bấm <b>Đổi / Xoay khóa mới</b> ở ô số 4 bên trái để dán vào (Server tự động mã hóa AES-256)!
-                    </span>
-                  </div>
-                </div>
+            <div style={{ padding: 12, backgroundColor: '#f8fafc', minWidth: 0 }}>
+              <svg viewBox="0 455 260 305" role="img" aria-label="Menu Cấu hình Công ty và API Access trên SePay" style={{ width: '100%', maxWidth: 260, display: 'block', margin: '0 auto 10px', borderRadius: 7, border: '1px solid #cbd5e1' }}>
+                <image href="/guides/sepay-api-access.png" width="1707" height="876" />
+                <path d="M 200 515 L 150 497 M 150 497 L 160 507 M 150 497 L 164 493 M 200 710 L 130 733 M 130 733 L 142 723 M 130 733 L 145 735" fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                <text x="205" y="520" fill="white" stroke="#b91c1c" strokeWidth="3" paintOrder="stroke" fontSize="20" fontWeight="bold">1</text>
+                <text x="205" y="714" fill="white" stroke="#b91c1c" strokeWidth="3" paintOrder="stroke" fontSize="20" fontWeight="bold">2</text>
+              </svg>
+              <svg viewBox="460 145 1040 255" role="img" aria-label="Trang API Access, mũi tên chỉ nút Thêm API và sao chép token" style={{ width: '100%', display: 'block', borderRadius: 7, border: '1px solid #cbd5e1' }}>
+                <image href="/guides/sepay-api-access.png" width="1707" height="876" />
+                <path d="M 1360 215 L 1410 190 M 1410 190 L 1393 192 M 1410 190 L 1402 204 M 735 295 L 660 291 M 660 291 L 675 282 M 660 291 L 675 300" fill="none" stroke="#dc2626" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                <text x="1335" y="225" fill="#b91c1c" fontSize="24" fontWeight="bold">3</text>
+                <text x="745" y="302" fill="#b91c1c" fontSize="24" fontWeight="bold">4</text>
+              </svg>
+              <div style={{ marginTop: 10, padding: '10px 12px', backgroundColor: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, fontSize: 12, color: '#92400e', fontWeight: 600 }}>
+                ① Mở <b>Cấu hình Công ty</b> → ② chọn <b>API Access</b> → ③ bấm <b>+ Thêm API</b>, đặt tên và chọn <b>Hoạt động</b> → ④ sao chép Token rồi dán vào ô <b>SePay API Key</b> bên trái. Giữ Token bí mật như mật khẩu.
               </div>
             </div>
           </div>
 
-          {/* Bước 4: Mockup UI Thêm Webhook */}
+          {/* Bước 4: Ảnh thật trang Webhooks của SePay */}
           <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, overflow: 'hidden', backgroundColor: '#ffffff' }}>
             <div
               style={{
@@ -1065,134 +1019,49 @@ export const StorePaymentConfigPage: FC = () => {
               }}
             >
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f766e' }}>
-                Bước 4: Màn hình SePay - Thêm Webhook Bắn Tiền Tự Động (Header Apikey)
+                ④ Tạo Webhook thông báo giao dịch tiền vào
               </div>
-              <span style={{ fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}>my.sepay.vn / userapi / webhooks / create</span>
+              <span style={{ fontSize: 12, color: '#64748b', fontFamily: 'monospace' }}>Webhooks / + Thêm webhook</span>
             </div>
 
-            {/* Mockup Canvas */}
-            <div style={{ padding: 16, backgroundColor: '#f8fafc' }}>
-              <div
-                style={{
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 8,
-                  backgroundColor: '#ffffff',
-                  display: 'grid',
-                  gridTemplateColumns: '180px 1fr',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                }}
-              >
-                {/* Mockup Sidebar */}
-                <div style={{ backgroundColor: '#0f172a', color: '#94a3b8', padding: '14px 10px', fontSize: 11.5 }}>
-                  <div
-                    style={{
-                      color: '#38bdf8',
-                      fontWeight: 800,
-                      fontSize: 13,
-                      marginBottom: 14,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    <div style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: '#38bdf8' }} />
-                    <span>SePay Dashboard</span>
-                  </div>
-                  <div style={{ padding: '4px 6px', color: '#64748b' }}>Tổng quan</div>
-                  <div style={{ padding: '4px 6px', color: '#64748b' }}>Tài khoản NH</div>
-                  <div style={{ padding: '4px 6px', color: '#64748b' }}>Giao dịch</div>
-                  <div
-                    style={{
-                      marginTop: 8,
-                      padding: '4px 6px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      borderRadius: 4,
-                      fontWeight: 700,
-                    }}
-                  >
-                    Tích hợp Web
-                  </div>
-                  <div style={{ padding: '4px 14px', color: '#94a3b8' }}>• API Key</div>
-                  <div style={{ padding: '4px 14px', color: '#38bdf8', fontWeight: 700 }}>• Webhooks</div>
-                </div>
-
-                {/* Mockup Form */}
-                <div style={{ padding: 16 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a', marginBottom: 12 }}>
-                    Thêm Webhook nhận thông báo
-                  </div>
-
-                  <div style={{ marginBottom: 10 }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
-                      Địa chỉ Webhook (URL nhận POST):
-                    </div>
-                    <input
-                      type="text"
-                      readOnly
-                      value={webhookUrl}
-                      style={{
-                        width: '100%',
-                        padding: '6px 10px',
-                        fontSize: 11.5,
-                        backgroundColor: '#f0fdfa',
-                        border: '1.5px solid #0f766e',
-                        borderRadius: 4,
-                        color: '#0f766e',
-                        fontWeight: 600,
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
-                      Kiểu chứng thực & Sự kiện kích hoạt:
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: '#1e293b', flexWrap: 'wrap' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input type="checkbox" checked readOnly style={{ accentColor: '#0284c7' }} />
-                        <span>Giao dịch nhận tiền (Money In)</span>
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input type="checkbox" checked readOnly style={{ accentColor: '#0284c7' }} />
-                        <span>Header: <code>Authorization: Apikey</code></span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Callout */}
-                  <div
-                    style={{
-                      padding: '10px 12px',
-                      backgroundColor: '#ecfdf5',
-                      border: '1px solid #a7f3d0',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      color: '#065f46',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                    }}
-                  >
-                    <ArrowRight size={16} className="text-emerald-700 flex-shrink-0" />
-                    <span>
-                      <b>HƯỚNG DẪN:</b> Copy link Webhook ở ô số 5 (cột trái) dán vào đây, chọn chứng thực bằng <b>API Key</b> rồi bấm <b>Thêm Webhook</b>!
-                    </span>
-                  </div>
-                </div>
+            <div style={{ padding: 12, backgroundColor: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 10, width: '100%', minWidth: 0 }}>
+                <figure style={{ margin: 0, minWidth: 0 }}>
+                  <svg viewBox="0 365 260 140" role="img" aria-label="Menu Tích hợp WebHooks trên SePay" style={{ width: '100%', maxWidth: 260, display: 'block', margin: '0 auto 10px', borderRadius: 7, border: '1px solid #cbd5e1' }}>
+                    <image href="/guides/sepay-webhooks.png" width="1707" height="876" />
+                    <path d="M 215 470 L 180 441 M 180 441 L 194 444 M 180 441 L 185 455" fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                    <text x="220" y="478" fill="white" stroke="#b91c1c" strokeWidth="3" paintOrder="stroke" fontSize="20" fontWeight="bold">1</text>
+                  </svg>
+                  <svg viewBox="260 145 1440 170" role="img" aria-label="Trang Webhooks, mũi tên chỉ nút Thêm webhook" style={{ width: '100%', display: 'block', borderRadius: 7, border: '1px solid #cbd5e1' }}>
+                    <image href="/guides/sepay-webhooks.png" width="1707" height="876" />
+                    <path d="M 1480 280 L 1575 245 M 1575 245 L 1555 244 M 1575 245 L 1562 261" fill="none" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                    <text x="1450" y="290" fill="#b91c1c" fontSize="30" fontWeight="bold">2</text>
+                  </svg>
+                  <figcaption style={{ marginTop: 5, fontSize: 11.5, color: '#475569', fontWeight: 700 }}>A. Mở danh sách và bấm “Thêm webhook”</figcaption>
+                </figure>
+                <figure style={{ margin: 0, minWidth: 0 }}>
+                  <svg viewBox="1007 0 700 876" role="img" aria-label="Form Thêm Webhook, mũi tên chỉ URL và nút Tiếp theo" style={{ width: '100%', maxWidth: 520, display: 'block', margin: '0 auto', borderRadius: 7, border: '1px solid #cbd5e1' }}>
+                    <image href="/guides/sepay-add-webhook.png" width="1707" height="876" />
+                    <path d="M 1540 250 L 1490 286 M 1490 286 L 1508 284 M 1490 286 L 1497 270 M 1510 790 L 1590 835 M 1590 835 L 1571 833 M 1590 835 L 1582 818" fill="none" stroke="#dc2626" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                    <text x="1545" y="250" fill="#b91c1c" fontSize="24" fontWeight="bold">3</text>
+                    <text x="1480" y="790" fill="#b91c1c" fontSize="24" fontWeight="bold">4</text>
+                  </svg>
+                  <figcaption style={{ marginTop: 5, fontSize: 11.5, color: '#475569', fontWeight: 700 }}>B. Hoàn thành lần lượt Cơ bản → Tài khoản → Bảo mật → Cảnh báo</figcaption>
+                </figure>
+              </div>
+              <div style={{ padding: '10px 12px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 6, fontSize: 12, color: '#065f46', fontWeight: 600 }}>
+                ① Chọn <b>Tích hợp WebHooks</b> → ② bấm <b>+ Thêm webhook</b> → ③ nhập tên, dán URL ở ô số 5 bên trái, chọn <b>Tiền vào</b> và <b>JSON</b> → ④ bấm <b>Tiếp theo</b>. Sau đó chọn tài khoản ngân hàng, chọn bảo mật <b>API Key</b> và dán Token ở bước ③, kiểm tra rồi bấm <b>Thêm</b>.
               </div>
             </div>
           </div>
 
           {/* Bước 5 */}
-          <div style={{ padding: 14, border: '1px solid #e2e8f0', borderRadius: 8, backgroundColor: '#ffffff' }}>
+          <div style={{ padding: 14, border: '1px solid #99f6e4', borderRadius: 8, backgroundColor: '#f0fdfa' }}>
             <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f766e' }}>
-              Bước 5: Trải nghiệm thanh toán chuyển khoản VietQR tự động báo "Ting Ting" tại quầy POS
+              ⑤ Lưu cấu hình trong MT-GRMS và gán theo chi nhánh
             </div>
             <div style={{ fontSize: 12.5, color: '#475569', marginTop: 4 }}>
-              Mở quầy bán hàng POS, tạo đơn và chọn <b>Chuyển khoản (QR)</b>. Hệ thống tự động gắn tiền tố <code>{tenantPrefix}_HDxxxx</code>, đối soát 6 lớp và tự động in hóa đơn sau 2.5 giây ngay khi tiền vào tài khoản!
+              Lần đầu, nhập tài khoản ngân hàng, chọn chi nhánh và dán API Token vào ô số 4, rồi bấm <b>Lưu Cấu Hình</b>. Sau khi lưu, có thể bấm <b>Đồng bộ SePay</b> để chọn tài khoản khác và gán cho chi nhánh. Mỗi chi nhánh chỉ dùng một tài khoản nhận tiền tại một thời điểm.
             </div>
           </div>
         </div>
