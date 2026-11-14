@@ -289,6 +289,10 @@ const NAV_GROUPS: NavGroup[] = [
         title: "Lịch & Chấm công",
         items: [
           {
+            label: "Cấu hình ca làm việc",
+            to: "/store-owner/employees/shifts"
+          },
+          {
             label: "Lịch làm việc chi nhánh",
             to: "/store-owner/employees/schedule"
           },
@@ -299,11 +303,7 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Duyệt đơn yêu cầu",
             to: "/store-owner/employees/approval-requests"
-          },
-          {
-            label: "Cấu hình ca làm việc",
-            to: "/store-owner/employees/shifts"
-          },
+          }
         ],
       }
     ],

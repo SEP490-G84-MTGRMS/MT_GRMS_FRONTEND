@@ -226,6 +226,7 @@ export interface PayslipDetailedRecord {
   employeeId: string;
   employeeCode: string; // NV001
   employeeName: string; // Dung Phạm
+  branchId?: string;
   branchName: string; // Chi nhánh trung tâm
   periodMonth: string; // 2026-10
 
@@ -277,6 +278,7 @@ export interface PayslipDetailedRecord {
   paidBy?: string; // Người chi trả
   cashbookVoucherCode?: string; // Mã phiếu chi sổ quỹ (PC-xxxx)
   approvedBy?: string; // Người duyệt
+  approvedAt?: string; // Thời điểm chốt lương
   note?: string; // Ghi chú phiếu lương
   bankName?: string;
   bankAccountNumber?: string;

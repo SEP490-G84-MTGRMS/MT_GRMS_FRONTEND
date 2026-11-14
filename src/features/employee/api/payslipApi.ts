@@ -26,6 +26,8 @@ export interface PayslipSummaryDto {
   paidAt?: string | null;
   paymentMethod?: string | null;
   cashbookVoucherCode?: string | null;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 }
 
 export interface PayslipResponse {
@@ -91,12 +93,23 @@ export interface PayPayslipRequest {
   paymentMethod: string;
   note?: string;
   cashbookAccountId?: string;
+  paidAt?: string;
+}
+
+export interface SalaryAdvanceRequest {
+  amount: number;
+  paymentMethod: string;
+  note?: string;
+  cashbookAccountId?: string;
+  paidAt?: string;
 }
 
 export interface BatchPayPayslipsRequest {
   payslipIds: string[];
   paymentMethod: string;
   note?: string;
+  cashbookAccountId?: string;
+  paidAt?: string;
 }
 
 export interface BatchPayResultDto {
@@ -104,6 +117,14 @@ export interface BatchPayResultDto {
   successCount: number;
   failedCount: number;
   paidPayslipCodes: string[];
+  errors: string[];
+}
+
+export interface BatchFinalizeResultDto {
+  totalRequested: number;
+  successCount: number;
+  failedCount: number;
+  finalizedPayslipCodes: string[];
   errors: string[];
 }
 
@@ -158,6 +179,7 @@ export function mapBackendSummaryToDetailedRecord(dto: PayslipSummaryDto): Paysl
     employeeId: dto.employeeId,
     employeeCode: dto.employeeCode,
     employeeName: dto.employeeName,
+    branchId: dto.branchId,
     branchName: dto.branchName,
     periodMonth: dto.periodMonth,
     salaryType: normalizeSalaryType(dto.salaryType),
@@ -185,6 +207,8 @@ export function mapBackendSummaryToDetailedRecord(dto: PayslipSummaryDto): Paysl
     paidAt: dto.paidAt ? dto.paidAt.replace('T', ' ').substring(0, 16) : undefined,
     paymentMethod: dto.paymentMethod ? (dto.paymentMethod.toUpperCase() as any) : undefined,
     cashbookVoucherCode: dto.cashbookVoucherCode || undefined,
+    approvedAt: dto.approvedAt ? dto.approvedAt.replace('T', ' ').substring(0, 16) : undefined,
+    approvedBy: dto.approvedBy || undefined,
   };
 }
 
@@ -204,6 +228,7 @@ export function mapBackendDetailToDetailedRecord(dto: PayslipResponse): PayslipD
     employeeId: dto.employeeId,
     employeeCode: dto.employeeCode,
     employeeName: dto.employeeName,
+    branchId: dto.branchId,
     branchName: dto.branchName,
     periodMonth: dto.periodMonth,
     salaryType: normalizeSalaryType(dto.salaryType),
@@ -245,6 +270,7 @@ export function mapBackendDetailToDetailedRecord(dto: PayslipResponse): PayslipD
     paidBy: dto.paidBy || undefined,
     cashbookVoucherCode: dto.cashbookVoucherCode || undefined,
     approvedBy: dto.approvedBy || undefined,
+    approvedAt: dto.approvedAt ? dto.approvedAt.replace('T', ' ').substring(0, 16) : undefined,
     note: dto.note || undefined,
     bankName: dto.bankName || undefined,
     bankAccountNumber: dto.bankAccountNumber || undefined,
@@ -400,6 +426,40 @@ export const payslipApi = {
       return res.data.data;
     }
 
-    throw new Error(res.data?.message || 'Không thể thực hiện chi trả hàng loạt.');
+    throw new Error(res.data?.message || 'Không thể chi trả hàng loạt phiếu lương.');
+  },
+
+  async finalizePayslip(id: string): Promise<PayslipResponse> {
+    const res = await httpClient.post<ApiResponse<PayslipResponse>>(`/payslips/${id}/finalize`);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể chốt phiếu lương.');
+  },
+
+  async batchFinalizePayslips(payslipIds: string[]): Promise<BatchFinalizeResultDto> {
+    const res = await httpClient.post<ApiResponse<BatchFinalizeResultDto>>('/payslips/batch-finalize', {
+      payslipIds,
+    });
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể chốt hàng loạt phiếu lương.');
+  },
+
+  async unfinalizePayslip(id: string): Promise<PayslipResponse> {
+    const res = await httpClient.post<ApiResponse<PayslipResponse>>(`/payslips/${id}/unfinalize`);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể mở chốt phiếu lương.');
+  },
+
+  async advanceSalary(id: string, data: SalaryAdvanceRequest): Promise<PayslipResponse> {
+    const res = await httpClient.post<ApiResponse<PayslipResponse>>(`/payslips/${id}/advance`, data);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể tạo khoản tạm ứng lương.');
   },
 };
