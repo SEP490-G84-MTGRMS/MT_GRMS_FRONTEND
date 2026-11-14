@@ -19,11 +19,15 @@ import { goodsReceiptApi, type BackendGoodsReceiptDto } from '../api/goodsReceip
 import { branchApi } from '../../purchase-order/api/branchApi';
 import { GrnFormHeaderCard, type GrnBranchOption } from '../components/form/GrnFormHeaderCard';
 import { GrnProductEntryTable } from '../components/form/GrnProductEntryTable';
-import { GrnCostSummaryCard } from '../components/form/GrnCostSummaryCard';
-import { GrnFormActionBar } from '../components/form/GrnFormActionBar';
+import { GrnFormFooter } from '../components/form/GrnFormFooter';
 import { GrnMismatchConfirmModal } from '../components/form/GrnMismatchConfirmModal';
 import { GrnPrintPreviewModal } from '../components/form/GrnPrintPreviewModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import {
+  formatDeliveryDateGateMessage,
+  isDeliveryDateReached,
+  toDeliveryDateKey,
+} from '../../purchase-order/lib/deliveryDateGate';
 import '../../purchase-order/purchase-order.css';
 
 const mapPaymentMethod = (method: PaymentMethod): string => {
@@ -144,9 +148,11 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   const [paymentTerm, setPaymentTerm] = useState<PaymentTerm>('30');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Credit');
   const [notes, setNotes] = useState('');
+  const [poDeliveryDate, setPoDeliveryDate] = useState<string | null>(null);
   const [items, setItems] = useState<GrnItemDetail[]>([]);
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [vatPercent, setVatPercent] = useState(0);
+  // GRN không nhập CK/VAT lúc nhận — luôn 0; BE còn field nên vẫn gửi 0.
+  const discountAmount = 0;
+  const vatPercent = 0;
 
   const [isMismatchModalOpen, setIsMismatchModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -177,8 +183,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       setSupplierCode(dto.supplierCode);
       setInvoiceNo(dto.invoiceNo || '');
       setNotes(dto.note || '');
-      setDiscountAmount(dto.discountAmount || 0);
-      setVatPercent(dto.vatPercent || 0);
       if (dto.receivedAtUtc) {
         const d = new Date(dto.receivedAtUtc);
         const day = String(d.getDate()).padStart(2, '0');
@@ -241,6 +245,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         setAvailablePos(pos);
         setPoReference(matched.poCode);
         setSelectedPoId(matched.id);
+        setPoDeliveryDate(toDeliveryDateKey(matched.expectedDeliveryDate));
         return;
       }
 
@@ -344,6 +349,14 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
           });
         }
 
+        const deliveryKey = toDeliveryDateKey(details.deliveryDate);
+        setPoDeliveryDate(deliveryKey);
+        if (!isDeliveryDateReached(deliveryKey)) {
+          showToast(formatDeliveryDateGateMessage(deliveryKey), 'warning');
+          navigate(listPath);
+          return;
+        }
+
         setSupplierId(details.supplierId);
         setSupplierName(details.supplierName);
         setSupplierCode(details.supplierCode);
@@ -387,7 +400,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     return () => {
       cancelled = true;
     };
-  }, [selectedPoId, isCreateMode, role, employeeBranchId]);
+  }, [selectedPoId, isCreateMode, role, employeeBranchId, listPath, navigate]);
 
   const costs: GrnCostSummary = useMemo(() => {
     const goodsTotal = items.reduce((acc, it) => acc + it.lineTotal, 0);
@@ -411,8 +424,9 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
           updated.differenceQty = received - updated.orderedQty;
           updated.lineTotal = received * updated.unitPrice;
         }
+        // RULE-02: giá nhận = giá PO — không cho sửa unitPrice trên form
         if (field === 'unitPrice') {
-          updated.lineTotal = (updated.receivedQty || 0) * Number(value);
+          return it;
         }
         if (field === 'manageBatch') {
           if (value) {
@@ -430,6 +444,20 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             updated.batchCode = '';
             updated.manufactureDate = '';
             updated.expiryDate = '';
+          }
+        }
+        // HSD không được trước ngày SX — clear nếu lệch
+        if (field === 'manufactureDate') {
+          const mfg = String(value || '');
+          if (mfg && updated.expiryDate && updated.expiryDate < mfg) {
+            updated.expiryDate = '';
+          }
+        }
+        if (field === 'expiryDate') {
+          const exp = String(value || '');
+          const mfg = updated.manufactureDate || '';
+          if (exp && mfg && exp < mfg) {
+            return it;
           }
         }
         return updated;
@@ -508,6 +536,10 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     }
     if (items.length === 0) {
       showToast('Danh sách hàng nhập không được để trống!', 'error');
+      return false;
+    }
+    if (!isDeliveryDateReached(poDeliveryDate)) {
+      showToast(formatDeliveryDateGateMessage(poDeliveryDate), 'warning');
       return false;
     }
 
@@ -606,29 +638,30 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     if (!validateForm()) return;
     setIsSaving(true);
     try {
-      // Phiếu DRAFT đã có: hủy rồi tạo lại để lưu đúng kiểm đếm (API chưa có update dòng)
+      const command = buildCreateCommand(false);
+      let saved: BackendGoodsReceiptDto;
+
       if (!isCreateMode && id && receiptStatus === 'DRAFT') {
-        await goodsReceiptApi.cancelGoodsReceipt(
-          id,
-          autoComplete
-            ? 'Cập nhật kiểm đếm và hoàn tất nhập kho'
-            : 'Cập nhật kiểm đếm phiếu nháp'
-        );
+        saved = await goodsReceiptApi.updateDraftGoodsReceipt(id, command);
+        if (autoComplete) {
+          saved = await goodsReceiptApi.completeGoodsReceipt(saved.id, notes);
+        }
+      } else {
+        saved = await goodsReceiptApi.createGoodsReceipt(buildCreateCommand(autoComplete));
       }
 
-      const created = await goodsReceiptApi.createGoodsReceipt(buildCreateCommand(autoComplete));
-      const hasAutoReturn = autoComplete && !!created.createdReturnCode;
+      const hasAutoReturn = autoComplete && !!saved.createdReturnCode;
       showToast(
         autoComplete
           ? hasAutoReturn
-            ? `Hoàn tất nhập kho ${created.code} & Đã lập Phiếu trả hàng ${created.createdReturnCode} (Từ chối nhận hàng — Tài xế chở về ngay)!`
-            : `Hoàn tất nhập kho ${created.code}. Tồn kho đã được cập nhật.`
-          : `Đã lưu nháp phiếu ${created.code}.`,
+            ? `Hoàn tất nhập kho ${saved.code} & Đã lập Phiếu trả hàng ${saved.createdReturnCode} (Từ chối nhận hàng — Tài xế chở về ngay)!`
+            : `Hoàn tất nhập kho ${saved.code}. Tồn kho đã được cập nhật.`
+          : `Đã lưu nháp phiếu ${saved.code}.`,
         'success'
       );
       setTimeout(() => {
-        if (redirectToReturn && created.createdReturnId) {
-          navigate(`/store-owner/supplier-returns/${created.createdReturnId}`);
+        if (redirectToReturn && saved.createdReturnId) {
+          navigate(`/store-owner/supplier-returns/${saved.createdReturnId}`);
         } else if (redirectToReturn) {
           navigate('/store-owner/supplier-returns');
         } else {
@@ -691,17 +724,20 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   return (
     <div
       style={{
-        padding: '16px 24px 32px 24px',
+        padding: '16px 24px 24px',
         backgroundColor: '#f8fafc',
-        minHeight: 'calc(100vh - 60px)',
+        height: 'calc(100vh - 60px)',
+        maxHeight: 'calc(100vh - 60px)',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        gap: 14,
+        gap: 12,
+        overflow: 'hidden',
       }}
     >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <button
           type="button"
           onClick={() => navigate(listPath)}
@@ -746,59 +782,67 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             </span>
             {isSaving && <Loader2 size={16} className="animate-spin" color="#0d9488" />}
           </h1>
-          <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
-            Đối soát số lượng thực nhận, kiểm tra hạn sử dụng FEFO và tính chi phí nhập kho
-          </p>
         </div>
       </div>
 
-      <GrnFormHeaderCard
-        grnNo={grnNo}
-        branchId={branchId}
-        poReference={poReference}
-        availablePos={availablePos}
-        branches={branches}
-        supplierName={supplierName}
-        supplierCode={supplierCode}
-        receiptTime={receiptTime}
-        invoiceNo={invoiceNo}
-        createdBy={createdBy}
-        paymentTerm={paymentTerm}
-        paymentMethod={paymentMethod}
-        role={role}
-        employeeBranchId={employeeBranchId}
-        readOnly={isReadOnly || !isCreateMode}
-        onBranchChange={setBranchId}
-        onPoChange={handlePoChange}
-        onInvoiceNoChange={setInvoiceNo}
-        onPaymentTermChange={setPaymentTerm}
-        onPaymentMethodChange={setPaymentMethod}
-      />
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 10,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <GrnFormHeaderCard
+            grnNo={grnNo}
+            branchId={branchId}
+            poReference={poReference}
+            availablePos={availablePos}
+            branches={branches}
+            supplierName={supplierName}
+            supplierCode={supplierCode}
+            receiptTime={receiptTime}
+            invoiceNo={invoiceNo}
+            createdBy={createdBy}
+            paymentTerm={paymentTerm}
+            paymentMethod={paymentMethod}
+            role={role}
+            employeeBranchId={employeeBranchId}
+            readOnly={isReadOnly || !isCreateMode}
+            onBranchChange={setBranchId}
+            onPoChange={handlePoChange}
+            onInvoiceNoChange={setInvoiceNo}
+            onPaymentTermChange={setPaymentTerm}
+            onPaymentMethodChange={setPaymentMethod}
+          />
 
-      <GrnProductEntryTable
-        items={items}
-        readOnly={isReadOnly}
-        onItemChange={handleItemChange}
-        onRemoveRow={handleRemoveRow}
-        onSplitLot={handleSplitLot}
-      />
+          <GrnProductEntryTable
+            items={items}
+            readOnly={isReadOnly}
+            onItemChange={handleItemChange}
+            onRemoveRow={handleRemoveRow}
+            onSplitLot={handleSplitLot}
+          />
+        </div>
 
-      <GrnCostSummaryCard
-        notes={notes}
-        costs={costs}
-        readOnly={isReadOnly}
-        onNotesChange={setNotes}
-        onDiscountChange={setDiscountAmount}
-        onVatPercentChange={setVatPercent}
-      />
-
-      <GrnFormActionBar
-        readOnly={isReadOnly}
-        onCancel={() => navigate(listPath)}
-        onSaveDraft={handleSaveDraft}
-        onCompleteAndPrint={handleCompleteAndPrint}
-        onComplete={handleComplete}
-      />
+        <GrnFormFooter
+          notes={notes}
+          readOnly={isReadOnly}
+          isSaving={isSaving}
+          hidePrint
+          onNotesChange={setNotes}
+          onCancel={() => navigate(listPath)}
+          onSaveDraft={handleSaveDraft}
+          onCompleteAndPrint={handleCompleteAndPrint}
+          onComplete={handleComplete}
+        />
+      </div>
 
       <GrnMismatchConfirmModal
         isOpen={isMismatchModalOpen}

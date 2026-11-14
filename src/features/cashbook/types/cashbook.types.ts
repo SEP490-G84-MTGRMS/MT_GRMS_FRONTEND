@@ -64,7 +64,9 @@ export interface LedgerTransaction {
   description: string;
   referenceDocType: ReferenceDocType;
   referenceDocId?: string;
+  sourceId?: string | null;
   sourceModuleName?: SourceModuleName;
+  sourceType?: string;
   linkedTransactionId?: string;
   isAutomated: boolean;
   createdBy: string;
@@ -95,7 +97,8 @@ export interface CashbookFilterParams {
   branchId?: string;
   accountId?: string;
   transactionType?: TransactionType | 'ALL';
-  datePeriod?: 'today' | 'last_7_days' | 'this_month' | 'last_month' | 'custom';
+  sourceType?: string;
+  datePeriod?: 'today' | 'last_7_days' | 'this_month' | 'last_month' | 'custom' | 'all';
   startDate?: string;
   endDate?: string;
   searchQuery?: string;
@@ -155,39 +158,6 @@ export interface CashbookSummaryKPI {
   totalCashInDrawers: number;
   totalBankDeposits: number;
   totalSafeDepositBalance?: number;
-}
-
-export interface DepositItem {
-  id: string;
-  voucherCode: string;
-  customerName: string;
-  originalAmount: number;
-  amount?: number;
-  refundedAmount: number;
-  remainingAmount: number;
-  remainingDeposit?: number;
-  isSettled: boolean;
-  createdAt: string;
-  note?: string;
-}
-
-export interface CreateDepositDTO {
-  branchId?: string;
-  customerName: string;
-  amount: number;
-  paymentSourceType?: string;
-  paymentSourceAccountId?: string;
-  accountId?: string;
-  note?: string;
-}
-
-export interface RefundDepositDTO {
-  amount?: number;
-  refundAmount?: number;
-  paymentSourceType?: string;
-  paymentSourceAccountId?: string;
-  accountId?: string;
-  note?: string;
 }
 
 export interface TriageItem {

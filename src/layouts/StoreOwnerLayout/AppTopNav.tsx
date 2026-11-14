@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
-import type { FC } from "react";
+import type { FC, RefObject } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   DashboardIcon,
@@ -7,7 +7,6 @@ import {
   PackageIcon,
   ChevronRightIcon,
   MenuIcon,
-  TrendingUpIcon,
 } from "../../features/admin/components";
 import {
   Gift,
@@ -25,6 +24,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
+import { authService } from "../../features/auth/authService";
 import {
   NotificationBadge,
   NotificationPopover,
@@ -38,8 +38,10 @@ interface NavSubItem {
   label: string;
   to: string;
   badge?: string;
-  badgeType?: "red" | "blue";
+  badgeType?: "red" | "blue" | "orange";
   divider?: boolean;
+  desc?: string;
+  icon?: FC<{ size?: number; color?: string }> | string;
 }
 
 interface NavSection {
@@ -52,6 +54,8 @@ interface NavGroup {
   label: string;
   icon: FC<{ size?: number; color?: string }>;
   to?: string; // direct link (no dropdown)
+  badge?: number | string;
+  badgeType?: "red" | "blue" | "orange";
   children?: NavSubItem[];
   sections?: NavSection[];
 }
@@ -86,6 +90,11 @@ const StoreNavIcon: FC<{ size?: number; color?: string }> = ({
   size = 18,
   color = "currentColor",
 }) => <Store size={size} color={color} strokeWidth={1.8} />;
+
+const WalletNavIcon: FC<{ size?: number; color?: string }> = ({
+  size = 18,
+  color = "currentColor",
+}) => <Wallet size={size} color={color} strokeWidth={1.8} />;
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -222,43 +231,39 @@ const NAV_GROUPS: NavGroup[] = [
           },
         ],
       },
-      {
-        title: "Dịch vụ & Tiện ích",
-        items: [
-          {
-            label: "Chi phí mua dịch vụ",
-            to: "/store-owner/expenses",
-            badge: "Mới",
-            badgeType: "red",
-          },
-        ],
-      },
     ],
   },
   {
     id: "finance",
-    label: "Tài chính",
-    icon: TrendingUpIcon,
+    label: "Tiền & Báo cáo",
+    icon: WalletNavIcon,
     sections: [
       {
-        title: "Dòng tiền & Chi tiêu",
+        title: "Tiền",
         items: [
-          { label: "Tổng quan tài chính", to: "/store-owner/finance" },
-          { label: "Tiền của tôi", to: "/store-owner/cashbook" },
-          { label: "Phải trả", to: "/store-owner/expenses" },
+          { label: "Sổ quỹ", to: "/store-owner/cashbook" },
+          {
+            label: "Ca & két (duyệt chi, rút két)",
+            to: "/store-owner/cash-control",
+          },
+          {
+            label: "Chi phí & hóa đơn phải trả",
+            to: "/store-owner/expenses",
+          },
+          {
+            label: "Khách nợ & Thu công nợ",
+            to: "/store-owner/customers",
+          },
         ],
       },
       {
-        title: "Công nợ & Khách hàng",
+        title: "Báo cáo",
         items: [
-          { label: "Khách nợ", to: "/store-owner/customers" },
-        ],
-      },
-      {
-        title: "Báo cáo & Thuế",
-        items: [
-          { label: "Lãi lỗ", to: "/store-owner/reports/pnl" },
-          { label: "Thuế", to: "/store-owner/tax-snapshots" },
+          {
+            label: "Tổng quan tài chính & lãi lỗ",
+            to: "/store-owner/finance",
+          },
+          { label: "Thuế & sổ sách", to: "/store-owner/tax-snapshots" },
         ],
       },
     ],
@@ -371,12 +376,105 @@ const ChevronDown: FC<{ open: boolean }> = ({ open }) => (
   </svg>
 );
 
+/* ─── Dropdown Active Helpers ─── */
+const NAV_PATH_EXCLUSIONS: Record<
+  string,
+  { excludedSegments?: string[]; excludedParams?: string[] }
+> = {
+  "/store-owner/suppliers": {
+    excludedSegments: ["/products", "/branches"],
+    excludedParams: ["view"],
+  },
+  "/store-owner/suppliers/products": { excludedParams: ["view"] },
+  "/store-owner/expenses": { excludedParams: ["view", "tab"] },
+  "/store-owner/employees": {
+    excludedSegments: ["/schedule", "/shifts", "/attendance", "/payroll"],
+    excludedParams: ["view"],
+  },
+  "/store-owner/employees/schedule": { excludedParams: ["view"] },
+  "/store-owner/promotions": { excludedParams: ["view", "action"] },
+  "/store-owner/vouchers": { excludedParams: ["view", "action"] },
+  "/store-owner/loyalty-config": { excludedParams: ["view", "action"] },
+};
+
+function matchesQueryParams(currQuery: string, toQuery: string): boolean {
+  const currParams = new URLSearchParams(currQuery);
+  const toParams = new URLSearchParams(toQuery);
+  let count = 0;
+  let match = true;
+  toParams.forEach((value, key) => {
+    count += 1;
+    if (currParams.get(key) !== value) {
+      match = false;
+    }
+  });
+  return count > 0 && match;
+}
+
+function isQueryNavItemActive(
+  toPath: string,
+  toQuery: string,
+  currPath: string,
+  normalizedQuery: string,
+): boolean {
+  if (
+    toPath === "/store-owner/subscriptions" &&
+    toQuery === "tab=subscriptions" &&
+    !normalizedQuery
+  ) {
+    return currPath === toPath;
+  }
+  if (
+    toPath === "/store-owner/subscriptions" ||
+    toPath === "/store-owner/account"
+  ) {
+    return currPath === toPath && normalizedQuery === toQuery;
+  }
+  return currPath === toPath && matchesQueryParams(normalizedQuery, toQuery);
+}
+
+function isNavItemActive(
+  to: string,
+  currPath: string,
+  currQuery: string,
+): boolean {
+  const [toPath, toQuery] = to.split("?");
+  const normalizedQuery = currQuery.startsWith("?")
+    ? currQuery.slice(1)
+    : currQuery;
+
+  if (toQuery) {
+    return isQueryNavItemActive(toPath, toQuery, currPath, normalizedQuery);
+  }
+
+  const pathMatches =
+    currPath === toPath ||
+    currPath.startsWith(toPath + "/") ||
+    (toPath === "/store-owner/customers" &&
+      (currPath === "/customers" || currPath.startsWith("/customers/")));
+  if (!pathMatches) {
+    return false;
+  }
+
+  const rule = NAV_PATH_EXCLUSIONS[toPath];
+  if (!rule) {
+    return true;
+  }
+
+  if (rule.excludedSegments?.some((seg) => currPath.includes(seg))) {
+    return false;
+  }
+
+  const currParams = new URLSearchParams(normalizedQuery);
+  return !rule.excludedParams?.some((param) => currParams.has(param));
+}
+
 /* ─── Dropdown ─── */
 interface DropdownProps {
   items?: NavSubItem[];
   sections?: NavSection[];
   isOpen: boolean;
-  anchorRef: React.RefObject<HTMLDivElement | null>;
+  anchorRef: RefObject<HTMLDivElement | null>;
   onClose: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
@@ -438,125 +536,19 @@ const NavDropdown: FC<DropdownProps> = ({
   }, [isOpen, onClose, anchorRef]);
 
   const isMega = Boolean(sections && sections.length > 0);
+  const hasRichCards = Boolean(items && items.some((i) => Boolean(i.desc)));
   const rect = anchorRef.current?.getBoundingClientRect();
   const top = rect && rect.bottom > 0 ? rect.bottom : coords.top;
   const rawLeft = rect && rect.left > 0 ? rect.left : coords.left;
   const maxLeft =
     typeof window !== "undefined"
-      ? window.innerWidth - (isMega ? 700 : 250) - 16
+      ? window.innerWidth - (isMega ? 700 : hasRichCards ? 360 : 250) - 16
       : rawLeft;
   const left = Math.max(16, Math.min(rawLeft, maxLeft));
 
   const checkItemActive = (to: string) => {
-    const [toPath, toQuery] = to.split("?");
-    const [currPath, currQuery] = currentPath.split("?");
-
-    if (toQuery) {
-      if (
-        toPath === "/store-owner/subscriptions" &&
-        toQuery === "tab=subscriptions" &&
-        !currQuery
-      ) {
-        return currPath === toPath;
-      }
-      if (
-        toPath === "/store-owner/subscriptions" ||
-        toPath === "/store-owner/account"
-      ) {
-        return currPath === toPath && currQuery === toQuery;
-      }
-      return (
-        currPath === toPath && Boolean(currQuery && currQuery.includes(toQuery))
-      );
-    }
-
-    if (toPath === "/store-owner/suppliers") {
-      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
-      return (
-        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
-        !currPath.includes("/products") &&
-        !currPath.includes("/branches") &&
-        !hasOtherView
-      );
-    }
-
-    if (toPath === "/store-owner/suppliers/products") {
-      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
-      return (
-        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
-        !hasOtherView
-      );
-    }
-
-    if (toPath === "/store-owner/expenses") {
-      const hasOtherView = Boolean(
-        currQuery &&
-        (currQuery.includes("view=") || currQuery.includes("tab=")),
-      );
-      return (
-        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
-        !hasOtherView
-      );
-    }
-
-    if (toPath === "/store-owner/employees") {
-      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
-      return (
-        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
-        !currPath.includes("/schedule") &&
-        !currPath.includes("/shifts") &&
-        !currPath.includes("/attendance") &&
-        !currPath.includes("/payroll") &&
-        !hasOtherView
-      );
-    }
-
-    if (toPath === "/store-owner/employees/shifts") {
-      return currPath === toPath || currPath.startsWith(toPath + "/");
-    }
-
-    if (toPath === "/store-owner/employees/schedule") {
-      const hasOtherView = Boolean(currQuery && currQuery.includes("view="));
-      return (
-        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
-        !hasOtherView
-      );
-    }
-
-    if (toPath === "/store-owner/promotions") {
-      const hasOtherView = Boolean(
-        currQuery &&
-        (currQuery.includes("view=") || currQuery.includes("action=")),
-      );
-      return (
-        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
-        !hasOtherView
-      );
-    }
-
-    if (toPath === "/store-owner/vouchers") {
-      const hasOtherView = Boolean(
-        currQuery &&
-        (currQuery.includes("view=") || currQuery.includes("action=")),
-      );
-      return (
-        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
-        !hasOtherView
-      );
-    }
-
-    if (toPath === "/store-owner/loyalty-config") {
-      const hasOtherView = Boolean(
-        currQuery &&
-        (currQuery.includes("view=") || currQuery.includes("action=")),
-      );
-      return (
-        (currPath === toPath || currPath.startsWith(toPath + "/")) &&
-        !hasOtherView
-      );
-    }
-
-    return currPath === toPath || currPath.startsWith(toPath + "/");
+    const [currPath, currQuery = ""] = currentPath.split("?");
+    return isNavItemActive(to, currPath, currQuery);
   };
 
   return (
@@ -580,12 +572,14 @@ const NavDropdown: FC<DropdownProps> = ({
           boxShadow:
             "0 12px 36px rgba(0, 30, 90, 0.15), 0 2px 8px rgba(0, 30, 90, 0.06)",
           border: "1px solid var(--border-light)",
-          padding: isMega ? "18px 24px" : "8px 0",
+          padding: isMega ? "18px 24px" : hasRichCards ? "8px 6px" : "8px 0",
           minWidth: isMega
             ? sections && sections.length <= 2
               ? 460
               : 680
-            : 210,
+            : hasRichCards
+              ? 330
+              : 210,
           overflow: "hidden",
           display: isMega ? "flex" : "block",
           gap: isMega ? 20 : 0,
@@ -624,10 +618,12 @@ const NavDropdown: FC<DropdownProps> = ({
               {sec.items.map((item) => {
                 const isActive = checkItemActive(item.to);
                 return (
-                  <NavLink
+                  <Link
                     key={item.label + item.to}
                     to={item.to}
                     onClick={onClose}
+                    aria-current={isActive ? "page" : undefined}
+                    className={isActive ? "active" : undefined}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -687,16 +683,119 @@ const NavDropdown: FC<DropdownProps> = ({
                         {item.badge}
                       </span>
                     )}
-                  </NavLink>
+                  </Link>
                 );
               })}
             </div>
           ))}
 
-        {/* Standard Single-Column List */}
+        {/* Single-Column List (Standard or Rich Cards) */}
         {!isMega &&
           items?.map((item) => {
             const isActive = checkItemActive(item.to);
+
+            if (hasRichCards) {
+              return (
+                <Fragment key={item.to}>
+                  <Link
+                    to={item.to}
+                    onClick={onClose}
+                    aria-current={isActive ? "page" : undefined}
+                    className={isActive ? "active" : undefined}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "9px 12px",
+                      borderRadius: 10,
+                      textDecoration: "none",
+                      backgroundColor: isActive ? "#F0FDFA" : "transparent",
+                      border: isActive ? "1px solid #CCFBF1" : "1px solid transparent",
+                      transition: "all 0.15s ease",
+                      marginBottom: 2,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = "#F8FAFC";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 10,
+                        backgroundColor: isActive ? "#CCFBF1" : "#F1F5F9",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 18,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {typeof item.icon === "string" ? item.icon : item.icon ? <item.icon size={18} /> : "📊"}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: "13.5px",
+                          fontWeight: 700,
+                          color: isActive ? "#0F766E" : "#0F172A",
+                          lineHeight: 1.25,
+                        }}
+                      >
+                        {item.label}
+                      </div>
+                      {item.desc && (
+                        <div
+                          style={{
+                            fontSize: "11.5px",
+                            color: "#64748B",
+                            marginTop: 2,
+                            lineHeight: 1.3,
+                            whiteSpace: "normal",
+                          }}
+                        >
+                          {item.desc}
+                        </div>
+                      )}
+                    </div>
+                    {item.badge && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: 20,
+                          height: 20,
+                          padding: "0 6px",
+                          borderRadius: 10,
+                          backgroundColor:
+                            item.badgeType === "orange"
+                              ? "#EA580C"
+                              : item.badgeType === "red"
+                                ? "#EF4444"
+                                : "#0F766E",
+                          color: "#ffffff",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          lineHeight: 1,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                </Fragment>
+              );
+            }
+
             return (
               <Fragment key={item.to}>
                 {item.divider && (
@@ -708,9 +807,11 @@ const NavDropdown: FC<DropdownProps> = ({
                     }}
                   />
                 )}
-                <NavLink
+                <Link
                   to={item.to}
                   onClick={onClose}
+                  aria-current={isActive ? "page" : undefined}
+                  className={isActive ? "active" : undefined}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -775,11 +876,13 @@ const NavDropdown: FC<DropdownProps> = ({
                         backgroundColor:
                           item.badgeType === "red"
                             ? "#FF3B30"
-                            : isActive
-                              ? "rgba(15,118,110,0.15)"
-                              : "var(--blue-light)",
+                            : item.badgeType === "orange"
+                              ? "#EA580C"
+                              : isActive
+                                ? "rgba(15,118,110,0.15)"
+                                : "var(--blue-light)",
                         color:
-                          item.badgeType === "red"
+                          item.badgeType === "red" || item.badgeType === "orange"
                             ? "#ffffff"
                             : "var(--blue-primary)",
                         fontFamily:
@@ -793,7 +896,7 @@ const NavDropdown: FC<DropdownProps> = ({
                       {item.badge}
                     </span>
                   )}
-                </NavLink>
+                </Link>
               </Fragment>
             );
           })}
@@ -813,15 +916,6 @@ export const AppTopNav: FC = () => {
     userRole === "CASHIER" ||
     userRole === "STAFF";
 
-  const visibleNavGroups = useMemo(() => {
-    if (isEmployee) {
-      // Ẩn hoàn toàn menu Tài chính, Nhân sự và Cấu hình gói cước gian hàng đối với Employee
-      return NAV_GROUPS.filter(
-        (g) => g.id !== "finance" && g.id !== "employees" && g.id !== "store"
-      );
-    }
-    return NAV_GROUPS;
-  }, [isEmployee]);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -831,6 +925,70 @@ export const AppTopNav: FC = () => {
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const settingsTimerRef = useRef<number | null>(null);
   const [pendingCashApprovalCount, setPendingCashApprovalCount] = useState<number>(0);
+  const [is2FAActive, setIs2FAActive] = useState<boolean>(() => Boolean(user?.isTwoFactorEnabled));
+
+  useEffect(() => {
+    if (user?.isTwoFactorEnabled !== undefined) {
+      setIs2FAActive(Boolean(user.isTwoFactorEnabled));
+    }
+  }, [user?.isTwoFactorEnabled]);
+
+  useEffect(() => {
+    const handle2FAChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ enabled: boolean }>;
+      if (customEvent.detail && typeof customEvent.detail.enabled === "boolean") {
+        setIs2FAActive(customEvent.detail.enabled);
+      }
+    };
+    window.addEventListener("mtgrms:2fa-changed", handle2FAChange);
+    return () => {
+      window.removeEventListener("mtgrms:2fa-changed", handle2FAChange);
+    };
+  }, []);
+
+  // Khi mở popup menu tài khoản hoặc khi khởi động, kiểm tra đồng bộ 2FA từ server
+  useEffect(() => {
+    if (accountMenuOpen) {
+      authService
+        .getTwoFactorStatus()
+        .then((res) => {
+          setIs2FAActive(res.enabled);
+          useAuthStore.getState().updateUser({ isTwoFactorEnabled: res.enabled });
+        })
+        .catch(() => {});
+    }
+  }, [accountMenuOpen]);
+
+  const visibleNavGroups = useMemo(() => {
+    let groups = NAV_GROUPS;
+    if (isEmployee) {
+      // Ẩn hoàn toàn menu Tài chính, Nhân sự và Cấu hình gói cước gian hàng đối với Employee
+      groups = groups.filter(
+        (g) => g.id !== "finance" && g.id !== "employees" && g.id !== "store"
+      );
+    }
+    return groups.map((g) => {
+      if (g.id === "finance") {
+        return {
+          ...g,
+          badge: pendingCashApprovalCount > 0 ? pendingCashApprovalCount : undefined,
+          children: g.children?.map((c) => {
+            if (c.to === "/store-owner/cash-control") {
+              return {
+                ...c,
+                badge:
+                  pendingCashApprovalCount > 0
+                    ? String(pendingCashApprovalCount)
+                    : undefined,
+              };
+            }
+            return c;
+          }),
+        };
+      }
+      return g;
+    });
+  }, [isEmployee, pendingCashApprovalCount]);
 
   useEffect(() => {
     if (user?.role === 'STORE_OWNER') {
@@ -870,7 +1028,7 @@ export const AppTopNav: FC = () => {
     }, 220);
   }, [clearSettingsTimer]);
   const anchorRefs = useRef<
-    Map<string, React.RefObject<HTMLDivElement | null>>
+    Map<string, RefObject<HTMLDivElement | null>>
   >(new Map());
   const closeTimerRef = useRef<number | null>(null);
 
@@ -965,7 +1123,7 @@ export const AppTopNav: FC = () => {
   }, [accountMenuOpen]);
 
   const getAnchorRef = useCallback(
-    (id: string): React.RefObject<HTMLDivElement | null> => {
+    (id: string): RefObject<HTMLDivElement | null> => {
       if (!anchorRefs.current.has(id)) {
         anchorRefs.current.set(id, { current: null });
       }
@@ -1033,6 +1191,18 @@ export const AppTopNav: FC = () => {
     }
     if (group.id === "finance") {
       return (
+        location.pathname === "/store-owner/finance" ||
+        location.pathname.startsWith("/store-owner/finance/") ||
+        location.pathname === "/store-owner/cashbook" ||
+        location.pathname.startsWith("/store-owner/cashbook/") ||
+        location.pathname === "/store-owner/cash-control" ||
+        location.pathname.startsWith("/store-owner/cash-control/") ||
+        location.pathname === "/store-owner/pos-cash-control" ||
+        location.pathname.startsWith("/store-owner/pos-cash-control/") ||
+        location.pathname === "/store-owner/shifts" ||
+        location.pathname.startsWith("/store-owner/shifts/") ||
+        location.pathname === "/store-owner/tax-snapshots" ||
+        location.pathname.startsWith("/store-owner/tax-snapshots/") ||
         location.pathname === "/store-owner/expenses" ||
         location.pathname.startsWith("/store-owner/expenses/") ||
         location.pathname === "/admin/expenses" ||
@@ -1258,6 +1428,26 @@ export const AppTopNav: FC = () => {
                   >
                     <group.icon size={16} color="currentColor" />
                     <span>{group.label}</span>
+                    {group.badge != null && Number(group.badge) > 0 && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: 18,
+                          height: 18,
+                          padding: "0 5px",
+                          borderRadius: 9,
+                          backgroundColor: "#EA580C",
+                          color: "#ffffff",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {group.badge}
+                      </span>
+                    )}
                     <ChevronDown open={isOpen} />
                   </button>
 
@@ -1583,7 +1773,7 @@ export const AppTopNav: FC = () => {
 
                       {/* Mục 2: Hạn Mức & Duyệt Chi Két POS */}
                       <Link
-                        to="/store-owner/pos-cash-control"
+                        to="/store-owner/cash-control"
                         onClick={() => setSettingsMenuOpen(false)}
                         style={{
                           display: "flex",
@@ -1863,17 +2053,57 @@ export const AppTopNav: FC = () => {
                         >
                           {user?.phone || user?.fullName || "0369880798"}
                         </div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 500,
-                            color: "#EF4444",
-                            marginTop: 2,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Chưa bật xác thực 2 lớp
-                        </div>
+                        {is2FAActive ? (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "#10B981",
+                              marginTop: 2,
+                              whiteSpace: "nowrap",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: "#10B981",
+                                display: "inline-block",
+                                flexShrink: 0,
+                              }}
+                            />
+                            Đã bật xác thực 2 lớp
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 500,
+                              color: "#EF4444",
+                              marginTop: 2,
+                              whiteSpace: "nowrap",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: "#EF4444",
+                                display: "inline-block",
+                                flexShrink: 0,
+                              }}
+                            />
+                            Chưa bật xác thực 2 lớp
+                          </div>
+                        )}
                       </div>
                       <ChevronRight size={16} color="#94A3B8" />
                     </Link>
@@ -2129,58 +2359,18 @@ export const AppTopNav: FC = () => {
                             {sec.title}
                           </div>
                           {sec.items.map((child) => {
-                            const isActive = (() => {
-                              const [toPath, toQuery] = child.to.split("?");
-                              const currPath = location.pathname;
-                              const currQuery = location.search;
-                              if (toQuery) {
-                                return (
-                                  currPath === toPath &&
-                                  currQuery.includes(toQuery)
-                                );
-                              }
-                              if (toPath === "/store-owner/suppliers") {
-                                const hasOtherView =
-                                  currQuery.includes("view=");
-                                return (
-                                  (currPath === toPath ||
-                                    currPath.startsWith(toPath + "/")) &&
-                                  !currPath.includes("/products") &&
-                                  !currPath.includes("/branches") &&
-                                  !hasOtherView
-                                );
-                              }
-                              if (
-                                toPath === "/store-owner/suppliers/products"
-                              ) {
-                                const hasOtherView =
-                                  currQuery.includes("view=");
-                                return (
-                                  (currPath === toPath ||
-                                    currPath.startsWith(toPath + "/")) &&
-                                  !hasOtherView
-                                );
-                              }
-                              if (toPath === "/store-owner/expenses") {
-                                const hasOtherView =
-                                  currQuery.includes("view=") ||
-                                  currQuery.includes("tab=");
-                                return (
-                                  (currPath === toPath ||
-                                    currPath.startsWith(toPath + "/")) &&
-                                  !hasOtherView
-                                );
-                              }
-                              return (
-                                currPath === toPath ||
-                                currPath.startsWith(toPath + "/")
-                              );
-                            })();
+                            const isActive = isNavItemActive(
+                              child.to,
+                              location.pathname,
+                              location.search,
+                            );
                             return (
-                              <NavLink
+                              <Link
                                 key={child.label + child.to}
                                 to={child.to}
                                 onClick={() => setMobileOpen(false)}
+                                aria-current={isActive ? "page" : undefined}
+                                className={isActive ? "active" : undefined}
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
@@ -2219,33 +2409,24 @@ export const AppTopNav: FC = () => {
                                     {child.badge}
                                   </span>
                                 )}
-                              </NavLink>
+                              </Link>
                             );
                           })}
                         </div>
                       ))
                       : group.children?.map((child) => {
-                        const isActive = (() => {
-                          if (child.to === "/store-owner/suppliers") {
-                            return (
-                              (location.pathname === child.to ||
-                                location.pathname.startsWith(
-                                  child.to + "/",
-                                )) &&
-                              !location.pathname.includes("/products") &&
-                              !location.pathname.includes("/branches")
-                            );
-                          }
-                          return (
-                            location.pathname === child.to ||
-                            location.pathname.startsWith(child.to + "/")
-                          );
-                        })();
+                        const isActive = isNavItemActive(
+                          child.to,
+                          location.pathname,
+                          location.search,
+                        );
                         return (
-                          <NavLink
+                          <Link
                             key={child.to}
                             to={child.to}
                             onClick={() => setMobileOpen(false)}
+                            aria-current={isActive ? "page" : undefined}
+                            className={isActive ? "active" : undefined}
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -2279,7 +2460,7 @@ export const AppTopNav: FC = () => {
                                 {child.badge}
                               </span>
                             )}
-                          </NavLink>
+                          </Link>
                         );
                       })}
                   </>

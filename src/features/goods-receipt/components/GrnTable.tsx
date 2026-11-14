@@ -2,7 +2,6 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import type { FC, CSSProperties } from 'react';
 import {
   ArrowUpDown,
-  Printer,
   PackageOpen,
   ArrowRightCircle,
   FileCheck2,
@@ -495,15 +494,6 @@ export const GrnTable: FC<GrnTableProps> = ({
                               title="Xem lô FEFO"
                             >
                               <Layers size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              className="so-list-action-btn"
-                              onClick={() => onActionClick('PRINT_RECEIPT', row)}
-                              style={actionBtnBase}
-                              title="In phiếu nhập kho"
-                            >
-                              <Printer size={12} />
                             </button>
                           </>
                         )}

@@ -163,4 +163,68 @@ describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
     expect(csv).toContain('Mã giao dịch');
     expect(csv).toContain('Số dư sau GD (VNĐ)');
   });
+
+  it('REQ-17.6: should filter internal transfers by sourceType === "INTERNAL_TRANSFER" instead of entryType === "TRANSFER"', async () => {
+    const accounts = await cashbookService.getCashAccounts();
+    const fromAcc = accounts.find((a) => a.accountType === 'CASH')!;
+    const toAcc = accounts.find((a) => a.accountType === 'BANK')!;
+
+    // Perform internal transfer
+    const { payment, receipt } = await cashbookService.transferFunds({
+      fromAccountId: fromAcc.id,
+      toAccountId: toAcc.id,
+      amount: 1000000,
+      note: 'Chuyển tiền vào tài khoản ngân hàng VietQR',
+    });
+
+    expect(payment.sourceType).toBe('INTERNAL_TRANSFER');
+    expect(receipt.sourceType).toBe('INTERNAL_TRANSFER');
+    // Notice backend double entry preserves PAYMENT & RECEIPT, not TRANSFER
+    expect(payment.transactionType).toBe('PAYMENT');
+    expect(receipt.transactionType).toBe('RECEIPT');
+
+    // Filter by sourceType === 'INTERNAL_TRANSFER'
+    const { items: transferItems } = await cashbookService.getTransactions(
+      { sourceType: 'INTERNAL_TRANSFER' },
+      1,
+      10
+    );
+
+    expect(transferItems.length).toBeGreaterThanOrEqual(2);
+    expect(transferItems.some((tx) => tx.id === payment.id)).toBe(true);
+    expect(transferItems.some((tx) => tx.id === receipt.id)).toBe(true);
+  });
+
+  it('REQ-17.7 (Immutable Ledger): should void transaction by creating compensating entry with prefix GB-', async () => {
+    const accounts = await cashbookService.getCashAccounts();
+    const cashAccount = accounts.find((a) => a.accountType === 'CASH')!;
+
+    // Create a payment
+    const paymentTx = await cashbookService.createPayment({
+      accountId: cashAccount.id,
+      amount: 150000,
+      category: 'Chi mua văn phòng phẩm',
+      counterpartyType: 'SUPPLIER',
+      counterpartyName: 'Nhà sách Fahasa',
+      description: 'Chi tiền mua giấy in bill',
+    });
+
+    // Void the transaction
+    const compTx = await cashbookService.voidTransaction(
+      paymentTx.id,
+      'Nhập sai số tiền phiếu chi, cần lập lại'
+    );
+
+    expect(compTx.transactionCode.startsWith('GB-')).toBe(true);
+    expect(compTx.isCompensating).toBe(true);
+    expect(compTx.referenceDocType).toBe('COMPENSATING');
+    expect(compTx.description).toContain('[BÚT TOÁN GẠCH BỎ]');
+    expect(compTx.description).toContain('Bù trừ cho phiếu gốc');
+
+    // Original entry should be marked as voided
+    const { items } = await cashbookService.getTransactions({}, 1, 20);
+    const original = items.find((tx) => tx.id === paymentTx.id);
+    expect(original?.isVoided).toBe(true);
+    expect(original?.voidReason).toContain('Nhập sai số tiền');
+  });
 });

@@ -248,6 +248,28 @@ export const SupplierDispatchDetailPage: FC = () => {
           </button>
           <button
             type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() =>
+              navigate(
+                `/store-owner/purchase-orders/list${supplierId ? `?supplierId=${supplierId}` : ''}`
+              )
+            }
+            title="Xem PO đã chốt của NCC này"
+          >
+            <Store size={14} />
+            <span>Danh sách PO</span>
+          </button>
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() => navigate('/store-owner/goods-receipts')}
+            title="Sổ phiếu nhập kho — nhận hàng theo PO đã chốt"
+          >
+            <Truck size={14} />
+            <span>Nhập kho</span>
+          </button>
+          <button
+            type="button"
             className="po-btn po-btn-primary"
             disabled={!canDispatch || isLoading}
             onClick={() => void openConfirm('NEAREST')}

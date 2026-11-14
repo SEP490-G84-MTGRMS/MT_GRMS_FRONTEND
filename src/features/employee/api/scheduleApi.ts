@@ -17,8 +17,6 @@ export interface ScheduleResponse {
   plannedStartTime: string;
   plannedEndTime: string;
   durationHours: number;
-  allowedCheckInStart: string;
-  allowedCheckInEnd: string;
   isCheckInNextDay: boolean;
   checkInTime?: string | null;
   checkOutTime?: string | null;
@@ -35,7 +33,6 @@ export interface ScheduleResponse {
   approvalType?: string | null;
   approvalStatus: string;
   approvalReason?: string | null;
-  evidenceImageUrl?: string | null;
   approvedBy?: string | null;
   approvedAt?: string | null;
   createdAt: string;
@@ -62,8 +59,6 @@ export interface CreateScheduleItemPayload {
   plannedStartTime?: string; // "HH:mm:ss"
   plannedEndTime?: string;   // "HH:mm:ss"
   durationHours?: number;
-  allowedCheckInStart?: string;
-  allowedCheckInEnd?: string;
   isCheckInNextDay?: boolean;
 }
 
@@ -88,8 +83,6 @@ export interface CreateRecurringSchedulePayload {
   plannedStartTime?: string; // "HH:mm:ss"
   plannedEndTime?: string;   // "HH:mm:ss"
   durationHours?: number;
-  allowedCheckInStart?: string;
-  allowedCheckInEnd?: string;
   isCheckInNextDay?: boolean;
 }
 
@@ -103,8 +96,6 @@ export interface UpdateSchedulePayload {
   plannedStartTime?: string;
   plannedEndTime?: string;
   durationHours?: number;
-  allowedCheckInStart?: string;
-  allowedCheckInEnd?: string;
   isCheckInNextDay?: boolean;
   status?: string;
 }
@@ -130,6 +121,16 @@ export interface ManualAttendancePayload {
   note?: string | null;
 }
 
+export interface ResetAttendancePayload {
+  reason?: string | null;
+}
+
+export interface ResetAttendanceResponse {
+  schedule: ScheduleResponse;
+  hasUnpaidPayslip: boolean;
+  message: string;
+}
+
 export const getShiftColor = (nameOrCode: string = ''): string => {
   const lower = nameOrCode.toLowerCase();
   if (lower.includes('sáng') || lower.includes('sang')) return '#3B82F6';
@@ -142,6 +143,40 @@ const DAY_KEYS: Array<'CN' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7'> = [
   'CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'
 ];
 
+export const isLeaveSchedule = (s: {
+  status?: string | null;
+  approvalType?: string | null;
+  checkInMethod?: string | null;
+  isLeave?: boolean | null;
+}): boolean => {
+  const statusLower = (s.status || '').toLowerCase();
+  const approvalUpper = (s.approvalType || '').toUpperCase();
+  const methodUpper = (s.checkInMethod || '').toUpperCase();
+  return (
+    Boolean(s.isLeave) ||
+    statusLower === 'onleave' ||
+    approvalUpper === 'PAID_LEAVE' ||
+    approvalUpper === 'UNPAID_LEAVE' ||
+    methodUpper === 'MANUAL_PAID_LEAVE' ||
+    methodUpper === 'MANUAL_UNPAID_LEAVE'
+  );
+};
+
+export const isScheduleDeletable = (s: {
+  status?: string | null;
+  approvalType?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  checkInMethod?: string | null;
+  isLeave?: boolean | null;
+}): boolean => {
+  if (isLeaveSchedule(s)) return false;
+  if (s.checkInTime || s.checkOutTime) return false;
+  const statusLower = (s.status || '').toLowerCase();
+  if (statusLower === 'completed' || statusLower === 'inprogress') return false;
+  return true;
+};
+
 export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAssignment => {
   const d = new Date(s.workDate);
   const dayOfWeek = DAY_KEYS[d.getDay()] || 'T2';
@@ -151,6 +186,9 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
 
   const startFormatted = (s.plannedStartTime || '00:00').substring(0, 5);
   const endFormatted = (s.plannedEndTime || '00:00').substring(0, 5);
+  const approvalUpper = (s.approvalType || '').toUpperCase();
+  const isLeave = isLeaveSchedule(s);
+  const isPaidLeave = approvalUpper === 'PAID_LEAVE' || (s.checkInMethod || '').toUpperCase() === 'MANUAL_PAID_LEAVE';
 
   return {
     id: s.id,
@@ -161,11 +199,19 @@ export const mapScheduleResponseToAssignment = (s: ScheduleResponse): ScheduleAs
     shiftName: s.shiftName || 'Ca làm việc',
     shiftTime: `${startFormatted} - ${endFormatted}`,
     shiftColor: getShiftColor(s.shiftName || s.shiftCode),
+    durationHours: s.durationHours,
     dayOfWeek,
     dateStr,
     workDate: s.workDate,
     branchId: s.branchId,
     branchName: s.branchName || 'Chi nhánh',
+    status: s.status,
+    approvalType: s.approvalType,
+    checkInTime: s.checkInTime,
+    checkOutTime: s.checkOutTime,
+    checkInMethod: s.checkInMethod,
+    isLeave,
+    isPaidLeave,
   };
 };
 
@@ -365,6 +411,24 @@ export const scheduleApi = {
       return res.data.data;
     }
     throw new Error(res.data?.message || 'Chấm công thủ công thất bại.');
+  },
+
+  /**
+   * Hủy chấm công và đưa ca làm việc về trạng thái chờ vào ca (Published)
+   * Backend: POST /api/schedules/{id}/attendance/reset
+   */
+  async resetManualAttendance(
+    id: string,
+    payload: ResetAttendancePayload = {}
+  ): Promise<ResetAttendanceResponse> {
+    const res = await httpClient.post<ApiResponse<ResetAttendanceResponse>>(
+      `/schedules/${id}/attendance/reset`,
+      payload
+    );
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể hủy kết quả chấm công.');
   },
 
   /**

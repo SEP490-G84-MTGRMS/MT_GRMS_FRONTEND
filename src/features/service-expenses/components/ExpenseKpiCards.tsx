@@ -12,12 +12,14 @@ interface ExpenseKpiCardsProps {
   summary?: ExpenseSummaryDto;
   isLoading?: boolean;
   periodLabel?: string;
+  overdueCount?: number;
 }
 
 export const ExpenseKpiCards: FC<ExpenseKpiCardsProps> = ({
   summary,
   isLoading,
   periodLabel,
+  overdueCount = 0,
 }) => {
   if (isLoading) {
     return (
@@ -33,39 +35,48 @@ export const ExpenseKpiCards: FC<ExpenseKpiCardsProps> = ({
   }
 
   const currentPeriod = periodLabel || 'tháng này';
+  const suspiciousCount = summary?.suspiciousCount || 0;
+  const suspiciousAmount = summary?.suspiciousAmount || 0;
 
   const cards = [
     {
-      title: `Tổng chi phí (${currentPeriod})`,
+      title: 'Tổng chi phí vận hành',
       value: formatMoney(summary?.totalExpenseThisMonth || 0),
-      subtext: 'Bao gồm mọi khoản chi vận hành',
+      subtext: `Kỳ: ${currentPeriod}`,
       icon: CreditCard,
       iconClass: 'kpi-icon-blue',
       iconColor: '#0F766E',
+      valueColor: 'var(--text-main, #0F172A)',
     },
     {
-      title: 'Chờ thanh toán',
+      title: 'Chưa thanh toán',
       value: formatMoney(summary?.totalPendingAmount || 0),
-      subtext: 'Cần giải ngân kịp hạn',
+      subtext: overdueCount > 0 ? `${overdueCount} khoản quá hạn cần chi` : 'Không có khoản nợ quá hạn',
       icon: ClockIcon,
-      iconClass: 'kpi-icon-amber',
-      iconColor: '#d97706',
+      iconClass: overdueCount > 0 ? 'kpi-icon-red' : 'kpi-icon-amber',
+      iconColor: overdueCount > 0 ? '#dc2626' : '#d97706',
+      valueColor: overdueCount > 0 ? '#dc2626' : '#d97706',
     },
     {
-      title: `Đã thanh toán (${currentPeriod})`,
+      title: 'Đã thanh toán',
       value: formatMoney(summary?.totalPaidAmount || 0),
       subtext: 'Đã hạch toán vào Sổ quỹ',
       icon: CheckCircleIcon,
       iconClass: 'kpi-icon-green',
       iconColor: '#059669',
+      valueColor: '#059669',
     },
     {
-      title: 'Khoản chi quá hạn',
-      value: summary?.overdueCount ? `${summary.overdueCount} khoản` : '0 khoản',
-      subtext: summary?.overdueCount ? 'Cần xử lý khẩn cấp' : 'Không có khoản nợ trễ',
+      title: 'Chi phí bất thường / Cần duyệt',
+      value: formatMoney(suspiciousAmount),
+      subtext:
+        suspiciousCount > 0
+          ? `${suspiciousCount} phiếu nghi vấn (Anti-Splitting)`
+          : '0 khoản bất thường',
       icon: AlertTriangleIcon,
-      iconClass: 'kpi-icon-red',
-      iconColor: '#dc2626',
+      iconClass: suspiciousCount > 0 ? 'kpi-icon-red' : 'kpi-icon-amber',
+      iconColor: suspiciousCount > 0 ? '#dc2626' : '#64748b',
+      valueColor: suspiciousCount > 0 ? '#dc2626' : 'var(--text-main, #0F172A)',
     },
   ];
 
@@ -81,7 +92,9 @@ export const ExpenseKpiCards: FC<ExpenseKpiCardsProps> = ({
                 <IconComp size={18} color={card.iconColor} />
               </div>
             </div>
-            <div className="expense-kpi-value">{card.value}</div>
+            <div className="expense-kpi-value" style={{ color: card.valueColor }}>
+              {card.value}
+            </div>
             <span className="expense-kpi-subtext">{card.subtext}</span>
           </div>
         );

@@ -1,5 +1,5 @@
 export * from './types';
-export * from './services/mockData';
+export * from './services/transferService';
 export * from './components/TransferFilterSidebar';
 export * from './components/SelectBatchModal';
 export * from './components/CancelTransferModal';

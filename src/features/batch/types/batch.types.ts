@@ -33,7 +33,12 @@ export interface BatchItem {
   qtyReserved?: number; // Số lượng đang giữ chỗ trả NCC
   qtyQuarantined?: number; // Số lượng đang cách ly chờ duyệt kiểm kê
   qtyAvailable?: number; // Số lượng khả dụng (qtyCurrent - qtyReserved - qtyQuarantined)
-  unit: string; // Hộp, Chai, Gói, Lon, Hũ, Kg
+  /** Đơn vị nhập (purchase) */
+  unit: string; // Thùng, Hộp, Kg...
+  /** Đơn vị tồn / gốc — số tồn đang tính theo đơn vị này */
+  stockUnit?: string; // Chai, Cái, Kg...
+  /** 1 đơn vị nhập = bao nhiêu đơn vị tồn */
+  purchaseToStockRate?: number;
   costPrice: number; // Đơn giá vốn nhập kho (VNĐ)
   totalValuation: number; // qtyCurrent * costPrice
   status: BatchStatus;
@@ -43,6 +48,12 @@ export interface BatchItem {
   originalGrnId?: string; // ID phiếu nhập gốc
   discountPercent?: number; // % giảm giá FEFO đã áp dụng
   movements: BatchMovement[];
+  /** SP đơn vị nhập/gốc là kg */
+  isWeightProduct?: boolean;
+  allowRepack?: boolean;
+  packagedQty?: number;
+  packageCount?: number;
+  rawSellableQty?: number;
 }
 
 export interface BatchFilterState {

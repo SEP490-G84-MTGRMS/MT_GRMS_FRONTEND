@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search,
   RotateCw,
   Building2,
-  ChevronDown,
-  Check,
   X,
   FileCheck2,
   AlertTriangle,
@@ -13,8 +11,6 @@ import {
   XCircle,
   Loader2,
 } from 'lucide-react';
-import type { Branch } from '../types';
-import { employeeApi } from '../api/employeeApi';
 import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
 import {
   ScheduleRequestType,
@@ -25,12 +21,15 @@ import {
   type ReviewScheduleApprovalRequestDto,
 } from '../types/scheduleApprovalTypes';
 import { TablePagination, NotificationModal } from '../../../components/common';
+import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalRequestsModal';
+import { matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import '../employee.css';
+
+const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
 
 export const ApprovalRequestsPage: React.FC = () => {
   // State data
   const [requests, setRequests] = useState<ScheduleApprovalRequestDto[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -40,17 +39,53 @@ export const ApprovalRequestsPage: React.FC = () => {
 
   // Filters state
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [activeBranch, setActiveBranch] = useState<{ id: string; name: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem(ACTIVE_BRANCH_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
   const [selectedType, setSelectedType] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
 
-  // Branch multi-select dropdown states
-  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
-  const [branchSearchKeyword, setBranchSearchKeyword] = useState('');
-  const branchDropdownRef = useRef<HTMLDivElement>(null);
+  // Lắng nghe thay đổi chi nhánh từ StoreOwnerLayout (BranchSelectorDropdown)
+  useEffect(() => {
+    const handleBranchChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      if (customEvent.detail) {
+        setActiveBranch(customEvent.detail);
+        setPage(1);
+      }
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ACTIVE_BRANCH_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setActiveBranch(parsed);
+          setPage(1);
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleBranchChanged);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleBranchChanged);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Sub-modal xác nhận Duyệt / Từ chối
   const [selectedRequest, setSelectedRequest] = useState<ScheduleApprovalRequestDto | null>(null);
+  const [detailRequest, setDetailRequest] = useState<ScheduleApprovalRequestDto | null>(null);
   const [isApproveAction, setIsApproveAction] = useState<boolean>(true);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
   const [reviewNote, setReviewNote] = useState<string>('');
@@ -71,45 +106,13 @@ export const ApprovalRequestsPage: React.FC = () => {
     message: string;
   } | null>(null);
 
-  // Close branch dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        branchDropdownRef.current &&
-        !branchDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsBranchDropdownOpen(false);
-      }
-    };
-
-    if (isBranchDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isBranchDropdownOpen]);
-
-  // Load branches
-  useEffect(() => {
-    const loadBranches = async () => {
-      try {
-        const branchList = await employeeApi.getBranches();
-        setBranches(branchList);
-      } catch (err) {
-        console.error('Không thể tải danh sách chi nhánh', err);
-      }
-    };
-    loadBranches();
-  }, []);
-
   // Fetch Requests
   const fetchRequests = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMessage(null);
-      // Gọi API lấy toàn bộ requests (có thể truyền branchId nếu chọn đúng 1 chi nhánh)
-      const branchIdParam = selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined;
+      // Gọi API lấy toàn bộ requests (lọc theo activeBranch nếu có và khác 'ALL')
+      const branchIdParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
       const typeParam = selectedType !== 'ALL' ? (selectedType as ScheduleRequestType) : undefined;
       const statusParam = selectedStatus !== 'ALL' ? selectedStatus : undefined;
 
@@ -123,27 +126,28 @@ export const ApprovalRequestsPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedBranchIds, selectedType, selectedStatus]);
+  }, [activeBranch, selectedType, selectedStatus]);
 
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
 
-  // Client-side filtering (Search keyword & Multiple branches)
+  // Client-side filtering (Search keyword & Active branch)
   const filteredRequests = requests.filter((req) => {
-    // 1. Keyword search (Mã NV, Tên NV, Lý do)
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase().trim();
-      const matchName = req.employeeName?.toLowerCase().includes(q);
-      const matchCode = req.employeeCode?.toLowerCase().includes(q);
-      const matchReason = req.reason?.toLowerCase().includes(q);
-      const matchShift = req.shiftName?.toLowerCase().includes(q);
-      if (!matchName && !matchCode && !matchReason && !matchShift) return false;
+    // 1. Keyword search (Mã NV, Tên NV, Lý do, Tên ca - không phân biệt dấu/hoa-thường)
+    if (
+      searchTerm.trim() &&
+      !matchesAnyVietnameseSearch(
+        [req.employeeName, req.employeeCode, req.reason, req.shiftName],
+        searchTerm
+      )
+    ) {
+      return false;
     }
 
-    // 2. Multi-branch filter
-    if (selectedBranchIds.length > 1) {
-      if (!selectedBranchIds.includes(req.branchId)) return false;
+    // 2. Active branch filter (nếu client có danh sách tổng)
+    if (activeBranch && activeBranch.id !== 'ALL') {
+      if (req.branchId && req.branchId !== activeBranch.id) return false;
     }
 
     return true;
@@ -153,38 +157,9 @@ export const ApprovalRequestsPage: React.FC = () => {
   const totalItems = filteredRequests.length;
   const paginatedRequests = filteredRequests.slice((page - 1) * pageSize, page * pageSize);
 
-  // Branch handlers
-  const handleBranchToggle = (branchId: string) => {
-    setSelectedBranchIds((prev) =>
-      prev.includes(branchId) ? prev.filter((id) => id !== branchId) : [...prev, branchId]
-    );
-    setPage(1);
-  };
-
-  const handleSelectAllBranches = () => {
-    setSelectedBranchIds(branches.map((b) => b.id));
-    setPage(1);
-  };
-
-  const handleClearAllBranches = () => {
-    setSelectedBranchIds([]);
-    setPage(1);
-  };
-
-  const handleRemoveBranchTag = (e: React.MouseEvent, branchId: string) => {
-    e.stopPropagation();
-    setSelectedBranchIds((prev) => prev.filter((id) => id !== branchId));
-    setPage(1);
-  };
-
-  const filteredBranchList = branches.filter((b) =>
-    b.name.toLowerCase().includes(branchSearchKeyword.toLowerCase().trim())
-  );
-
   // Reset filters
   const handleResetFilters = () => {
     setSearchTerm('');
-    setSelectedBranchIds([]);
     setSelectedType('ALL');
     setSelectedStatus('ALL');
     setPage(1);
@@ -192,7 +167,6 @@ export const ApprovalRequestsPage: React.FC = () => {
 
   const hasActiveFilters =
     Boolean(searchTerm) ||
-    selectedBranchIds.length > 0 ||
     selectedType !== 'ALL' ||
     selectedStatus !== 'ALL';
 
@@ -209,6 +183,34 @@ export const ApprovalRequestsPage: React.FC = () => {
   const handleConfirmReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRequest) return;
+
+    if (!isApproveAction && !reviewNote.trim()) {
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Thiếu lý do từ chối',
+        message: 'Vui lòng cung cấp lý do từ chối yêu cầu.',
+      });
+      return;
+    }
+    if (reviewNote.trim().length > 500) {
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Quá giới hạn ký tự',
+        message: 'Ghi chú phản hồi không được vượt quá 500 ký tự.',
+      });
+      return;
+    }
+    if (isApproveAction && selectedRequest.requestType === ScheduleRequestType.Overtime && (approvedMinutes < 0 || approvedMinutes > 480)) {
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Số phút OT không hợp lệ',
+        message: 'Số phút làm thêm giờ phê duyệt phải từ 0 đến 480 phút.',
+      });
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -370,256 +372,30 @@ export const ApprovalRequestsPage: React.FC = () => {
             )}
           </div>
 
-          {/* 2. Lọc Chi nhánh làm việc (Searchable Multi-Select Dropdown) */}
-          <div ref={branchDropdownRef} style={{ position: 'relative', minWidth: 220, maxWidth: 340 }}>
-            <div
-              onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
-              style={{
-                height: 40,
-                padding: '4px 10px',
-                border: `1px solid ${isBranchDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
-                borderRadius: 8,
-                background: '#FFFFFF',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 8,
-                userSelect: 'none',
-                boxShadow: isBranchDropdownOpen ? '0 0 0 2px rgba(15, 118, 110, 0.15)' : 'none',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  overflow: 'hidden',
-                  flex: 1,
-                }}
-              >
-                <Building2 size={16} color="#0F766E" style={{ flexShrink: 0 }} />
-                {selectedBranchIds.length === 0 ? (
-                  <span style={{ color: '#64748B', fontSize: 13, whiteSpace: 'nowrap' }}>
-                    Tất cả chi nhánh ({branches.length})
-                  </span>
-                ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
-                    {branches
-                      .filter((b) => selectedBranchIds.includes(b.id))
-                      .slice(0, 1)
-                      .map((b) => (
-                        <span
-                          key={b.id}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '2px 8px',
-                            borderRadius: 6,
-                            fontSize: 12,
-                            fontWeight: 500,
-                            background: '#F0FDFA',
-                            color: '#0F766E',
-                            border: '1px solid #99F6E4',
-                            whiteSpace: 'nowrap',
-                            maxWidth: 150,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
-                          <span
-                            onClick={(e) => handleRemoveBranchTag(e, b.id)}
-                            title="Gỡ chi nhánh"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              borderRadius: '50%',
-                              width: 14,
-                              height: 14,
-                              color: '#0F766E',
-                              fontWeight: 700,
-                              flexShrink: 0,
-                            }}
-                          >
-                            <X size={11} />
-                          </span>
-                        </span>
-                      ))}
-                    {selectedBranchIds.length > 1 && (
-                      <span
-                        style={{
-                          padding: '2px 6px',
-                          borderRadius: 6,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          background: '#F1F5F9',
-                          color: '#475569',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                        }}
-                      >
-                        +{selectedBranchIds.length - 1} khác
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#64748B', flexShrink: 0 }}>
-                <ChevronDown
-                  size={16}
-                  style={{
-                    transform: isBranchDropdownOpen ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s ease',
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Dropdown Panel */}
-            {isBranchDropdownOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: 6,
-                  width: 320,
-                  background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: 10,
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                  zIndex: 1000,
-                  overflow: 'hidden',
-                }}
-              >
-                <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      background: '#F8FAFC',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: 6,
-                      padding: '5px 10px',
-                    }}
-                  >
-                    <Search size={14} color="#94A3B8" />
-                    <input
-                      type="text"
-                      value={branchSearchKeyword}
-                      onChange={(e) => setBranchSearchKeyword(e.target.value)}
-                      placeholder="Tìm kiếm chi nhánh..."
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        outline: 'none',
-                        width: '100%',
-                        fontSize: 12,
-                        color: '#1E293B',
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: '6px 12px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    borderBottom: '1px solid #F1F5F9',
-                    fontSize: 11,
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={handleSelectAllBranches}
-                    style={{ background: 'none', border: 'none', color: '#0F766E', fontWeight: 600, cursor: 'pointer', padding: 0 }}
-                  >
-                    Chọn tất cả
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClearAllBranches}
-                    style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: 0 }}
-                  >
-                    Bỏ chọn
-                  </button>
-                </div>
-
-                <div style={{ maxHeight: 200, overflowY: 'auto', padding: '4px 0' }}>
-                  {filteredBranchList.length > 0 ? (
-                    filteredBranchList.map((b) => {
-                      const isChecked = selectedBranchIds.includes(b.id);
-                      return (
-                        <div
-                          key={b.id}
-                          onClick={() => handleBranchToggle(b.id)}
-                          style={{
-                            padding: '8px 12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            cursor: 'pointer',
-                            background: isChecked ? '#F0FDFA' : 'transparent',
-                          }}
-                        >
-                          <label
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 10,
-                              cursor: 'pointer',
-                              fontSize: 13,
-                              width: '100%',
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {}}
-                              style={{ accentColor: '#0F766E', width: 16, height: 16 }}
-                            />
-                            <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
-                              {b.name}
-                            </span>
-                          </label>
-                          {isChecked && <Check size={15} color="#0F766E" />}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div style={{ padding: '16px 12px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
-                      Không tìm thấy chi nhánh
-                    </div>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    background: '#F8FAFC',
-                    borderTop: '1px solid #F1F5F9',
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="emp-btn emp-btn-primary"
-                    style={{ height: 28, padding: '0 14px', fontSize: 12 }}
-                    onClick={() => setIsBranchDropdownOpen(false)}
-                  >
-                    Xong ({selectedBranchIds.length})
-                  </button>
-                </div>
-              </div>
-            )}
+          {/* 2. Hiển thị Chi nhánh đang áp dụng từ StoreOwnerLayout */}
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              height: 40,
+              padding: '0 14px',
+              borderRadius: 8,
+              background: '#F0FDFA',
+              border: '1px solid #99F6E4',
+              color: '#0F766E',
+              fontSize: 13,
+              fontWeight: 500,
+            }}
+            title="Chi nhánh được đồng bộ trực tiếp từ bộ chọn chi nhánh của hệ thống ở thanh điều hướng trên cùng"
+          >
+            <Building2 size={16} color="#0F766E" />
+            <span>
+              Chi nhánh:{' '}
+              <strong style={{ fontWeight: 600 }}>
+                {activeBranch?.name || 'Tất cả chi nhánh'}
+              </strong>
+            </span>
           </div>
 
           {/* 3. Lọc Loại đơn (Dropdown) */}
@@ -661,29 +437,30 @@ export const ApprovalRequestsPage: React.FC = () => {
           </div>
 
           {/* 5. Nút Đặt lại bộ lọc */}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 12px',
-                fontSize: 12,
-                fontWeight: 500,
-                color: '#EF4444',
-                background: '#FEE2E2',
-                border: '1px solid #FECACA',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
-              title="Xóa toàn bộ bộ lọc và từ khóa"
-            >
-              <RotateCw size={12} />
-              <span>Đặt lại bộ lọc</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            disabled={!hasActiveFilters}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              height: 40,
+              padding: '0 14px',
+              fontSize: 13,
+              fontWeight: 500,
+              color: hasActiveFilters ? '#EF4444' : '#94A3B8',
+              background: hasActiveFilters ? '#FEE2E2' : '#F8FAFC',
+              border: `1px solid ${hasActiveFilters ? '#FECACA' : '#E2E8F0'}`,
+              borderRadius: 8,
+              cursor: hasActiveFilters ? 'pointer' : 'not-allowed',
+              transition: 'all 0.15s ease',
+            }}
+            title="Xóa toàn bộ bộ lọc và từ khóa"
+          >
+            <RotateCw size={13} />
+            <span>Đặt lại bộ lọc</span>
+          </button>
         </div>
       </div>
 
@@ -787,14 +564,17 @@ export const ApprovalRequestsPage: React.FC = () => {
               paginatedRequests.map((req) => {
                 const images = (req.evidenceImageUrls && req.evidenceImageUrls.length > 0)
                   ? req.evidenceImageUrls
-                  : req.evidenceImageUrl
-                  ? [req.evidenceImageUrl]
                   : [];
 
                 const isPending = req.status === ScheduleApprovalStatus.Pending;
 
                 return (
-                  <tr key={req.id}>
+                  <tr
+                    key={req.id}
+                    onClick={() => setDetailRequest(req)}
+                    style={{ cursor: 'pointer' }}
+                    title="Bấm để xem chi tiết đơn"
+                  >
                     <td style={{ fontWeight: 600, color: '#0F766E' }}>
                       {req.employeeCode || '—'}
                     </td>
@@ -830,15 +610,6 @@ export const ApprovalRequestsPage: React.FC = () => {
                           </div>
                         )}
 
-                        {req.requestType === ScheduleRequestType.ShiftSwap && (
-                          <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                            Đổi ca với: <strong>{req.targetEmployeeName || 'Đồng nghiệp'}</strong>
-                            {req.peerConfirmed === true && ' (Đã đồng ý)'}
-                            {req.peerConfirmed === false && ' (Đã từ chối)'}
-                            {req.peerConfirmed === null && ' (Chờ xác nhận)'}
-                          </div>
-                        )}
-
                         {req.requestType === ScheduleRequestType.CheckInIncident && (
                           <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                             {req.requestedCheckInTime && (
@@ -858,7 +629,10 @@ export const ApprovalRequestsPage: React.FC = () => {
                         {images.length > 0 && (
                           <div style={{ marginTop: 4 }}>
                             <span
-                              onClick={() => handleOpenLightbox(images, 0)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenLightbox(images, 0);
+                              }}
                               style={{
                                 color: '#0F766E',
                                 cursor: 'pointer',
@@ -889,7 +663,7 @@ export const ApprovalRequestsPage: React.FC = () => {
                         <span style={{ fontSize: 13, color: '#94A3B8' }}>—</span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                       {isPending ? (
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
                           <button
@@ -966,6 +740,14 @@ export const ApprovalRequestsPage: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* ─── SUB-MODAL CHI TIẾT PHIẾU YÊU CẦU ─── */}
+      <ApprovalRequestsModal
+        isOpen={Boolean(detailRequest)}
+        onClose={() => setDetailRequest(null)}
+        request={detailRequest}
+        onSuccess={fetchRequests}
+      />
 
       {/* ─── SUB-MODAL XÁC NHẬN DUYỆT / TỪ CHỐI ─── */}
       {isConfirmModalOpen && selectedRequest && (
@@ -1055,15 +837,11 @@ export const ApprovalRequestsPage: React.FC = () => {
                 <div>
                   <strong>Lý do gửi:</strong> {selectedRequest.reason}
                 </div>
-                {((selectedRequest.evidenceImageUrls && selectedRequest.evidenceImageUrls.length > 0) ||
-                  selectedRequest.evidenceImageUrl) && (
+                {selectedRequest.evidenceImageUrls && selectedRequest.evidenceImageUrls.length > 0 && (
                   <div style={{ marginTop: 8 }}>
                     <strong>Ảnh minh chứng:</strong>
                     <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                      {((selectedRequest.evidenceImageUrls && selectedRequest.evidenceImageUrls.length > 0)
-                        ? selectedRequest.evidenceImageUrls
-                        : [selectedRequest.evidenceImageUrl!]
-                      ).map((url, idx) => (
+                      {selectedRequest.evidenceImageUrls.map((url, idx) => (
                         <img
                           key={url}
                           src={url}
@@ -1077,11 +855,7 @@ export const ApprovalRequestsPage: React.FC = () => {
                             cursor: 'pointer',
                           }}
                           onClick={() => {
-                            const list =
-                              selectedRequest.evidenceImageUrls && selectedRequest.evidenceImageUrls.length > 0
-                                ? selectedRequest.evidenceImageUrls
-                                : [selectedRequest.evidenceImageUrl!];
-                            handleOpenLightbox(list, idx);
+                            handleOpenLightbox(selectedRequest.evidenceImageUrls!, idx);
                           }}
                           title="Bấm để xem phóng to"
                         />

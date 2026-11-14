@@ -59,6 +59,7 @@ export interface EmployeeBackendDetailDto {
 }
 
 export interface CreateEmployeePayload {
+  employeeCode?: string;
   fullName: string;
   citizenId: string;
   phone: string;
@@ -233,6 +234,7 @@ export const mapFormToCreatePayload = (
     });
 
   return {
+    employeeCode: emp.employeeCode?.trim().toUpperCase() || undefined,
     fullName: (emp.fullName || '').trim(),
     citizenId: (emp.citizenId || '').trim(),
     phone: (emp.phone || '').trim(),
@@ -258,7 +260,7 @@ export const mapFormToCreatePayload = (
     allowances: activeAllowances,
     bankAccountNumber: emp.bankAccountNumber?.trim() || undefined,
     bankName: emp.bankName?.trim() || undefined,
-    bankAccountHolder: emp.bankAccountHolder?.trim() || undefined,
+    bankAccountHolder: emp.bankAccountHolder?.trim().toUpperCase() || undefined,
     avatarUrl: emp.avatarUrl?.trim() || undefined,
     faceDescriptor: emp.faceDescriptor ?? undefined,
     faceImageUrls: typeof emp.faceImageUrls === 'string' ? emp.faceImageUrls : Array.isArray(emp.faceImageUrls) ? JSON.stringify(emp.faceImageUrls) : undefined,

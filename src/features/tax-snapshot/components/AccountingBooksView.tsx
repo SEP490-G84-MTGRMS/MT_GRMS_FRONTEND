@@ -23,6 +23,7 @@ import {
 } from '../types/taxSnapshot';
 import { taxSnapshotApi } from '../api/taxSnapshotApi';
 import { formatMoney } from '../../finance/utils/formatters';
+import { TaxBookPrintModal } from './TaxBookPrintModal';
 
 interface Props {
   summary?: HouseholdTaxSummaryDto;
@@ -40,6 +41,96 @@ interface BookTabMetadata {
   desc: string;
   badge?: string;
 }
+
+/**
+ * Phân loại chứng từ kế toán có phải là Phiếu Thu (receipt) hay không theo Thông tư 152/2025/TT-BTC.
+ * Ưu tiên phát sinh inAmount/outAmount, phân loại chuỗi chuẩn xác, không dùng .includes('thu') trực tiếp trên description.
+ */
+export const isReceiptEntry = (entry: AccountingBookEntryDto): boolean => {
+  // 1. Ưu tiên số tiền phát sinh rõ ràng
+  if (entry.inAmount != null && entry.inAmount > 0) {
+    return true;
+  }
+  if (entry.outAmount != null && entry.outAmount > 0) {
+    return false;
+  }
+
+  // 2. Phân loại theo mã chứng từ chuẩn
+  const vNum = entry.voucherNumber?.trim().toUpperCase() || '';
+  if (vNum.startsWith('PT') || vNum.startsWith('CB-IN')) {
+    return true;
+  }
+  if (vNum.startsWith('PC') || vNum.startsWith('CB-OUT')) {
+    return false;
+  }
+
+  // 3. Phân loại theo danh mục nghiệp vụ
+  const cat = entry.category?.trim().toLowerCase() || '';
+  if (
+    cat === 'thu' ||
+    cat.startsWith('thu ') ||
+    cat.includes('phiếu thu')
+  ) {
+    return true;
+  }
+  if (
+    cat === 'chi' ||
+    cat.startsWith('chi ') ||
+    cat.includes('phiếu chi')
+  ) {
+    return false;
+  }
+
+  // 4. Phân loại theo nội dung diễn giải (description)
+  const desc = entry.description?.trim() || '';
+  const descLower = desc.toLowerCase();
+
+  // Loại trừ các trường hợp chi phí hoặc nộp thuế có chứa "thuê" hoặc "thuế"
+  if (descLower.includes('thuê') || descLower.includes('thuế') || descLower.startsWith('chi ') || descLower.includes('[chi ')) {
+    return false;
+  }
+
+  if (
+    descLower.startsWith('[thu') ||
+    descLower.startsWith('thu ') ||
+    /\bthu\b/i.test(desc) ||
+    /(?:^|[^\p{L}\p{N}])thu(?:$|[^\p{L}\p{N}])/iu.test(desc)
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Trích xuất chuẩn xác số tiền Thu (inAmt) và Chi (outAmt) cho dòng chứng từ quỹ S2e.
+ */
+export const getEntryFundAmounts = (
+  entry: AccountingBookEntryDto
+): { isReceipt: boolean; inAmt: number; outAmt: number } => {
+  const isReceipt = isReceiptEntry(entry);
+
+  let inAmt = 0;
+  let outAmt = 0;
+
+  if (entry.inAmount != null && entry.inAmount > 0) {
+    inAmt = entry.inAmount;
+    outAmt = entry.outAmount != null && entry.outAmount > 0 ? entry.outAmount : 0;
+  } else if (entry.outAmount != null && entry.outAmount > 0) {
+    outAmt = entry.outAmount;
+    inAmt = 0;
+  } else if (entry.amount > 0) {
+    if (isReceipt) {
+      inAmt = entry.amount;
+      outAmt = 0;
+    } else {
+      outAmt = entry.amount;
+      inAmt = 0;
+    }
+  }
+
+  return { isReceipt, inAmt, outAmt };
+};
 
 export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, periodNumber }) => {
   // Determine if business is under declaration method
@@ -74,6 +165,8 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
   const [isLoadingBooks, setIsLoadingBooks] = useState<boolean>(false);
   const [bookError, setBookError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
 
   // Synchronize period from parent props
   useEffect(() => {
@@ -218,47 +311,71 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
     let cOut = 0;
     let bIn = 0;
     let bOut = 0;
-    let openingCash = 0;
-    let openingBank = 0;
+
+    // Tìm số dư đầu kỳ từ bookEntries để không bị mất khi filter/search
+    const dkCashEntry = bookEntries.find(
+      (e) =>
+        e.voucherNumber === 'DK-CASH' ||
+        e.voucherNumber === 'DK_CASH' ||
+        (e.isSummaryRow &&
+          (e.sectionGroup?.includes('Khối I') || !e.sectionGroup?.includes('Khối II')) &&
+          e.description?.toLowerCase().includes('đầu kỳ'))
+    );
+    const dkBankEntry = bookEntries.find(
+      (e) =>
+        e.voucherNumber === 'DK-BANK' ||
+        e.voucherNumber === 'DK_BANK' ||
+        (e.isSummaryRow &&
+          e.sectionGroup?.includes('Khối II') &&
+          e.description?.toLowerCase().includes('đầu kỳ'))
+    );
+
+    let openingCash = dkCashEntry?.balanceAmount ?? dkCashEntry?.amount ?? 0;
+    let openingBank = dkBankEntry?.balanceAmount ?? dkBankEntry?.amount ?? 0;
 
     filteredEntries.forEach((entry) => {
-      if (entry.voucherNumber === 'DK-CASH') {
-        openingCash = entry.balanceAmount ?? entry.amount ?? 0;
+      // Cập nhật lại nếu gặp dòng DK trong filteredEntries
+      if (
+        entry.voucherNumber === 'DK-CASH' ||
+        entry.voucherNumber === 'DK_CASH' ||
+        (entry.isSummaryRow &&
+          (entry.sectionGroup?.includes('Khối I') || !entry.sectionGroup?.includes('Khối II')) &&
+          entry.description?.toLowerCase().includes('đầu kỳ'))
+      ) {
+        if (entry.balanceAmount != null || entry.amount != null) {
+          openingCash = entry.balanceAmount ?? entry.amount ?? 0;
+        }
         return;
       }
-      if (entry.voucherNumber === 'DK-BANK') {
-        openingBank = entry.balanceAmount ?? entry.amount ?? 0;
+
+      if (
+        entry.voucherNumber === 'DK-BANK' ||
+        entry.voucherNumber === 'DK_BANK' ||
+        (entry.isSummaryRow &&
+          entry.sectionGroup?.includes('Khối II') &&
+          entry.description?.toLowerCase().includes('đầu kỳ'))
+      ) {
+        if (entry.balanceAmount != null || entry.amount != null) {
+          openingBank = entry.balanceAmount ?? entry.amount ?? 0;
+        }
         return;
       }
+
       if (entry.isSummaryRow) {
         return;
       }
 
       const isBank =
-        entry.category?.toLowerCase().includes('ngân hàng') ||
-        entry.category?.toLowerCase().includes('bank') ||
-        entry.sectionGroup?.includes('Khối II') ||
-        entry.sectionGroup?.includes('II.') ||
-        entry.beneficiaryName?.toLowerCase().includes('vietcombank') ||
-        entry.beneficiaryName?.toLowerCase().includes('bank');
+        !entry.sectionGroup?.includes('Khối I') &&
+        !entry.sectionGroup?.includes('I.') &&
+        (entry.category?.toLowerCase().includes('ngân hàng') ||
+          entry.category?.toLowerCase().includes('bank') ||
+          entry.sectionGroup?.includes('Khối II') ||
+          entry.sectionGroup?.includes('II.') ||
+          entry.beneficiaryName?.toLowerCase().includes('vietcombank') ||
+          entry.beneficiaryName?.toLowerCase().includes('bank'));
 
-      const inAmt =
-        entry.inAmount ??
-        (entry.amount > 0 &&
-        (entry.description.toLowerCase().includes('thu') ||
-          entry.voucherNumber.startsWith('PT') ||
-          entry.category.toLowerCase().includes('thu'))
-          ? entry.amount
-          : 0);
-
-      const outAmt =
-        entry.outAmount ??
-        (entry.amount > 0 &&
-        (entry.description.toLowerCase().includes('chi') ||
-          entry.voucherNumber.startsWith('PC') ||
-          entry.category.toLowerCase().includes('chi'))
-          ? entry.amount
-          : 0);
+      const { inAmt, outAmt } = getEntryFundAmounts(entry);
 
       if (isBank) {
         bIn += inAmt;
@@ -289,12 +406,13 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
       totalIn,
       totalOut,
     };
-  }, [filteredEntries]);
+  }, [bookEntries, filteredEntries]);
 
   // Export excel (single active book or full 7-book workbook)
   const handleExportExcel = async (onlyActiveBook = false) => {
     try {
       setIsExporting(true);
+      setExportError(null);
       const targetBookType = onlyActiveBook ? activeBookTab : undefined;
       const blob = await taxSnapshotApi.exportTaxExcel(
         {
@@ -327,7 +445,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể xuất file sổ kế toán Excel từ máy chủ.');
+      setExportError(err instanceof Error ? err.message : 'Không thể xuất file sổ kế toán Excel từ máy chủ.');
     } finally {
       setIsExporting(false);
     }
@@ -781,7 +899,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
           </button>
           <button
             type="button"
-            onClick={handlePrint}
+            onClick={() => setIsPrintModalOpen(true)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -798,7 +916,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
             }}
           >
             <Printer size={15} />
-            <span>In sổ chuẩn A4</span>
+            <span>Xem bản in & In A4</span>
           </button>
         </div>
       </div>
@@ -822,6 +940,28 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
         >
           <AlertCircle size={16} />
           <span>{bookError}</span>
+        </div>
+      )}
+
+      {/* Export Error Notice */}
+      {exportError && (
+        <div
+          className="no-print"
+          style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: '#FEF2F2',
+            border: '1px solid #FECACA',
+            color: '#991B1B',
+            fontSize: '0.82rem',
+            marginBottom: 14,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <AlertCircle size={16} />
+          <span>⚠️ {exportError}</span>
         </div>
       )}
 
@@ -1387,15 +1527,15 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                         !e.isSummaryRow &&
                         e.voucherNumber !== 'DK-CASH' &&
                         e.voucherNumber !== 'DK-BANK' &&
+                        e.voucherNumber !== 'DK_CASH' &&
+                        e.voucherNumber !== 'DK_BANK' &&
                         !e.category?.toLowerCase().includes('ngân hàng') &&
                         !e.category?.toLowerCase().includes('bank') &&
                         !e.sectionGroup?.includes('Khối II') &&
                         !e.sectionGroup?.includes('II.')
                     )
                     .map((entry, idx) => {
-                      const isReceipt =
-                        (entry.inAmount != null && entry.inAmount > 0) ||
-                        (entry.amount > 0 && (entry.description.toLowerCase().includes('thu') || entry.voucherNumber.startsWith('PT')));
+                      const { isReceipt, inAmt, outAmt } = getEntryFundAmounts(entry);
                       return (
                         <tr key={entry.voucherNumber ? `${entry.voucherNumber}-${idx}` : idx}>
                           <td style={{ fontWeight: 700, color: '#0F766E' }}>{entry.voucherNumber || '—'}</td>
@@ -1409,10 +1549,10 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                             </div>
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 700, color: '#166534' }}>
-                            {isReceipt ? formatMoney(entry.inAmount ?? entry.amount) : '—'}
+                            {isReceipt ? formatMoney(inAmt) : '—'}
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 700, color: '#991B1B' }}>
-                            {!isReceipt ? formatMoney(entry.outAmount ?? entry.amount) : '—'}
+                            {!isReceipt ? formatMoney(outAmt) : '—'}
                           </td>
                         </tr>
                       );
@@ -1443,15 +1583,15 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                         !e.isSummaryRow &&
                         e.voucherNumber !== 'DK-CASH' &&
                         e.voucherNumber !== 'DK-BANK' &&
+                        e.voucherNumber !== 'DK_CASH' &&
+                        e.voucherNumber !== 'DK_BANK' &&
                         (e.category?.toLowerCase().includes('ngân hàng') ||
                           e.category?.toLowerCase().includes('bank') ||
                           e.sectionGroup?.includes('Khối II') ||
                           e.sectionGroup?.includes('II.'))
                     )
                     .map((entry, idx) => {
-                      const isReceipt =
-                        (entry.inAmount != null && entry.inAmount > 0) ||
-                        (entry.amount > 0 && (entry.description.toLowerCase().includes('thu') || entry.voucherNumber.startsWith('PT')));
+                      const { isReceipt, inAmt, outAmt } = getEntryFundAmounts(entry);
                       return (
                         <tr key={entry.voucherNumber ? `${entry.voucherNumber}-${idx}` : idx}>
                           <td style={{ fontWeight: 700, color: '#1E40AF' }}>{entry.voucherNumber || '—'}</td>
@@ -1465,10 +1605,10 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                             </div>
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 700, color: '#166534' }}>
-                            {isReceipt ? formatMoney(entry.inAmount ?? entry.amount) : '—'}
+                            {isReceipt ? formatMoney(inAmt) : '—'}
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 700, color: '#991B1B' }}>
-                            {!isReceipt ? formatMoney(entry.outAmount ?? entry.amount) : '—'}
+                            {!isReceipt ? formatMoney(outAmt) : '—'}
                           </td>
                         </tr>
                       );
@@ -1664,6 +1804,23 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
           </div>
         </div>
       </div>
+
+      {/* Modal Xem trước và in ấn A4 chuẩn Thông tư 152 */}
+      <TaxBookPrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        activeBookTab={activeBookTab}
+        onSelectBookTab={(type) => setActiveBookTab(type)}
+        bookTabs={bookTabs}
+        activeTabMetadata={activeTabMetadata}
+        entries={filteredEntries}
+        fundMetrics={fundMetrics}
+        totalAmount={totalAmount}
+        summary={summary}
+        periodDisplayName={periodDisplayName}
+        year={year}
+        onPrint={handlePrint}
+      />
     </div>
   );
 };

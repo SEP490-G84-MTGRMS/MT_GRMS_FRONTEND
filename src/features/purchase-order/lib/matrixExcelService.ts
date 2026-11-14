@@ -4,11 +4,13 @@ import type {
   OrderMatrixProduct,
   DayColInfo,
   MatrixCellMap,
+  MatrixCellData,
   OrderMatrixSupplierDeliveryConfig,
   SupplierDeliveryConfig,
   BranchOption,
   SupplierOption,
 } from '../types/po.types';
+import { productRowKey } from './matrixRowKey';
 
 // ============================================================================
 // TYPES & CONSTANTS
@@ -56,7 +58,10 @@ export type ExcelValidationCode =
   | 'QUANTITY_TOO_LARGE'
   // Cell State (Disabled / Blocked)
   | 'BLOCKED_CELL_MODIFIED'
-  | 'QUANTITY_REVIEW';
+  | 'QUANTITY_REVIEW'
+  | 'PRODUCT_OUT_OF_FILTER'
+  | 'PRODUCT_AMBIGUOUS'
+  | 'OWNER_LOCKED_SKIPPED';
 
 export interface ExcelValidationErrorItem {
   type: 'ERROR' | 'WARNING';
@@ -72,7 +77,9 @@ export interface ExcelValidationErrorItem {
 
 export interface ExcelCellToApply {
   row: number;
+  rowKey?: string;
   productId: string;
+  supplierId?: string;
   productCode: string;
   productName: string;
   supplierName?: string;
@@ -100,6 +107,9 @@ export interface ExcelValidationSummary {
   errorCount: number;
   warningCount: number;
   ignoredCells: number;
+  skippedOwnerLocked?: number;
+  outOfFilterCount?: number;
+  productsInFilterCount?: number;
 }
 
 export interface ExcelValidationResult {
@@ -120,7 +130,37 @@ export interface ExportMatrixExcelOptions {
   viewFrom: Date;
   viewTo: Date;
   exportedBy?: string;
+  isStoreOwner?: boolean;
+  /** Khi true: để trống các ô editable (file mẫu). */
+  blankQty?: boolean;
+  /** Map supplierId → mã NCC hiển thị trên cột Mã NCC */
+  supplierCodeById?: Record<string, string>;
   isCellEditable: (d: DayColInfo, product?: OrderMatrixProduct) => boolean;
+}
+
+const FIXED_COL_COUNT = 10; // STT..Đơn giá (đã gồm Mã NCC)
+
+/** Qty hiển thị trên Excel — khớp OrderMatrixTable theo role. */
+export function resolveExportQty(
+  cell: MatrixCellData | undefined,
+  isStoreOwner: boolean
+): number {
+  if (!cell) return 0;
+  if (isStoreOwner) {
+    if (cell.isOwnerAdjusted || cell.storeQty !== null) {
+      return cell.storeQty ?? cell.finalQty ?? 0;
+    }
+    return cell.employeeQty > 0 ? cell.employeeQty : cell.finalQty || 0;
+  }
+  if (cell.isOwnerAdjusted || (cell.storeQty !== null && cell.storeQty !== undefined)) {
+    return cell.storeQty ?? cell.finalQty ?? 0;
+  }
+  return cell.employeeQty > 0 ? cell.employeeQty : 0;
+}
+
+function getCellForExport(cellMap: MatrixCellMap, p: OrderMatrixProduct, dateKey: string) {
+  const rk = productRowKey(p);
+  return cellMap[rk]?.[dateKey] ?? cellMap[p.id]?.[dateKey];
 }
 
 // ============================================================================
@@ -141,6 +181,9 @@ export function exportMatrixToExcel(
     ? 'Tất cả nhà cung cấp'
     : options.supplierId;
   const supplierId = options.supplier ? options.supplier.id : options.supplierId;
+  const isStoreOwner = options.isStoreOwner !== false;
+  const blankQty = Boolean(options.blankQty);
+  const codeById = options.supplierCodeById ?? {};
 
   const exportTime = dayjs().format('DD/MM/YYYY HH:mm:ss');
   const periodStr = `${dayjs(options.viewFrom).format('DD/MM/YYYY')} - ${dayjs(options.viewTo).format('DD/MM/YYYY')}`;
@@ -151,11 +194,10 @@ export function exportMatrixToExcel(
       ? products
       : products.filter((p) => p.supplierId === options.supplierId);
 
-  // Total columns: 9 fixed cols + dayColumns.length + 2 summary cols
-  const totalCols = 9 + dayColumns.length + 2;
+  const totalCols = FIXED_COL_COUNT + dayColumns.length + 2;
   const lastColIdx = totalCols - 1;
+  const dayColStart = FIXED_COL_COUNT;
 
-  // Styles Definition
   const borderThin = {
     top: { style: 'thin', color: { rgb: 'CBD5E1' } },
     bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
@@ -178,18 +220,15 @@ export function exportMatrixToExcel(
   };
 
   const fontBase = 'Segoe UI';
-
   const ws: any = {};
   const merges: any[] = [];
   const rowHeights: any[] = [];
 
-  // Helper to set cell
   const setCell = (r: number, c: number, val: any, type: 's' | 'n', style?: any) => {
     const ref = XLSX.utils.encode_cell({ r, c });
     ws[ref] = { v: val, t: type, s: style };
   };
 
-  // Helper to set merged banner
   const setBannerRow = (r: number, text: string, style: any, heightPt: number) => {
     for (let c = 0; c <= lastColIdx; c++) {
       setCell(r, c, c === 0 ? text : '', 's', style);
@@ -198,13 +237,12 @@ export function exportMatrixToExcel(
     rowHeights[r] = { hpt: heightPt };
   };
 
-  // 1. Title Banner Rows
   setBannerRow(
     0,
     'HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS — ĐẶT HÀNG NHẬP KHO (PURCHASE ORDER MATRIX)',
     {
       font: { name: fontBase, sz: 14, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '1E3A8A' } }, // Deep Navy
+      fill: { fgColor: { rgb: '1E3A8A' } },
       alignment: { horizontal: 'center', vertical: 'center' },
     },
     36
@@ -212,10 +250,10 @@ export function exportMatrixToExcel(
 
   setBannerRow(
     1,
-    `🏪 Chi nhánh: ${branchName}   |   Mã hệ thống: ${branchId}`,
+    `Chi nhánh: ${branchName}   |   Mã hệ thống: ${branchId}`,
     {
       font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: '1E3A8A' } },
-      fill: { fgColor: { rgb: 'F0F9FF' } }, // Soft Blue
+      fill: { fgColor: { rgb: 'F0F9FF' } },
       alignment: { horizontal: 'center', vertical: 'center' },
       border: { bottom: { style: 'thin', color: { rgb: 'BAE6FD' } } },
     },
@@ -224,7 +262,7 @@ export function exportMatrixToExcel(
 
   setBannerRow(
     2,
-    `🏢 Nhà cung cấp: ${supplierName}   |   Mã NCC: ${supplierId}   |   Kỳ đặt hàng: ${periodStr}`,
+    `Nhà cung cấp: ${supplierName}   |   Mã NCC: ${supplierId}   |   Kỳ đặt hàng: ${periodStr}`,
     {
       font: { name: fontBase, sz: 10, color: { rgb: '334155' } },
       fill: { fgColor: { rgb: 'F0F9FF' } },
@@ -236,7 +274,7 @@ export function exportMatrixToExcel(
 
   setBannerRow(
     3,
-    `📅 Thời gian xuất: ${exportTime}   |   Người lập: ${exportedBy}   |   Tổng số: ${relevantProducts.length} mặt hàng`,
+    `Thời gian xuất: ${exportTime}   |   Người lập: ${exportedBy}   |   Tổng số: ${relevantProducts.length} mặt hàng`,
     {
       font: { name: fontBase, sz: 9.5, italic: true, color: { rgb: '64748B' } },
       fill: { fgColor: { rgb: 'F8FAFC' } },
@@ -246,13 +284,11 @@ export function exportMatrixToExcel(
     20
   );
 
-  // Row 4: Spacer row
   for (let c = 0; c <= lastColIdx; c++) {
     setCell(4, c, '', 's', {});
   }
   rowHeights[4] = { hpt: 10 };
 
-  // 2. Table Header Row (Row Index 5)
   const headerRowIdx = 5;
   rowHeights[headerRowIdx] = { hpt: 32 };
 
@@ -260,7 +296,8 @@ export function exportMatrixToExcel(
     { text: 'STT', wch: 6 },
     { text: 'Ngành hàng', wch: 15 },
     { text: 'Mã vạch', wch: 16 },
-    { text: 'Mã sản phẩm (SKU)', wch: 18 },
+    { text: 'Mã sản phẩm', wch: 18 },
+    { text: 'Mã NCC', wch: 14 },
     { text: 'Tên sản phẩm', wch: 34 },
     { text: 'ĐVT', wch: 9 },
     { text: 'MOQ', wch: 8 },
@@ -271,46 +308,42 @@ export function exportMatrixToExcel(
   fixedHeaders.forEach((h, c) => {
     setCell(headerRowIdx, c, h.text, 's', {
       font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '1E40AF' } }, // Royal Navy Blue
+      fill: { fgColor: { rgb: '1E40AF' } },
       alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
       border: borderHeader,
     });
   });
 
-  // Date Column Headers
   dayColumns.forEach((d, i) => {
-    const colIdx = 9 + i;
-    const isLocked = d.isLocked || d.isOff || d.cutoffStatus === 'PO_GENERATED' || d.cutoffStatus === 'LOCKED' || d.cutoffStatus === 'SUPPLIER_OFF';
-    setCell(
-      headerRowIdx,
-      colIdx,
-      `${d.dowName} ${d.dateShort}\n[${d.dateKey}]`,
-      's',
-      {
-        font: { name: fontBase, sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
-        fill: { fgColor: { rgb: isLocked ? '475569' : '2563EB' } }, // Gray slate if locked, vivid blue if open
-        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: borderHeader,
-      }
-    );
+    const colIdx = dayColStart + i;
+    const isLocked =
+      d.isLocked ||
+      d.isOff ||
+      d.cutoffStatus === 'PO_GENERATED' ||
+      d.cutoffStatus === 'LOCKED' ||
+      d.cutoffStatus === 'SUPPLIER_OFF';
+    setCell(headerRowIdx, colIdx, `${d.dowName} ${d.dateShort}\n[${d.dateKey}]`, 's', {
+      font: { name: fontBase, sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: isLocked ? '475569' : '2563EB' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border: borderHeader,
+    });
   });
 
-  // Summary Column Headers
-  setCell(headerRowIdx, 9 + dayColumns.length, 'Tổng SL', 's', {
-    font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
-    fill: { fgColor: { rgb: '065F46' } }, // Deep Forest Emerald
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border: borderHeader,
-  });
-
-  setCell(headerRowIdx, 10 + dayColumns.length, 'Thành tiền (VNĐ)', 's', {
+  setCell(headerRowIdx, dayColStart + dayColumns.length, 'Tổng SL', 's', {
     font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
     fill: { fgColor: { rgb: '065F46' } },
     alignment: { horizontal: 'center', vertical: 'center' },
     border: borderHeader,
   });
 
-  // 3. Data Rows (Row Index 6 onwards)
+  setCell(headerRowIdx, dayColStart + dayColumns.length + 1, 'Thành tiền (VNĐ)', 's', {
+    font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
+    fill: { fgColor: { rgb: '065F46' } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: borderHeader,
+  });
+
   let currentRowIdx = 6;
   const dayTotals: number[] = new Array(dayColumns.length).fill(0);
   let grandTotalQty = 0;
@@ -319,95 +352,58 @@ export function exportMatrixToExcel(
   relevantProducts.forEach((p, idx) => {
     rowHeights[currentRowIdx] = { hpt: 22 };
     const isOdd = idx % 2 === 1;
-    const bgRowColor = isOdd ? 'F8FAFC' : 'FFFFFF'; // Subtle zebra striping
-
+    const bgRowColor = isOdd ? 'F8FAFC' : 'FFFFFF';
     let rowQty = 0;
+    const nccCode = codeById[p.supplierId] || p.supplierName || p.supplierId || '';
 
-    // Col 0: STT
-    setCell(currentRowIdx, 0, idx + 1, 'n', {
-      font: { name: fontBase, sz: 9.5, color: { rgb: '64748B' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderThin,
-    });
-
-    // Col 1: Ngành hàng
-    setCell(currentRowIdx, 1, p.category || 'Tạp hóa', 's', {
+    const baseStyle = (extra: any = {}) => ({
       font: { name: fontBase, sz: 10, color: { rgb: '334155' } },
       fill: { fgColor: { rgb: bgRowColor } },
       alignment: { horizontal: 'center', vertical: 'center' },
       border: borderThin,
+      ...extra,
     });
 
-    // Col 2: Mã vạch
+    setCell(currentRowIdx, 0, idx + 1, 'n', baseStyle({ font: { name: fontBase, sz: 9.5, color: { rgb: '64748B' } } }));
+    setCell(currentRowIdx, 1, p.category || 'Tạp hóa', 's', baseStyle());
     const barcodeStr = (p as any).barcode ? String((p as any).barcode) : '';
-    setCell(currentRowIdx, 2, barcodeStr, 's', {
-      font: { name: 'Consolas', sz: 9.5, color: { rgb: '475569' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderThin,
+    setCell(currentRowIdx, 2, barcodeStr, 's', baseStyle({ font: { name: 'Consolas', sz: 9.5, color: { rgb: '475569' } } }));
+    setCell(
+      currentRowIdx,
+      3,
+      p.sku || '',
+      's',
+      baseStyle({ font: { name: 'Consolas', sz: 10, bold: true, color: { rgb: '0F766E' } } })
+    );
+    setCell(currentRowIdx, 4, nccCode, 's', baseStyle({ font: { name: 'Consolas', sz: 9.5, bold: true, color: { rgb: '1E40AF' } } }));
+    setCell(
+      currentRowIdx,
+      5,
+      p.name || '',
+      's',
+      baseStyle({
+        font: { name: fontBase, sz: 10, bold: true, color: { rgb: '0F172A' } },
+        alignment: { horizontal: 'left', vertical: 'center' },
+      })
+    );
+    setCell(currentRowIdx, 6, p.unit || 'Cái', 's', baseStyle());
+    setCell(currentRowIdx, 7, p.moq || 1, 'n', {
+      ...baseStyle({ font: { name: fontBase, sz: 10, bold: true, color: { rgb: 'D97706' } } }),
+      numFmt: '#,##0',
     });
-
-    // Col 3: Mã sản phẩm (SKU) — Distinctive Teal Bold
-    setCell(currentRowIdx, 3, p.sku || '', 's', {
-      font: { name: 'Consolas', sz: 10, bold: true, color: { rgb: '0F766E' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderThin,
-    });
-
-    // Col 4: Tên sản phẩm — Bold Charcoal
-    setCell(currentRowIdx, 4, p.name || '', 's', {
-      font: { name: fontBase, sz: 10, bold: true, color: { rgb: '0F172A' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'left', vertical: 'center' },
-      border: borderThin,
-    });
-
-    // Col 5: ĐVT
-    setCell(currentRowIdx, 5, p.unit || 'Cái', 's', {
-      font: { name: fontBase, sz: 10, color: { rgb: '475569' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderThin,
-    });
-
-    // Col 6: MOQ — Bold Amber
-    setCell(currentRowIdx, 6, p.moq || 1, 'n', {
-      font: { name: fontBase, sz: 10, bold: true, color: { rgb: 'D97706' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderThin,
+    setCell(currentRowIdx, 8, p.orderMultiple || 1, 'n', { ...baseStyle(), numFmt: '#,##0' });
+    setCell(currentRowIdx, 9, p.price || 0, 'n', {
+      ...baseStyle({ alignment: { horizontal: 'right', vertical: 'center' } }),
       numFmt: '#,##0',
     });
 
-    // Col 7: Bội số
-    setCell(currentRowIdx, 7, p.orderMultiple || 1, 'n', {
-      font: { name: fontBase, sz: 10, color: { rgb: '64748B' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderThin,
-      numFmt: '#,##0',
-    });
-
-    // Col 8: Đơn giá
-    setCell(currentRowIdx, 8, p.price || 0, 'n', {
-      font: { name: fontBase, sz: 10, color: { rgb: '0F172A' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'right', vertical: 'center' },
-      border: borderThin,
-      numFmt: '#,##0',
-    });
-
-    // Day Columns
     dayColumns.forEach((d, dayIdx) => {
-      const colIdx = 9 + dayIdx;
+      const colIdx = dayColStart + dayIdx;
       const isEditable = options.isCellEditable(d, p);
-      const currentCell = cellMap[p.id]?.[d.dateKey];
-      const q = currentCell?.finalQty || 0;
+      const currentCell = getCellForExport(cellMap, p, d.dateKey);
+      const q = blankQty && isEditable ? 0 : resolveExportQty(currentCell, isStoreOwner);
 
       if (!isEditable) {
-        // Locked / Cutoff passed cell: Solid Light Gray #F1F5F9 matching CISCA
         const displayVal = q > 0 ? q : '—';
         setCell(currentRowIdx, colIdx, displayVal, typeof displayVal === 'number' ? 'n' : 's', {
           font: {
@@ -426,43 +422,37 @@ export function exportMatrixToExcel(
           rowQty += q;
           dayTotals[dayIdx] += q;
         }
+      } else if (q > 0) {
+        rowQty += q;
+        dayTotals[dayIdx] += q;
+        setCell(currentRowIdx, colIdx, q, 'n', {
+          font: { name: fontBase, sz: 11, bold: true, color: { rgb: '1D4ED8' } },
+          fill: { fgColor: { rgb: 'EFF6FF' } },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: borderThin,
+          numFmt: '#,##0',
+        });
       } else {
-        // Editable cell
-        if (q > 0) {
-          rowQty += q;
-          dayTotals[dayIdx] += q;
-          setCell(currentRowIdx, colIdx, q, 'n', {
-            font: { name: fontBase, sz: 11, bold: true, color: { rgb: '1D4ED8' } }, // Highlighted Blue
-            fill: { fgColor: { rgb: 'EFF6FF' } }, // Soft Sky Blue tint
-            alignment: { horizontal: 'center', vertical: 'center' },
-            border: borderThin,
-            numFmt: '#,##0',
-          });
-        } else {
-          setCell(currentRowIdx, colIdx, '', 's', {
-            fill: { fgColor: { rgb: bgRowColor } },
-            alignment: { horizontal: 'center', vertical: 'center' },
-            border: borderThin,
-          });
-        }
+        setCell(currentRowIdx, colIdx, '', 's', {
+          fill: { fgColor: { rgb: bgRowColor } },
+          alignment: { horizontal: 'center', vertical: 'center' },
+          border: borderThin,
+        });
       }
     });
 
-    // Total Qty Column — Soft Emerald tint
     const rowAmt = rowQty * (p.price || 0);
     grandTotalQty += rowQty;
     grandTotalAmt += rowAmt;
 
-    setCell(currentRowIdx, 9 + dayColumns.length, rowQty, 'n', {
+    setCell(currentRowIdx, dayColStart + dayColumns.length, rowQty, 'n', {
       font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: '047857' } },
       fill: { fgColor: { rgb: 'F0FDF4' } },
       alignment: { horizontal: 'center', vertical: 'center' },
       border: borderThin,
       numFmt: '#,##0',
     });
-
-    // Total Amount Column — Soft Emerald tint
-    setCell(currentRowIdx, 10 + dayColumns.length, rowAmt, 'n', {
+    setCell(currentRowIdx, dayColStart + dayColumns.length + 1, rowAmt, 'n', {
       font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: '047857' } },
       fill: { fgColor: { rgb: 'F0FDF4' } },
       alignment: { horizontal: 'right', vertical: 'center' },
@@ -473,43 +463,35 @@ export function exportMatrixToExcel(
     currentRowIdx++;
   });
 
-  // 4. Summary / Total Row at the bottom
   rowHeights[currentRowIdx] = { hpt: 26 };
-
-  // Merged "TỔNG CỘNG HÀNG NGÀY" label (Col 0 to 8)
-  for (let c = 0; c <= 8; c++) {
+  for (let c = 0; c < FIXED_COL_COUNT; c++) {
     setCell(currentRowIdx, c, c === 0 ? 'TỔNG CỘNG HÀNG NGÀY' : '', 's', {
       font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '1E293B' } }, // Dark Slate Navy
+      fill: { fgColor: { rgb: '1E293B' } },
       alignment: { horizontal: 'center', vertical: 'center' },
       border: borderDoubleBottom,
     });
   }
-  merges.push({ s: { r: currentRowIdx, c: 0 }, e: { r: currentRowIdx, c: 8 } });
+  merges.push({ s: { r: currentRowIdx, c: 0 }, e: { r: currentRowIdx, c: FIXED_COL_COUNT - 1 } });
 
-  // Day Column Totals
   dayColumns.forEach((_, dayIdx) => {
-    const colIdx = 9 + dayIdx;
-    setCell(currentRowIdx, colIdx, dayTotals[dayIdx], 'n', {
+    setCell(currentRowIdx, dayColStart + dayIdx, dayTotals[dayIdx], 'n', {
       font: { name: fontBase, sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '0F172A' } }, // Midnight Slate
+      fill: { fgColor: { rgb: '0F172A' } },
       alignment: { horizontal: 'center', vertical: 'center' },
       border: borderDoubleBottom,
       numFmt: '#,##0',
     });
   });
 
-  // Grand Total Quantity
-  setCell(currentRowIdx, 9 + dayColumns.length, grandTotalQty, 'n', {
+  setCell(currentRowIdx, dayColStart + dayColumns.length, grandTotalQty, 'n', {
     font: { name: fontBase, sz: 11.5, bold: true, color: { rgb: 'FFFFFF' } },
-    fill: { fgColor: { rgb: '065F46' } }, // Deep Forest Emerald
+    fill: { fgColor: { rgb: '065F46' } },
     alignment: { horizontal: 'center', vertical: 'center' },
     border: borderDoubleBottom,
     numFmt: '#,##0',
   });
-
-  // Grand Total Amount
-  setCell(currentRowIdx, 10 + dayColumns.length, grandTotalAmt, 'n', {
+  setCell(currentRowIdx, dayColStart + dayColumns.length + 1, grandTotalAmt, 'n', {
     font: { name: fontBase, sz: 11.5, bold: true, color: { rgb: 'FFFFFF' } },
     fill: { fgColor: { rgb: '065F46' } },
     alignment: { horizontal: 'right', vertical: 'center' },
@@ -517,20 +499,20 @@ export function exportMatrixToExcel(
     numFmt: '#,##0',
   });
 
-  // 5. Column Widths configuration
   const colWidths = [
-    { wch: 6 }, // STT
-    { wch: 15 }, // Ngành hàng
-    { wch: 16 }, // Mã vạch
-    { wch: 18 }, // Mã sản phẩm (SKU)
-    { wch: 36 }, // Tên sản phẩm
-    { wch: 10 }, // ĐVT
-    { wch: 9 }, // MOQ
-    { wch: 9 }, // Bội số
-    { wch: 15 }, // Đơn giá
-    ...dayColumns.map(() => ({ wch: 18 })), // Ngày giao hàng
-    { wch: 14 }, // Tổng SL
-    { wch: 20 }, // Thành tiền
+    { wch: 6 },
+    { wch: 15 },
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 36 },
+    { wch: 10 },
+    { wch: 9 },
+    { wch: 9 },
+    { wch: 15 },
+    ...dayColumns.map(() => ({ wch: 18 })),
+    { wch: 14 },
+    { wch: 20 },
   ];
 
   ws['!ref'] = XLSX.utils.encode_range({
@@ -540,17 +522,12 @@ export function exportMatrixToExcel(
   ws['!merges'] = merges;
   ws['!rows'] = rowHeights;
   ws['!cols'] = colWidths;
-  ws['!freeze'] = { xSplit: 5, ySplit: 6 }; // Freeze header & product columns
+  ws['!freeze'] = { xSplit: 6, ySplit: 6 };
 
-  // Create Workbook
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'PO_Matrix');
-
-  // File name
   const cleanSup = options.supplier ? options.supplier.code : options.supplierId;
   const fileName = `PO_Matrix_${cleanSup}_${dayjs(options.viewFrom).format('YYYYMMDD')}.xlsx`;
-
-  // Write and trigger browser download
   XLSX.writeFile(wb, fileName);
 }
 
@@ -600,16 +577,28 @@ export async function validateMatrixExcelFile(
     isCellEditable,
   } = context;
 
+  const isGuidLike = (v?: string) =>
+    !!v &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.trim());
+
   const branchExpectStr = currentBranchName
-    ? `${currentBranchName} (${currentBranchCode || currentBranchId})`
-    : currentBranchCode || currentBranchId || '-';
+    ? currentBranchCode && !isGuidLike(currentBranchCode)
+      ? `${currentBranchName} (${currentBranchCode})`
+      : currentBranchName
+    : currentBranchCode && !isGuidLike(currentBranchCode)
+      ? currentBranchCode
+      : '-';
 
   const supplierExpectStr =
     currentSupplierId === 'ALL'
       ? 'Tất cả nhà cung cấp'
       : currentSupplierName
-      ? `${currentSupplierName} (${currentSupplierCode || currentSupplierId})`
-      : currentSupplierCode || currentSupplierId || '-';
+        ? currentSupplierCode && !isGuidLike(currentSupplierCode)
+          ? `${currentSupplierName} (${currentSupplierCode})`
+          : currentSupplierName
+        : currentSupplierCode && !isGuidLike(currentSupplierCode)
+          ? currentSupplierCode
+          : '-';
 
   const periodExpectStr =
     viewFrom && viewTo
@@ -781,7 +770,8 @@ export async function validateMatrixExcelFile(
         val === 'mã sku' ||
         val === 'msコード' ||
         val === 'sku' ||
-        val === 'product code'
+        val === 'product code' ||
+        val.includes('mã sản phẩm')
       ) {
         headerRowIndex = r;
         skuColIdx = c;
@@ -1116,7 +1106,7 @@ export async function validateMatrixExcelFile(
       }
 
       const strVal = String(rawCellVal).trim();
-      const numVal = Number(strVal);
+      let numVal = Number(strVal);
 
       // Check numeric format
       if (isNaN(numVal)) {
@@ -1151,7 +1141,8 @@ export async function validateMatrixExcelFile(
         return;
       }
 
-      if (!Number.isInteger(numVal)) {
+      const isKgUnit = String(targetProduct.unit || '').trim().toLowerCase() === 'kg';
+      if (!Number.isInteger(numVal) && !isKgUnit) {
         result.errors.push({
           type: 'ERROR',
           row: rowNum,
@@ -1165,6 +1156,10 @@ export async function validateMatrixExcelFile(
         });
         result.summary.errorCount++;
         return;
+      }
+      if (isKgUnit && !Number.isInteger(numVal)) {
+        // Làm tròn 3 chữ số thập phân cho SP cân kg
+        numVal = Math.round(numVal * 1000) / 1000;
       }
 
       if (numVal > 1_000_000) {
@@ -1281,11 +1276,11 @@ export async function validateMatrixExcelFile(
       let cellNote = currentFinalQty > 0 ? `Cập nhật (${currentFinalQty} → ${numVal})` : 'Nạp mới';
       let hasWarning = false;
 
-      // Validate MOQ per Delivery Date (WARNING)
+      // Validate MOQ per Delivery Date (ERROR — không cho lưu/apply bản thảo)
       const moq = targetProduct.moq || 1;
-      if (numVal < moq) {
-        result.warnings.push({
-          type: 'WARNING',
+      if (numVal > 0 && numVal < moq) {
+        result.errors.push({
+          type: 'ERROR',
           row: rowNum,
           productCode: targetProduct.sku,
           productName: targetProduct.name,
@@ -1293,11 +1288,10 @@ export async function validateMatrixExcelFile(
           dateLabel: `${dayCol.dowName} ${dayCol.dateShort}`,
           inputValue: numVal,
           code: 'MOQ_NOT_MET',
-          message: `Số lượng đặt (${numVal}) nhỏ hơn số lượng đặt tối thiểu MOQ = ${moq} của sản phẩm trong ngày này.`,
+          message: `Số lượng đặt (${numVal}) nhỏ hơn MOQ = ${moq}. Không được lưu bản thảo.`,
         });
-        result.summary.warningCount++;
-        cellNote += ` • ⚠️ Dưới MOQ (${moq})`;
-        hasWarning = true;
+        result.summary.errorCount++;
+        return;
       }
 
       // Validate Order Multiple (WARNING)
@@ -1373,18 +1367,29 @@ export async function validateMatrixExcelFile(
 // ============================================================================
 
 export function applyMatrixExcelImport(
-  cellsToApply: Array<{ productId: string; deliveryDate: string; quantity: number }>,
+  cellsToApply: Array<{
+    productId: string;
+    supplierId?: string;
+    rowKey?: string;
+    deliveryDate: string;
+    quantity: number;
+  }>,
   currentCellMap: MatrixCellMap,
   isStoreOwner: boolean
 ): MatrixCellMap {
   const newMap: MatrixCellMap = { ...currentCellMap };
 
-  cellsToApply.forEach(({ productId, deliveryDate, quantity }) => {
-    if (!newMap[productId]) {
-      newMap[productId] = {};
+  cellsToApply.forEach((cell) => {
+    const { productId, deliveryDate, quantity } = cell;
+    const key =
+      cell.rowKey ||
+      (cell.supplierId ? productRowKey({ id: productId, supplierId: cell.supplierId }) : productId);
+
+    if (!newMap[key]) {
+      newMap[key] = {};
     }
 
-    const currentCell = newMap[productId][deliveryDate] || {
+    const currentCell = newMap[key][deliveryDate] || newMap[productId]?.[deliveryDate] || {
       employeeQty: 0,
       storeQty: null,
       finalQty: 0,
@@ -1393,8 +1398,7 @@ export function applyMatrixExcelImport(
     };
 
     if (isStoreOwner) {
-      // Store Owner import -> ghi đè storeQty, giữ nguyên employeeQty gốc
-      newMap[productId][deliveryDate] = {
+      newMap[key][deliveryDate] = {
         ...currentCell,
         storeQty: quantity,
         isOwnerAdjusted: true,
@@ -1404,12 +1408,11 @@ export function applyMatrixExcelImport(
         modifiedAt: new Date().toISOString(),
       };
     } else {
-      // Employee import: ô đã được Store Owner chốt thì bỏ qua — không cho ghi đè.
       const hasOwnerOverride = currentCell.storeQty !== null || currentCell.isOwnerAdjusted;
       if (hasOwnerOverride) {
         return;
       }
-      newMap[productId][deliveryDate] = {
+      newMap[key][deliveryDate] = {
         ...currentCell,
         employeeQty: quantity,
         finalQty: quantity,

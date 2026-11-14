@@ -17,23 +17,6 @@ export interface BranchOption {
   isHeadquarter?: boolean;
 }
 
-const DEFAULT_BRANCHES: BranchOption[] = [
-  {
-    id: "01a181dc-5902-7b21-b424-1c9ea18e917d",
-    code: "BR-HCM-01",
-    name: "MT-Mart Chi Nhánh Quận 1",
-    address: "Số 45 Lê Duẩn, Bến Nghé, Quận 1",
-    isHeadquarter: true,
-  },
-  {
-    id: "01a181dc-5902-71fe-ba6d-aeb9700b4743",
-    code: "BR-HN-01",
-    name: "MT-Mart Chi Nhánh Cầu Giấy",
-    address: "Số 88 Cầu Giấy, Quan Hoa, Cầu Giấy",
-    isHeadquarter: false,
-  },
-];
-
 const ALL_BRANCHES_OPTION: BranchOption = {
   id: "ALL",
   code: "ALL",
@@ -46,17 +29,24 @@ const STORAGE_KEY = "mtgrms_active_branch";
 export const BranchSelectorDropdown: FC = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [branches, setBranches] = useState<BranchOption[]>(DEFAULT_BRANCHES);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<BranchOption>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (
+          parsed.id === "01a181dc-5902-7b21-b424-1c9ea18e917d" ||
+          parsed.id === "01a181dc-5902-71fe-ba6d-aeb9700b4743"
+        ) {
+          return ALL_BRANCHES_OPTION;
+        }
+        return parsed;
       }
     } catch {
       // fallback
     }
-    return DEFAULT_BRANCHES[0];
+    return ALL_BRANCHES_OPTION;
   });
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -66,11 +56,7 @@ export const BranchSelectorDropdown: FC = () => {
     async (options?: { selectBranchId?: string }) => {
       try {
         const res = await branchManagementApi.getBranches({ pageSize: 50 });
-        if (
-          res.success &&
-          res.data?.items &&
-          res.data.items.length > 0
-        ) {
+        if (res.success && res.data?.items) {
           const mapped: BranchOption[] = res.data.items.map(
             (b: BranchItemResponse) => ({
               id: b.id,
@@ -84,7 +70,26 @@ export const BranchSelectorDropdown: FC = () => {
 
           // Cập nhật selectedBranch
           setSelectedBranch((current) => {
-            // 1. Nếu có branchId được chỉ định ưu tiên chọn (ví dụ vừa thêm chi nhánh mới)
+            // 1. Nếu chỉ có đúng 1 chi nhánh: Luôn luôn chọn chi nhánh đó, không chọn Toàn hệ thống
+            if (mapped.length === 1) {
+              const single = mapped[0];
+              try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(single));
+                window.dispatchEvent(
+                  new CustomEvent("mtgrms:branch-changed", { detail: single }),
+                );
+              } catch {
+                // ignore
+              }
+              return single;
+            }
+
+            // 2. Nếu chưa có chi nhánh nào
+            if (mapped.length === 0) {
+              return ALL_BRANCHES_OPTION;
+            }
+
+            // 3. Nếu có >= 2 chi nhánh: Có quyền chọn chi nhánh cụ thể hoặc Toàn hệ thống
             if (options?.selectBranchId) {
               const target = mapped.find((b) => b.id === options.selectBranchId);
               if (target) {
@@ -100,10 +105,10 @@ export const BranchSelectorDropdown: FC = () => {
               }
             }
 
-            // 2. Nếu đang chọn "ALL", giữ nguyên
+            // Nếu đang chọn "ALL", giữ nguyên
             if (current.id === "ALL") return current;
 
-            // 3. Nếu chi nhánh đang chọn có trong danh sách
+            // Nếu chi nhánh đang chọn có trong danh sách
             const exists = mapped.find((b) => b.id === current.id);
             if (exists) {
               if (
@@ -120,21 +125,12 @@ export const BranchSelectorDropdown: FC = () => {
               return exists;
             }
 
-            // 4. Nếu không còn tồn tại (hoặc là mock cũ), fallback về chi nhánh đầu tiên
-            const fallback = mapped[0];
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
-              window.dispatchEvent(
-                new CustomEvent("mtgrms:branch-changed", { detail: fallback }),
-              );
-            } catch {
-              // ignore
-            }
-            return fallback;
+            // Fallback về Toàn hệ thống khi có nhiều chi nhánh
+            return ALL_BRANCHES_OPTION;
           });
         }
       } catch {
-        // Giữ mock fallback nếu mạng lỗi
+        // ignore
       }
     },
     [],
@@ -161,11 +157,7 @@ export const BranchSelectorDropdown: FC = () => {
         setBranches((prev) => {
           const exists = prev.some((b) => b.id === createdBranch.id);
           if (exists) return prev;
-          const cleanPrev = prev.filter(
-            (b) =>
-              b.id !== DEFAULT_BRANCHES[0].id && b.id !== DEFAULT_BRANCHES[1].id,
-          );
-          return [createdBranch, ...cleanPrev];
+          return [createdBranch, ...prev];
         });
 
         if (detail.selectCreated) {
@@ -295,6 +287,75 @@ export const BranchSelectorDropdown: FC = () => {
     }
   };
 
+  // 1. Trường hợp chưa có chi nhánh nào: Nút dẫn đến trang tạo chi nhánh, không có dropdown
+  if (branches.length === 0) {
+    return (
+      <button
+        type="button"
+        onClick={() => navigate("/store-owner/subscriptions?tab=branches")}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          backgroundColor: "rgba(255, 255, 255, 0.14)",
+          border: "1px dashed rgba(255, 255, 255, 0.35)",
+          borderRadius: "var(--radius-pill, 9999px)",
+          padding: "5px 14px",
+          color: "#ffffff",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          transition: "all 0.15s ease",
+          boxSizing: "border-box",
+          whiteSpace: "nowrap",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.22)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.14)";
+        }}
+        title="Cửa hàng chưa có chi nhánh. Bấm để tạo chi nhánh mới."
+      >
+        <span>Chưa có chi nhánh</span>
+      </button>
+    );
+  }
+
+  // 2. Trường hợp chỉ có 1 chi nhánh (Gói thường 1 chi nhánh): Hiển thị tên chi nhánh, KHÔNG CÓ DROPDOWN
+  if (branches.length === 1) {
+    return (
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          backgroundColor: "rgba(0, 0, 0, 0.22)",
+          border: "1px solid rgba(255, 255, 255, 0.25)",
+          borderRadius: "var(--radius-pill, 9999px)",
+          padding: "6px 14px",
+          color: "#ffffff",
+          fontSize: 13,
+          fontWeight: 600,
+          boxSizing: "border-box",
+          whiteSpace: "nowrap",
+          maxWidth: 280,
+        }}
+        title={`Chi nhánh hoạt động: ${branches[0].name}${branches[0].address ? ` (${branches[0].address})` : ""}`}
+      >
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {branches[0].name}
+        </span>
+      </div>
+    );
+  }
+
+  // 3. Trường hợp có từ 2 chi nhánh trở lên: Có dropdown chọn từng chi nhánh hoặc Toàn hệ thống
   return (
     <div
       ref={dropdownRef}
@@ -498,82 +559,96 @@ export const BranchSelectorDropdown: FC = () => {
             </button>
 
             {/* Từng chi nhánh cụ thể (Bỏ icon và bỏ mã chi nhánh, chỉ hiển thị tên & địa chỉ) */}
-            {branches.map((b) => {
-              const isSelected = selectedBranch.id === b.id;
-              return (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => handleSelectBranch(b)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "9px 12px",
-                    borderRadius: 8,
-                    border: "none",
-                    backgroundColor: isSelected ? "#F0FDF4" : "transparent",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    transition: "background-color 0.12s ease",
-                    width: "100%",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = "#F8FAFC";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                    }
-                  }}
-                >
-                  <div
+            {branches.length === 0 ? (
+              <div
+                style={{
+                  padding: "14px 12px",
+                  textAlign: "center",
+                  color: "#64748B",
+                  fontSize: 12,
+                  fontStyle: "italic",
+                }}
+              >
+                Chưa có chi nhánh nào
+              </div>
+            ) : (
+              branches.map((b) => {
+                const isSelected = selectedBranch.id === b.id;
+                return (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => handleSelectBranch(b)}
                     style={{
                       display: "flex",
-                      flexDirection: "column",
-                      minWidth: 0,
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "9px 12px",
+                      borderRadius: 8,
+                      border: "none",
+                      backgroundColor: isSelected ? "#F0FDF4" : "transparent",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      transition: "background-color 0.12s ease",
+                      width: "100%",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = "#F8FAFC";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }
                     }}
                   >
-                    <span
+                    <div
                       style={{
-                        fontSize: 13,
-                        fontWeight: isSelected ? 700 : 600,
-                        color: isSelected ? "#15803D" : "#0F172A",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        display: "flex",
+                        flexDirection: "column",
+                        minWidth: 0,
                       }}
                     >
-                      {b.name}
-                    </span>
-                    {b.address && (
                       <span
                         style={{
-                          fontSize: 11,
-                          color: "#64748B",
+                          fontSize: 13,
+                          fontWeight: isSelected ? 700 : 600,
+                          color: isSelected ? "#15803D" : "#0F172A",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
-                          marginTop: 2,
                         }}
                       >
-                        {b.address}
+                        {b.name}
                       </span>
+                      {b.address && (
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: "#64748B",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            marginTop: 2,
+                          }}
+                        >
+                          {b.address}
+                        </span>
+                      )}
+                    </div>
+                    {isSelected && (
+                      <Check
+                        size={16}
+                        color="#15803D"
+                        strokeWidth={2.5}
+                        style={{ flexShrink: 0, marginLeft: 8 }}
+                      />
                     )}
-                  </div>
-                  {isSelected && (
-                    <Check
-                      size={16}
-                      color="#15803D"
-                      strokeWidth={2.5}
-                      style={{ flexShrink: 0, marginLeft: 8 }}
-                    />
-                  )}
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })
+            )}
           </div>
 
           {/* Footer: Liên kết nhanh đến trang Quản lý chi nhánh */}

@@ -23,6 +23,7 @@ export interface UserProfile {
   phone?: string;
   avatarUrl?: string;
   isAdmin?: boolean;
+  isTwoFactorEnabled?: boolean;
 }
 
 export interface LoginCredentials {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -248,6 +248,11 @@ const TopProductsCard: React.FC<{
 }> = ({ products, isLoading }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+
+  // Reset page when products array changes from filter update
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [products]);
 
   if (isLoading) {
     return (

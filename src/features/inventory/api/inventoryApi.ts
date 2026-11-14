@@ -4,112 +4,115 @@ import type {
   InventoryFilterState,
   InventoryKpiSummary,
 } from '../types/inventory.types';
-import { MOCK_INVENTORY_ITEMS } from '../lib/mockInventoryData';
+
+const mapStatus = (status: string | undefined): InventoryItem['status'] => {
+  if (status === 'LOW_STOCK') return 'Low';
+  if (status === 'OUT_OF_STOCK') return 'Out';
+  return 'OK';
+};
+
+export type InventoryBatchRow = {
+  id: string;
+  batchCode: string;
+  mfgDate: string | null;
+  expiryDate: string | null;
+  daysLeft: number;
+  availableQty: number;
+  status: string;
+};
 
 export const inventoryApi = {
+  async getProductBatches(productId: string, branchId: string): Promise<InventoryBatchRow[]> {
+    const res = await httpClient.get(`/inventory/${productId}/batches`, {
+      params: { branchId },
+    });
+    const rows = res.data?.data;
+    if (!Array.isArray(rows)) {
+      throw new Error(res.data?.message || 'Không tải được danh sách lô.');
+    }
+    return rows.map((b: any) => ({
+      id: String(b.batchId ?? b.id ?? ''),
+      batchCode: b.batchCode || '—',
+      mfgDate: b.mfgDate ?? null,
+      expiryDate: b.expiryDate ?? null,
+      daysLeft: Number(b.daysLeft ?? 0),
+      availableQty: Number(b.availableQty ?? 0),
+      status: b.status || 'Normal',
+    }));
+  },
+
   async getStockSummary(filters: InventoryFilterState): Promise<{
     items: InventoryItem[];
     totalCount: number;
     kpiSummary: InventoryKpiSummary;
   }> {
-    try {
-      const params = new URLSearchParams();
-      const keyword = [filters.keyword, filters.sku, filters.productName].filter(Boolean).join(' ').trim();
-      if (keyword) params.append('keyword', keyword);
-      if (filters.branchId) params.append('branchId', filters.branchId);
-      if (filters.category) params.append('category', filters.category);
-      if (filters.location) params.append('locationShelf', filters.location);
-      if (filters.stockStatus) params.append('status', filters.stockStatus);
-      params.append('pageIndex', String(filters.pageIndex));
-      params.append('pageSize', String(filters.pageSize));
+    const params = new URLSearchParams();
+    const keyword = [filters.keyword, filters.sku, filters.productName].filter(Boolean).join(' ').trim();
+    if (keyword) params.append('keyword', keyword);
+    if (filters.branchId) params.append('branchId', filters.branchId);
+    if (filters.category) params.append('category', filters.category);
+    if (filters.location) params.append('locationShelf', filters.location);
+    if (filters.stockStatus) {
+      const apiStatus =
+        filters.stockStatus === 'Low'
+          ? 'LOW_STOCK'
+          : filters.stockStatus === 'Out'
+            ? 'OUT_OF_STOCK'
+            : 'OK';
+      params.append('status', apiStatus);
+    }
+    params.append('pageIndex', String(filters.pageIndex));
+    params.append('pageSize', String(filters.pageSize));
 
-      const res = await httpClient.get(`/inventory?${params.toString()}`);
-      if (res.data?.data) {
-        const d = res.data.data;
-        const mappedItems: InventoryItem[] = (d.items || []).map((i: any) => ({
-          id: i.id || `${i.sku}-${i.branchId}`,
-          sku: i.sku,
-          productName: i.productName,
-          category: i.category as any,
-          categoryLabel: i.category,
-          branchId: i.branchId,
-          branchName: i.branchName,
-          location: i.locationShelf || 'A-01-01',
-          unit: i.unit || 'Cái',
-          onHand: i.physicalQty,
-          committed: i.pendingReturnQty + i.expiredQty + i.damagedQty,
-          available: i.availableQty,
-          onOrder: i.onOrderQty,
-          reorderPoint: i.minStock,
-          avgCost: i.avgCost,
-          totalValue: i.totalValue,
-          status: i.status === 'LOW_STOCK' ? 'Low' : i.status === 'OUT_OF_STOCK' ? 'Out' : 'OK',
-          batchCount: i.batchCount,
-        }));
-
-        const kpi: InventoryKpiSummary = {
-          skuCount: d.kpiSummary?.totalSkus ?? mappedItems.length,
-          branchCount: 2,
-          totalValue: d.kpiSummary?.totalValue ?? 0,
-          onOrderUnits: d.kpiSummary?.totalOnOrder ?? 0,
-          lowCount: d.kpiSummary?.lowStockCount ?? 0,
-          outCount: d.kpiSummary?.outOfStockCount ?? 0,
-          expiryBatchCount: d.kpiSummary?.expiryWarningCount ?? 0,
-        };
-
-        return {
-          items: mappedItems,
-          totalCount: d.totalCount,
-          kpiSummary: kpi,
-        };
-      }
-    } catch {
-      // Fallback to local mock data
+    const res = await httpClient.get(`/inventory?${params.toString()}`);
+    const d = res.data?.data;
+    if (!d) {
+      throw new Error(res.data?.message || 'Không tải được tồn kho từ máy chủ.');
     }
 
-    let scoped = [...MOCK_INVENTORY_ITEMS];
-    if (filters.branchId) scoped = scoped.filter((i) => i.branchId === filters.branchId);
-    if (filters.branchKeyword.trim()) {
-      const br = filters.branchKeyword.trim().toLowerCase();
-      scoped = scoped.filter(
-        (i) =>
-          i.branchId.toLowerCase().includes(br) ||
-          i.branchName.toLowerCase().includes(br)
-      );
-    }
-    if (filters.category) scoped = scoped.filter((i) => i.category === filters.category);
-    if (filters.location) scoped = scoped.filter((i) => i.location === filters.location);
-    if (filters.stockStatus) scoped = scoped.filter((i) => i.status === filters.stockStatus);
-    if (filters.sku.trim()) {
-      const sku = filters.sku.trim().toLowerCase();
-      scoped = scoped.filter((i) => i.sku.toLowerCase().includes(sku));
-    }
-    if (filters.productName.trim()) {
-      const name = filters.productName.trim().toLowerCase();
-      scoped = scoped.filter((i) => i.productName.toLowerCase().includes(name));
-    }
-    if (filters.keyword.trim()) {
-      const kw = filters.keyword.trim().toLowerCase();
-      scoped = scoped.filter(
-        (i) => i.sku.toLowerCase().includes(kw) || i.productName.toLowerCase().includes(kw)
-      );
-    }
+    const mappedItems: InventoryItem[] = (d.items || []).map((i: any) => {
+      const quarantined = Number(i.quarantinedQty ?? 0);
+      const reserved = Number(i.reservedQty ?? 0);
+      return {
+        id: i.productId || i.id || `${i.sku}-${i.branchId}`,
+        productId: i.productId,
+        sku: i.sku,
+        productName: i.productName,
+        category: (i.categoryName || i.category || 'Chung') as any,
+        categoryLabel: i.categoryName || i.category || 'Chung',
+        branchId: i.branchId,
+        branchName: i.branchName,
+        location: i.locationShelf || '—',
+        unit: i.unit || 'Cái',
+        onHand: Number(i.physicalQty ?? 0),
+        committed: reserved + quarantined,
+        available: Number(i.availableQty ?? 0),
+        onOrder: Number(i.onOrderQty ?? 0),
+        reorderPoint: Number(i.minStock ?? 0),
+        avgCost: Number(i.avgCost ?? 0),
+        totalValue: Number(i.totalValue ?? 0),
+        status: mapStatus(i.status),
+        batchCount: Number(i.batchCount ?? i.batches?.length ?? 0),
+        quarantined,
+        reserved,
+      };
+    });
 
-    const start = (filters.pageIndex - 1) * filters.pageSize;
-    const paged = scoped.slice(start, start + filters.pageSize);
+    const uniqueBranches = new Set(mappedItems.map((x) => x.branchId));
+    const kpi: InventoryKpiSummary = {
+      skuCount: d.kpiSummary?.totalSkus ?? mappedItems.length,
+      branchCount: uniqueBranches.size || (filters.branchId ? 1 : 0),
+      totalValue: d.kpiSummary?.totalValue ?? 0,
+      onOrderUnits: d.kpiSummary?.totalOnOrder ?? 0,
+      lowCount: d.kpiSummary?.lowStockCount ?? 0,
+      outCount: d.kpiSummary?.outOfStockCount ?? 0,
+      expiryBatchCount: d.kpiSummary?.expiryWarningCount ?? 0,
+    };
 
     return {
-      items: paged,
-      totalCount: scoped.length,
-      kpiSummary: {
-        skuCount: new Set(scoped.map((s) => s.sku)).size,
-        branchCount: new Set(scoped.map((s) => s.branchId)).size,
-        totalValue: scoped.reduce((sum, s) => sum + s.totalValue, 0),
-        onOrderUnits: scoped.reduce((sum, s) => sum + s.onOrder, 0),
-        lowCount: scoped.filter((s) => s.status === 'Low').length,
-        outCount: scoped.filter((s) => s.status === 'Out').length,
-        expiryBatchCount: 4,
-      },
+      items: mappedItems,
+      totalCount: d.totalCount ?? mappedItems.length,
+      kpiSummary: kpi,
     };
   },
 };

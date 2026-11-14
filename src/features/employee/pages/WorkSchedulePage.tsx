@@ -1,14 +1,12 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search,
   Plus,
   User,
   RefreshCw,
+  RotateCw,
   Building2,
-  ChevronDown,
-  Check,
-  X,
   CalendarX,
   ArrowLeftRight,
   Clock,
@@ -16,6 +14,7 @@ import {
   Edit3,
   LogIn,
   LogOut,
+  X,
 } from 'lucide-react';
 import type {
   Employee,
@@ -25,27 +24,28 @@ import type {
   DebtTransaction,
   Branch,
 } from '../types';
-import { AddScheduleModal } from '../components/AddScheduleModal';
-import { EmployeeDetailModal } from '../components/EmployeeDetailModal';
-import { ShiftConfigModal } from '../components/ShiftConfigModal';
+import { AddScheduleModal } from '../components/work-schedule/AddScheduleModal';
+import { EmployeeDetailModal } from '../components/employee-list/EmployeeDetailModal';
+import { ShiftConfigModal } from '../components/shift-config/ShiftConfigModal';
 import {
   ScheduleScopeConfirmModal,
   type ScheduleScopeType,
   type ScheduleScopeDateRange,
-} from '../components/ScheduleScopeConfirmModal';
+} from '../components/work-schedule/ScheduleScopeConfirmModal';
 import { TablePagination, NotificationModal } from '../../../components/common';
-import { CreateScheduleRequestModal } from '../components/CreateScheduleRequestModal';
-import { ScheduleRequestsHistoryModal } from '../components/ScheduleRequestsHistoryModal';
+import { CreateScheduleRequestModal } from '../components/approval-requests/CreateScheduleRequestModal';
+import { ScheduleRequestsHistoryModal } from '../components/approval-requests/ScheduleRequestsHistoryModal';
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { employeeApi } from '../api/employeeApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
-import { scheduleApi, getShiftColor } from '../api/scheduleApi';
+import { scheduleApi, getShiftColor, isLeaveSchedule, isScheduleDeletable } from '../api/scheduleApi';
+import { getVietnamToday, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
 const getWeekDates = (offsetWeeks: number) => {
-  // Mốc mặc định: Thứ Hai của tuần hiện tại
-  const now = new Date();
+  // Mốc mặc định: Thứ Hai của tuần hiện tại theo múi giờ Việt Nam (UTC+7)
+  const now = getVietnamToday();
   const currentDay = now.getDay();
   const distanceToMonday = (currentDay + 6) % 7;
   const baseMonday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - distanceToMonday);
@@ -103,68 +103,67 @@ const getWeekDates = (offsetWeeks: number) => {
   return { label, days, monday, sunday, fromDateIso, toDateIso };
 };
 
+const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
+
 export const WorkSchedulePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const location = useLocation();
   const roleUpper = (user?.role || '').toUpperCase();
+  const isEmployeePortal = location.pathname.startsWith('/employee/') || location.pathname === '/employee';
+  const isStoreOwnerOrAdmin =
+    Boolean(user?.isAdmin) ||
+    roleUpper === 'STORE_OWNER' ||
+    roleUpper === 'STOREOWNER' ||
+    roleUpper === 'ADMIN';
+
   const isEmployeeRole =
-    location.pathname.startsWith('/employee') ||
-    roleUpper === 'STAFF' ||
-    (!user?.isAdmin && roleUpper !== 'STORE_OWNER' && roleUpper !== 'ADMIN');
+    isEmployeePortal ||
+    (!isStoreOwnerOrAdmin && (roleUpper === 'STAFF' || roleUpper === 'EMPLOYEE' || roleUpper === 'CASHIER'));
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [shifts, setShifts] = useState<WorkShiftDefinition[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  // Branch multi-select dropdown states (giống EmployeeListPage)
-  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
-  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
-  const [branchSearchKeyword, setBranchSearchKeyword] = useState('');
-  const branchDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Click outside to close branch dropdown
+  // Lắng nghe thay đổi chi nhánh từ StoreOwnerLayout (BranchSelectorDropdown)
+  const [activeBranch, setActiveBranch] = useState<{ id: string; name: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem(ACTIVE_BRANCH_STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        branchDropdownRef.current &&
-        !branchDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsBranchDropdownOpen(false);
+    const handleBranchChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<any>;
+      if (customEvent.detail) {
+        setActiveBranch(customEvent.detail);
       }
     };
 
-    if (isBranchDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === ACTIVE_BRANCH_STORAGE_KEY && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setActiveBranch(parsed);
+        } catch {
+          // ignore
+        }
+      }
     };
-  }, [isBranchDropdownOpen]);
 
-  const filteredBranches = useMemo(() => {
-    return branches.filter((b) =>
-      b.name.toLowerCase().includes(branchSearchKeyword.toLowerCase())
-    );
-  }, [branches, branchSearchKeyword]);
-
-  const handleBranchToggle = (branchId: string) => {
-    setSelectedBranchIds((prev) =>
-      prev.includes(branchId) ? prev.filter((id) => id !== branchId) : [...prev, branchId]
-    );
-  };
-
-  const handleRemoveBranchTag = (e: React.MouseEvent, branchId: string) => {
-    e.stopPropagation();
-    setSelectedBranchIds((prev) => prev.filter((id) => id !== branchId));
-  };
-
-  const handleSelectAllBranches = () => {
-    setSelectedBranchIds(branches.map((b) => b.id));
-  };
-
-  const handleClearAllBranches = () => {
-    setSelectedBranchIds([]);
-  };
+    window.addEventListener('mtgrms:branch-changed', handleBranchChanged);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleBranchChanged);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
   const [assignments, setAssignments] = useState<ScheduleAssignment[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -299,21 +298,17 @@ export const WorkSchedulePage: React.FC = () => {
   const fetchEmployeesAndShifts = useCallback(async () => {
     try {
       const branchParam =
-        selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined;
-      const branchIdsParam =
-        selectedBranchIds.length > 0 ? selectedBranchIds : undefined;
+        activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
 
       const [empResult, shiftResult] = await Promise.allSettled([
         isEmployeeRole
           ? Promise.resolve({ items: [] })
           : employeeApi.getEmployeesPaged({
             branchId: branchParam,
-            branchIds: branchIdsParam,
             pageSize: 200,
           }),
         shiftConfigApi.getShiftConfigsPaged({
           branchId: branchParam,
-          branchIds: branchIdsParam,
           pageSize: 100,
           isActive: true,
         }),
@@ -357,7 +352,7 @@ export const WorkSchedulePage: React.FC = () => {
           startTime: (c.startTime || '00:00').substring(0, 5),
           endTime: (c.endTime || '00:00').substring(0, 5),
           totalHours: c.durationHours,
-          checkInAllowance: `${(c.allowedCheckInStart || '00:00').substring(0, 5)} - ${(c.allowedCheckInEnd || '00:00').substring(0, 5)}`,
+          checkInAllowance: `${(c.startTime || '00:00').substring(0, 5)} - ${(c.endTime || '00:00').substring(0, 5)}`,
           color: getShiftColor(c.shiftName),
           status: c.isActive ? ('active' as const) : ('inactive' as const),
           branchId: c.branchId,
@@ -373,7 +368,7 @@ export const WorkSchedulePage: React.FC = () => {
       setEmployees([]);
       setShifts([]);
     }
-  }, [selectedBranchIds, isEmployeeRole, user]);
+  }, [activeBranch, isEmployeeRole, user]);
 
   useEffect(() => {
     fetchEmployeesAndShifts();
@@ -384,7 +379,7 @@ export const WorkSchedulePage: React.FC = () => {
     setIsLoading(true);
     try {
       const branchParam =
-        selectedBranchIds.length === 1 ? selectedBranchIds[0] : undefined;
+        activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
 
       let data: ScheduleAssignment[] = [];
       if (isEmployeeRole) {
@@ -451,9 +446,9 @@ export const WorkSchedulePage: React.FC = () => {
       }
 
       const filteredData =
-        !isEmployeeRole && selectedBranchIds.length > 1
+        !isEmployeeRole && activeBranch && activeBranch.id !== 'ALL'
           ? data.filter(
-            (item) => item.branchId && selectedBranchIds.includes(item.branchId)
+            (item) => item.branchId === activeBranch.id
           )
           : data;
 
@@ -464,7 +459,7 @@ export const WorkSchedulePage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [weekData.fromDateIso, weekData.toDateIso, selectedBranchIds, isEmployeeRole]);
+  }, [weekData.fromDateIso, weekData.toDateIso, activeBranch, isEmployeeRole]);
 
   useEffect(() => {
     fetchSchedules();
@@ -477,26 +472,25 @@ export const WorkSchedulePage: React.FC = () => {
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((e) => {
-      // 1. Tìm kiếm theo từ khóa (tên hoặc mã nhân viên)
-      const keyword = searchEmployee.trim().toLowerCase();
-      const matchesKeyword =
-        !keyword ||
-        e.fullName.toLowerCase().includes(keyword) ||
-        e.employeeCode.toLowerCase().includes(keyword);
+      // 1. Tìm kiếm theo từ khóa (tên hoặc mã nhân viên - không phân biệt dấu/hoa-thường)
+      const matchesKeyword = matchesAnyVietnameseSearch(
+        [e.fullName, e.employeeCode],
+        searchEmployee
+      );
 
       if (!matchesKeyword) return false;
 
       // 2. Lọc theo chi nhánh được chọn từ dropdown (chỉ áp dụng cho Owner)
-      if (!isEmployeeRole && selectedBranchIds.length > 0) {
+      if (!isEmployeeRole && activeBranch && activeBranch.id !== 'ALL') {
         const matchesSalaryBranch =
-          e.salaryBranchId && selectedBranchIds.includes(e.salaryBranchId);
+          e.salaryBranchId && e.salaryBranchId === activeBranch.id;
         const matchesWorkingBranch =
           Array.isArray(e.workingBranchIds) &&
-          e.workingBranchIds.some((bId) => selectedBranchIds.includes(bId));
+          e.workingBranchIds.includes(activeBranch.id);
         const hasAssignment = assignments.some(
           (a) =>
             a.employeeId === e.id &&
-            (!a.branchId || selectedBranchIds.includes(a.branchId))
+            (!a.branchId || a.branchId === activeBranch.id)
         );
 
         return matchesSalaryBranch || matchesWorkingBranch || hasAssignment;
@@ -504,7 +498,7 @@ export const WorkSchedulePage: React.FC = () => {
 
       return true;
     });
-  }, [employees, searchEmployee, selectedBranchIds, assignments, isEmployeeRole]);
+  }, [employees, searchEmployee, activeBranch, assignments, isEmployeeRole]);
 
   const paginatedEmployees = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -513,7 +507,7 @@ export const WorkSchedulePage: React.FC = () => {
 
   const filteredShifts = useMemo(() => {
     let list = shifts;
-    if (!isEmployeeRole && selectedBranchIds.length > 0) {
+    if (!isEmployeeRole && activeBranch && activeBranch.id !== 'ALL') {
       list = list.filter((s) => {
         if (s.id === 'custom') return true;
         if (!s.branchId && (!s.branchIds || s.branchIds.length === 0)) return true;
@@ -523,19 +517,16 @@ export const WorkSchedulePage: React.FC = () => {
             : s.branchId
               ? [s.branchId]
               : [];
-        return selectedBranchIds.some((bId) => shiftBranchIds.includes(bId));
+        return shiftBranchIds.includes(activeBranch.id);
       });
     }
     if (searchEmployee.trim()) {
-      const kw = searchEmployee.trim().toLowerCase();
-      list = list.filter(
-        (s) =>
-          s.name.toLowerCase().includes(kw) ||
-          (s.code ? s.code.toLowerCase().includes(kw) : false)
+      list = list.filter((s) =>
+        matchesAnyVietnameseSearch([s.name, s.code], searchEmployee)
       );
     }
     return list;
-  }, [shifts, selectedBranchIds, isEmployeeRole, searchEmployee]);
+  }, [shifts, activeBranch, isEmployeeRole, searchEmployee]);
 
   const paginatedShifts = useMemo(() => {
     const start = (shiftCurrentPage - 1) * shiftPageSize;
@@ -546,7 +537,7 @@ export const WorkSchedulePage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
     setShiftCurrentPage(1);
-  }, [searchEmployee, selectedBranchIds, weekOffset]);
+  }, [searchEmployee, activeBranch, weekOffset]);
 
   const handleOpenCell = (empId: string, day: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN') => {
     if (isEmployeeRole) return;
@@ -615,40 +606,105 @@ export const WorkSchedulePage: React.FC = () => {
   const handleDeleteAssignment = (assignId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     const item = assignments.find((a) => a.id === assignId);
-    if (item) {
-      setDeletingAssignment(item);
+    if (!item) return;
+    if (isLeaveSchedule(item)) {
+      setNotificationModal({
+        isOpen: true,
+        type: 'warning',
+        title: 'Không thể xóa ca nghỉ phép',
+        message: 'Ca làm việc đang ở trạng thái nghỉ phép (nghỉ phép có lương hoặc không lương) không được phép xóa.',
+      });
+      return;
     }
+    setDeletingAssignment(item);
   };
 
-  // 5. Xác nhận xóa ca trên Backend theo phạm vi
-  const handleConfirmDelete = async (scope?: ScheduleScopeType, dateRange?: ScheduleScopeDateRange) => {
-    if (!deletingAssignment) return;
+  // 5. Hàm thực thi xóa ca làm việc trên Backend theo phạm vi
+  const executeDeleteSchedule = async (
+    target: ScheduleAssignment,
+    scope?: ScheduleScopeType,
+    dateRange?: ScheduleScopeDateRange
+  ) => {
     try {
       setIsLoading(true);
 
-      // Luôn xóa ca hiện tại được bấm
-      await scheduleApi.deleteSchedule(deletingAssignment.id);
+      // TRƯỜNG HỢP 4: scope === 'entire' -> Xóa toàn bộ ca của nhân viên (trừ ca đã chấm công / nghỉ phép)
+      if (scope === 'entire') {
+        try {
+          const rawList = await scheduleApi.getRawSchedules({
+            employeeId: target.employeeId,
+            pageSize: 1000,
+          });
 
-      // Nếu người dùng chọn Option 2 (following) hoặc Option 3 (all), fetch và xóa các ca cùng phạm vi
+          // Lọc ra các ca chưa có dữ liệu chấm công, chưa hoàn thành và không phải ca nghỉ phép (có lương / không lương)
+          const deletable = rawList.filter((s) => isScheduleDeletable(s));
+
+          if (deletable.length > 0) {
+            await Promise.allSettled(
+              deletable.map((s) =>
+                scheduleApi.deleteSchedule(s.id).catch((err) => {
+                  console.warn(`Lỗi xóa ca ${s.id}:`, err);
+                })
+              )
+            );
+          }
+
+          await fetchSchedules();
+          setNotificationModal({
+            isOpen: true,
+            type: 'success',
+            title: 'Thành công',
+            message: `Đã xóa toàn bộ ${deletable.length} ca làm việc chưa chấm công của nhân viên. Các ca đã có dữ liệu chấm công hoặc nghỉ phép được giữ nguyên.`,
+          });
+          return true;
+        } catch (entireErr: any) {
+          console.error('Lỗi khi xóa toàn bộ ca:', entireErr);
+          setNotificationModal({
+            isOpen: true,
+            type: 'error',
+            title: 'Lỗi xóa ca',
+            message: entireErr?.response?.data?.message || entireErr?.message || 'Không thể xóa toàn bộ ca làm việc.',
+          });
+          return false;
+        }
+      }
+
+      // Chặn xóa ca hiện tại nếu là ca nghỉ phép (có lương hoặc không lương)
+      if (isLeaveSchedule(target)) {
+        if (!scope || scope === 'single') {
+          setNotificationModal({
+            isOpen: true,
+            type: 'warning',
+            title: 'Không thể xóa ca nghỉ phép',
+            message: 'Ca làm việc đang ở trạng thái nghỉ phép (nghỉ phép có lương hoặc không lương) không được phép xóa.',
+          });
+          return false;
+        }
+      } else if (isScheduleDeletable(target)) {
+        await scheduleApi.deleteSchedule(target.id);
+      }
+
+      // Nếu người dùng chọn Option 2 (following) hoặc Option 3 (all), fetch và xóa các ca cùng phạm vi (bỏ qua ca nghỉ phép và ca đã chấm công)
       if ((scope === 'following' || scope === 'all') && dateRange?.fromDate && dateRange?.toDate) {
         try {
           const schedulesInRange = await scheduleApi.getSchedules({
-            employeeId: deletingAssignment.employeeId,
+            employeeId: target.employeeId,
             fromDate: dateRange.fromDate,
             toDate: dateRange.toDate,
             pageSize: 1000,
           });
 
-          const targetDow = deletingAssignment.dayOfWeek;
-          const targetShiftId = deletingAssignment.shiftId;
-          const targetShiftName = deletingAssignment.shiftName?.toLowerCase().trim();
+          const targetDow = target.dayOfWeek;
+          const targetShiftId = target.shiftId;
+          const targetShiftName = target.shiftName?.toLowerCase().trim();
 
           const DAY_MAP: Record<number, string> = {
             0: 'CN', 1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7'
           };
 
           const otherMatching = schedulesInRange.filter((s) => {
-            if (s.id === deletingAssignment.id) return false;
+            if (s.id === target.id) return false;
+            if (!isScheduleDeletable(s)) return false;
             const dow = s.dayOfWeek || (s.workDate ? DAY_MAP[new Date(s.workDate).getDay()] : undefined);
             const matchesDow = !targetDow || dow === targetDow;
             const matchesShift = !targetShiftId || s.shiftId === targetShiftId || (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftName);
@@ -656,7 +712,7 @@ export const WorkSchedulePage: React.FC = () => {
           });
 
           if (otherMatching.length > 0) {
-            await Promise.all(
+            await Promise.allSettled(
               otherMatching.map((s) =>
                 scheduleApi.deleteSchedule(s.id).catch((err) => {
                   console.warn(`Lỗi xóa ca ${s.id}:`, err);
@@ -669,13 +725,14 @@ export const WorkSchedulePage: React.FC = () => {
         }
       }
 
+      await fetchSchedules();
       setNotificationModal({
         isOpen: true,
         type: 'success',
         title: 'Thành công',
         message: 'Đã xóa ca làm việc thành công.',
       });
-      await fetchSchedules();
+      return true;
     } catch (err: any) {
       setNotificationModal({
         isOpen: true,
@@ -683,9 +740,27 @@ export const WorkSchedulePage: React.FC = () => {
         title: 'Lỗi xóa ca',
         message: err?.response?.data?.message || err?.message || 'Không thể xóa ca làm việc.',
       });
+      return false;
     } finally {
       setIsLoading(false);
-      setDeletingAssignment(null);
+    }
+  };
+
+  const handleConfirmDelete = async (scope?: ScheduleScopeType, dateRange?: ScheduleScopeDateRange) => {
+    if (!deletingAssignment) return;
+    const target = deletingAssignment;
+    setDeletingAssignment(null);
+    await executeDeleteSchedule(target, scope, dateRange);
+  };
+
+  const handleDeleteFromModal = async (
+    assignmentId: string,
+    scope?: ScheduleScopeType,
+    dateRange?: ScheduleScopeDateRange
+  ) => {
+    const target = editingAssignment || assignments.find((a) => a.id === assignmentId);
+    if (target) {
+      await executeDeleteSchedule(target, scope, dateRange);
     }
   };
 
@@ -722,11 +797,6 @@ export const WorkSchedulePage: React.FC = () => {
     );
   };
 
-  const formatVND = (num?: number) => {
-    if (!num) return '0 ₫';
-    return `${num.toLocaleString('vi-VN')} ₫`;
-  };
-
   return (
     <div className="emp-page-container">
       {/* ─── HEADER BAR ─── */}
@@ -752,6 +822,53 @@ export const WorkSchedulePage: React.FC = () => {
             <RefreshCw size={15} className={isLoading ? 'spin' : ''} />
             <span>Tải lại</span>
           </button>
+
+          {!isEmployeeRole && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-secondary"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                height: 36,
+                padding: '0 12px',
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#0F766E',
+                borderColor: '#99F6E4',
+                backgroundColor: '#F0FDFA',
+                cursor: 'pointer',
+                borderRadius: 8,
+                transition: 'all 0.15s ease',
+              }}
+              onClick={() => {
+                const branchParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : (branches[0]?.id || '');
+                navigate(branchParam ? `/store-owner/shifts?branchId=${branchParam}` : '/store-owner/shifts');
+              }}
+              title="Xem nhật ký lịch sử ca bán hàng và bàn giao quầy thu ngân"
+            >
+              <Clock size={15} />
+              <span>Lịch sử giao ca</span>
+            </button>
+          )}
+
+          {!isEmployeeRole && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={() => {
+                setSelectedEmpId(undefined);
+                setSelectedDay(undefined);
+                setEditingAssignment(null);
+                setShowAddModal(true);
+              }}
+            >
+              <Plus size={16} />
+              <span>Phân ca</span>
+            </button>
+          )}
         </div>
       </div>
       <div className="emp-header-bar">
@@ -800,332 +917,29 @@ export const WorkSchedulePage: React.FC = () => {
 
           {/* Lọc Chi nhánh làm việc (Chỉ dành cho Quản lý / StoreOwner) */}
           {!isEmployeeRole && (
-            <div ref={branchDropdownRef} style={{ position: 'relative', minWidth: 240, maxWidth: 360 }}>
-              <div
-                onClick={() => setIsBranchDropdownOpen((prev) => !prev)}
-                style={{
-                  height: 40,
-                  padding: '4px 10px',
-                  border: `1px solid ${isBranchDropdownOpen ? '#0F766E' : '#CBD5E1'}`,
-                  borderRadius: 8,
-                  background: '#FFFFFF',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  transition: 'all 0.15s ease',
-                  boxShadow: isBranchDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.15)' : 'none',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'nowrap', overflow: 'hidden', flex: 1 }}>
-                  <Building2 size={16} color="#64748B" style={{ flexShrink: 0 }} />
-
-                  {selectedBranchIds.length === 0 ? (
-                    <span style={{ color: '#475569', fontSize: 13, whiteSpace: 'nowrap' }}>
-                      Tất cả chi nhánh ({branches.length})
-                    </span>
-                  ) : selectedBranchIds.length === branches.length && branches.length > 1 ? (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '2px 8px',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        background: '#F0FDFA',
-                        color: '#0F766E',
-                        border: '1px solid #99F6E4',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Tất cả chi nhánh ({branches.length})
-                    </span>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
-                      {branches
-                        .filter((b) => selectedBranchIds.includes(b.id))
-                        .slice(0, 1)
-                        .map((b) => (
-                          <span
-                            key={b.id}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 500,
-                              background: '#F0FDFA',
-                              color: '#0F766E',
-                              border: '1px solid #99F6E4',
-                              whiteSpace: 'nowrap',
-                              maxWidth: 150,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.name}</span>
-                            <span
-                              onClick={(e) => handleRemoveBranchTag(e, b.id)}
-                              title="Gỡ chi nhánh"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
-                                borderRadius: '50%',
-                                width: 14,
-                                height: 14,
-                                color: '#0F766E',
-                                fontWeight: 700,
-                                flexShrink: 0,
-                              }}
-                            >
-                              <X size={11} />
-                            </span>
-                          </span>
-                        ))}
-                      {selectedBranchIds.length > 1 && (
-                        <span
-                          style={{
-                            padding: '2px 6px',
-                            borderRadius: 6,
-                            fontSize: 11,
-                            fontWeight: 600,
-                            background: '#F1F5F9',
-                            color: '#475569',
-                            whiteSpace: 'nowrap',
-                            flexShrink: 0,
-                          }}
-                        >
-                          +{selectedBranchIds.length - 1} khác
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#64748B', flexShrink: 0 }}>
-                  <ChevronDown
-                    size={16}
-                    style={{
-                      transform: isBranchDropdownOpen ? 'rotate(180deg)' : 'none',
-                      transition: 'transform 0.2s ease',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Dropdown Panel */}
-              {isBranchDropdownOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: 6,
-                    width: 320,
-                    background: '#FFFFFF',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: 10,
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                    zIndex: 1000,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* Search Input Bar */}
-                  <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        background: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 6,
-                        padding: '5px 10px',
-                      }}
-                    >
-                      <Search size={14} color="#94A3B8" />
-                      <input
-                        type="text"
-                        value={branchSearchKeyword}
-                        onChange={(e) => setBranchSearchKeyword(e.target.value)}
-                        placeholder="Tìm kiếm chi nhánh theo tên..."
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          outline: 'none',
-                          width: '100%',
-                          fontSize: 13,
-                          color: '#1E293B',
-                        }}
-                        autoFocus
-                      />
-                      {branchSearchKeyword && (
-                        <button
-                          type="button"
-                          onClick={() => setBranchSearchKeyword('')}
-                          style={{
-                            border: 'none',
-                            background: 'transparent',
-                            cursor: 'pointer',
-                            color: '#94A3B8',
-                            padding: 0,
-                            display: 'flex',
-                          }}
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quick Selection Actions */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '6px 12px',
-                      background: '#F8FAFC',
-                      borderBottom: '1px solid #F1F5F9',
-                      fontSize: 12,
-                    }}
-                  >
-                    <span style={{ color: '#64748B' }}>
-                      Tìm thấy {filteredBranches.length} chi nhánh
-                    </span>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <button
-                        type="button"
-                        onClick={handleSelectAllBranches}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#0F766E',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          padding: 0,
-                          fontSize: 12,
-                        }}
-                      >
-                        Chọn tất cả ({branches.length})
-                      </button>
-                      <span style={{ color: '#CBD5E1' }}>|</span>
-                      <button
-                        type="button"
-                        onClick={handleClearAllBranches}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#64748B',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          padding: 0,
-                          fontSize: 12,
-                        }}
-                      >
-                        Bỏ chọn tất cả
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Branches List */}
-                  <div style={{ maxHeight: 210, overflowY: 'auto', padding: '4px 0' }}>
-                    {filteredBranches.length ? (
-                      filteredBranches.map((b) => {
-                        const isChecked = selectedBranchIds.includes(b.id);
-                        return (
-                          <div
-                            key={b.id}
-                            onClick={() => handleBranchToggle(b.id)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              background: isChecked ? '#F0FDFA' : 'transparent',
-                              transition: 'background 0.12s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isChecked) e.currentTarget.style.background = '#F8FAFC';
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isChecked) e.currentTarget.style.background = 'transparent';
-                            }}
-                          >
-                            <label
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 10,
-                                cursor: 'pointer',
-                                fontSize: 13,
-                                width: '100%',
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => { }}
-                                style={{ accentColor: '#0F766E', width: 16, height: 16 }}
-                              />
-                              <span style={{ fontWeight: isChecked ? 600 : 400, color: isChecked ? '#134E4A' : '#1E293B' }}>
-                                {b.name}
-                              </span>
-                              {b.isMain && (
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    padding: '1px 6px',
-                                    borderRadius: 4,
-                                    background: '#E2E8F0',
-                                    color: '#475569',
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  Trụ sở
-                                </span>
-                              )}
-                            </label>
-
-                            {isChecked && <Check size={15} color="#0F766E" />}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div style={{ padding: '16px 12px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
-                        Không tìm thấy chi nhánh nào phù hợp
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Footer */}
-                  <div
-                    style={{
-                      padding: '8px 12px',
-                      background: '#F8FAFC',
-                      borderTop: '1px solid #F1F5F9',
-                      display: 'flex',
-                      justifyContent: 'flex-end',
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className="emp-btn emp-btn-primary"
-                      style={{ height: 28, padding: '0 14px', fontSize: 12 }}
-                      onClick={() => setIsBranchDropdownOpen(false)}
-                    >
-                      Xong ({selectedBranchIds.length})
-                    </button>
-                  </div>
-                </div>
-              )}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                height: 40,
+                padding: '0 14px',
+                borderRadius: 8,
+                background: '#F0FDFA',
+                border: '1px solid #99F6E4',
+                color: '#0F766E',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
+              title="Chi nhánh được đồng bộ trực tiếp từ bộ chọn chi nhánh của hệ thống ở thanh điều hướng trên cùng"
+            >
+              <Building2 size={16} color="#0F766E" />
+              <span>
+                Chi nhánh:{' '}
+                <strong style={{ fontWeight: 600 }}>
+                  {activeBranch?.name || 'Tất cả chi nhánh'}
+                </strong>
+              </span>
             </div>
           )}
 
@@ -1171,6 +985,43 @@ export const WorkSchedulePage: React.FC = () => {
           >
             Tuần này
           </button>
+
+          {/* Nút Đặt lại bộ lọc */}
+          {(() => {
+            const hasActiveFilters =
+              (!isEmployeeRole && Boolean(searchEmployee.trim())) || weekOffset !== 0;
+            return (
+              <button
+                type="button"
+                disabled={!hasActiveFilters}
+                onClick={() => {
+                  setSearchEmployee('');
+                  setWeekOffset(0);
+                  setCurrentPage(1);
+                  setShiftCurrentPage(1);
+                }}
+                title="Xóa toàn bộ bộ lọc và từ khóa"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 36,
+                  padding: '0 12px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: hasActiveFilters ? '#EF4444' : '#94A3B8',
+                  background: hasActiveFilters ? '#FEE2E2' : '#F8FAFC',
+                  border: `1px solid ${hasActiveFilters ? '#FECACA' : '#E2E8F0'}`,
+                  borderRadius: 8,
+                  cursor: hasActiveFilters ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <RotateCw size={13} />
+                <span>Đặt lại bộ lọc</span>
+              </button>
+            );
+          })()}
         </div>
 
         <div className="emp-header-actions">
@@ -1184,53 +1035,6 @@ export const WorkSchedulePage: React.FC = () => {
             <option value="by_employee">Xem theo nhân viên</option>
             <option value="by_shift">Xem theo ca</option>
           </select>
-
-          {!isEmployeeRole && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                height: 36,
-                padding: '0 12px',
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#0F766E',
-                borderColor: '#99F6E4',
-                backgroundColor: '#F0FDFA',
-                cursor: 'pointer',
-                borderRadius: 8,
-                transition: 'all 0.15s ease',
-              }}
-              onClick={() => {
-                const branchParam = selectedBranchIds.length === 1 ? selectedBranchIds[0] : (selectedBranchIds[0] || '');
-                navigate(branchParam ? `/store-owner/shifts?branchId=${branchParam}` : '/store-owner/shifts');
-              }}
-              title="Xem nhật ký lịch sử ca bán hàng và bàn giao quầy thu ngân"
-            >
-              <Clock size={15} />
-              <span>Lịch sử giao ca</span>
-            </button>
-          )}
-
-          {!isEmployeeRole && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              onClick={() => {
-                setSelectedEmpId(undefined);
-                setSelectedDay(undefined);
-                setEditingAssignment(null);
-                setShowAddModal(true);
-              }}
-            >
-              <Plus size={16} />
-              <span>Phân ca</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -1254,22 +1058,17 @@ export const WorkSchedulePage: React.FC = () => {
                     <div style={{ fontSize: 15, fontWeight: 700 }}>{d.date}</div>
                   </th>
                 ))}
-                <th style={{ width: 140, textAlign: 'right' }}>Lương dự kiến</th>
               </tr>
             </thead>
             <tbody>
               {filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '36px 0', color: '#64748B' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '36px 0', color: '#64748B' }}>
                     Không có nhân viên nào phù hợp với bộ lọc.
                   </td>
                 </tr>
               ) : (
                 paginatedEmployees.map((emp, empRowIndex) => {
-                  const empAssignments = assignments.filter((a) => isEmployeeRole || a.employeeId === emp.id);
-                  const shiftCount = empAssignments.length;
-                  const estimatedWage = shiftCount * 250000;
-
                   return (
                     <tr key={emp.id} style={{ height: 68 }}>
                       {/* Cột nhân viên (Click để xem chi tiết lịch làm việc 360) */}
@@ -1335,13 +1134,17 @@ export const WorkSchedulePage: React.FC = () => {
                           >
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                               {matched.map((item) => {
-                                const isOnLeave = item.status?.toLowerCase() === 'onleave' || item.isLeave;
+                                const isOnLeave = isLeaveSchedule(item);
                                 const isMenuOpen = openMenuScheduleId === item.id;
                                 return (
                                   <div key={item.id} style={{ position: 'relative', width: '90%' }}>
                                     <div
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        if (!isEmployeeRole) {
+                                          handleEditAssignment(item);
+                                          return;
+                                        }
                                         if (isMenuOpen) {
                                           setOpenMenuScheduleId(null);
                                           setMenuPosition(null);
@@ -1382,10 +1185,10 @@ export const WorkSchedulePage: React.FC = () => {
                                         cursor: 'pointer',
                                         transition: 'all 0.15s ease',
                                       }}
-                                      title="Bấm để gửi yêu cầu hoặc thao tác ca làm"
+                                      title={!isEmployeeRole ? "Bấm để xem chi tiết và chỉnh sửa ca làm việc" : "Bấm để gửi yêu cầu hoặc thao tác ca làm"}
                                     >
                                       <span>{isOnLeave ? `[Nghỉ] ${item.shiftName}` : item.shiftName}</span>
-                                      {!isEmployeeRole && (
+                                      {!isEmployeeRole && !isOnLeave && (
                                         <button
                                           type="button"
                                           style={{
@@ -1393,8 +1196,21 @@ export const WorkSchedulePage: React.FC = () => {
                                             border: 'none',
                                             color: isOnLeave ? '#7E22CE' : item.shiftColor,
                                             cursor: 'pointer',
-                                            fontSize: 12,
-                                            padding: 0,
+                                            padding: 2,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: 22,
+                                            height: 22,
+                                            borderRadius: 4,
+                                            transition: 'all 0.15s ease',
+                                            flexShrink: 0,
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent';
                                           }}
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1402,7 +1218,7 @@ export const WorkSchedulePage: React.FC = () => {
                                           }}
                                           title="Hủy ca"
                                         >
-                                          &times;
+                                          <X size={15} strokeWidth={2.5} />
                                         </button>
                                       )}
                                     </div>
@@ -1673,12 +1489,6 @@ export const WorkSchedulePage: React.FC = () => {
                           </td>
                         );
                       })}
-
-                      {/* Lương dự kiến */}
-                      <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
-                        <div style={{ fontWeight: 700, color: '#0F766E' }}>{formatVND(estimatedWage)}</div>
-                        <div style={{ fontSize: 11, color: '#64748B' }}>{shiftCount} ca</div>
-                      </td>
                     </tr>
                   );
                 }))}
@@ -1761,7 +1571,7 @@ export const WorkSchedulePage: React.FC = () => {
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                             {assignedEmps.map((item) => {
                               if (!item) return null;
-                              const isOnLeave = item.status?.toLowerCase() === 'onleave' || item.isLeave;
+                              const isOnLeave = isLeaveSchedule(item);
                               const isMenuOpen = openMenuScheduleId === ('shift_' + item.id);
                               const isMyShift = !isEmployeeRole || (
                                 (user?.id && item.employeeId === user.id) ||
@@ -1774,6 +1584,10 @@ export const WorkSchedulePage: React.FC = () => {
                                   <div
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (!isEmployeeRole) {
+                                        handleEditAssignment(item);
+                                        return;
+                                      }
                                       if (isMenuOpen) {
                                         setOpenMenuScheduleId(null);
                                         setMenuPosition(null);
@@ -1809,6 +1623,7 @@ export const WorkSchedulePage: React.FC = () => {
                                       transition: 'all 0.15s ease',
                                       boxShadow: '0 1px 2px rgba(15, 118, 110, 0.05)',
                                     }}
+                                    title={!isEmployeeRole ? "Bấm để xem chi tiết và chỉnh sửa ca làm việc" : "Bấm để gửi yêu cầu hoặc thao tác ca làm"}
                                   >
                                     <div
                                       style={{
@@ -2164,19 +1979,24 @@ export const WorkSchedulePage: React.FC = () => {
         defaultEmployeeId={selectedEmpId}
         defaultDayOfWeek={selectedDay}
         weekDays={weekData.days}
+        weekAssignments={assignments}
         editingAssignment={editingAssignment}
         onSave={handleSaveAssignments}
-        onSuccess={async () => {
+        onSuccess={async (actionType) => {
           await fetchSchedules();
-          setNotificationModal({
-            isOpen: true,
-            type: 'success',
-            title: 'Thành công',
-            message: 'Đã khởi tạo ca làm việc thành công vào hệ thống.',
-          });
+          if (actionType !== 'delete') {
+            setNotificationModal({
+              isOpen: true,
+              type: 'success',
+              title: 'Thành công',
+              message: editingAssignment
+                ? 'Đã cập nhật ca làm việc thành công.'
+                : 'Đã khởi tạo ca làm việc thành công vào hệ thống.',
+            });
+          }
         }}
         onUpdate={handleUpdateAssignment}
-        onDelete={handleDeleteAssignment}
+        onDelete={handleDeleteFromModal}
       />
 
       {/* Modal Chi Tiết Lịch Làm Việc Của Nhân Viên (360 độ - tab Lịch làm việc) */}
@@ -2198,10 +2018,10 @@ export const WorkSchedulePage: React.FC = () => {
           fetchSchedules();
           fetchEmployeesAndShifts();
         }}
-        branchId={selectedBranchIds.length > 0 ? selectedBranchIds[0] : branches[0]?.id || 'b1'}
+        branchId={activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : branches[0]?.id || 'b1'}
         branchName={
-          selectedBranchIds.length > 0
-            ? branches.find((b) => b.id === selectedBranchIds[0])?.name || 'Chi nhánh mặc định'
+          activeBranch && activeBranch.id !== 'ALL'
+            ? activeBranch.name
             : branches[0]?.name || 'Chi nhánh mặc định'
         }
       />
@@ -2278,6 +2098,7 @@ export const WorkSchedulePage: React.FC = () => {
         }}
         scheduleId={historyModalScheduleId}
         shiftTitle={historyModalTitle}
+        onChanged={fetchSchedules}
       />
     </div>
   );

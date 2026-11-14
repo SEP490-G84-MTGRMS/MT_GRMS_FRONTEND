@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { FC } from 'react';
-import { Users } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { useCustomerCrm } from '../hooks/useCustomerCrm';
 import { CustomerKpiCards } from '../components/CustomerKpiCards';
@@ -15,7 +14,7 @@ import type { CreateCustomerInput, UpdateCustomerInput } from '../types/customer
 import '../customer-crm.css';
 
 export const CustomerManagementPage: FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const {
     customers,
@@ -60,11 +59,29 @@ export const CustomerManagementPage: FC = () => {
     }
   }, [urlSearch, setSearchTerm]);
 
+  const handleSearchChange = (term: string) => {
+    setSearchTerm(term);
+    setCurrentPage(1);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (term) {
+          next.set('search', term);
+        } else {
+          next.delete('search');
+          next.delete('keyword');
+        }
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
   const [ledgerCustomer, setLedgerCustomer] = useState<any>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = (message: string, type: ToastState["type"] = "success") => {
+  const showToast = (message: string, type: ToastState['type'] = 'success') => {
     if (toastTimerRef.current) {
       clearTimeout(toastTimerRef.current);
     }
@@ -87,7 +104,7 @@ export const CustomerManagementPage: FC = () => {
         showToast(`Thêm mới khách hàng ${data.fullName} thành công!`);
       }
     } catch (err: any) {
-      showToast(err.message || "Lỗi xử lý dữ liệu khách hàng", "error");
+      showToast(err.message || 'Lỗi xử lý dữ liệu khách hàng', 'error');
       throw err;
     }
   };
@@ -96,10 +113,12 @@ export const CustomerManagementPage: FC = () => {
     try {
       await collectDebtMutation.mutateAsync(data);
       showToast(
-        `Đã lập phiếu thu nợ ${data.amount.toLocaleString("vi-VN")} đ qua ${data.method === "VietQR" ? "VietQR" : "Tiền mặt"} và đồng bộ Sổ quỹ thành công!`,
+        `Đã lập phiếu thu nợ ${data.amount.toLocaleString('vi-VN')} đ qua ${
+          data.method === 'VietQR' ? 'VietQR' : 'Tiền mặt'
+        } và đồng bộ Sổ quỹ thành công!`
       );
     } catch (err: any) {
-      showToast(err.message || "Lỗi khi thu nợ", "error");
+      showToast(err.message || 'Lỗi khi thu nợ', 'error');
       throw err;
     }
   };
@@ -107,98 +126,106 @@ export const CustomerManagementPage: FC = () => {
   return (
     <div className="min-h-screen bg-[#F7F8F7] font-finance">
       <div className="customer-page">
-      {/* Toast Notification chuẩn của dự án */}
-      {toast && (
-        <AdminToast
-          toast={toast}
-          onClose={() => {
-            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-            setToast(null);
-          }}
-        />
-      )}
+        {/* Toast Notification chuẩn của dự án */}
+        {toast && (
+          <AdminToast
+            toast={toast}
+            onClose={() => {
+              if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+              setToast(null);
+            }}
+          />
+        )}
 
-      {/* Page Header */}
-      <div className="customer-topbar">
-        <div className="customer-topbar-title">
-          <div className="customer-topbar-icon">
-            <Users size={22} color="#ffffff" />
-          </div>
-          <div className="customer-topbar-text">
-            <h1>Khách nợ</h1>
-            <p>
-              Sổ theo dõi nợ và thu hồi công nợ · Tích hợp thanh toán
-              VietQR động
+        {/* 1. Page Header & Title chuẩn prototype mới */}
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1 className="page-title">Khách hàng &amp; công nợ</h1>
+            <p className="page-subtitle">
+              Hạn mức tín dụng, mã số thuế &amp; thu nợ FIFO 1 nguồn duy nhất đồng bộ Sổ quỹ
             </p>
           </div>
+          <div className="page-actions">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleOpenCreateModal}
+            >
+              + Thêm khách hàng
+            </button>
+          </div>
         </div>
+
+        {/* 2. 3 Thẻ KPI chuẩn prototype */}
+        <CustomerKpiCards
+          summary={kpiSummary}
+          customers={customers}
+          isLoading={isKpiLoading}
+          onFilterDebt={() => setSelectedDebtStatus('DEBT')}
+          onFilterOverLimit={() => setSelectedDebtStatus('OVER_LIMIT')}
+        />
+
+        {/* 3. Filter & Quick Chips Bar */}
+        <CustomerFilterBar
+          searchTerm={searchTerm}
+          onSearchChange={handleSearchChange}
+          selectedTier={selectedTier}
+          onTierChange={setSelectedTier}
+          selectedDebtStatus={selectedDebtStatus}
+          onDebtStatusChange={setSelectedDebtStatus}
+          onRefresh={() => refetch()}
+          isRefreshing={isLoading}
+        />
+
+        {/* 4. Customer Table (Bảng 5 cột chuẩn prototype) */}
+        <CustomerTable
+          customers={customers}
+          isLoading={isLoading}
+          onSelect={handleSelectCustomer}
+          onEdit={handleOpenEditModal}
+          onCollect={handleOpenCollectModal}
+          onViewLedger={(c) => setLedgerCustomer(c)}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
+
+        {/* 5. Customer Drawer Detail */}
+        <CustomerDrawerDetail
+          customer={selectedCustomer}
+          onClose={handleCloseDrawer}
+          onOpenEdit={handleOpenEditModal}
+          onOpenCollect={handleOpenCollectModal}
+          onViewLedger={(c) => setLedgerCustomer(c)}
+        />
+
+        {/* 6. Create / Edit Modal */}
+        <CustomerFormModal
+          isOpen={isFormModalOpen}
+          onClose={() => setIsFormModalOpen(false)}
+          onSubmit={handleFormSubmit}
+          initialData={editingCustomer}
+          isSubmitting={createMutation.isPending || updateMutation.isPending}
+        />
+
+        {/* 7. Collect Debt Modal (VietQR & Cash) */}
+        <DebtCollectionModal
+          isOpen={Boolean(collectingCustomer)}
+          onClose={() => setCollectingCustomer(null)}
+          customer={collectingCustomer}
+          onConfirm={handleCollectDebtConfirm}
+          isSubmitting={collectDebtMutation.isPending}
+        />
+
+        {/* 8. Customer Debt Ledger Drawer */}
+        <CustomerDebtLedgerDrawer
+          isOpen={Boolean(ledgerCustomer)}
+          customer={ledgerCustomer}
+          onClose={() => setLedgerCustomer(null)}
+          onOpenCollect={handleOpenCollectModal}
+        />
       </div>
-
-      {/* 1. KPI Cards */}
-      <CustomerKpiCards summary={kpiSummary} isLoading={isKpiLoading} />
-
-      {/* 2. Filter & Action Bar */}
-      <CustomerFilterBar
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        selectedTier={selectedTier}
-        onTierChange={setSelectedTier}
-        selectedDebtStatus={selectedDebtStatus}
-        onDebtStatusChange={setSelectedDebtStatus}
-        onOpenCreate={handleOpenCreateModal}
-        onRefresh={() => refetch()}
-        isRefreshing={isLoading}
-      />
-
-      {/* 3. Customer Table */}
-      <CustomerTable
-        customers={customers}
-        isLoading={isLoading}
-        onSelect={handleSelectCustomer}
-        onEdit={handleOpenEditModal}
-        onCollect={handleOpenCollectModal}
-        onViewLedger={(c) => setLedgerCustomer(c)}
-        currentPage={currentPage}
-        pageSize={pageSize}
-        onPageChange={setCurrentPage}
-        onPageSizeChange={setPageSize}
-      />
-
-      {/* 4. Customer Drawer Detail */}
-      <CustomerDrawerDetail
-        customer={selectedCustomer}
-        onClose={handleCloseDrawer}
-        onOpenEdit={handleOpenEditModal}
-        onOpenCollect={handleOpenCollectModal}
-        onViewLedger={(c) => setLedgerCustomer(c)}
-      />
-
-      {/* 5. Create / Edit Modal */}
-      <CustomerFormModal
-        isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
-        onSubmit={handleFormSubmit}
-        initialData={editingCustomer}
-        isSubmitting={createMutation.isPending || updateMutation.isPending}
-      />
-
-      {/* 6. Collect Debt Modal (VietQR & Cash) */}
-      <DebtCollectionModal
-        isOpen={Boolean(collectingCustomer)}
-        onClose={() => setCollectingCustomer(null)}
-        customer={collectingCustomer}
-        onConfirm={handleCollectDebtConfirm}
-        isSubmitting={collectDebtMutation.isPending}
-      />
-
-      {/* 7. Customer Debt Ledger Drawer */}
-      <CustomerDebtLedgerDrawer
-        isOpen={Boolean(ledgerCustomer)}
-        customer={ledgerCustomer}
-        onClose={() => setLedgerCustomer(null)}
-        onOpenCollect={handleOpenCollectModal}
-      />
-    </div>
     </div>
   );
 };

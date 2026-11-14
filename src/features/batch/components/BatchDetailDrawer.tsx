@@ -1,15 +1,9 @@
-import { useState } from 'react';
 import type { FC } from 'react';
 import {
   X,
-  MapPin,
-  Trash2,
-  Tag,
   FileText,
   Calendar,
-  Check,
   Building2,
-  Clock,
   ClipboardCheck,
 } from 'lucide-react';
 import type { BatchItem } from '../types/batch.types';
@@ -33,28 +27,13 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
   isOpen,
   batch,
   onClose,
-  onUpdateLocation,
-  onDiscountClick,
-  onWriteOffClick,
+  onUpdateLocation: _onUpdateLocation,
+  onDiscountClick: _onDiscountClick,
+  onWriteOffClick: _onWriteOffClick,
   onViewGrn,
   onStocktakeClick,
 }) => {
-  const [isEditingLoc, setIsEditingLoc] = useState(false);
-  const [locInput, setLocInput] = useState('');
-
   if (!isOpen || !batch) return null;
-
-  const handleStartEditLoc = () => {
-    setLocInput(batch.shelfLocation);
-    setIsEditingLoc(true);
-  };
-
-  const handleSaveLoc = () => {
-    if (locInput.trim()) {
-      onUpdateLocation(batch.id, locInput.trim());
-    }
-    setIsEditingLoc(false);
-  };
 
   const renderBadge = () => {
     switch (batch.status) {
@@ -295,7 +274,7 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Action Toolbar */}
+          {/* Action Toolbar — ẩn sửa kệ / markdown / xuất hủy stub */}
           <div
             style={{
               display: 'flex',
@@ -308,68 +287,6 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
               border: '1px solid #e2e8f0',
             }}
           >
-            {isEditingLoc ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                <input
-                  type="text"
-                  value={locInput}
-                  onChange={(e) => setLocInput(e.target.value)}
-                  placeholder="Nhập mã vị trí kệ mới (vd: C-B-05)..."
-                  style={{
-                    height: 32,
-                    padding: '0 10px',
-                    borderRadius: 5,
-                    border: '1px solid #0d9488',
-                    fontSize: 12.5,
-                    outline: 'none',
-                    flex: 1,
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveLoc}
-                  style={{
-                    height: 32,
-                    padding: '0 12px',
-                    borderRadius: 5,
-                    border: 'none',
-                    backgroundColor: '#0d9488',
-                    color: '#ffffff',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <Check size={14} />
-                  <span>Lưu vị trí</span>
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleStartEditLoc}
-                style={{
-                  height: 32,
-                  padding: '0 12px',
-                  borderRadius: 6,
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#ffffff',
-                  color: '#334155',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-              >
-                <MapPin size={13} color="#0d9488" />
-                <span>Sửa vị trí kệ: {batch.shelfLocation}</span>
-              </button>
-            )}
 
             <button
               type="button"
@@ -414,139 +331,17 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
                 }}
               >
                 <ClipboardCheck size={13} />
-                <span>Kiểm kê lô này</span>
+                <span>
+                  {batch.status === 'Expired' || batch.status === 'Critical'
+                    ? 'Kiểm kê / xuất hủy'
+                    : 'Kiểm kê lô này'}
+                </span>
               </button>
             )}
-
-            {batch.status !== 'Expired' && (
-              <button
-                type="button"
-                onClick={() => onDiscountClick(batch)}
-                style={{
-                  height: 32,
-                  padding: '0 12px',
-                  borderRadius: 6,
-                  border: '1px solid #bfdbfe',
-                  backgroundColor: '#eff6ff',
-                  color: '#1d4ed8',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-              >
-                <Tag size={13} />
-                <span>Giảm giá FEFO</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => onWriteOffClick(batch)}
-              style={{
-                height: 32,
-                padding: '0 12px',
-                borderRadius: 6,
-                border: 'none',
-                backgroundColor: '#fee2e2',
-                color: '#dc2626',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                marginLeft: 'auto',
-              }}
-            >
-              <Trash2 size={13} />
-              <span>Xuất hủy (FE-06)</span>
-            </button>
           </div>
 
-          {/* Lịch sử di chuyển hàng của Lô (Movement History) */}
-          <div style={{ marginTop: 10 }}>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: '#1e293b',
-                marginBottom: 10,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <Clock size={14} color="#0d9488" />
-              <span>Lịch sử luân chuyển lượt hàng (Lot Movement Ledger)</span>
-            </div>
-
-            <div
-              style={{
-                border: '1px solid #e2e8f0',
-                borderRadius: 8,
-                overflow: 'hidden',
-                backgroundColor: '#ffffff',
-              }}
-            >
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 700, textAlign: 'left' }}>
-                    <th style={{ padding: '8px 10px', width: '22%' }}>Thời gian</th>
-                    <th style={{ padding: '8px 10px', width: '25%' }}>Loại giao dịch</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right', width: '15%' }}>Số lượng</th>
-                    <th style={{ padding: '8px 10px', width: '20%' }}>Mã chứng từ</th>
-                    <th style={{ padding: '8px 10px', width: '18%' }}>Người thực hiện</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {batch.movements.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} style={{ padding: '24px 10px', textAlign: 'center', color: '#94a3b8' }}>
-                        Chưa ghi nhận biến động bổ sung ngoài phiếu nhập khởi tạo ban đầu.
-                      </td>
-                    </tr>
-                  ) : (
-                    batch.movements.map((m) => (
-                      <tr key={m.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 10px', color: '#334155' }}>{m.timestamp}</td>
-                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>
-                          <span
-                            style={{
-                              color:
-                                m.type === 'RECEIPT'
-                                  ? '#15803d'
-                                  : m.type === 'POS_SALE'
-                                  ? '#1d4ed8'
-                                  : '#d97706',
-                            }}
-                          >
-                            {m.typeLabel}
-                          </span>
-                        </td>
-                        <td
-                          style={{
-                            padding: '8px 10px',
-                            textAlign: 'right',
-                            fontFamily: 'monospace',
-                            fontWeight: 700,
-                            color: m.quantity > 0 ? '#15803d' : '#dc2626',
-                          }}
-                        >
-                          {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
-                        </td>
-                        <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: '#0d9488' }}>
-                          {m.documentCode}
-                        </td>
-                        <td style={{ padding: '8px 10px', color: '#64748b' }}>{m.actor}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+          <div style={{ marginTop: 10, fontSize: 12.5, color: '#64748b' }}>
+            Chưa hỗ trợ thẻ kho / lịch sử luân chuyển lô.
           </div>
         </div>
       </div>

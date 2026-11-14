@@ -2,7 +2,7 @@ export * from './types/pos.types';
 export * from './types/inventory.types';
 export * from './pages/PosCheckoutPage';
 export * from './pages/PosShiftPage';
-export * from './pages/CashierShiftDashboardPage';
+export { CashControlHubPage as CashierShiftDashboardPage } from '../cash-control/pages/CashControlHubPage';
 export * from './pages/InventoryLookupPage';
 export * from './pages/InvoiceManagementPage';
 export * from './mock/inventoryMockData';

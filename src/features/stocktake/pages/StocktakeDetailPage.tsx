@@ -78,6 +78,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
     null
   );
   const [reviewNote, setReviewNote] = useState('');
+  const [confirmSurplusFound, setConfirmSurplusFound] = useState(false);
 
   // Create Return modal state
   const [isCreateReturnOpen, setIsCreateReturnOpen] = useState(false);
@@ -155,17 +156,29 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
       showToast('Vui lòng nhập lý do khi từ chối hoặc yêu cầu kiểm kê lại.', 'error');
       return;
     }
+    const hasSurplus = (detail.totalVarianceQty ?? 0) > 0 || detail.lines.some((l) => l.varianceQty > 0);
+    if (reviewAction === 'APPROVE' && hasSurplus && !confirmSurplusFound) {
+      showToast('Phiếu có hàng thừa — hãy tick xác minh nguồn thừa trước khi duyệt cộng tồn.', 'error');
+      return;
+    }
     setIsSubmitting(true);
     setErrorMsg('');
     try {
       const updated = await stocktakeApi.review(detail.id, {
         action: reviewAction,
         note: reviewNote.trim() || null,
+        confirmSurplusFound: reviewAction === 'APPROVE' ? confirmSurplusFound : false,
       });
       setDetail(updated);
       setReviewAction(null);
       setReviewNote('');
-      showToast('Đã cập nhật kết quả duyệt phiếu kiểm kê thành công!', 'success');
+      setConfirmSurplusFound(false);
+      showToast(
+        reviewAction === 'APPROVE'
+          ? 'Đã duyệt kiểm kê và cập nhật tồn kho theo RULE-03.'
+          : 'Đã cập nhật kết quả duyệt phiếu kiểm kê thành công!',
+        'success'
+      );
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
       showToast(e.response?.data?.message || e.message || 'Lỗi khi duyệt phiếu kiểm kê.', 'error');
@@ -377,6 +390,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                 onClick={() => {
                   setReviewAction('APPROVE');
                   setReviewNote('');
+                  setConfirmSurplusFound(false);
                 }}
               >
                 <CheckCircle2 size={14} />
@@ -927,9 +941,43 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
             </h3>
             <p style={{ fontSize: 12.5, color: '#475569', marginTop: 8 }}>
               {reviewAction === 'APPROVE'
-                ? 'Khi phê duyệt: Hệ thống sẽ tự động điều chỉnh chênh lệch kiểm kê, trừ tồn xuất hủy đối với hàng hỏng tại cửa hàng & hàng hết hạn, và giữ cách ly hàng lỗi NCC để tạo Phiếu trả hàng NCC.'
+                ? 'Khi phê duyệt: write-off hỏng/hết hạn; giảm tồn nếu thiếu; giữ cách ly hàng lỗi NCC (chờ trả). Hàng cận hạn markdown vẫn bán được. Hàng thừa chỉ cộng tồn sau khi bạn xác minh.'
                 : 'Khi từ chối hoặc yêu cầu kiểm kê lại: Số lượng đang tạm cách ly sẽ được hoàn lại để kiểm đếm lại.'}
             </p>
+            {reviewAction === 'APPROVE' &&
+              detail &&
+              ((detail.totalVarianceQty ?? 0) > 0 || detail.lines.some((l) => l.varianceQty > 0)) && (
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
+                    marginTop: 12,
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    fontSize: 12.5,
+                    color: '#1e3a8a',
+                    cursor: 'pointer',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={confirmSurplusFound}
+                    onChange={(e) => setConfirmSurplusFound(e.target.checked)}
+                    style={{ marginTop: 2 }}
+                  />
+                  <span>
+                    <b>Xác minh nguồn hàng thừa</b> (tổng +
+                    {fmt(
+                      detail.lines.reduce((s, l) => s + Math.max(0, l.varianceQty), 0)
+                    )}
+                    ). Tôi xác nhận đã kiểm tra nguồn → cho phép cộng tồn khi duyệt.
+                  </span>
+                </label>
+              )}
             <div style={{ marginTop: 12 }}>
               <label
                 style={{
@@ -961,7 +1009,10 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
               <button
                 type="button"
                 className="po-btn po-btn-secondary"
-                onClick={() => setReviewAction(null)}
+                onClick={() => {
+                  setReviewAction(null);
+                  setConfirmSurplusFound(false);
+                }}
                 disabled={isSubmitting}
               >
                 Hủy
@@ -1096,7 +1147,9 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                   }}
                 >
                   <option value="DEDUCT_INVOICE">Cấn trừ công nợ / Hóa đơn (DEDUCT_INVOICE)</option>
-                  <option value="REPLACE_GOODS">Đổi hàng bù từ NCC (REPLACE_GOODS)</option>
+                  <option value="REPLACE_GOODS">
+                    Đổi hàng bù từ NCC (trừ tồn lúc bàn giao → PO → GRN)
+                  </option>
                   <option value="REFUND">Hoàn tiền mặt / Chuyển khoản (REFUND)</option>
                   <option value="SUPPLIER_CREDIT">Ghi nhận Credit Note (SUPPLIER_CREDIT)</option>
                 </select>

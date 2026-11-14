@@ -7,8 +7,12 @@ import {
   FileText,
   PackageCheck,
 } from 'lucide-react';
-import type { PurchaseOrderListItem, PurchaseOrderStatus } from '../../types/po-list.types';
+import type { PurchaseOrderListItem } from '../../types/po-list.types';
 import { TablePagination } from '../../../../components/common';
+import {
+  formatDeliveryDateGateMessage,
+  isDeliveryDateReached,
+} from '../../lib/deliveryDateGate';
 
 interface PoListTableProps {
   orders: PurchaseOrderListItem[];
@@ -22,33 +26,100 @@ interface PoListTableProps {
   onReceiveOrder?: (order: PurchaseOrderListItem) => void;
 }
 
+const isExchangePo = (order: PurchaseOrderListItem): boolean =>
+  String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN';
+
 const canShowReceiveAction = (order: PurchaseOrderListItem): boolean => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
-  // Khi đã nhập rồi (COMPLETED / RECEIVED) thì bỏ icon nhập hàng đi, chỉ để lại nút chi tiết
-  if (grn === 'COMPLETED') return false;
+  // Đã có GRN COMPLETED → vẫn hiện nút để xem phiếu nhập (hoặc nhập tiếp nếu PO đổi hàng partial)
+  if (grn === 'COMPLETED' && order.activeGoodsReceiptId) return true;
   if (grn === 'DRAFT') return true;
+  if (order.status === 'CANCELLED' || order.status === 'REJECTED') return false;
   if (
-    order.status === 'CANCELLED' ||
-    order.status === 'REJECTED' ||
-    order.status === 'RECEIVED' ||
-    order.status === 'COMPLETED'
+    (order.status === 'RECEIVED' || order.status === 'COMPLETED') &&
+    !order.activeGoodsReceiptId &&
+    !isExchangePo(order)
   ) {
     return false;
   }
   return (
+    order.status === 'PENDING_APPROVAL' ||
     order.status === 'SENT' ||
     order.status === 'CONFIRMED' ||
     order.status === 'APPROVED' ||
     order.status === 'DISPATCHED' ||
-    order.status === 'PARTIALLY_RECEIVED'
+    order.status === 'PARTIALLY_RECEIVED' ||
+    order.status === 'RECEIVED' ||
+    order.status === 'COMPLETED'
+  );
+};
+
+/** Một badge duy nhất: ưu tiên tiến độ nhập kho, không chồng "Đã nhập" + "Đã nhập kho". */
+const resolveDisplayStatus = (
+  order: PurchaseOrderListItem
+): { label: string; bg: string; color: string; border: string } => {
+  const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
+  const byStatus: Record<string, { label: string; bg: string; color: string; border: string }> = {
+    PENDING_APPROVAL: { label: 'Chờ duyệt', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
+    APPROVED: { label: 'Đã duyệt', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+    DISPATCHED: { label: 'Đã gửi', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
+    SENT: { label: 'Đã gửi', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
+    CONFIRMED: { label: 'Đã chốt', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+    PARTIALLY_RECEIVED: { label: 'Nhận 1 phần', bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe' },
+    RECEIVED: { label: 'Đã nhập kho', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+    COMPLETED: { label: 'Đã nhập kho', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+    REJECTED: { label: 'Đã từ chối', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+    CANCELLED: { label: 'Đã hủy', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
+  };
+
+  if (order.status === 'PARTIALLY_RECEIVED' || (isExchangePo(order) && order.status === 'PARTIALLY_RECEIVED')) {
+    return byStatus.PARTIALLY_RECEIVED;
+  }
+  if (
+    !isExchangePo(order) &&
+    (grn === 'COMPLETED' || order.status === 'RECEIVED' || order.status === 'COMPLETED')
+  ) {
+    return { label: 'Đã nhập kho', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
+  }
+  if (
+    isExchangePo(order) &&
+    (order.status === 'RECEIVED' || order.status === 'COMPLETED') &&
+    grn === 'COMPLETED'
+  ) {
+    return { label: 'Đã nhập kho', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
+  }
+  if (grn === 'DRAFT') {
+    return { label: 'GRN nháp', bg: '#fffbeb', color: '#b45309', border: '#fde68a' };
+  }
+  return (
+    byStatus[order.status] || {
+      label: order.status,
+      bg: '#f8fafc',
+      color: '#334155',
+      border: '#e2e8f0',
+    }
   );
 };
 
 const receiveActionTitle = (order: PurchaseOrderListItem): string => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
-  if (grn === 'COMPLETED') return `Xem phiếu nhập ${order.activeGoodsReceiptCode || ''}`.trim();
+  if (isExchangePo(order) && order.status === 'PARTIALLY_RECEIVED') {
+    return 'Nhận tiếp hàng đổi trên cùng PO';
+  }
+  if (grn === 'COMPLETED' && !isExchangePo(order)) {
+    return `Xem phiếu nhập ${order.activeGoodsReceiptCode || ''}`.trim();
+  }
+  if (!isDeliveryDateReached(order.deliveryDate)) {
+    return formatDeliveryDateGateMessage(order.deliveryDate);
+  }
   if (grn === 'DRAFT') return `Tiếp tục xác nhận phiếu nháp ${order.activeGoodsReceiptCode || ''}`.trim();
   return 'Nhận hàng / Nhập kho theo PO này';
+};
+
+const isReceiveBlockedByDeliveryDate = (order: PurchaseOrderListItem): boolean => {
+  const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
+  if (grn === 'COMPLETED') return false;
+  return !isDeliveryDateReached(order.deliveryDate);
 };
 
 type SortField =
@@ -224,15 +295,8 @@ export const PoListTable: FC<PoListTableProps> = ({
     lineHeight: 1.35,
   };
 
-  const renderStatusBadge = (status: PurchaseOrderStatus) => {
-    const styles: Record<string, { bg: string; color: string; border: string; label: string }> = {
-      SENT: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', label: 'Đã gửi' },
-      CONFIRMED: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'Đã chốt' },
-      PARTIALLY_RECEIVED: { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe', label: 'Nhận 1 phần' },
-      RECEIVED: { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd', label: 'Đã nhập' },
-      CANCELLED: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Đã hủy' },
-    };
-    const st = styles[status] || { bg: '#f8fafc', color: '#334155', border: '#e2e8f0', label: status };
+  const renderStatusBadge = (order: PurchaseOrderListItem) => {
+    const st = resolveDisplayStatus(order);
 
     return (
       <span
@@ -250,7 +314,7 @@ export const PoListTable: FC<PoListTableProps> = ({
           border: `1px solid ${st.border}`,
           whiteSpace: 'nowrap',
         }}
-        title={st.label}
+        title={order.activeGoodsReceiptCode ? `${st.label} · ${order.activeGoodsReceiptCode}` : st.label}
       >
         {st.label}
       </span>
@@ -423,6 +487,29 @@ export const PoListTable: FC<PoListTableProps> = ({
                         >
                           {order.poCode}
                         </span>
+                        {String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignSelf: 'flex-start',
+                              marginTop: 2,
+                              padding: '1px 6px',
+                              borderRadius: 999,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: '#0369a1',
+                              background: '#e0f2fe',
+                              border: '1px solid #7dd3fc',
+                            }}
+                            title={
+                              order.sourceSupplierReturnId
+                                ? `PO đổi hàng từ phiếu trả ${order.sourceSupplierReturnId}`
+                                : 'PO đổi hàng từ phiếu trả NCC'
+                            }
+                          >
+                            Đổi hàng NCC
+                          </span>
+                        )}
                         {order.revisionNumber != null && order.revisionNumber > 1 && (
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#0369a1' }}>
                             Rev {order.revisionNumber}
@@ -534,7 +621,7 @@ export const PoListTable: FC<PoListTableProps> = ({
                     </td>
 
                     <td className="so-list-td so-list-td--wrap" style={{ textAlign: 'center', ...cellWrap }}>
-                      {renderStatusBadge(order.status)}
+                      {renderStatusBadge(order)}
                     </td>
 
                     <td
@@ -563,7 +650,12 @@ export const PoListTable: FC<PoListTableProps> = ({
                           <Eye size={12} />
                         </button>
 
-                        {(order.status === 'SENT' || order.status === 'CONFIRMED') && onEditOrder && (
+                        {(order.status === 'SENT' ||
+                          order.status === 'CONFIRMED' ||
+                          order.status === 'PENDING_APPROVAL' ||
+                          order.status === 'DISPATCHED' ||
+                          order.status === 'APPROVED') &&
+                          onEditOrder && (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -591,8 +683,10 @@ export const PoListTable: FC<PoListTableProps> = ({
                         {onReceiveOrder && canShowReceiveAction(order) && (
                           <button
                             type="button"
+                            disabled={isReceiveBlockedByDeliveryDate(order)}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (isReceiveBlockedByDeliveryDate(order)) return;
                               onReceiveOrder(order);
                             }}
                             style={{
@@ -602,13 +696,15 @@ export const PoListTable: FC<PoListTableProps> = ({
                               width: 26,
                               height: 26,
                               borderRadius: 6,
-                              backgroundColor:
-                                (order.activeGoodsReceiptStatus || '').toUpperCase() === 'COMPLETED'
+                              backgroundColor: isReceiveBlockedByDeliveryDate(order)
+                                ? '#f1f5f9'
+                                : (order.activeGoodsReceiptStatus || '').toUpperCase() === 'COMPLETED'
                                   ? '#ecfdf5'
                                   : '#f0fdfa',
-                              border: '1px solid #99f6e4',
-                              color: '#0f766e',
-                              cursor: 'pointer',
+                              border: `1px solid ${isReceiveBlockedByDeliveryDate(order) ? '#cbd5e1' : '#99f6e4'}`,
+                              color: isReceiveBlockedByDeliveryDate(order) ? '#94a3b8' : '#0f766e',
+                              cursor: isReceiveBlockedByDeliveryDate(order) ? 'not-allowed' : 'pointer',
+                              opacity: isReceiveBlockedByDeliveryDate(order) ? 0.65 : 1,
                             }}
                             title={receiveActionTitle(order)}
                           >

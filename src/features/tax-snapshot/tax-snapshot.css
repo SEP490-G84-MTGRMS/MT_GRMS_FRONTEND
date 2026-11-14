@@ -910,3 +910,327 @@
 .tax-method-pill.active * {
   color: #ffffff !important;
 }
+
+/* ── Threshold Ruler (Prototype Parity) ── */
+.tax-threshold-card {
+  background: #ffffff;
+  border: 1px solid var(--border-subtle, #E2E8F0);
+  border-radius: var(--radius-lg, 16px);
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.tax-threshold-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.tax-threshold-title {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.tax-threshold-badge {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tax-threshold-badge.badge-teal {
+  background: #F0FDFA;
+  color: #0F766E;
+  border: 1px solid #99F6E4;
+}
+
+.tax-threshold-badge.badge-orange {
+  background: #FFF7ED;
+  color: #C2410C;
+  border: 1px solid #FFEDD5;
+}
+
+.tax-threshold-badge.badge-red {
+  background: #FEF2F2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+}
+
+.tax-threshold-metrics {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+.threshold-ruler {
+  position: relative;
+  padding: 24px 0 28px;
+}
+
+.threshold-track {
+  position: relative;
+  height: 14px;
+  border-radius: 9999px;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  overflow: visible;
+}
+
+.threshold-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #0F766E, #06B6D4);
+  transition: width 300ms ease;
+}
+
+.threshold-fill.warn {
+  background: linear-gradient(90deg, #F59E0B, #EA580C);
+}
+
+.threshold-fill.danger {
+  background: linear-gradient(90deg, #EA580C, #DC2626);
+}
+
+.threshold-marker {
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  width: 2px;
+  background: #0F172A;
+  z-index: 2;
+}
+
+.threshold-marker-label {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0F172A;
+  background: #ffffff;
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.threshold-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: #64748B;
+}
+
+.tax-threshold-alert {
+  padding: 12px 16px;
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.tax-threshold-alert.alert-teal {
+  background: #F0FDFA;
+  border: 1px solid #99F6E4;
+}
+
+.tax-threshold-alert.alert-danger {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+}
+
+/* ── Wizard Step Bar (Prototype Parity) ── */
+.step-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.step-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #94A3B8;
+  position: relative;
+}
+
+.step-item::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: #E2E8F0;
+  margin-left: 4px;
+}
+
+.step-item:last-child::after {
+  display: none;
+}
+
+.step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #CBD5E1;
+  background: #ffffff;
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.step-item.active {
+  color: #0F766E;
+}
+
+.step-item.active .step-circle {
+  border-color: #0F766E;
+  background: #0F766E;
+  color: #ffffff;
+}
+
+.step-item.completed {
+  color: #059669;
+}
+
+.step-item.completed .step-circle {
+  border-color: #059669;
+  background: #ECFDF5;
+  color: #059669;
+}
+
+/* ── Toggle Switch ── */
+.switch-toggle-btn {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #CBD5E1;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  padding: 2px;
+}
+
+.switch-toggle-btn.on {
+  background: #0F766E;
+}
+
+.switch-toggle-btn::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.switch-toggle-btn.on::after {
+  transform: translateX(20px);
+}
+
+/* ── A4 Print Sheet Container & Media Print Styles ── */
+.a4-print-sheet {
+  background: #ffffff;
+  border: 1px solid #E2E8F0;
+  padding: 28px 32px;
+  border-radius: 8px;
+  color: #0F172A;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.a4-print-sheet table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8.5pt;
+}
+
+.a4-print-sheet table th,
+.a4-print-sheet table td {
+  border: 1px solid #334155;
+  padding: 5px 8px;
+}
+
+.a4-print-sheet table th {
+  background: #F8FAFC;
+  font-weight: 700;
+  text-align: center;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 10mm 12mm;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide app chrome, buttons and modal overlays */
+  body * {
+    visibility: hidden !important;
+  }
+
+  .a4-print-sheet,
+  .a4-print-sheet * {
+    visibility: visible !important;
+  }
+
+  .a4-print-sheet {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  .no-print,
+  .tax-topbar-wrapper,
+  .tax-segmented-tabs,
+  .tax-modal-backdrop,
+  .tax-modal-header,
+  .tax-modal-footer,
+  button,
+  .btn-primary-pill,
+  .btn-secondary-pill {
+    display: none !important;
+  }
+}
+

@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { FC } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { CSSProperties, FC } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
-  ArrowLeft,
   Save,
   Send,
-  RefreshCw,
   Trash2,
   ClipboardCheck,
   ClipboardList,
   AlertTriangle,
   Plus,
+  RotateCcw,
+  Loader2,
 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -18,22 +18,68 @@ import { branchApi } from '../../purchase-order/api/branchApi';
 import { batchApi } from '../../batch/api/batchApi';
 import type { BatchItem } from '../../batch/types/batch.types';
 import { stocktakeApi } from '../api/stocktakeApi';
-import {
-  DEFECTIVE_REASON_OPTIONS,
-  NEAR_EXPIRY_ACTION_OPTIONS,
-  type UpsertStocktakeLineInput,
-} from '../types/stocktake.types';
+import { type UpsertStocktakeLineInput } from '../types/stocktake.types';
 import '../../purchase-order/purchase-order.css';
 import '../../../styles/so-list-page.css';
 
 interface LocationState {
-  preselectedBatches?: BatchItem[];
+  preselectedBatches?: Array<BatchItem & { confirmQty?: number }>;
   branchId?: string;
 }
 
-const mapBatchToLine = (b: BatchItem): UpsertStocktakeLineInput => {
+const lineActualQty = (l: UpsertStocktakeLineInput) =>
+  l.goodQty + l.defectiveQty + l.damagedQty + l.expiredQty;
+
+const lineIssueQty = (l: UpsertStocktakeLineInput) => l.defectiveQty + l.damagedQty;
+
+const lineIssueKind = (l: UpsertStocktakeLineInput): 'defective' | 'damaged' =>
+  l.defectiveQty > 0 ? 'defective' : 'damaged';
+
+const applyCount = (
+  line: UpsertStocktakeLineInput,
+  patch: {
+    actualQty?: number;
+    expiredQty?: number;
+    issueQty?: number;
+    issueKind?: 'defective' | 'damaged';
+  }
+): UpsertStocktakeLineInput => {
+  const kind = patch.issueKind ?? lineIssueKind(line);
+  let actual = patch.actualQty ?? lineActualQty(line);
+  let expired = patch.expiredQty ?? line.expiredQty;
+  let issue = patch.issueQty ?? lineIssueQty(line);
+
+  actual = Math.max(0, actual);
+  expired = Math.max(0, expired);
+  issue = Math.max(0, issue);
+  if (expired + issue > actual) {
+    if (patch.actualQty !== undefined) actual = expired + issue;
+    else if (patch.expiredQty !== undefined) expired = Math.max(0, actual - issue);
+    else issue = Math.max(0, actual - expired);
+  }
+
+  return {
+    ...line,
+    goodQty: Math.max(0, actual - expired - issue),
+    expiredQty: expired,
+    defectiveQty: kind === 'defective' ? issue : 0,
+    damagedQty: kind === 'damaged' ? issue : 0,
+    nearExpiryQty: 0,
+    nearExpiryAction: null,
+    defectiveReasonCode:
+      kind === 'defective' && issue > 0
+        ? line.defectiveReasonCode || 'MANUFACTURING_DEFECT'
+        : null,
+    defectiveReasonDetail: kind === 'defective' ? line.defectiveReasonDetail : null,
+  };
+};
+
+const mapBatchToLine = (
+  b: BatchItem & { confirmQty?: number }
+): UpsertStocktakeLineInput => {
   const isExpired = b.status === 'Expired';
-  const isNearExpiry = b.status === 'Critical' || b.status === 'Warning';
+  const confirmed =
+    typeof b.confirmQty === 'number' && b.confirmQty >= 0 ? b.confirmQty : b.qtyCurrent;
   return {
     branchStockId: b.id,
     productId: b.productId,
@@ -50,14 +96,14 @@ const mapBatchToLine = (b: BatchItem): UpsertStocktakeLineInput => {
     goodsReceiptLineId: null,
     unitCost: b.costPrice || 0,
     systemQty: b.qtyCurrent,
-    goodQty: isExpired ? 0 : b.qtyCurrent,
+    goodQty: isExpired ? 0 : confirmed,
     defectiveQty: 0,
     damagedQty: 0,
     nearExpiryQty: 0,
-    expiredQty: isExpired ? b.qtyCurrent : 0,
+    expiredQty: isExpired ? confirmed : 0,
     defectiveReasonCode: null,
     defectiveReasonDetail: null,
-    nearExpiryAction: isNearExpiry ? 'DISCOUNT_SALE' : null,
+    nearExpiryAction: null,
     discountPercent: null,
     evidenceUrl: null,
     note: null,
@@ -84,9 +130,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
   const [branchId, setBranchId] = useState<string>(
     locState?.branchId || userBranchId || ''
   );
-  const [scopeType, setScopeType] = useState<string>(
-    locState?.preselectedBatches?.length ? 'SELECTED_ITEMS' : 'FULL_BRANCH'
-  );
+  const [scopeType, setScopeType] = useState<string>('SELECTED_ITEMS');
   const [scopeReference, setScopeReference] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [lines, setLines] = useState<UpsertStocktakeLineInput[]>(() =>
@@ -94,12 +138,12 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       ? locState.preselectedBatches.map(mapBatchToLine)
       : []
   );
-  const [autoBalanceGoodQty, setAutoBalanceGoodQty] = useState<boolean>(true);
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const [isLoadingBatches, setIsLoadingBatches] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [toast, setToast] = useState<ToastState | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = useCallback(
     (message: string, type: ToastState['type'] = 'error') => {
@@ -141,8 +185,8 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       .getById(id)
       .then((detail) => {
         setBranchId(detail.branchId);
-        setScopeType(detail.scopeType);
-        setScopeReference(detail.scopeReference || '');
+        setScopeType(detail.scopeType === 'BY_SHELF' ? 'FULL_BRANCH' : detail.scopeType);
+        setScopeReference(detail.scopeType === 'BY_SHELF' ? '' : detail.scopeReference || '');
         setNote(detail.note || '');
         setLines(
           detail.lines.map((l) => ({
@@ -161,14 +205,14 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
             goodsReceiptLineId: l.goodsReceiptLineId,
             unitCost: l.unitCost,
             systemQty: l.systemQty,
-            goodQty: l.goodQty,
+            goodQty: l.goodQty + (l.nearExpiryQty || 0),
             defectiveQty: l.defectiveQty,
             damagedQty: l.damagedQty,
-            nearExpiryQty: l.nearExpiryQty,
+            nearExpiryQty: 0,
             expiredQty: l.expiredQty,
             defectiveReasonCode: l.defectiveReasonCode || null,
             defectiveReasonDetail: l.defectiveReasonDetail || null,
-            nearExpiryAction: l.nearExpiryAction || null,
+            nearExpiryAction: null,
             discountPercent: l.discountPercent || null,
             evidenceUrl: l.evidenceUrl || null,
             note: l.note || null,
@@ -182,110 +226,94 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       });
   }, [id, showToast]);
 
-  const loadBatchesFromInventory = useCallback(
-    async (appendOnly = false) => {
-      if (!branchId) {
-        showToast('Vui lòng chọn chi nhánh kiểm kê trước.', 'warning');
+  const addProductsFromSearch = useCallback(async () => {
+    if (!branchId) {
+      showToast('Vui lòng chọn chi nhánh kiểm kê trước.', 'warning');
+      return;
+    }
+    const kw = searchKeyword.trim();
+    if (!kw) {
+      showToast('Quét mã vạch hoặc nhập SKU / tên sản phẩm để thêm vào phiếu.', 'warning');
+      searchInputRef.current?.focus();
+      return;
+    }
+
+    setIsLoadingBatches(true);
+    setErrorMsg('');
+    try {
+      const res = await batchApi.getBatches({
+        keyword: kw,
+        productName: '',
+        sku: '',
+        batchCode: '',
+        supplierName: '',
+        branchId,
+        status: 'ALL',
+        pageIndex: 1,
+        pageSize: 50,
+      });
+
+      let matched = res.items;
+      if (scopeType === 'BY_CATEGORY' && scopeReference.trim()) {
+        const cat = scopeReference.trim().toLowerCase();
+        matched = matched.filter((b) => b.categoryName.toLowerCase().includes(cat));
+      }
+
+      const kwLower = kw.toLowerCase();
+      const exact = matched.filter(
+        (b) =>
+          b.sku.toLowerCase() === kwLower ||
+          (b.batchCode && b.batchCode !== '—' && b.batchCode.toLowerCase() === kwLower)
+      );
+      const toAdd = exact.length > 0 ? exact : matched;
+
+      if (toAdd.length === 0) {
+        showToast(`Không tìm thấy lô tồn kho khớp "${kw}".`, 'warning');
+        searchInputRef.current?.select();
         return;
       }
-      setIsLoadingBatches(true);
-      setErrorMsg('');
-      try {
-        const res = await batchApi.getBatches({
-          keyword: searchKeyword,
-          productName: '',
-          sku: '',
-          batchCode: '',
-          supplierName: '',
-          branchId,
-          status: 'ALL',
-          pageIndex: 1,
-          pageSize: 100,
-        });
 
-        let filtered = res.items;
-        if (scopeType === 'BY_CATEGORY' && scopeReference.trim()) {
-          const kw = scopeReference.trim().toLowerCase();
-          filtered = filtered.filter((b) => b.categoryName.toLowerCase().includes(kw));
-        } else if (scopeType === 'BY_SHELF' && scopeReference.trim()) {
-          const kw = scopeReference.trim().toLowerCase();
-          filtered = filtered.filter(
-            (b) =>
-              b.shelfLocation.toLowerCase().includes(kw) ||
-              b.zoneArea.toLowerCase().includes(kw)
-          );
-        }
+      const mapped = toAdd.map(mapBatchToLine);
+      const existingKeys = new Set(
+        lines.map((p) => p.branchStockId || `${p.productId}_${p.batchCode || ''}`)
+      );
+      const added = mapped.filter(
+        (m) => !existingKeys.has(m.branchStockId || `${m.productId}_${m.batchCode || ''}`)
+      );
 
-        const mapped = filtered.map(mapBatchToLine);
-        if (appendOnly) {
-          setLines((prev) => {
-            const existingKeys = new Set(
-              prev.map((p) => p.branchStockId || `${p.productId}_${p.batchCode || ''}`)
-            );
-            const added = mapped.filter(
-              (m) =>
-                !existingKeys.has(m.branchStockId || `${m.productId}_${m.batchCode || ''}`)
-            );
-            return [...prev, ...added];
-          });
-        } else {
-          setLines(mapped);
-        }
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error ? err.message : 'Không thể tải danh sách lô hàng từ tồn kho.';
-        showToast(msg, 'error');
-      } finally {
-        setIsLoadingBatches(false);
+      if (added.length === 0) {
+        showToast('Sản phẩm / lô này đã có trên phiếu kiểm kê.', 'warning');
+      } else {
+        setLines((prev) => [...prev, ...added]);
+        showToast(
+          added.length === 1
+            ? `Đã thêm ${added[0].productName} vào phiếu.`
+            : `Đã thêm ${added.length} lô vào phiếu kiểm kê.`,
+          'success'
+        );
       }
-    },
-    [branchId, scopeType, scopeReference, searchKeyword, showToast]
-  );
 
-  // Auto-load batches if creating new without preselected batches once branchId is ready
-  useEffect(() => {
-    if (!isEditMode && !locState?.preselectedBatches?.length && branchId && lines.length === 0) {
-      void loadBatchesFromInventory(false);
+      setSearchKeyword('');
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Không thể tìm sản phẩm trong tồn kho.';
+      showToast(msg, 'error');
+    } finally {
+      setIsLoadingBatches(false);
     }
-  }, [isEditMode, locState, branchId, lines.length, loadBatchesFromInventory]);
+  }, [branchId, scopeType, scopeReference, searchKeyword, lines, showToast]);
 
-  const handleQtyChange = (
+  const handleCountChange = (
     idx: number,
-    field: 'goodQty' | 'defectiveQty' | 'damagedQty' | 'nearExpiryQty' | 'expiredQty',
-    rawVal: string
+    patch: {
+      actualQty?: number;
+      expiredQty?: number;
+      issueQty?: number;
+      issueKind?: 'defective' | 'damaged';
+    }
   ) => {
-    const val = Math.max(0, Number(rawVal) || 0);
-    setLines((prev) =>
-      prev.map((line, i) => {
-        if (i !== idx) return line;
-        const updated = { ...line, [field]: val };
-
-        if (field !== 'goodQty' && autoBalanceGoodQty) {
-          const otherBuckets =
-            (field === 'defectiveQty' ? val : updated.defectiveQty) +
-            (field === 'damagedQty' ? val : updated.damagedQty) +
-            (field === 'nearExpiryQty' ? val : updated.nearExpiryQty) +
-            (field === 'expiredQty' ? val : updated.expiredQty);
-          updated.goodQty = Math.max(0, updated.systemQty - otherBuckets);
-        }
-
-        if (updated.defectiveQty > 0 && !updated.defectiveReasonCode) {
-          updated.defectiveReasonCode = 'MANUFACTURING_DEFECT';
-        }
-        if (updated.nearExpiryQty > 0 && !updated.nearExpiryAction) {
-          updated.nearExpiryAction = 'DISCOUNT_SALE';
-        }
-        return updated;
-      })
-    );
-  };
-
-  const handleFieldChange = <K extends keyof UpsertStocktakeLineInput>(
-    idx: number,
-    field: K,
-    value: UpsertStocktakeLineInput[K]
-  ) => {
-    setLines((prev) => prev.map((line, i) => (i === idx ? { ...line, [field]: value } : line)));
+    setLines((prev) => prev.map((line, i) => (i === idx ? applyCount(line, patch) : line)));
   };
 
   const handleRemoveLine = (idx: number) => {
@@ -304,27 +332,11 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     }
 
     for (const l of lines) {
-      if (l.defectiveQty > 0 && !l.defectiveReasonCode) {
+      const actual = lineActualQty(l);
+      const issue = lineIssueQty(l);
+      if (l.expiredQty + issue > actual) {
         showToast(
-          `Dòng SP "${l.productName}" có SL lỗi NCC > 0 nhưng chưa chọn mã lý do lỗi.`,
-          'error'
-        );
-        return;
-      }
-      if (
-        l.defectiveQty > 0 &&
-        l.defectiveReasonCode === 'OTHER' &&
-        !l.defectiveReasonDetail?.trim()
-      ) {
-        showToast(
-          `Dòng SP "${l.productName}" chọn lý do lỗi KHÁC (OTHER) phải nhập mô tả chi tiết.`,
-          'error'
-        );
-        return;
-      }
-      if (l.nearExpiryQty > 0 && !l.nearExpiryAction) {
-        showToast(
-          `Dòng SP "${l.productName}" có SL cận hạn > 0 nhưng chưa chọn hướng xử lý cận hạn.`,
+          `Dòng "${l.productName}": hết hạn + lỗi/hỏng không được lớn hơn số lượng thực tế.`,
           'error'
         );
         return;
@@ -339,7 +351,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         scopeReference: scopeReference.trim() || null,
         note: note.trim() || null,
         submitImmediately,
-        lines,
+        lines: lines.map((l) => applyCount(l, {})),
       };
 
       const saved =
@@ -378,12 +390,75 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     }
   };
 
-  const totalSystem = lines.reduce((s, l) => s + l.systemQty, 0);
-  const totalGood = lines.reduce((s, l) => s + l.goodQty, 0);
-  const totalDefective = lines.reduce((s, l) => s + l.defectiveQty, 0);
-  const totalDamaged = lines.reduce((s, l) => s + l.damagedQty, 0);
-  const totalNearExpiry = lines.reduce((s, l) => s + l.nearExpiryQty, 0);
-  const totalExpired = lines.reduce((s, l) => s + l.expiredQty, 0);
+  const handleResetFilters = () => {
+    setSearchKeyword('');
+    setScopeType('SELECTED_ITEMS');
+    setScopeReference('');
+    searchInputRef.current?.focus();
+  };
+
+  const tableMinWidth = 1180;
+  const tableFitStyle: CSSProperties = {
+    width: '100%',
+    minWidth: tableMinWidth,
+    tableLayout: 'fixed',
+  };
+  const filterFieldStyle: CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+  };
+  const filterLabelStyle: CSSProperties = {
+    width: 84,
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#475569',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  };
+  const filterControlStyle: CSSProperties = {
+    height: 32,
+    flex: 1,
+    minWidth: 0,
+    width: '100%',
+    padding: '0 8px',
+    borderRadius: 6,
+    border: '1px solid #cbd5e1',
+    fontSize: 12.5,
+    fontWeight: 600,
+    color: '#1e293b',
+    backgroundColor: '#ffffff',
+    boxSizing: 'border-box',
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: 44 }} />
+      <col style={{ width: 210 }} />
+      <col style={{ width: 160 }} />
+      <col style={{ width: 140 }} />
+      <col style={{ width: 80 }} />
+      <col style={{ width: 96 }} />
+      <col style={{ width: 88 }} />
+      <col style={{ width: 150 }} />
+      <col style={{ width: 88 }} />
+      <col style={{ width: 48 }} />
+    </colgroup>
+  );
+
+  const qtyInputStyle = (active?: boolean, color?: string): CSSProperties => ({
+    width: '100%',
+    maxWidth: 88,
+    height: 30,
+    textAlign: 'right',
+    padding: '0 6px',
+    borderRadius: 5,
+    border: active && color ? `1.5px solid ${color}` : '1px solid #cbd5e1',
+    backgroundColor: '#ffffff',
+    fontWeight: 700,
+    color: active && color ? color : '#0f172a',
+  });
 
   return (
     <div
@@ -391,40 +466,31 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       style={{
         width: '100%',
         height: '100%',
+        maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
         flex: 1,
-        overflow: 'auto',
-        padding: '0 4px 24px',
+        overflow: 'hidden',
       }}
     >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Header */}
-      <div className="so-list-header" style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            onClick={() => navigate(basePath)}
-            style={{ width: 34, height: 34, padding: 0, justifyContent: 'center' }}
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <div>
-            <h1 className="so-list-title" style={{ margin: 0 }}>
-              <ClipboardCheck size={22} color="#0f766e" />
-              <span>
-                {isEditMode
-                  ? 'Cập nhật Phiếu Kiểm Kê Hàng Hóa'
-                  : 'Lập Phiếu Kiểm Kê Hàng Hóa Tại Chi Nhánh'}
-              </span>
-            </h1>
-            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-              Ghi nhận số lượng kiểm đếm thực tế và phân loại tình trạng hàng hóa (Tốt / Lỗi NCC / Hỏng / Cận hạn / Hết hạn)
-            </div>
-          </div>
+      <div className="so-list-header">
+        <div>
+          <h1 className="so-list-title">
+            <ClipboardCheck size={22} color="var(--blue-primary, #0f766e)" />
+            <span>
+              {isEditMode ? 'Cập nhật phiếu kiểm kê' : 'Lập phiếu kiểm kê'}
+            </span>
+            {(isLoadingBatches || isSaving) && (
+              <Loader2
+                size={16}
+                className="animate-spin"
+                style={{ color: 'var(--blue-primary, #0f766e)' }}
+              />
+            )}
+          </h1>
         </div>
 
         <div className="so-list-header-actions">
@@ -434,7 +500,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
             onClick={() => navigate(basePath)}
           >
             <ClipboardList size={14} />
-            <span>Danh sách phiếu kiểm kê</span>
+            <span>Danh sách phiếu</span>
           </button>
           <button
             type="button"
@@ -443,17 +509,16 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
             onClick={() => void handleSave(false)}
           >
             <Save size={14} />
-            <span>Lưu nháp (DRAFT)</span>
+            <span>Lưu nháp</span>
           </button>
           <button
             type="button"
             className="po-btn po-btn-primary"
-            style={{ backgroundColor: '#0f766e' }}
             disabled={isSaving}
             onClick={() => void handleSave(true)}
           >
             <Send size={14} />
-            <span>Gửi Store Owner duyệt (Cách ly hàng lỗi/hỏng)</span>
+            <span>Gửi duyệt</span>
           </button>
         </div>
       </div>
@@ -461,8 +526,9 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       {errorMsg && (
         <div
           style={{
-            marginBottom: 12,
-            padding: '10px 14px',
+            flexShrink: 0,
+            marginBottom: 8,
+            padding: '8px 12px',
             borderRadius: 8,
             backgroundColor: '#fef2f2',
             border: '1px solid #fecaca',
@@ -478,313 +544,178 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         </div>
       )}
 
-      {/* Khu vực 1: Thông tin chung của phiếu kiểm kê */}
-      <div
-        style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: 8,
-          padding: '14px 16px',
-          marginBottom: 12,
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 12,
-          alignItems: 'end',
-        }}
-      >
-        <div>
-          <label
-            style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}
-          >
-            Chi nhánh kiểm kê <span style={{ color: '#dc2626' }}>*</span>
-          </label>
-          <select
-            value={branchId}
-            disabled={!isStoreOwner && Boolean(userBranchId)}
-            onChange={(e) => setBranchId(e.target.value)}
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <div className="so-list-filter">
+          <div
             style={{
-              width: '100%',
-              height: 36,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 13,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+              gap: '10px 14px',
             }}
           >
-            <option value="">-- Chọn chi nhánh --</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
+            <div style={filterFieldStyle}>
+              <label style={filterLabelStyle} htmlFor="stocktake-branch">
+                Chi nhánh:
+              </label>
+              <select
+                id="stocktake-branch"
+                value={branchId}
+                disabled={!isStoreOwner && Boolean(userBranchId)}
+                onChange={(e) => setBranchId(e.target.value)}
+                style={{
+                  ...filterControlStyle,
+                  border: branchId ? '1px solid #0d9488' : '1px solid #cbd5e1',
+                  color: branchId ? '#0f766e' : '#1e293b',
+                  backgroundColor: branchId ? '#f0fdfa' : '#ffffff',
+                }}
+              >
+                <option value="">-- Chọn chi nhánh --</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <div>
-          <label
-            style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}
-          >
-            Phạm vi kiểm kê
-          </label>
-          <select
-            value={scopeType}
-            onChange={(e) => setScopeType(e.target.value)}
-            style={{
-              width: '100%',
-              height: 36,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 13,
-            }}
-          >
-            <option value="FULL_BRANCH">Toàn bộ chi nhánh</option>
-            <option value="BY_CATEGORY">Theo ngành hàng</option>
-            <option value="BY_SHELF">Theo khu vực / vị trí kệ</option>
-            <option value="SELECTED_ITEMS">Theo lô / sản phẩm được chọn</option>
-          </select>
-        </div>
+            <div style={filterFieldStyle}>
+              <label style={filterLabelStyle} htmlFor="stocktake-scope">
+                Phạm vi:
+              </label>
+              <select
+                id="stocktake-scope"
+                value={scopeType}
+                onChange={(e) => setScopeType(e.target.value)}
+                style={{
+                  ...filterControlStyle,
+                  border: '1px solid #0d9488',
+                  color: '#0f766e',
+                  backgroundColor: '#f0fdfa',
+                }}
+              >
+                <option value="FULL_BRANCH">Toàn bộ chi nhánh</option>
+                <option value="BY_CATEGORY">Theo ngành hàng</option>
+                <option value="SELECTED_ITEMS">Theo lô / sản phẩm chọn</option>
+              </select>
+            </div>
 
-        {(scopeType === 'BY_CATEGORY' || scopeType === 'BY_SHELF') && (
-          <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 12,
-                fontWeight: 700,
-                color: '#334155',
-                marginBottom: 4,
-              }}
-            >
-              {scopeType === 'BY_CATEGORY' ? 'Tên ngành hàng' : 'Mã kệ / Khu vực'}
-            </label>
-            <input
-              type="text"
-              value={scopeReference}
-              onChange={(e) => setScopeReference(e.target.value)}
-              placeholder={
-                scopeType === 'BY_CATEGORY' ? 'VD: Sữa, Đồ uống...' : 'VD: C-B-01, Kho mát...'
-              }
-              style={{
-                width: '100%',
-                height: 36,
-                padding: '0 10px',
-                borderRadius: 6,
-                border: '1px solid #cbd5e1',
-                fontSize: 13,
-                boxSizing: 'border-box',
-              }}
-            />
+            <div style={filterFieldStyle}>
+              <label style={filterLabelStyle} htmlFor="stocktake-category">
+                Ngành hàng:
+              </label>
+              <input
+                id="stocktake-category"
+                type="text"
+                value={scopeReference}
+                disabled={scopeType !== 'BY_CATEGORY'}
+                onChange={(e) => setScopeReference(e.target.value)}
+                placeholder={scopeType === 'BY_CATEGORY' ? 'VD: Sữa, Đồ uống...' : 'Chỉ dùng khi lọc ngành hàng'}
+                style={{
+                  ...filterControlStyle,
+                  backgroundColor: scopeType === 'BY_CATEGORY' ? '#ffffff' : '#f8fafc',
+                }}
+              />
+            </div>
+
+            <div style={filterFieldStyle}>
+              <label style={filterLabelStyle} htmlFor="stocktake-keyword">
+                Tìm / quét:
+              </label>
+              <input
+                id="stocktake-keyword"
+                ref={searchInputRef}
+                type="text"
+                autoComplete="off"
+                autoFocus
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void addProductsFromSearch();
+                  }
+                }}
+                placeholder="Quét mã vạch hoặc nhập SKU, tên SP, mã lô..."
+                style={filterControlStyle}
+              />
+            </div>
           </div>
-        )}
 
-        <div>
-          <label
-            style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}
-          >
-            Thêm / Lọc nhanh sản phẩm, mã lô
-          </label>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <input
-              type="text"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="Nhập SKU, tên SP hoặc mã lô..."
-              style={{
-                flex: 1,
-                height: 36,
-                padding: '0 10px',
-                borderRadius: 6,
-                border: '1px solid #cbd5e1',
-                fontSize: 13,
-                boxSizing: 'border-box',
-              }}
-            />
-            <button
-              type="button"
-              className="po-btn po-btn-secondary"
-              style={{ height: 36 }}
-              disabled={isLoadingBatches}
-              onClick={() => void loadBatchesFromInventory(true)}
-              title="Thêm các lô khớp bộ lọc vào bảng kiểm kê"
-            >
-              <Plus size={14} />
-              <span>Thêm lô</span>
-            </button>
-            <button
-              type="button"
-              className="po-btn po-btn-secondary"
-              style={{ height: 36 }}
-              disabled={isLoadingBatches}
-              onClick={() => void loadBatchesFromInventory(false)}
-              title="Tải lại toàn bộ danh sách lô theo phạm vi"
-            >
-              <RefreshCw size={14} />
-              <span>Tải lại</span>
-            </button>
-          </div>
-        </div>
-
-        <div style={{ gridColumn: '1 / -1' }}>
-          <label
-            style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}
-          >
-            Ghi chú đợt kiểm kê
-          </label>
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Ví dụ: Kiểm kê định kỳ cuối ca / Phát hiện thùng sữa bị móp, rỉ nắp từ lô nhập..."
+          <div
             style={{
-              width: '100%',
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 13,
-              boxSizing: 'border-box',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              paddingTop: 8,
+              borderTop: '1px dashed #f1f5f9',
+              flexWrap: 'wrap',
             }}
-          />
+          >
+            <div className="so-list-filter-actions" style={{ marginLeft: 'auto', flexWrap: 'nowrap' }}>
+              <button
+                type="button"
+                className="so-list-filter-search"
+                disabled={isLoadingBatches}
+                onClick={() => void addProductsFromSearch()}
+                title="Quét mã hoặc tìm SKU/tên rồi thêm vào phiếu kiểm kê"
+              >
+                {isLoadingBatches ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                <span>Thêm sản phẩm</span>
+              </button>
+              <button
+                type="button"
+                className="so-list-filter-reset"
+                onClick={handleResetFilters}
+              >
+                <RotateCcw size={13} />
+                <span>Đặt lại</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Khu vực 2: Bảng kiểm kê hàng hóa */}
-      <div
-        style={{
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: 8,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          flex: 1,
-        }}
-      >
-        {/* Summary & Helper Bar */}
-        <div
-          style={{
-            padding: '10px 16px',
-            backgroundColor: '#f8fafc',
-            borderBottom: '1px solid #e2e8f0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 12,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12.5 }}>
-            <span>
-              Tổng dòng kiểm kê: <b>{lines.length}</b>
-            </span>
-            <span>
-              Tồn hệ thống: <b>{totalSystem}</b>
-            </span>
-            <span style={{ color: '#15803d' }}>
-              Hàng tốt: <b>{totalGood}</b>
-            </span>
-            <span style={{ color: '#dc2626' }}>
-              Lỗi do NCC: <b>{totalDefective}</b>
-            </span>
-            <span style={{ color: '#b45309' }}>
-              Hỏng tại CH: <b>{totalDamaged}</b>
-            </span>
-            <span style={{ color: '#2563eb' }}>
-              Cận hạn: <b>{totalNearExpiry}</b>
-            </span>
-            <span style={{ color: '#be123c' }}>
-              Hết hạn: <b>{totalExpired}</b>
-            </span>
-          </div>
-
-          <label
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: '#0f766e',
-              cursor: 'pointer',
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={autoBalanceGoodQty}
-              onChange={(e) => setAutoBalanceGoodQty(e.target.checked)}
-              style={{ accentColor: '#0f766e' }}
-            />
-            <span>Tự động trừ vào SL Hàng tốt khi nhập SL lỗi/hỏng/cận hạn</span>
-          </label>
-        </div>
-
-        {/* Table */}
-        <div style={{ overflowX: 'auto', flex: 1 }}>
-          <table style={{ width: '100%', minWidth: 1320, borderCollapse: 'collapse', fontSize: 12.5 }}>
+      <div className="so-list-table-card so-list-table-card--wrap">
+        <div className="so-list-table-head">
+          <table className="so-list-table" style={tableFitStyle}>
+            {tableColGroup}
             <thead>
-              <tr
-                style={{
-                  backgroundColor: '#f1f5f9',
-                  borderBottom: '1px solid #cbd5e1',
-                  color: '#334155',
-                  fontWeight: 700,
-                  textAlign: 'left',
-                }}
-              >
-                <th style={{ padding: '9px 10px', width: 36, textAlign: 'center' }}>#</th>
-                <th style={{ padding: '9px 10px', width: 210 }}>Sản phẩm / SKU</th>
-                <th style={{ padding: '9px 10px', width: 150 }}>Mã lô / HSD / Kệ</th>
-                <th style={{ padding: '9px 10px', width: 150 }}>Nguồn nhập (GRN / NCC)</th>
-                <th style={{ padding: '9px 10px', width: 80, textAlign: 'right' }}>Tồn HT</th>
-                <th style={{ padding: '9px 10px', width: 95, textAlign: 'right', color: '#15803d' }}>
-                  SL Tốt
-                </th>
-                <th style={{ padding: '9px 10px', width: 95, textAlign: 'right', color: '#dc2626' }}>
-                  Lỗi NCC
-                </th>
-                <th style={{ padding: '9px 10px', width: 95, textAlign: 'right', color: '#b45309' }}>
-                  Hỏng CH
-                </th>
-                <th style={{ padding: '9px 10px', width: 95, textAlign: 'right', color: '#2563eb' }}>
-                  Cận hạn
-                </th>
-                <th style={{ padding: '9px 10px', width: 95, textAlign: 'right', color: '#be123c' }}>
-                  Hết hạn
-                </th>
-                <th style={{ padding: '9px 10px', width: 85, textAlign: 'right' }}>Thực đếm</th>
-                <th style={{ padding: '9px 10px', width: 85, textAlign: 'right' }}>Chênh lệch</th>
-                <th style={{ padding: '9px 10px', minWidth: 220 }}>
-                  Phân loại lý do / Hướng xử lý / Ghi chú
-                </th>
-                <th style={{ padding: '9px 10px', width: 42, textAlign: 'center' }} />
+              <tr>
+                <th className="so-list-th" style={{ textAlign: 'center' }}>#</th>
+                <th className="so-list-th">Sản phẩm / SKU</th>
+                <th className="so-list-th">Mã lô / HSD / Kệ</th>
+                <th className="so-list-th">Nguồn nhập</th>
+                <th className="so-list-th" style={{ textAlign: 'right' }}>Tồn HT</th>
+                <th className="so-list-th" style={{ textAlign: 'right' }}>Thực tế</th>
+                <th className="so-list-th" style={{ textAlign: 'right', color: '#be123c' }}>Hết hạn</th>
+                <th className="so-list-th" style={{ textAlign: 'right', color: '#b45309' }}>Lỗi / hư hỏng</th>
+                <th className="so-list-th" style={{ textAlign: 'right' }}>Chênh lệch</th>
+                <th className="so-list-th" />
               </tr>
             </thead>
+          </table>
+        </div>
+
+        <div className="so-list-table-body">
+          <table className="so-list-table" style={tableFitStyle}>
+            {tableColGroup}
             <tbody>
               {lines.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={14}
+                    colSpan={10}
                     style={{ padding: '40px 16px', textAlign: 'center', color: '#64748b' }}
                   >
-                    Chưa có dòng sản phẩm nào trong bảng kiểm kê. Chọn chi nhánh và bấm &quot;Tải lại&quot; hoặc chọn lô từ màn hình FEFO.
+                    Phiếu đang trống. Quét mã vạch hoặc nhập SKU / tên sản phẩm rồi bấm Thêm sản phẩm.
                   </td>
                 </tr>
               ) : (
                 lines.map((line, idx) => {
-                  const actualQty =
-                    line.goodQty +
-                    line.defectiveQty +
-                    line.damagedQty +
-                    line.nearExpiryQty +
-                    line.expiredQty;
+                  const actualQty = lineActualQty(line);
+                  const issueQty = lineIssueQty(line);
+                  const issueKind = lineIssueKind(line);
                   const varianceQty = actualQty - line.systemQty;
-                  const hasIssue =
-                    line.defectiveQty > 0 ||
-                    line.damagedQty > 0 ||
-                    line.nearExpiryQty > 0 ||
-                    line.expiredQty > 0 ||
-                    varianceQty !== 0;
+                  const hasIssue = issueQty > 0 || line.expiredQty > 0 || varianceQty !== 0;
 
                   return (
                     <tr
@@ -797,13 +728,13 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                       <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>
                         {idx + 1}
                       </td>
-                      <td style={{ padding: '8px 10px' }}>
-                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{line.productName}</div>
+                      <td>
+                        <div className="so-list-name">{line.productName}</div>
                         <div style={{ fontSize: 11.5, color: '#64748b', fontFamily: 'monospace' }}>
                           {line.sku} · ĐVT: {line.unit}
                         </div>
                       </td>
-                      <td style={{ padding: '8px 10px' }}>
+                      <td>
                         <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f766e' }}>
                           {line.batchCode || '—'}
                         </div>
@@ -815,21 +746,11 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                           · Kệ: {line.shelfLocation || '—'}
                         </div>
                       </td>
-                      <td style={{ padding: '8px 10px' }}>
+                      <td>
                         <div style={{ fontSize: 12, fontWeight: 600, color: '#2563eb', fontFamily: 'monospace' }}>
                           {line.goodsReceiptNo || '—'}
                         </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: '#64748b',
-                            maxWidth: 145,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                          title={line.supplierName || ''}
-                        >
+                        <div style={{ fontSize: 11, color: '#64748b' }}>
                           {line.supplierName || '—'}
                         </div>
                       </td>
@@ -845,129 +766,68 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                         {line.systemQty}
                       </td>
 
-                      {/* GoodQty */}
                       <td style={{ padding: '8px 6px', textAlign: 'right' }}>
                         <input
                           type="number"
                           min={0}
-                          value={line.goodQty}
-                          onChange={(e) => handleQtyChange(idx, 'goodQty', e.target.value)}
-                          style={{
-                            width: 72,
-                            height: 30,
-                            textAlign: 'right',
-                            padding: '0 6px',
-                            borderRadius: 5,
-                            border: '1px solid #86efac',
-                            backgroundColor: '#f0fdf4',
-                            fontWeight: 700,
-                            color: '#15803d',
-                          }}
+                          value={actualQty}
+                          onChange={(e) =>
+                            handleCountChange(idx, { actualQty: Math.max(0, Number(e.target.value) || 0) })
+                          }
+                          style={qtyInputStyle()}
                         />
                       </td>
-
-                      {/* DefectiveQty */}
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          value={line.defectiveQty}
-                          onChange={(e) => handleQtyChange(idx, 'defectiveQty', e.target.value)}
-                          style={{
-                            width: 72,
-                            height: 30,
-                            textAlign: 'right',
-                            padding: '0 6px',
-                            borderRadius: 5,
-                            border:
-                              line.defectiveQty > 0 ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                            backgroundColor: line.defectiveQty > 0 ? '#fef2f2' : '#ffffff',
-                            fontWeight: 700,
-                            color: line.defectiveQty > 0 ? '#dc2626' : '#475569',
-                          }}
-                        />
-                      </td>
-
-                      {/* DamagedQty */}
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          value={line.damagedQty}
-                          onChange={(e) => handleQtyChange(idx, 'damagedQty', e.target.value)}
-                          style={{
-                            width: 72,
-                            height: 30,
-                            textAlign: 'right',
-                            padding: '0 6px',
-                            borderRadius: 5,
-                            border:
-                              line.damagedQty > 0 ? '1.5px solid #f59e0b' : '1px solid #cbd5e1',
-                            backgroundColor: line.damagedQty > 0 ? '#fffbeb' : '#ffffff',
-                            fontWeight: 700,
-                            color: line.damagedQty > 0 ? '#b45309' : '#475569',
-                          }}
-                        />
-                      </td>
-
-                      {/* NearExpiryQty */}
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          value={line.nearExpiryQty}
-                          onChange={(e) => handleQtyChange(idx, 'nearExpiryQty', e.target.value)}
-                          style={{
-                            width: 72,
-                            height: 30,
-                            textAlign: 'right',
-                            padding: '0 6px',
-                            borderRadius: 5,
-                            border:
-                              line.nearExpiryQty > 0 ? '1.5px solid #3b82f6' : '1px solid #cbd5e1',
-                            backgroundColor: line.nearExpiryQty > 0 ? '#eff6ff' : '#ffffff',
-                            fontWeight: 700,
-                            color: line.nearExpiryQty > 0 ? '#1d4ed8' : '#475569',
-                          }}
-                        />
-                      </td>
-
-                      {/* ExpiredQty */}
                       <td style={{ padding: '8px 6px', textAlign: 'right' }}>
                         <input
                           type="number"
                           min={0}
                           value={line.expiredQty}
-                          onChange={(e) => handleQtyChange(idx, 'expiredQty', e.target.value)}
-                          style={{
-                            width: 72,
-                            height: 30,
-                            textAlign: 'right',
-                            padding: '0 6px',
-                            borderRadius: 5,
-                            border:
-                              line.expiredQty > 0 ? '1.5px solid #e11d48' : '1px solid #cbd5e1',
-                            backgroundColor: line.expiredQty > 0 ? '#ffe4e6' : '#ffffff',
-                            fontWeight: 700,
-                            color: line.expiredQty > 0 ? '#be123c' : '#475569',
-                          }}
+                          onChange={(e) =>
+                            handleCountChange(idx, {
+                              expiredQty: Math.max(0, Number(e.target.value) || 0),
+                            })
+                          }
+                          style={qtyInputStyle(line.expiredQty > 0, '#be123c')}
                         />
                       </td>
-
-                      {/* ActualQty */}
-                      <td
-                        style={{
-                          padding: '8px 10px',
-                          textAlign: 'right',
-                          fontFamily: 'monospace',
-                          fontWeight: 800,
-                          color: '#0f172a',
-                        }}
-                      >
-                        {actualQty}
+                      <td style={{ padding: '8px 6px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                          <input
+                            type="number"
+                            min={0}
+                            value={issueQty}
+                            onChange={(e) =>
+                              handleCountChange(idx, {
+                                issueQty: Math.max(0, Number(e.target.value) || 0),
+                              })
+                            }
+                            style={qtyInputStyle(issueQty > 0, '#b45309')}
+                          />
+                          {issueQty > 0 && (
+                            <select
+                              value={issueKind}
+                              onChange={(e) =>
+                                handleCountChange(idx, {
+                                  issueKind: e.target.value as 'defective' | 'damaged',
+                                })
+                              }
+                              style={{
+                                width: '100%',
+                                height: 26,
+                                fontSize: 11,
+                                fontWeight: 700,
+                                borderRadius: 4,
+                                border: '1px solid #fcd34d',
+                                backgroundColor: '#fffbeb',
+                                color: '#92400e',
+                              }}
+                            >
+                              <option value="damaged">Hỏng tại CH</option>
+                              <option value="defective">Lỗi NCC</option>
+                            </select>
+                          )}
+                        </div>
                       </td>
-
-                      {/* VarianceQty */}
                       <td
                         style={{
                           padding: '8px 10px',
@@ -975,120 +835,19 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                           fontFamily: 'monospace',
                           fontWeight: 800,
                           color:
-                            varianceQty < 0
-                              ? '#dc2626'
-                              : varianceQty > 0
-                              ? '#2563eb'
-                              : '#15803d',
+                            varianceQty < 0 ? '#dc2626' : varianceQty > 0 ? '#2563eb' : '#15803d',
                         }}
                       >
                         {varianceQty > 0 ? `+${varianceQty}` : varianceQty}
                       </td>
 
-                      {/* Reason & Action */}
-                      <td style={{ padding: '8px 10px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {line.defectiveQty > 0 && (
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                              <select
-                                value={line.defectiveReasonCode || ''}
-                                onChange={(e) =>
-                                  handleFieldChange(idx, 'defectiveReasonCode', e.target.value)
-                                }
-                                style={{
-                                  height: 28,
-                                  fontSize: 11.5,
-                                  padding: '0 6px',
-                                  borderRadius: 4,
-                                  border: '1px solid #fca5a5',
-                                  backgroundColor: '#fef2f2',
-                                  color: '#991b1b',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                <option value="">-- Chọn lý do lỗi NCC --</option>
-                                {DEFECTIVE_REASON_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                              {line.defectiveReasonCode === 'OTHER' && (
-                                <input
-                                  type="text"
-                                  placeholder="Mô tả chi tiết lỗi (bắt buộc)..."
-                                  value={line.defectiveReasonDetail || ''}
-                                  onChange={(e) =>
-                                    handleFieldChange(idx, 'defectiveReasonDetail', e.target.value)
-                                  }
-                                  style={{
-                                    height: 28,
-                                    fontSize: 11.5,
-                                    padding: '0 8px',
-                                    borderRadius: 4,
-                                    border: '1px solid #ef4444',
-                                    flex: 1,
-                                    minWidth: 140,
-                                  }}
-                                />
-                              )}
-                            </div>
-                          )}
-
-                          {line.nearExpiryQty > 0 && (
-                            <select
-                              value={line.nearExpiryAction || ''}
-                              onChange={(e) =>
-                                handleFieldChange(idx, 'nearExpiryAction', e.target.value)
-                              }
-                              style={{
-                                height: 28,
-                                fontSize: 11.5,
-                                padding: '0 6px',
-                                borderRadius: 4,
-                                border: '1px solid #93c5fd',
-                                backgroundColor: '#eff6ff',
-                                color: '#1e40af',
-                                fontWeight: 600,
-                              }}
-                            >
-                              <option value="">-- Hướng xử lý cận hạn --</option>
-                              {NEAR_EXPIRY_ACTION_OPTIONS.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-
-                          <input
-                            type="text"
-                            placeholder="Ghi chú / Link ảnh minh chứng..."
-                            value={line.note || ''}
-                            onChange={(e) => handleFieldChange(idx, 'note', e.target.value)}
-                            style={{
-                              height: 26,
-                              fontSize: 11.5,
-                              padding: '0 8px',
-                              borderRadius: 4,
-                              border: '1px solid #e2e8f0',
-                            }}
-                          />
-                        </div>
-                      </td>
-
-                      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                      <td className="so-list-td--actions" style={{ textAlign: 'center' }}>
                         <button
                           type="button"
+                          className="so-list-action-btn"
                           onClick={() => handleRemoveLine(idx)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: '#94a3b8',
-                            padding: 4,
-                          }}
                           title="Xóa dòng này khỏi phiếu kiểm kê"
+                          style={{ width: 28, padding: 0 }}
                         >
                           <Trash2 size={14} />
                         </button>

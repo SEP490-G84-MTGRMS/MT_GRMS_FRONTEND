@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
-import type { FC, FormEvent } from 'react';
+import type { FC, FormEvent, CSSProperties } from 'react';
 import type { SupplierSummary, SupplierDeliveryConfig, HolidayDateRange } from '../../types/supplier.types';
-import { Calendar, Plus, Pencil, Trash2, X, CheckCircle2 } from 'lucide-react';
+import { Calendar, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { AdminToast, type ToastState } from '../../../admin/components';
 
 interface Props {
   supplier: SupplierSummary;
   initialConfig?: SupplierDeliveryConfig;
-  onSaveConfig?: (cfg: SupplierDeliveryConfig) => void | Promise<void>;
+  onSaveConfig?: (
+    cfg: SupplierDeliveryConfig,
+    options?: { silentToast?: boolean; toastMessage?: string },
+  ) => void | Promise<void>;
 }
 
 function formatDate(value: string) {
@@ -16,6 +20,29 @@ function formatDate(value: string) {
   return `${day}/${month}/${year}`;
 }
 
+const fieldRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  width: '100%',
+};
+
+const labelStyle: CSSProperties = {
+  flex: '0 0 210px',
+  fontSize: 13,
+  fontWeight: 600,
+  color: 'var(--text-main, #1e293b)',
+  lineHeight: 1.3,
+  whiteSpace: 'nowrap',
+};
+
+const inputStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  height: 38,
+  width: '100%',
+};
+
 export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSaveConfig }) => {
   const [holidays, setHolidays] = useState<HolidayDateRange[]>(initialConfig?.holidays ?? []);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,20 +50,24 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [reason, setReason] = useState('');
-  const [formError, setFormError] = useState('');
-  const [saveMsg, setSaveMsg] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     setHolidays(initialConfig?.holidays ?? []);
   }, [initialConfig]);
+
+  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    setToast({ id: Date.now().toString(), message, type });
+    setTimeout(() => setToast(null), 3200);
+  };
 
   const persist = async (next: HolidayDateRange[]) => {
     if (!initialConfig || !onSaveConfig) {
       setHolidays(next);
       return;
     }
-    await onSaveConfig({ ...initialConfig, holidays: next });
+    // silentToast: page cha không toast — tab tự báo 1 msg duy nhất
+    await onSaveConfig({ ...initialConfig, holidays: next }, { silentToast: true });
     setHolidays(next);
   };
 
@@ -45,7 +76,6 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
     setFromDate('');
     setToDate('');
     setReason('');
-    setFormError('');
     setIsModalOpen(true);
   };
 
@@ -54,24 +84,22 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
     setFromDate(item.fromDate);
     setToDate(item.toDate);
     setReason(item.reason);
-    setFormError('');
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditing(null);
-    setFormError('');
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!fromDate || !toDate || !reason.trim()) {
-      setFormError('Vui lòng nhập đủ: Từ ngày, Đến ngày và Lý do nghỉ.');
+      showToast('Vui lòng nhập đủ: Từ ngày, Đến ngày và Lý do nghỉ.', 'error');
       return;
     }
     if (toDate < fromDate) {
-      setFormError('Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.');
+      showToast('Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu.', 'error');
       return;
     }
 
@@ -86,64 +114,31 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
       : [...holidays, nextItem];
 
     try {
-      setSaveError(null);
       await persist(next);
       closeModal();
-      setSaveMsg(true);
-      setTimeout(() => setSaveMsg(false), 3000);
+      showToast(
+        editing
+          ? `Đã cập nhật kỳ nghỉ cho ${supplier.name}.`
+          : `Đã thêm kỳ nghỉ lễ thành công cho ${supplier.name}.`
+      );
     } catch (err: unknown) {
-      setFormError(err instanceof Error ? err.message : 'Không thể lưu kỳ nghỉ.');
+      showToast(err instanceof Error ? err.message : 'Không thể lưu kỳ nghỉ.', 'error');
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Xóa kỳ nghỉ này?')) return;
     try {
-      setSaveError(null);
       await persist(holidays.filter((item) => item.id !== id));
-      setSaveMsg(true);
-      setTimeout(() => setSaveMsg(false), 3000);
+      showToast(`Đã xóa kỳ nghỉ khỏi ${supplier.name}.`);
     } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : 'Không thể xóa kỳ nghỉ.');
+      showToast(err instanceof Error ? err.message : 'Không thể xóa kỳ nghỉ.', 'error');
     }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {saveMsg && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            background: '#e8f9ee',
-            border: '1px solid #bbf7d0',
-            padding: '12px 18px',
-            borderRadius: 'var(--radius-pill)',
-            color: '#065f46',
-            fontWeight: 600,
-            fontSize: '0.88rem',
-          }}
-        >
-          <CheckCircle2 size={18} color="#00c853" />
-          <span>Đã lưu danh sách ngày nghỉ lễ thành công cho {supplier.name}!</span>
-        </div>
-      )}
-      {saveError && (
-        <div
-          style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            padding: '12px 18px',
-            borderRadius: 'var(--radius-pill)',
-            color: '#991b1b',
-            fontWeight: 600,
-            fontSize: '0.88rem',
-          }}
-        >
-          {saveError}
-        </div>
-      )}
+      <AdminToast toast={toast} onClose={() => setToast(null)} />
 
       <div>
         <div
@@ -246,7 +241,7 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
 
       {isModalOpen && (
         <div className="modal-overlay" style={{ zIndex: 80 }} onClick={closeModal}>
-          <div className="modal-box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-box" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">
                 <Calendar size={18} />
@@ -257,52 +252,44 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
               </button>
             </div>
             <form onSubmit={handleSubmit} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {formError && (
-                <div
-                  style={{
-                    background: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    color: '#991b1b',
-                    borderRadius: 8,
-                    padding: '8px 12px',
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
-                  {formError}
-                </div>
-              )}
-              <label className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span className="form-label">Từ ngày (*)</span>
+              <div style={fieldRowStyle}>
+                <span style={labelStyle}>Từ ngày (*)</span>
                 <input
                   type="date"
                   value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
+                  onChange={(e) => {
+                    const nextFrom = e.target.value;
+                    setFromDate(nextFrom);
+                    if (toDate && nextFrom && toDate < nextFrom) {
+                      setToDate(nextFrom);
+                    }
+                  }}
                   className="admin-search-input"
-                  style={{ width: '100%', height: 38 }}
+                  style={inputStyle}
                 />
-              </label>
-              <label className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span className="form-label">Đến ngày (*)</span>
+              </div>
+              <div style={fieldRowStyle}>
+                <span style={labelStyle}>Đến ngày (*)</span>
                 <input
                   type="date"
                   value={toDate}
+                  min={fromDate || undefined}
                   onChange={(e) => setToDate(e.target.value)}
                   className="admin-search-input"
-                  style={{ width: '100%', height: 38 }}
+                  style={inputStyle}
                 />
-              </label>
-              <label className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span className="form-label">Lý do nghỉ / Tên ngày lễ (*)</span>
+              </div>
+              <div style={fieldRowStyle}>
+                <span style={labelStyle}>Lý do nghỉ / Tên ngày lễ (*)</span>
                 <input
                   type="text"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="VD: Nghỉ Tết Nguyên Đán, Bảo trì kho hàng..."
                   className="admin-search-input"
-                  style={{ width: '100%', height: 38 }}
+                  style={inputStyle}
                 />
-              </label>
+              </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
                 <button
                   type="button"

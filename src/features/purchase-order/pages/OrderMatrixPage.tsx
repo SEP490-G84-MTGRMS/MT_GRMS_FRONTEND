@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import type {
   DayColInfo,
@@ -23,14 +23,15 @@ import { OrderMatrixSplitModal } from '../components/matrix/OrderMatrixSplitModa
 import { OrderMatrixImportPreviewModal } from '../components/matrix/OrderMatrixImportPreviewModal';
 import {
   exportMatrixToExcel,
-  validateMatrixExcelFile,
-  applyMatrixExcelImport,
   type ExcelValidationResult,
+  type ExcelCellToApply,
+  type ExcelValidationErrorItem,
 } from '../lib/matrixExcelService';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import { storeProductApi } from '../../product/api/storeProductApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
+import { productRowKey } from '../lib/matrixRowKey';
 import '../purchase-order.css';
 
 const GUID_RE =
@@ -150,6 +151,17 @@ function mapServerStatus(status?: string): DayCutoffStatus {
     default:
       return 'OPEN';
   }
+}
+
+
+function tokenMatches(value: string | undefined, tokens: string[]): boolean {
+  if (!tokens.length) return true;
+  const hay = (value || '').toLowerCase();
+  return tokens.some((t) => {
+    const needle = t.trim().toLowerCase();
+    if (!needle) return true;
+    return hay === needle || hay.includes(needle);
+  });
 }
 
 // Compute dynamic day columns — ưu tiên DayStatuses từ BE (OpenSpec §4.4)
@@ -313,12 +325,11 @@ function buildEmptyCellMap(
   prodList: OrderMatrixProduct[],
   existing?: MatrixCellMap
 ): MatrixCellMap {
-  const map: MatrixCellMap = { ...(existing || {}) };
+  // Chỉ giữ ô thuộc SP×NCC đang có trên matrix — bỏ draft localStorage với SupplierId cũ (sau khi xóa/tạo lại NCC).
+  const map: MatrixCellMap = {};
   prodList.forEach((p) => {
     const key = `${p.id}__${p.supplierId || 'none'}`;
-    if (!map[key]) {
-      map[key] = {};
-    }
+    map[key] = existing?.[key] ? { ...existing[key] } : {};
   });
   return map;
 }
@@ -329,6 +340,7 @@ export interface OrderMatrixPageProps {
 
 export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   const initialSupplier = searchParams.get('supplier') || 'ALL';
@@ -357,7 +369,11 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     GUID_RE.test(branchParam) ? branchParam : ''
   );
 
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string>(initialSupplier);
+  const [supplierCodes, setSupplierCodes] = useState<string[]>([]);
+  const [supplierNames, setSupplierNames] = useState<string[]>([]);
+  const [productSkus, setProductSkus] = useState<string[]>([]);
+  const [productNames, setProductNames] = useState<string[]>([]);
+  const supplierFilterSeededRef = useRef(false);
   const [viewFrom, setViewFrom] = useState<Date>(initialViewFrom);
   const [dateFromInput, setDateFromInput] = useState<string>(initialToday);
   const [dateToInput, setDateToInput] = useState<string>(() =>
@@ -365,7 +381,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   );
 
   // State: Secondary Filters
-  const [keyword, setKeyword] = useState<string>('');
   const [moqOnly, setMoqOnly] = useState<boolean>(false);
   const [orderedOnly, setOrderedOnly] = useState<boolean>(false);
   const [ownerModifiedOnly, setOwnerModifiedOnly] = useState<boolean>(false);
@@ -375,6 +390,21 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const [matrixProducts, setMatrixProducts] = useState<OrderMatrixProduct[]>([]);
   const [supplierConfigs, setSupplierConfigs] = useState<OrderMatrixSupplierDeliveryConfig[]>([]);
   const [, setIsLoadingMatrix] = useState<boolean>(false);
+
+  /** NCC khớp filter mã/tên (AND giữa 2 field; empty = tất cả). */
+  const matchedSupplierIds = useMemo(() => {
+    if (!supplierCodes.length && !supplierNames.length) return null as string[] | null;
+    return suppliers
+      .filter((s) => tokenMatches(s.code, supplierCodes) && tokenMatches(s.name, supplierNames))
+      .map((s) => s.id);
+  }, [suppliers, supplierCodes, supplierNames]);
+
+  /** Key cho dayColumns / Excel: 1 NCC → id đó; 0 hoặc nhiều → ALL. */
+  const selectedSupplierId = useMemo(() => {
+    if (!matchedSupplierIds) return 'ALL';
+    if (matchedSupplierIds.length === 1) return matchedSupplierIds[0];
+    return 'ALL';
+  }, [matchedSupplierIds]);
 
   const isCellEditable = (d: DayColInfo, product?: OrderMatrixProduct) => {
     if (!branchIsActive) return false;
@@ -408,6 +438,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const [isSplitModalOpen, setIsSplitModalOpen] = useState<boolean>(false);
   const [importPreviewResult, setImportPreviewResult] = useState<ExcelValidationResult | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [pendingImportFileName, setPendingImportFileName] = useState<string>('');
 
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -432,6 +463,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   // Nạp danh sách chi nhánh thật (không dùng mock DC1 / BR-01)
   useEffect(() => {
     let isMounted = true;
+    const norm = (id: string) => id.trim().toLowerCase();
     const loadBranches = async () => {
       try {
         const summaries = await storeProductApi.getStoreSummaries();
@@ -444,23 +476,40 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         const authUser = useAuthStore.getState().user;
         const employeeBranchId = !isStoreOwner ? (authUser?.branchId || '') : '';
 
-        const urlBranch =
+        // Ưu tiên branch từ URL (màn /branches → Đặt hàng?branchId=...) — không ghi đè sang CN khác
+        const urlBranchRaw =
           employeeBranchId ||
           searchParams.get('branchId') ||
           searchParams.get('branch') ||
           searchParams.get('storeId') ||
           '';
-        if (urlBranch && realBranches.some((b) => b.id === urlBranch)) {
-          setSelectedBranchId(urlBranch);
-        } else {
+        const urlBranch = GUID_RE.test(urlBranchRaw) ? urlBranchRaw : '';
+
+        if (urlBranch) {
+          const matched = realBranches.find((b) => norm(b.id) === norm(urlBranch));
+          const resolvedId = matched?.id || urlBranch;
+          setSelectedBranchId(resolvedId);
+          // Nếu CN từ URL chưa có trong summaries (lệch API), vẫn giữ id để matrix load đúng branch
+          if (!matched) {
+            setBranches((prev) =>
+              prev.some((b) => norm(b.id) === norm(resolvedId))
+                ? prev
+                : [{ id: resolvedId, code: 'CN', name: 'Chi nhánh đã chọn' }, ...prev]
+            );
+          }
+          return;
+        }
+
+        // Không có branch trên URL → chọn mặc định 1 lần (không cướp selection đang chọn)
+        setSelectedBranchId((prev) => {
+          if (prev && realBranches.some((b) => norm(b.id) === norm(prev))) {
+            return prev;
+          }
           const withProducts = (summaries || []).find(
             (b) => GUID_RE.test(b.id) && (b.totalProducts || 0) > 0
           );
-          const nextId = withProducts?.id || realBranches[0]?.id || '';
-          if (nextId !== selectedBranchId) {
-            setSelectedBranchId(nextId);
-          }
-        }
+          return withProducts?.id || realBranches[0]?.id || prev || '';
+        });
       } catch {
         if (isMounted) {
           setBranches([]);
@@ -526,18 +575,37 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           }
         }
 
-        setCellMap(buildEmptyCellMap(res.products || [], targetCells));
+        const sanitizedCells = buildEmptyCellMap(res.products || [], targetCells);
+        setCellMap(sanitizedCells);
+        try {
+          localStorage.setItem(
+            `matrix_draft_${selectedBranchId}_ALL`,
+            JSON.stringify(sanitizedCells)
+          );
+        } catch {
+          // ignore quota
+        }
         const nextSuppliers = suppliersFromMatrix(res.products || [], res.supplierConfigs || []);
         setSuppliers(nextSuppliers);
+        // Seed filter từ ?supplier= đúng một lần (không ghi đè khi user đã xóa filter)
+        if (!supplierFilterSeededRef.current && initialSupplier && initialSupplier !== 'ALL') {
+          const seeded = nextSuppliers.find((s) => s.id === initialSupplier);
+          if (seeded) {
+            supplierFilterSeededRef.current = true;
+            if (seeded.code) setSupplierCodes([seeded.code]);
+            if (seeded.name) setSupplierNames([seeded.name]);
+          }
+        }
         if (res.branchIsActive === false) {
           showToast('Chi nhánh đang ngừng hoạt động — ma trận chỉ xem, không chỉnh sửa/chốt.', 'warning');
         }
-      } catch {
+      } catch (err: unknown) {
         if (!isMounted) return;
         setMatrixProducts([]);
         setCellMap({});
         setDayStatuses([]);
-        showToast('Không tải được sản phẩm theo chi nhánh cho ma trận đặt hàng.', 'error');
+        const e = err as { message?: string };
+        showToast(e.message || 'Không tải được sản phẩm theo chi nhánh cho ma trận đặt hàng.', 'error');
       } finally {
         if (isMounted) setIsLoadingMatrix(false);
       }
@@ -695,12 +763,13 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   // Filtered Products
   const filteredProducts = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
     return matrixProducts.filter((p) => {
-      if (selectedSupplierId !== 'ALL' && p.supplierId !== selectedSupplierId) return false;
-      if (kw && !p.name.toLowerCase().includes(kw) && !p.sku.toLowerCase().includes(kw)) {
-        return false;
-      }
+      if (matchedSupplierIds && !matchedSupplierIds.includes(p.supplierId)) return false;
+      const sup = suppliers.find((s) => s.id === p.supplierId);
+      if (!tokenMatches(sup?.code || p.supplierName, supplierCodes)) return false;
+      if (!tokenMatches(sup?.name || p.supplierName, supplierNames)) return false;
+      if (!tokenMatches(p.sku, productSkus)) return false;
+      if (!tokenMatches(p.name, productNames)) return false;
       if (moqOnly) {
         const hasMoqFail = dayColumns.some((d) => {
           const q = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0;
@@ -725,8 +794,12 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     });
   }, [
     matrixProducts,
-    selectedSupplierId,
-    keyword,
+    matchedSupplierIds,
+    suppliers,
+    supplierCodes,
+    supplierNames,
+    productSkus,
+    productNames,
     moqOnly,
     orderedOnly,
     ownerModifiedOnly,
@@ -734,25 +807,50 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     cellMap,
   ]);
 
-  // Real-time MOQ Fails check
+  // Real-time MOQ Fails: MOQ sản phẩm + MOQ tổng đơn NCC theo ngày
   const { moqFails } = useMemo(() => {
     const fails: string[] = [];
     const activeProducts =
-      selectedSupplierId === 'ALL'
+      !matchedSupplierIds
         ? matrixProducts
-        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
+        : matrixProducts.filter((p) => matchedSupplierIds.includes(p.supplierId));
 
     activeProducts.forEach((p) => {
       dayColumns.forEach((d) => {
         const q = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0;
         if (q > 0 && q < p.moq) {
-          fails.push(`${p.name} (${d.dateShort}): SL ${q} < MOQ ${p.moq}`);
+          fails.push(`${p.name} (${d.dateShort}): SL ${q} < MOQ SP ${p.moq}`);
+        }
+      });
+    });
+
+    const productsBySupplier = new Map<string, typeof activeProducts>();
+    activeProducts.forEach((p) => {
+      const sid = p.supplierId || 'none';
+      if (!productsBySupplier.has(sid)) productsBySupplier.set(sid, []);
+      productsBySupplier.get(sid)!.push(p);
+    });
+
+    productsBySupplier.forEach((items, supplierId) => {
+      const cfg = supplierConfigs.find((c) => c.supplierId === supplierId);
+      const orderMoq = cfg?.minOrderQuantity || 0;
+      if (orderMoq <= 0) return;
+
+      dayColumns.forEach((d) => {
+        if (d.isOff || d.isLocked) return;
+        const dayTotal = items.reduce((sum, p) => {
+          const q = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0;
+          return sum + q;
+        }, 0);
+        if (dayTotal > 0 && dayTotal < orderMoq) {
+          const name = cfg?.supplierName || items[0]?.supplierName || supplierId;
+          fails.push(`${name} (${d.dateShort}): tổng SL ${dayTotal} < MOQ đơn ${orderMoq}`);
         }
       });
     });
 
     return { moqFails: fails };
-  }, [dayColumns, cellMap, selectedSupplierId, matrixProducts]);
+  }, [dayColumns, cellMap, matchedSupplierIds, matrixProducts, supplierConfigs]);
 
   // Change duration preset (7, 14, 21, 31)
   const handleSelectDuration = (days: number) => {
@@ -876,9 +974,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     let copyCount = 0;
     let skipped = 0;
     const relevantProducts =
-      selectedSupplierId === 'ALL'
+      !matchedSupplierIds
         ? matrixProducts
-        : matrixProducts.filter((p) => p.supplierId === selectedSupplierId);
+        : matrixProducts.filter((p) => matchedSupplierIds.includes(p.supplierId));
 
     relevantProducts.forEach((p) => {
       if (p.isRowDisabled) return;
@@ -941,53 +1039,147 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     );
   };
 
-  // Excel Download — Chuẩn CISCA / MT-GRMS .xlsx
+  const buildSupplierCodeById = () => {
+    const map: Record<string, string> = {};
+    suppliers.forEach((s) => {
+      if (s.id) map[s.id] = s.code || s.id;
+    });
+    supplierConfigs.forEach((c) => {
+      if (c.supplierId && c.supplierCode) map[c.supplierId] = c.supplierCode;
+    });
+    return map;
+  };
+
+  const mapBackendIssue = (e: any): ExcelValidationErrorItem => ({
+    type: (e.type === 'WARNING' ? 'WARNING' : 'ERROR') as 'ERROR' | 'WARNING',
+    row: e.row ?? 0,
+    productCode: e.productCode || '-',
+    productName: e.productName || '-',
+    deliveryDate: e.deliveryDate || '-',
+    dateLabel: e.dateLabel || '-',
+    inputValue: e.inputValue ?? '-',
+    code: (e.code || 'FORMAT_INVALID') as ExcelValidationErrorItem['code'],
+    message: e.message || '',
+  });
+
+  const mapBackendPreviewToFe = (d: any, file: File): ExcelValidationResult => {
+    const branch = branches.find((b) => b.id === selectedBranchId);
+    const supplier = suppliers.find((s) => s.id === selectedSupplierId);
+    const isGuidLike = (v?: string) =>
+      !!v &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.trim());
+
+    const pickReadable = (...candidates: Array<string | undefined>) => {
+      for (const c of candidates) {
+        const t = (c || '').trim();
+        if (t && !isGuidLike(t)) return t;
+      }
+      return '';
+    };
+
+    const cellsToApply: ExcelCellToApply[] = (d.cellsToApply || []).map((c: any) => ({
+      row: c.excelRow ?? 0,
+      rowKey: productRowKey({ id: c.productId, supplierId: c.supplierId }),
+      productId: c.productId,
+      supplierId: c.supplierId,
+      productCode: c.productCode || '',
+      productName: c.productName || '',
+      deliveryDate: typeof c.deliveryDate === 'string'
+        ? c.deliveryDate.slice(0, 10)
+        : dayjs(c.deliveryDate).format('YYYY-MM-DD'),
+      dateLabel: c.dateLabel || '',
+      currentQty: Number(c.currentQty || 0),
+      quantity: Number(c.quantity || 0),
+    }));
+
+    const branchExpected = pickReadable(
+      d.scopeStatus?.branchExpected,
+      branch?.name,
+      branch?.code
+    );
+    const supplierExpected =
+      selectedSupplierId === 'ALL'
+        ? 'Tất cả nhà cung cấp'
+        : pickReadable(d.scopeStatus?.supplierExpected, supplier?.name, supplier?.code);
+    const branchActual = pickReadable(d.scopeStatus?.branchActual);
+    const supplierActual = pickReadable(d.scopeStatus?.supplierActual);
+
+    return {
+      valid: Boolean(d.valid),
+      fileName: d.fileName || file.name,
+      fileSize: d.fileSize || file.size,
+      scopeStatus: {
+        branchMatched: Boolean(d.scopeStatus?.branchMatched),
+        branchExpected,
+        branchActual: branchActual || undefined,
+        supplierMatched: Boolean(d.scopeStatus?.supplierMatched),
+        supplierExpected,
+        supplierActual: supplierActual || undefined,
+        periodMatched: Boolean(d.scopeStatus?.periodMatched),
+        periodExpected: d.scopeStatus?.periodExpected || '',
+      },
+      summary: {
+        totalCells: d.summary?.totalCells ?? 0,
+        validCells: d.summary?.validCells ?? cellsToApply.length,
+        errorCount: d.summary?.errorCount ?? (d.errors?.length || 0),
+        warningCount: d.summary?.warningCount ?? (d.warnings?.length || 0),
+        ignoredCells: d.summary?.ignoredCells ?? 0,
+        skippedOwnerLocked: d.summary?.skippedOwnerLocked ?? 0,
+        outOfFilterCount: d.summary?.outOfFilterCount ?? 0,
+        productsInFilterCount: d.scopeStatus?.productsInFilterCount ?? filteredProducts.length,
+      },
+      errors: (d.errors || []).map(mapBackendIssue),
+      warnings: (d.warnings || []).map(mapBackendIssue),
+      cellsToApply,
+    };
+  };
+
+  // Excel Download — khớp filteredProducts + role + Mã NCC
   const handleExcelDownload = () => {
     try {
       const branch = branches.find((b) => b.id === selectedBranchId);
       const supplier = suppliers.find((s) => s.id === selectedSupplierId);
-      exportMatrixToExcel(matrixProducts, dayColumns, cellMap, {
+      exportMatrixToExcel(filteredProducts, dayColumns, cellMap, {
         branch,
         supplier,
         supplierId: selectedSupplierId,
         viewFrom,
         viewTo: addDaysToDate(viewFrom, durationDays - 1),
         exportedBy: isStoreOwner ? 'Store Owner' : 'Nhân viên chi nhánh',
+        isStoreOwner,
+        supplierCodeById: buildSupplierCodeById(),
         isCellEditable,
       });
-      showToast('Đã xuất file bảng ma trận đặt hàng (.xlsx) chuẩn doanh nghiệp thành công!', 'success');
+      showToast('Đã xuất file bảng ma trận đặt hàng (.xlsx) theo bộ lọc hiện tại!', 'success');
     } catch (err: any) {
       showToast('Xuất file Excel thất bại: ' + (err?.message || err), 'error');
     }
   };
 
-  // Excel Upload — 3 Giai đoạn: Validate -> Preview Modal -> Apply
+  // Excel Upload — BE preview (CN / NCC / SP filter) → modal → import API → result popup
   const handleExcelUpload = async (file: File) => {
     const branch = branches.find((b) => b.id === selectedBranchId);
     const supplier = suppliers.find((s) => s.id === selectedSupplierId);
+    setPendingImportFileName(file.name);
 
     try {
-      const validationResult = await validateMatrixExcelFile({
+      const allowedProducts = filteredProducts.map((p) => ({
+        productId: p.id,
+        supplierId: p.supplierId,
+      }));
+
+      const raw = await purchaseOrderApi.previewMatrixExcel({
         file,
-        currentBranchId: selectedBranchId,
-        currentBranchCode: branch?.code,
-        currentBranchName: branch?.name,
-        currentSupplierId: selectedSupplierId,
-        currentSupplierCode: supplier?.code,
-        currentSupplierName: supplier?.name,
-        viewFrom,
-        viewTo: addDaysToDate(viewFrom, durationDays - 1),
-        matrixProducts,
-        dayColumns,
-        cellMap,
-        supplierConfigs,
-        isCellEditable,
+        branchId: selectedBranchId,
+        supplierId: selectedSupplierId,
+        viewFrom: dayjs(viewFrom).format('YYYY-MM-DD'),
+        durationDays,
+        allowedProducts,
       });
 
-      setImportPreviewResult(validationResult);
+      setImportPreviewResult(mapBackendPreviewToFe(raw, file));
       setIsImportModalOpen(true);
     } catch (err: any) {
-      // Đảm bảo luôn mở Preview Modal kể cả khi gặp lỗi đọc file sớm
       const errResult: ExcelValidationResult = {
         valid: false,
         fileName: file?.name || 'unknown.xlsx',
@@ -1017,7 +1209,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
             dateLabel: '-',
             inputValue: '-',
             code: 'FORMAT_INVALID',
-            message: `Không thể đọc nội dung file Excel: ${err?.message || 'File lỗi hoặc không đúng định dạng'}`,
+            message: `Không thể kiểm tra file Excel trên máy chủ: ${err?.message || 'Lỗi không xác định'}`,
           },
         ],
         warnings: [],
@@ -1028,24 +1220,57 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     }
   };
 
-  // Xử lý nạp dữ liệu từ Modal Preview sau khi đã kiểm tra không có lỗi
-  const handleConfirmApplyImport = () => {
-    if (!importPreviewResult || !importPreviewResult.valid || importPreviewResult.summary.validCells === 0) return;
+  const handleConfirmApplyImport = async () => {
+    if (!importPreviewResult || importPreviewResult.summary.validCells === 0) return;
+    if (importPreviewResult.summary.errorCount > 0 && importPreviewResult.cellsToApply.length === 0) return;
 
-    const newMap = applyMatrixExcelImport(
-      importPreviewResult.cellsToApply,
-      cellMap,
-      isStoreOwner
-    );
+    try {
+      const allowedProducts = filteredProducts.map((p) => ({
+        productId: p.id,
+        supplierId: p.supplierId,
+      }));
+      const viewTo = addDaysToDate(viewFrom, durationDays - 1);
+      const raw = await purchaseOrderApi.importMatrixExcel({
+        branchId: selectedBranchId,
+        supplierId: selectedSupplierId,
+        viewFrom: dayjs(viewFrom).format('YYYY-MM-DD'),
+        viewTo: dayjs(viewTo).format('YYYY-MM-DD'),
+        fileName: pendingImportFileName || importPreviewResult.fileName,
+        allowedProducts,
+        cells: importPreviewResult.cellsToApply.map((c) => ({
+          productId: c.productId,
+          supplierId: c.supplierId,
+          deliveryDate: c.deliveryDate,
+          quantity: c.quantity,
+          excelRow: c.row,
+          productCode: c.productCode,
+          productName: c.productName,
+          dateLabel: c.dateLabel,
+        })),
+      });
 
-    setCellMap(newMap);
-    setIsDirty(true);
-    setIsImportModalOpen(false);
+      const appliedCells = raw.summary?.appliedCells ?? 0;
+      const successDayCount =
+        raw.summary?.successDayCount ?? (raw.successDays?.length || 0);
+      const skippedOwnerLocked = raw.summary?.skippedOwnerLocked ?? 0;
 
-    showToast(
-      'Nạp thành công ' + importPreviewResult.summary.validCells + ' ô số lượng từ file "' + importPreviewResult.fileName + '" vào Ma trận!',
-      'success'
-    );
+      setIsImportModalOpen(false);
+      setImportPreviewResult(null);
+      setPendingImportFileName('');
+      setIsDirty(false);
+      setMatrixRefreshKey((k) => k + 1);
+
+      const skipNote =
+        skippedOwnerLocked > 0 ? ` · Bỏ qua ${skippedOwnerLocked} ô đã chốt chủ` : '';
+      showToast(
+        appliedCells > 0
+          ? `Đã nạp ${appliedCells} ô vào ${successDayCount} ngày giao${skipNote}.`
+          : `Không có ô nào được nạp${skipNote}.`,
+        appliedCells > 0 ? 'success' : 'warning'
+      );
+    } catch (err: any) {
+      showToast(err?.message || 'Nạp Excel thất bại.', 'error');
+    }
   };
 
   // Compute PO Split Preview according to FE-05 rules:
@@ -1059,9 +1284,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     };
 
     const activeSuppliers =
-      selectedSupplierId === 'ALL'
+      !matchedSupplierIds
         ? suppliers
-        : suppliers.filter((s) => s.id === selectedSupplierId);
+        : suppliers.filter((s) => matchedSupplierIds.includes(s.id));
 
     activeSuppliers.forEach((sup) => {
       const supProducts = matrixProducts.filter((p) => p.supplierId === sup.id);
@@ -1209,6 +1434,14 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   // Save Draft
   const handleSaveDraft = async () => {
+    if (moqFails.length > 0) {
+      showToast(
+        `Không lưu được bản thảo — còn ${moqFails.length} ô dưới MOQ: ${moqFails.slice(0, 3).join('; ')}`,
+        'error'
+      );
+      return;
+    }
+
     try {
       setIsSaving(true);
       await purchaseOrderApi.saveMatrixDraft(
@@ -1252,8 +1485,12 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onBack={() => navigate('/store-owner/purchase-orders/branches')}
         onSave={handleSaveDraft}
         isSaving={isSaving}
-        onOpenSplitModal={() => setIsSplitModalOpen(true)}
-        onGoToCutoffHub={() => navigate('/store-owner/purchase-orders/dispatch-hub')}
+        saveDisabled={moqFails.length > 0}
+        saveDisabledReason={
+          moqFails.length > 0
+            ? `Không lưu được — còn ${moqFails.length} ô dưới MOQ`
+            : undefined
+        }
         readOnly={isReadOnly}
         isStoreOwner={isStoreOwner}
         title={
@@ -1279,16 +1516,32 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         fixedBranchLabel={branches.find((b) => b.id === selectedBranchId)?.name}
         onSelectBranch={(id) => {
           setSelectedBranchId(id);
-          setSelectedSupplierId('ALL');
-          setKeyword('');
+          setSupplierCodes([]);
+          setSupplierNames([]);
+          setProductSkus([]);
+          setProductNames([]);
           setCellMap({});
           setIsDirty(false);
+          // Đồng bộ URL để quay lại / reload vẫn đúng CN (và khớp luồng từ màn branches)
+          if (isStoreOwner && GUID_RE.test(id)) {
+            const next = new URLSearchParams(searchParams);
+            next.set('branchId', id);
+            navigate(
+              { pathname: location.pathname, search: `?${next.toString()}` },
+              { replace: true }
+            );
+          }
         }}
         suppliers={suppliers}
-        selectedSupplierId={selectedSupplierId}
-        onSelectSupplier={(id) => {
-          setSelectedSupplierId(id);
-        }}
+        supplierCodes={supplierCodes}
+        onSupplierCodesChange={setSupplierCodes}
+        supplierNames={supplierNames}
+        onSupplierNamesChange={setSupplierNames}
+        products={matrixProducts}
+        productSkus={productSkus}
+        onProductSkusChange={setProductSkus}
+        productNames={productNames}
+        onProductNamesChange={setProductNames}
         dateFrom={dateFromInput}
         dateTo={dateToInput}
         onDateFromChange={(val) => setDateFromInput(val)}
@@ -1296,8 +1549,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onApplyRange={handleApplyRange}
         durationDays={durationDays}
         onSelectDuration={handleSelectDuration}
-        keyword={keyword}
-        onKeywordChange={(kw) => setKeyword(kw)}
         moqOnly={moqOnly}
         onMoqOnlyChange={(checked) => setMoqOnly(checked)}
         orderedOnly={orderedOnly}
@@ -1309,7 +1560,10 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         showSoh={showSoh}
         onShowSohChange={(checked) => setShowSoh(checked)}
         onResetFilters={() => {
-          setKeyword('');
+          setSupplierCodes([]);
+          setSupplierNames([]);
+          setProductSkus([]);
+          setProductNames([]);
           setMoqOnly(false);
           setOrderedOnly(false);
           setOwnerModifiedOnly(false);
@@ -1358,6 +1612,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         result={importPreviewResult}
         onConfirmApply={handleConfirmApplyImport}
       />
+
     </div>
   );
 };

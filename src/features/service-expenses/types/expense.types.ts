@@ -35,11 +35,13 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
  */
 export interface ServiceExpenseDto {
   expenseId: string;
+  voucherCode?: string;
   branchId: string;
   branchName?: string;
   category: ExpenseCategory;
   amount: number;
   status: ExpenseStatus;
+  approvalStatus?: string;
   expenseDate: string;
   dueDate: string;
   vendorName: string;
@@ -57,6 +59,13 @@ export interface ServiceExpenseDto {
   createdAt: string;
 }
 
+export type ExpenseQuickStatus =
+  | 'ALL'
+  | 'PENDING_APPROVAL'
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'SUSPICIOUS';
+
 /**
  * DTO for monthly KPI metrics summary
  */
@@ -65,6 +74,8 @@ export interface ExpenseSummaryDto {
   totalPendingAmount: number;
   totalPaidAmount: number;
   overdueCount: number;
+  suspiciousAmount?: number;
+  suspiciousCount?: number;
 }
 
 /**
@@ -76,6 +87,7 @@ export interface ExpenseFilterParams {
   branchId?: string;
   category?: ExpenseCategory | '';
   status?: ExpenseStatus | '';
+  quickStatus?: ExpenseQuickStatus | '';
   fromDate?: string;
   toDate?: string;
   keyword?: string;
@@ -167,4 +179,5 @@ export interface PayExpenseRequest {
   createCashBookEntry: boolean;
   paymentDate: string;
   note?: string;
+  approvalNote?: string;
 }

@@ -389,6 +389,58 @@ export const supplierApi = {
     throw new Error(res.data?.message || 'Không thể lưu cấu hình giao hàng.');
   },
 
+  async getReturnPolicy(id: string): Promise<import('../types/supplier.types').SupplierReturnPolicy | null> {
+    const res = await httpClient.get<ApiResponse<any>>(`/suppliers/${id}/return-policy`);
+    if (res.data?.success && res.data.data) {
+      const d = res.data.data;
+      return {
+        id: d.id || '',
+        supplierId: d.supplierId || id,
+        allowReturn: d.allowReturn ?? true,
+        allowedReturnTypes: d.allowedReturnTypes || [],
+        allowedResolutionTypes: d.allowedResolutionTypes || [],
+        defaultResolutionType: d.defaultResolutionType || 'REDUCE_PAYABLE',
+        nearExpiryMinDaysLeft: d.nearExpiryMinDaysLeft ?? null,
+        requireEvidenceImage: d.requireEvidenceImage ?? true,
+        maxReturnDaysAfterReceipt: d.maxReturnDaysAfterReceipt ?? null,
+        costShareEnabled: d.costShareEnabled ?? false,
+        storeCostSharePercent: d.storeCostSharePercent ?? null,
+        supplierCostSharePercent: d.supplierCostSharePercent ?? null,
+        costShareBase: d.costShareBase || 'REPLACEMENT_VALUE',
+        requireStorePaymentBeforeReplacement: d.requireStorePaymentBeforeReplacement ?? true,
+        notes: d.notes ?? '',
+        isActive: d.isActive ?? true,
+      };
+    }
+    return null;
+  },
+
+  async upsertReturnPolicy(
+    id: string,
+    policy: import('../types/supplier.types').SupplierReturnPolicy
+  ): Promise<import('../types/supplier.types').SupplierReturnPolicy> {
+    const body = {
+      allowReturn: policy.allowReturn,
+      allowedReturnTypes: policy.allowedReturnTypes,
+      allowedResolutionTypes: policy.allowedResolutionTypes,
+      defaultResolutionType: policy.defaultResolutionType,
+      nearExpiryMinDaysLeft: policy.nearExpiryMinDaysLeft,
+      requireEvidenceImage: policy.requireEvidenceImage,
+      maxReturnDaysAfterReceipt: policy.maxReturnDaysAfterReceipt,
+      costShareEnabled: policy.costShareEnabled,
+      storeCostSharePercent: policy.storeCostSharePercent,
+      supplierCostSharePercent: policy.supplierCostSharePercent,
+      costShareBase: policy.costShareBase,
+      requireStorePaymentBeforeReplacement: policy.requireStorePaymentBeforeReplacement,
+      notes: policy.notes,
+    };
+    const res = await httpClient.put<ApiResponse<any>>(`/suppliers/${id}/return-policy`, body);
+    if (res.data?.success && res.data.data) {
+      return (await this.getReturnPolicy(id))!;
+    }
+    throw new Error(res.data?.message || 'Không thể lưu chính sách trả hàng.');
+  },
+
   /**
    * Liên kết hồ sơ khách hàng đối tác kép
    */

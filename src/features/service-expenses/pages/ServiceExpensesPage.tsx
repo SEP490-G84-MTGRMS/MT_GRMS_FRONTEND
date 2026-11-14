@@ -1,6 +1,7 @@
-import { type FC, useState, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { type FC, useState, useRef, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
+import { employeeApi } from '../../employee/api/employeeApi';
 import {
   AdminToast,
   type ToastState,
@@ -9,6 +10,7 @@ import {
 } from '../../admin/components';
 import { BillPreviewModal } from '../components/BillPreviewModal';
 import { CreateExpenseModal } from '../components/CreateExpenseModal';
+import { ConfirmModal } from '../../../components/common';
 import { ExpenseFilterBar } from '../components/ExpenseFilterBar';
 import { ExpenseKpiCards } from '../components/ExpenseKpiCards';
 import { ExpenseTable } from '../components/ExpenseTable';
@@ -29,32 +31,102 @@ import type {
 import { calculatePeriodRange } from '../utils/datePeriodUtils';
 import '../service-expenses.css';
 
+/**
+ * Trích xuất branchId ban đầu từ authStore hoặc localStorage mtgrms_active_branch
+ */
+const getInitialActiveBranchId = (userBranchId?: string): string => {
+  try {
+    const raw = localStorage.getItem('mtgrms_active_branch');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.id && parsed.id !== 'ALL') {
+        return parsed.id;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return userBranchId || '';
+};
+
 export const ServiceExpensesPage: FC = () => {
-  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const isEmployee =
     user?.role === 'STAFF' ||
     (user?.role as unknown as string) === 'EMPLOYEE' ||
     (user?.role as unknown as string) === 'CASHIER';
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
-  const [periodLabel, setPeriodLabel] = useState('Tháng 10/2026');
+  const initialRange = calculatePeriodRange('this-month');
+  const [periodLabel, setPeriodLabel] = useState(urlSearch ? 'Tất cả thời gian' : initialRange.label);
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
   const [filters, setFilters] = useState<ExpenseFilterParams>(() => {
-    const range = calculatePeriodRange('this-month');
     return {
       page: 1,
       pageSize: 10,
-      branchId: '',
+      branchId: getInitialActiveBranchId(user?.branchId),
       category: '',
       status: '',
+      quickStatus: 'ALL',
       keyword: urlSearch,
-      fromDate: range.fromDate,
-      toDate: range.toDate,
+      fromDate: urlSearch ? undefined : initialRange.fromDate,
+      toDate: urlSearch ? undefined : initialRange.toDate,
     };
   });
+
+  // Tải danh sách chi nhánh hoạt động thực tế từ Backend
+  useEffect(() => {
+    let isMounted = true;
+    employeeApi.getBranches().then((list) => {
+      if (isMounted && list && list.length > 0) {
+        setBranches(list);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Đồng bộ chi nhánh đang chọn từ TopNav (mtgrms_active_branch & event mtgrms:branch-changed)
+  useEffect(() => {
+    const handleGlobalBranchChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ id?: string }>;
+      const branch = customEvent.detail;
+      if (branch) {
+        const nextBranchId = branch.id === 'ALL' ? '' : (branch.id || '');
+        setFilters((prev) => ({
+          ...prev,
+          branchId: nextBranchId,
+          page: 1,
+        }));
+      }
+    };
+
+    window.addEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    return () => {
+      window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
+    };
+  }, []);
+
+  // Keep filters in sync when navigation query parameters change
+  useEffect(() => {
+    if (urlSearch) {
+      setPeriodLabel('Tất cả thời gian');
+      setFilters((prev) => ({
+        ...prev,
+        keyword: urlSearch,
+        fromDate: undefined,
+        toDate: undefined,
+        page: 1,
+      }));
+    }
+  }, [urlSearch]);
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [payingItem, setPayingItem] = useState<ServiceExpenseDto | null>(null);
+  const [cancelingItem, setCancelingItem] = useState<ServiceExpenseDto | null>(null);
   const [previewBill, setPreviewBill] = useState<{
     url: string;
     title: string;
@@ -93,6 +165,21 @@ export const ServiceExpensesPage: FC = () => {
   const cancelExpenseMutation = useCancelExpense();
 
   const handleFilterChange = (updated: Partial<ExpenseFilterParams>) => {
+    if (updated.keyword !== undefined) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (updated.keyword) {
+            next.set('search', updated.keyword);
+          } else {
+            next.delete('search');
+            next.delete('keyword');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    }
     setFilters((prev) => ({
       ...prev,
       ...updated,
@@ -101,14 +188,24 @@ export const ServiceExpensesPage: FC = () => {
   };
 
   const handleResetFilters = () => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('search');
+        next.delete('keyword');
+        return next;
+      },
+      { replace: true }
+    );
     const range = calculatePeriodRange('this-month');
     setPeriodLabel(range.label);
     setFilters({
       page: 1,
       pageSize: 10,
-      branchId: '',
+      branchId: getInitialActiveBranchId(user?.branchId),
       category: '',
       status: '',
+      quickStatus: 'ALL',
       keyword: '',
       fromDate: range.fromDate,
       toDate: range.toDate,
@@ -135,18 +232,30 @@ export const ServiceExpensesPage: FC = () => {
     }
   };
 
-  const handleCancelClick = async (item: ServiceExpenseDto) => {
-    const confirm = window.confirm(
-      `Bạn có chắc chắn muốn hủy khoản chi "${item.expenseId} - ${item.vendorName}"? Thao tác này không thể hoàn tác.`
-    );
-    if (!confirm) return;
-
-    await cancelExpenseMutation.mutateAsync({
-      expenseId: item.expenseId,
-      reason: 'Người dùng hủy thao tác trên hệ thống quản lý',
-    });
-    showToast('Đã hủy khoản chi phí thành công.', 'info');
+  const handleCancelClick = (item: ServiceExpenseDto) => {
+    setCancelingItem(item);
   };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelingItem) return;
+    try {
+      await cancelExpenseMutation.mutateAsync({
+        expenseId: cancelingItem.expenseId,
+        reason: 'Người dùng hủy thao tác trên hệ thống quản lý',
+      });
+      showToast('Đã hủy khoản chi phí thành công.', 'info');
+      setCancelingItem(null);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Lỗi khi hủy khoản chi', 'error');
+    }
+  };
+
+  const todayIso = new Date().toISOString().substring(0, 10);
+  const clientOverdueCount = expensesData?.items
+    ? expensesData.items.filter(
+        (i) => i.status === 'Pending' && Boolean(i.dueDate) && i.dueDate < todayIso
+      ).length
+    : 0;
 
   return (
     <div className="expense-page">
@@ -161,11 +270,11 @@ export const ServiceExpensesPage: FC = () => {
       {/* Top Header Bar */}
       <div className="expense-topbar" style={{ marginTop: '16px' }}>
         <div className="expense-topbar-title">
-          <h1 style={{ fontSize: '1.4rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0F172A)' }}>
-            Phải trả
+          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0F172A)' }}>
+            Chi phí &amp; hóa đơn phải trả
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748B' }}>
-            Theo dõi tiền phụ tùng, mặt bằng, điện nước cần thanh toán
+            Quản lý tiền mặt bằng, điện nước, bảo trì tủ mát, bao bì &amp; giao vận, lương nhân viên (chuẩn Thông tư 152 &amp; Anti-Splitting)
           </p>
         </div>
 
@@ -178,6 +287,28 @@ export const ServiceExpensesPage: FC = () => {
             className="action-icon-btn"
           >
             <RefreshIcon size={16} color="currentColor" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/store-owner/cashbook')}
+            className="btn-secondary-pill"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '9px 16px',
+              borderRadius: '9999px',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              border: '1px solid #cbd5e1',
+              background: '#ffffff',
+              color: '#334155',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            }}
+          >
+            <span>Đối chiếu Sổ quỹ</span>
           </button>
 
           <button
@@ -200,7 +331,7 @@ export const ServiceExpensesPage: FC = () => {
             }}
           >
             <PlusIcon size={16} color="#ffffff" />
-            <span>+ Ghi nhận chi phí</span>
+            <span>Ghi nhận chi phí</span>
           </button>
         </div>
       </div>
@@ -210,6 +341,7 @@ export const ServiceExpensesPage: FC = () => {
         summary={summaryData}
         isLoading={isSummaryLoading}
         periodLabel={periodLabel}
+        overdueCount={clientOverdueCount}
       />
 
       {/* Filter Bar */}
@@ -218,6 +350,7 @@ export const ServiceExpensesPage: FC = () => {
         onFilterChange={handleFilterChange}
         onReset={handleResetFilters}
         onPeriodLabelChange={setPeriodLabel}
+        branches={branches}
       />
 
       {/* Main Expense Table */}
@@ -245,6 +378,8 @@ export const ServiceExpensesPage: FC = () => {
         onClose={() => setIsCreateOpen(false)}
         onSubmit={handleCreateSubmit}
         isSubmitting={createExpenseMutation.isPending}
+        branches={branches}
+        defaultBranchId={filters.branchId || branches[0]?.id || ''}
       />
 
       {/* Pay Modal */}
@@ -262,6 +397,20 @@ export const ServiceExpensesPage: FC = () => {
         onClose={() => setPreviewBill(null)}
         imageUrl={previewBill?.url || null}
         title={previewBill?.title || ''}
+      />
+
+      {/* Cancel Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(cancelingItem)}
+        onClose={() => setCancelingItem(null)}
+        onConfirm={handleConfirmCancel}
+        title="Xác nhận hủy khoản chi phí"
+        itemName={cancelingItem ? `${cancelingItem.expenseId} - ${cancelingItem.vendorName}` : ''}
+        message="Khoản chi sau khi hủy sẽ không thể hoàn tác hoặc tiếp tục thanh toán. Bạn có chắc chắn muốn hủy không?"
+        confirmText="Đồng ý hủy"
+        cancelText="Đóng"
+        variant="danger"
+        isLoading={cancelExpenseMutation.isPending}
       />
     </div>
   );

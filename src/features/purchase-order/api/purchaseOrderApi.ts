@@ -64,6 +64,7 @@ export interface MatrixBackendResponse {
     inactiveReason?: string;
     cutoffTime: string;
     cutoffDayOffset?: number;
+    minOrderQuantity?: number;
     activeDeliveryDays: number[];
     blackoutDates: string[];
   }>;
@@ -123,9 +124,12 @@ export interface PurchaseOrderListApiItem {
   totalAmount: number;
   note?: string;
   createdAt: string;
+  createdByRole?: string;
   activeGoodsReceiptId?: string | null;
   activeGoodsReceiptCode?: string | null;
   activeGoodsReceiptStatus?: string | null;
+  sourceType?: string | null;
+  sourceSupplierReturnId?: string | null;
   details: Array<{
     id: string;
     productId: string;
@@ -155,6 +159,7 @@ export const purchaseOrderApi = {
     status?: string;
     dateFrom?: string;
     dateTo?: string;
+    keyword?: string;
     pageIndex?: number;
     pageSize?: number;
   }): Promise<PurchaseOrderPagedResult> {
@@ -165,6 +170,7 @@ export const purchaseOrderApi = {
         Status: params.status && params.status !== 'all' ? params.status : undefined,
         DateFrom: params.dateFrom || undefined,
         DateTo: params.dateTo || undefined,
+        Keyword: params.keyword?.trim() || undefined,
         PageIndex: params.pageIndex ?? 1,
         PageSize: params.pageSize ?? 10,
       },
@@ -262,6 +268,14 @@ export const purchaseOrderApi = {
             typeof sc.cutoffDayOffset === 'number' && sc.cutoffDayOffset >= 0
               ? sc.cutoffDayOffset
               : 1,
+          minOrderQuantity: Math.max(
+            0,
+            Number(
+              (sc as { minOrderQuantity?: number; MinOrderQuantity?: number }).minOrderQuantity ??
+                (sc as { MinOrderQuantity?: number }).MinOrderQuantity ??
+                0
+            ) || 0
+          ),
           activeDeliveryDays: sc.activeDeliveryDays || [1, 2, 3, 4, 5, 6],
           blackoutDates: sc.blackoutDates || [],
         }));
@@ -296,30 +310,11 @@ export const purchaseOrderApi = {
           status: d.status || 'DRAFT',
         };
       }
-    } catch {
-      // Fallback
+      throw new Error(res.data?.message || 'Không tải được ma trận đặt hàng.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      throw new Error(e.response?.data?.message || e.message || 'Không tải được ma trận đặt hàng.');
     }
-
-    const localKey = `matrix_draft_${branchId}_${supplierId || 'ALL'}`;
-    let cachedMap: MatrixCellMap = {};
-    try {
-      const raw = localStorage.getItem(localKey);
-      if (raw) {
-        cachedMap = JSON.parse(raw);
-      }
-    } catch {
-      // ignore
-    }
-
-    return {
-      products: [],
-      cellMap: cachedMap,
-      supplierConfigs: [],
-      dayStatuses: [],
-      branchIsActive: true,
-      serverNow: new Date().toISOString(),
-      status: 'DRAFT',
-    };
   },
 
   /**
@@ -351,10 +346,18 @@ export const purchaseOrderApi = {
         finalQty: number;
       }> = [];
 
+      const guidRe =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
       Object.entries(cellMap).forEach(([rowKey, dayMap]) => {
         const sep = rowKey.indexOf('__');
         const productId = sep >= 0 ? rowKey.slice(0, sep) : rowKey;
-        const supplierId = sep >= 0 ? rowKey.slice(sep + 2) : undefined;
+        const rowSupplierId = sep >= 0 ? rowKey.slice(sep + 2) : undefined;
+        // Bỏ SupplierId rác / cũ (không còn trong bảng Suppliers) để tránh FK 23503
+        const safeSupplierId =
+          rowSupplierId && rowSupplierId !== 'none' && guidRe.test(rowSupplierId)
+            ? rowSupplierId
+            : undefined;
         Object.entries(dayMap).forEach(([dateKey, cell]) => {
           const isOwnerAdjusted = Boolean(
             cell.isOwnerAdjusted || cell.isOwnerOverridden || (cell.storeQty !== null && cell.storeQty !== undefined)
@@ -368,7 +371,7 @@ export const purchaseOrderApi = {
           ) {
             cells.push({
               productId,
-              supplierId: supplierId && supplierId !== 'none' ? supplierId : undefined,
+              supplierId: safeSupplierId,
               deliveryDate: dateKey,
               employeeQty: cell.employeeQty ?? 0,
               storeQty: cell.storeQty ?? null,
@@ -391,6 +394,75 @@ export const purchaseOrderApi = {
       console.error('Lỗi khi lưu bản thảo ma trận lên backend:', err);
       throw err;
     }
+  },
+
+  /**
+   * Preview nạp Excel ma trận — BE kiểm tra khớp CN / NCC / SP filter.
+   */
+  async previewMatrixExcel(params: {
+    file: File;
+    branchId: string;
+    supplierId?: string;
+    viewFrom: string;
+    durationDays: number;
+    allowedProducts: Array<{ productId: string; supplierId: string }>;
+  }): Promise<any> {
+    const form = new FormData();
+    form.append('file', params.file);
+    form.append('branchId', params.branchId);
+    form.append('viewFrom', params.viewFrom);
+    form.append('durationDays', String(params.durationDays));
+    if (params.supplierId && params.supplierId !== 'ALL') {
+      form.append('supplierId', params.supplierId);
+    }
+    form.append('allowedProducts', JSON.stringify(params.allowedProducts));
+
+    const res = await httpClient.post<ApiResponse<any>>(
+      '/purchase-orders/matrix/excel/preview',
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    if (res.data?.success && res.data.data) return res.data.data;
+    throw new Error(res.data?.message || 'Không thể kiểm tra file Excel ma trận.');
+  },
+
+  /**
+   * Import số lượng từ Excel vào draft (sau confirm preview).
+   */
+  async importMatrixExcel(payload: {
+    branchId: string;
+    supplierId?: string;
+    viewFrom: string;
+    viewTo: string;
+    fileName?: string;
+    allowedProducts: Array<{ productId: string; supplierId: string }>;
+    cells: Array<{
+      productId: string;
+      supplierId: string;
+      deliveryDate: string;
+      quantity: number;
+      excelRow?: number;
+      productCode?: string;
+      productName?: string;
+      dateLabel?: string;
+    }>;
+  }): Promise<any> {
+    const body = {
+      branchId: payload.branchId,
+      supplierId:
+        payload.supplierId && payload.supplierId !== 'ALL' ? payload.supplierId : undefined,
+      viewFrom: payload.viewFrom,
+      viewTo: payload.viewTo,
+      fileName: payload.fileName,
+      allowedProducts: payload.allowedProducts,
+      cells: payload.cells,
+    };
+    const res = await httpClient.post<ApiResponse<any>>(
+      '/purchase-orders/matrix/excel/import',
+      body
+    );
+    if (res.data?.success && res.data.data) return res.data.data;
+    throw new Error(res.data?.message || 'Không thể nạp Excel vào ma trận.');
   },
 
   /**
@@ -480,6 +552,8 @@ export const purchaseOrderApi = {
         totalAmount: Number(po.totalAmount || 0),
         status: (po.status as PurchaseOrderStatus) || 'PENDING_APPROVAL',
         note: po.note || '',
+        sourceType: po.sourceType || null,
+        sourceSupplierReturnId: po.sourceSupplierReturnId || null,
         items: (po.details || []).map((d: any) => ({
           id: d.id,
           name: d.productName,
@@ -528,6 +602,8 @@ export const purchaseOrderApi = {
         totalAmount: Number(po.totalAmount || 0),
         status: (po.status as PurchaseOrderStatus) || 'PENDING_APPROVAL',
         note: po.note || '',
+        sourceType: po.sourceType || null,
+        sourceSupplierReturnId: po.sourceSupplierReturnId || null,
         items: (po.details || []).map((d: any) => ({
           id: d.id,
           name: d.productName,
