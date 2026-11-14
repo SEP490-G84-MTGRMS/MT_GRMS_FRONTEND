@@ -95,20 +95,20 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
-      <div className="table-responsive">
-        <table className="so-list-table promotion-table">
+    <div className="so-list-table-card promotion-card">
+      <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1340, width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
-              <th style={{ ...thStyle, width: 120 }}>Mã CTKM</th>
-              <th style={{ ...thStyle, minWidth: 200 }}>Tên chương trình</th>
-              <th style={{ ...thStyle, width: 140 }}>Hình thức</th>
-              <th style={{ ...thStyle, width: 185 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 165 }}>Chi nhánh áp dụng</th>
-              <th style={{ ...thStyle, minWidth: 155, width: 165 }}>Lượt & Ngân sách</th>
-              <th style={{ ...thStyle, width: 140 }}>Trạng thái</th>
-              <th style={{ ...thStyle, width: 90, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 125 }}>Mã CTKM</th>
+              <th style={{ ...thStyle, width: 220 }}>Tên chương trình</th>
+              <th style={{ ...thStyle, width: 145 }}>Hình thức</th>
+              <th style={{ ...thStyle, width: 245 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 180 }}>Chi nhánh áp dụng</th>
+              <th style={{ ...thStyle, width: 185 }}>Lượt &amp; Ngân sách</th>
+              <th style={{ ...thStyle, width: 135 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 85, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>

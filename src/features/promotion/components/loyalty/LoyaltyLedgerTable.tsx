@@ -87,7 +87,7 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
+    <div className="so-list-table-card promotion-card">
       <div className="promotion-card-header">
         <h3 className="promotion-card-title">
           <span>Sổ cái lịch sử biến động điểm</span>
@@ -102,53 +102,94 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
         </button>
       </div>
 
-      {/* Filter inside ledger */}
-      <div className="ledger-filter-row">
-        <div className="ledger-search-box">
-          <Search size={15} className="ledger-search-icon" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Tìm theo KH, SĐT, mã GD..."
-            className="ledger-search-input"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="ledger-search-clear"
-              title="Xóa tìm kiếm"
+      {/* Filter inside ledger chuẩn StoreProductFilter */}
+      <div className="so-list-filter" style={{ border: 'none', borderBottom: '1px solid #e2e8f0', borderRadius: 0, padding: '10px 16px', backgroundColor: '#f8fafc' }}>
+        <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
+          <div className="so-list-filter-field" style={{ flex: '1 1 260px', minWidth: 220 }}>
+            <label className="so-list-filter-label">Tìm kiếm:</label>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm theo KH, SĐT, mã GD..."
+                className="so-list-filter-input"
+                style={{ width: '100%', paddingLeft: 30, paddingRight: searchTerm ? 28 : 10 }}
+              />
+              <Search
+                size={14}
+                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 2,
+                  }}
+                  title="Xóa tìm kiếm"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label">Loại biến động:</label>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className={`so-list-filter-select ${typeFilter !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
             >
-              <X size={13} />
-            </button>
+              <option value="ALL">Tất cả loại giao dịch</option>
+              <option value="EARN_PURCHASE">Tích điểm mua hàng</option>
+              <option value="REDEEM_PURCHASE">Tiêu điểm đơn hàng</option>
+              <option value="MANUAL_ADJUST_ADD">Điều chỉnh thủ công (Cộng)</option>
+              <option value="MANUAL_ADJUST_SUB">Điều chỉnh thủ công (Trừ)</option>
+              <option value="EXPIRED">Điểm hết hạn</option>
+            </select>
+          </div>
+
+          {(searchTerm || typeFilter !== 'ALL') && (
+            <div className="so-list-filter-actions" style={{ marginLeft: 'auto' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setTypeFilter('ALL');
+                }}
+                className="so-list-filter-reset"
+                title="Đặt lại bộ lọc"
+              >
+                <span>Đặt lại</span>
+              </button>
+            </div>
           )}
         </div>
-
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="ledger-type-select"
-        >
-          <option value="ALL">Tất cả loại giao dịch</option>
-          <option value="EARN_PURCHASE">Tích điểm mua hàng</option>
-          <option value="REDEEM_PURCHASE">Tiêu điểm đơn hàng</option>
-          <option value="MANUAL_ADJUST_ADD">Điều chỉnh thủ công (Cộng)</option>
-          <option value="MANUAL_ADJUST_SUB">Điều chỉnh thủ công (Trừ)</option>
-          <option value="EXPIRED">Điểm hết hạn</option>
-        </select>
       </div>
 
-      <div className="table-responsive">
-        <table className="so-list-table promotion-table">
+      <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1060, width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th style={{ ...thStyle, width: 140 }}>Mã GD</th>
-              <th style={{ ...thStyle, width: 170 }}>Khách hàng</th>
-              <th style={{ ...thStyle, width: 160 }}>Loại biến động</th>
-              <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Điểm (+/-)</th>
-              <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Số dư sau</th>
-              <th style={{ ...thStyle }}>Lý do & Ghi chú</th>
-              <th style={{ ...thStyle, width: 140 }}>Thời gian</th>
+              <th style={{ ...thStyle, width: 135 }}>Mã GD</th>
+              <th style={{ ...thStyle, width: 180 }}>Khách hàng</th>
+              <th style={{ ...thStyle, width: 165 }}>Loại biến động</th>
+              <th style={{ ...thStyle, width: 105, textAlign: 'right' }}>Điểm (+/-)</th>
+              <th style={{ ...thStyle, width: 105, textAlign: 'right' }}>Số dư sau</th>
+              <th style={{ ...thStyle, width: 220 }}>Lý do &amp; Ghi chú</th>
+              <th style={{ ...thStyle, width: 150 }}>Thời gian</th>
             </tr>
           </thead>
           <tbody>

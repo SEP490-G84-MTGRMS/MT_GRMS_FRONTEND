@@ -164,20 +164,20 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
-      <div className="table-responsive">
-        <table className="so-list-table promotion-table">
+    <div className="so-list-table-card promotion-card">
+      <div className="table-responsive" style={{ width: '100%', overflowX: 'auto' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1330, width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
               <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
-              <th style={{ ...thStyle, width: 120 }}>Mã đợt</th>
-              <th style={{ ...thStyle, minWidth: 200 }}>Tên đợt Voucher / Coupon</th>
-              <th style={{ ...thStyle, width: 140 }}>Loại ưu đãi</th>
-              <th style={{ ...thStyle, width: 170 }}>Điều kiện áp dụng</th>
-              <th style={{ ...thStyle, width: 140 }}>Đã dùng / Phát hành</th>
-              <th style={{ ...thStyle, width: 180 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 140 }}>Trạng thái</th>
-              <th style={{ ...thStyle, width: 110, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 125 }}>Mã đợt</th>
+              <th style={{ ...thStyle, width: 220 }}>Tên đợt Voucher / Coupon</th>
+              <th style={{ ...thStyle, width: 145 }}>Loại ưu đãi</th>
+              <th style={{ ...thStyle, width: 165 }}>Điều kiện áp dụng</th>
+              <th style={{ ...thStyle, width: 155 }}>Đã dùng / Phát hành</th>
+              <th style={{ ...thStyle, width: 245 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 135 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 95, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>

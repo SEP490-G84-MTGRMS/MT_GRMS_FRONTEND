@@ -1650,6 +1650,7 @@ export const PosCheckoutPage: FC = () => {
 
       <VietQrModal
         isOpen={isVietQrOpen}
+        branchId={activeBranch.id}
         orderCode={pendingPaymentOrder?.orderCode || `HD${Math.floor(100000 + Math.random() * 900000)}`}
         amount={pendingPaymentOrder?.finalAmount ?? finalAmount}
         onClose={handleCancelPendingVietQrPayment}

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../../../stores/useAuthStore';
 import { httpClient } from '../../../../api/httpClient';
+import { branchApi } from '../../../purchase-order/api/branchApi';
 
 export interface StorePaymentConfigData {
   tenantId: string;
@@ -36,6 +37,8 @@ export interface StorePaymentConfigData {
   isEncryptedAtRest?: boolean;
   webhookUrl: string;
   isActive: boolean;
+  paymentAccountId?: string | null;
+  branchIds?: string[];
 }
 
 interface Props {
@@ -74,6 +77,9 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [branches, setBranches] = useState<Array<{ id: string; name: string; code?: string }>>([]);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [paymentAccountId, setPaymentAccountId] = useState<string | null>(null);
 
   // Sinh Webhook URL tự động
   const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/payments/sepay-webhook`;
@@ -83,6 +89,9 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
     if (!isOpen) return;
 
     setSaveMessage(null);
+    branchApi.getBranches({ status: 'active', pageIndex: 1, pageSize: 100 })
+      .then(({ items }) => setBranches(items.map((item) => ({ id: item.id, name: item.name, code: item.code }))))
+      .catch(() => setBranches([]));
     const storageKey = `pos_payment_config_${currentTenantId}`;
     const saved = localStorage.getItem(storageKey);
 
@@ -122,6 +131,10 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
           if (data.bankAccountName) setBankAccountName(data.bankAccountName);
           if (data.sepayApiKeyMasked) setSepayApiKey(data.sepayApiKeyMasked);
           if (typeof data.isActive === 'boolean') setIsActive(data.isActive);
+          const accounts = Array.isArray(data.paymentAccounts) ? data.paymentAccounts : [];
+          const account = accounts.find((item: any) => item.bankCode === data.bankCode && item.bankAccountNumber === data.bankAccountNumber) || accounts[0];
+          setPaymentAccountId(account?.paymentAccountId || null);
+          setSelectedBranchIds(Array.isArray(account?.branchIds) ? account.branchIds : []);
         }
       })
       .catch(() => {
@@ -139,6 +152,10 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
   };
 
   const handleSave = async () => {
+    if (selectedBranchIds.length === 0) {
+      setSaveMessage('Vui lòng chọn ít nhất một chi nhánh sử dụng tài khoản này.');
+      return;
+    }
     setIsSaving(true);
     setSaveMessage(null);
 
@@ -152,6 +169,8 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
       sepayApiKey: sepayApiKey.trim(),
       webhookUrl,
       isActive,
+      paymentAccountId,
+      branchIds: selectedBranchIds,
     };
 
     // 1. Chỉ lưu thông tin ngân hàng công khai vào LocalStorage (Tuyệt đối KHÔNG lưu sepayApiKey)
@@ -304,6 +323,22 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
           {activeTab === 'config' ? (
             /* TAB 1: FORM CẤU HÌNH */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ padding: 12, border: '1px solid #99f6e4', borderRadius: 8, background: '#f0fdfa' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#115e59', marginBottom: 8 }}>
+                  Chi nhánh sử dụng tài khoản
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {branches.map((branch) => (
+                    <label key={branch.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#334155' }}>
+                      <input type="checkbox" checked={selectedBranchIds.includes(branch.id)} onChange={() => setSelectedBranchIds((current) =>
+                        current.includes(branch.id) ? current.filter((id) => id !== branch.id) : [...current, branch.id]
+                      )} />
+                      <span>{branch.code || 'CN'} — {branch.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               {/* Ngân hàng */}
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>

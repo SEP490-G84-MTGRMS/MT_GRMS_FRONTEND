@@ -16,6 +16,7 @@ import { httpClient } from '../../../../api/httpClient';
 
 interface Props {
   isOpen: boolean;
+  branchId: string;
   orderCode: string;
   amount: number;
   onClose: () => void;
@@ -24,6 +25,7 @@ interface Props {
 
 export const VietQrModal: FC<Props> = ({
   isOpen,
+  branchId,
   orderCode,
   amount,
   onClose,
@@ -83,7 +85,7 @@ export const VietQrModal: FC<Props> = ({
 
     // Đồng bộ cấu hình QR công khai từ Backend (An toàn cho mọi nhân viên thu ngân, không lộ API Key)
     httpClient
-      .get('/payments/public-qr-config', { params: { tenantId: currentTenantId } })
+      .get('/payments/public-qr-config', { params: { tenantId: currentTenantId, branchId } })
       .then((res) => {
         const data = res.data;
         if (!data) return;
@@ -96,7 +98,7 @@ export const VietQrModal: FC<Props> = ({
       .catch(() => {
         // Giữ nguyên cấu hình cache nếu offline
       });
-  }, [isOpen, currentTenantId]);
+  }, [isOpen, currentTenantId, branchId]);
 
   // LỚP 6: Tự động Polling kiểm tra trạng thái gạch nợ mỗi 2.5 giây khi đang mở QR
   useEffect(() => {

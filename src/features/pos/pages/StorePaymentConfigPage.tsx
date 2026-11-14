@@ -18,6 +18,13 @@ import {
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { httpClient } from '../../../api/httpClient';
 import { VIETNAMESE_BANKS } from '../components/modals/PaymentConfigModal';
+import { branchApi } from '../../purchase-order/api/branchApi';
+
+interface BranchOption {
+  id: string;
+  name: string;
+  code?: string;
+}
 
 interface SePayLinkedBankAccount {
   bankCode: string;
@@ -40,6 +47,9 @@ export const StorePaymentConfigPage: FC = () => {
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
   const [tenantPrefix, setTenantPrefix] = useState('');
+  const [paymentAccountId, setPaymentAccountId] = useState<string | null>(null);
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
 
   // Danh sách đa tài khoản ngân hàng liên kết trong SePay của Chủ cửa hàng
   const [linkedAccounts, setLinkedAccounts] = useState<SePayLinkedBankAccount[]>([]);
@@ -67,6 +77,10 @@ export const StorePaymentConfigPage: FC = () => {
     localStorage.removeItem(linkedKey);
     setLinkedAccounts([]);
 
+    branchApi.getBranches({ status: 'active', pageIndex: 1, pageSize: 100 })
+      .then(({ items }) => setBranches(items.map((item) => ({ id: item.id, name: item.name, code: item.code }))))
+      .catch(() => setBranches([]));
+
     // Tải cấu hình đã mã hóa AES-256 từ Backend API
     httpClient
       .get('/payments/config')
@@ -81,6 +95,12 @@ export const StorePaymentConfigPage: FC = () => {
         setMaskedApiKey(data.sepayApiKeyMasked || '');
         setIsRotatingKey(!data.hasApiKey);
         if (typeof data.isActive === 'boolean') setIsActive(data.isActive);
+        const accounts = Array.isArray(data.paymentAccounts) ? data.paymentAccounts : [];
+        const currentAccount = accounts.find(
+          (account: any) => account.bankCode === data.bankCode && account.bankAccountNumber === data.bankAccountNumber
+        ) || accounts[0];
+        setPaymentAccountId(currentAccount?.paymentAccountId || null);
+        setSelectedBranchIds(Array.isArray(currentAccount?.branchIds) ? currentAccount.branchIds : []);
       })
       .catch(() => {
         setSaveMessage('Không thể tải cấu hình từ máy chủ. Không sử dụng dữ liệu mẫu.');
@@ -119,6 +139,7 @@ export const StorePaymentConfigPage: FC = () => {
     setBankCode(acc.bankCode);
     setBankAccountNumber(acc.bankAccountNumber);
     setBankAccountName(acc.bankAccountName);
+    setPaymentAccountId(null);
 
     const storageKey = `pos_payment_config_${currentTenantId}`;
     const publicQrCache = {
@@ -130,6 +151,8 @@ export const StorePaymentConfigPage: FC = () => {
       bankAccountName: acc.bankAccountName.trim().toUpperCase(),
       webhookUrl,
       isActive,
+      paymentAccountId,
+      branchIds: selectedBranchIds,
     };
     try {
       await httpClient.post('/payments/config', publicQrCache);
@@ -176,6 +199,14 @@ export const StorePaymentConfigPage: FC = () => {
     setTimeout(() => setCopiedWebhook(false), 2000);
   };
 
+  const toggleBranch = (branchId: string) => {
+    setSelectedBranchIds((current) =>
+      current.includes(branchId)
+        ? current.filter((id) => id !== branchId)
+        : [...current, branchId]
+    );
+  };
+
   const handleSave = async () => {
     if (!isOwnerOrAdmin) return;
     if (!bankAccountNumber.trim() || !/^\d{6,30}$/.test(bankAccountNumber.trim())) {
@@ -184,6 +215,10 @@ export const StorePaymentConfigPage: FC = () => {
     }
     if (!bankAccountName.trim() || bankAccountName.trim().length > 150) {
       setSaveMessage('Tên chủ tài khoản không được trống và không quá 150 ký tự.');
+      return;
+    }
+    if (selectedBranchIds.length === 0) {
+      setSaveMessage('Vui lòng chọn ít nhất một chi nhánh sử dụng tài khoản nhận tiền này.');
       return;
     }
     if (!hasApiKey && !newApiKeyInput.trim()) {
@@ -207,6 +242,8 @@ export const StorePaymentConfigPage: FC = () => {
       bankAccountName: bankAccountName.trim().toUpperCase(),
       webhookUrl,
       isActive,
+      paymentAccountId,
+      branchIds: selectedBranchIds,
     };
     // 2. Gửi lên Backend để mã hóa AES-256 và lưu vào PostgreSQL
     try {
@@ -417,6 +454,38 @@ export const StorePaymentConfigPage: FC = () => {
               >
                 Tiền tố QR: {tenantPrefix}_HDxxxx
               </span>
+            </div>
+
+            <div style={{ padding: '12px 14px', backgroundColor: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#115e59' }}>Chi nhánh sử dụng tài khoản này</div>
+                  <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                    Chọn một hoặc nhiều chi nhánh dùng tài khoản này làm mặc định khi tạo VietQR.
+                  </div>
+                </div>
+                {branches.length > 0 && (
+                  <button type="button" disabled={!isOwnerOrAdmin}
+                    onClick={() => setSelectedBranchIds(selectedBranchIds.length === branches.length ? [] : branches.map((branch) => branch.id))}
+                    style={{ border: 0, background: 'transparent', color: '#0f766e', fontSize: 11.5, fontWeight: 800, cursor: 'pointer' }}>
+                    {selectedBranchIds.length === branches.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 7 }}>
+                {branches.map((branch) => (
+                  <label key={branch.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 6,
+                    border: selectedBranchIds.includes(branch.id) ? '1px solid #14b8a6' : '1px solid #dbeafe',
+                    backgroundColor: selectedBranchIds.includes(branch.id) ? '#ccfbf1' : '#ffffff',
+                    cursor: isOwnerOrAdmin ? 'pointer' : 'default', fontSize: 12.5, color: '#334155',
+                  }}>
+                    <input type="checkbox" disabled={!isOwnerOrAdmin} checked={selectedBranchIds.includes(branch.id)} onChange={() => toggleBranch(branch.id)} />
+                    <span><b>{branch.code || 'CN'}</b> — {branch.name}</span>
+                  </label>
+                ))}
+                {branches.length === 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Không tải được danh sách chi nhánh.</div>}
+              </div>
             </div>
 
             {/* Danh sách Đa Tài Khoản Ngân Hàng Liên Kết SePay (Chủ cửa hàng chọn TK nhận tiền) */}
