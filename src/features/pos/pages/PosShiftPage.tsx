@@ -6,9 +6,6 @@ import {
   Clock,
   History,
   CheckCircle2,
-  TrendingUp,
-  Wallet,
-  Banknote,
   RefreshCw,
   AlertCircle,
   X,
@@ -18,6 +15,8 @@ import {
   BarChart3,
   Scale,
   FileText,
+  Search,
+  RotateCcw,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
 import { posOrderApi, type OwnerUnsettledSummaryResponse } from '../api/posOrderApi';
@@ -49,8 +48,10 @@ export const PosShiftPage: FC = () => {
     branchFromUrl || user?.branchId || ''
   );
 
-  // Bộ lọc dải thời gian
+  // Bộ lọc dải thời gian & tìm kiếm
   const [timePreset, setTimePreset] = useState<'today' | '7days' | '30days' | 'all'>('7days');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Trạng thái dữ liệu
   const [shifts, setShifts] = useState<ShiftDetailResponse[]>([]);
@@ -59,7 +60,7 @@ export const PosShiftPage: FC = () => {
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(15);
 
   // Modal Xác nhận bàn giao ca
   const [handoverShift, setHandoverShift] = useState<ShiftDetailResponse | null>(null);
@@ -117,7 +118,9 @@ export const PosShiftPage: FC = () => {
           const stored = localStorage.getItem('mtgrms_active_branch');
           if (stored) {
             const b = JSON.parse(stored);
-            if (b?.id && b.id !== 'ALL') {
+            if (b?.id === 'ALL' && isOwnerOrAdmin) {
+              initialId = 'ALL';
+            } else if (b?.id) {
               const matched = list.find((item) => item.id === b.id || item.name === b.name);
               if (matched) initialId = matched.id;
             }
@@ -142,7 +145,7 @@ export const PosShiftPage: FC = () => {
     const handleGlobalBranchChange = (e: Event) => {
       const customEvent = e as CustomEvent;
       const branch = customEvent.detail;
-      if (branch?.id && branch.id !== 'ALL') {
+      if (branch?.id && (branch.id !== 'ALL' || isOwnerOrAdmin)) {
         setSelectedBranchId(branch.id);
         setSearchParams({ branchId: branch.id });
       }
@@ -153,7 +156,7 @@ export const PosShiftPage: FC = () => {
       isMounted = false;
       window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
     };
-  }, [branchFromUrl, user?.branchId]);
+  }, [branchFromUrl, user?.branchId, isOwnerOrAdmin]);
 
   // Tải danh sách lịch sử ca từ Backend API
   const fetchShiftHistory = useCallback(async () => {
@@ -176,7 +179,9 @@ export const PosShiftPage: FC = () => {
         fromIso = start.toISOString();
       }
 
-      const res = await posShiftApi.getShiftHistory(selectedBranchId, fromIso, toIso);
+      const res = selectedBranchId === 'ALL' && isOwnerOrAdmin
+        ? (await Promise.all((await employeeApi.getBranches()).map((branch) => posShiftApi.getShiftHistory(branch.id, fromIso, toIso)))).flat()
+        : await posShiftApi.getShiftHistory(selectedBranchId, fromIso, toIso);
       setShifts(res || []);
       setCurrentPage(1);
 
@@ -288,19 +293,6 @@ export const PosShiftPage: FC = () => {
         (s.handoverStatus === 1 || s.handoverStatus === 'PENDING' || !s.handoverStatus)
     );
   }, [shifts]);
-
-  // Cảnh báo các ca đã đóng lâu (> 2 giờ hoặc từ ngày trước) mà Chủ chưa duyệt bàn giao
-  const overduePendingShifts = useMemo(() => {
-    const nowMs = Date.now();
-    const todayVn = new Date(nowMs + 7 * 3600 * 1000).toISOString().slice(0, 10);
-    return pendingEmployeeShifts.filter((s) => {
-      const closedTime = s.closedAtUtc ? new Date(s.closedAtUtc).getTime() : 0;
-      const shiftBizDate = getShiftBusinessDate(s);
-      const isOverTwoHours = closedTime > 0 && nowMs - closedTime > 2 * 3600 * 1000;
-      const isFromPastDay = shiftBizDate !== '' && shiftBizDate < todayVn;
-      return isOverTwoHours || isFromPastDay;
-    });
-  }, [pendingEmployeeShifts, getShiftBusinessDate]);
 
   const pendingEmployeeCashDrop = useMemo(
     () =>
@@ -551,28 +543,36 @@ export const PosShiftPage: FC = () => {
     }
   };
 
-  // Tính 4 thẻ KPI tổng hợp từ dữ liệu thực tế
-  const kpiMetrics = useMemo(() => {
-    const totalCount = shifts.length;
-    const totalOpeningFloat = shifts.reduce((sum, s) => sum + s.openingFloat, 0);
-    const totalActualCash = shifts.reduce((sum, s) => sum + (s.actualCashCounted ?? s.expectedCash), 0);
-    const totalDiscrepancy = shifts.reduce((sum, s) => sum + (s.discrepancy ?? 0), 0);
-    const totalBankRevenue = shifts.reduce((sum, s) => sum + (s.totalBankRevenue || 0), 0);
-
-    return {
-      totalCount,
-      totalOpeningFloat,
-      totalActualCash,
-      totalDiscrepancy,
-      totalBankRevenue,
-    };
-  }, [shifts]);
+  // Lọc danh sách ca theo ô tìm kiếm và trạng thái
+  const filteredShifts = useMemo(() => {
+    return shifts.filter((s) => {
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matchCode = (s.shiftCode || '').toLowerCase().includes(q);
+        const matchCashier = s.participants?.some(
+          (p) => (p.fullName || p.userName || '').toLowerCase().includes(q)
+        );
+        const matchNote = (s.notes || '').toLowerCase().includes(q);
+        if (!matchCode && !matchCashier && !matchNote) return false;
+      }
+      if (statusFilter !== 'ALL') {
+        const statusStr = String(s.status || '').toUpperCase();
+        const handoverStr = String(s.handoverStatus || '').toUpperCase();
+        if (statusFilter === 'OPEN' && statusStr !== '1' && statusStr !== 'OPEN') return false;
+        if (statusFilter === 'CLOSING' && statusStr !== '3' && statusStr !== 'CLOSING') return false;
+        if (statusFilter === 'CLOSED' && statusStr !== '2' && statusStr !== 'CLOSED') return false;
+        if (statusFilter === 'CONFIRMED' && handoverStr !== '2' && handoverStr !== 'CONFIRMED') return false;
+        if (statusFilter === 'DISPUTED' && handoverStr !== '3' && handoverStr !== 'DISPUTED') return false;
+      }
+      return true;
+    });
+  }, [shifts, searchTerm, statusFilter]);
 
   // Dữ liệu phân trang
   const paginatedShifts = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return shifts.slice(start, start + pageSize);
-  }, [shifts, currentPage, pageSize]);
+    return filteredShifts.slice(start, start + pageSize);
+  }, [filteredShifts, currentPage, pageSize]);
 
   // Xử lý gửi xác nhận bàn giao
   const handleConfirmHandoverSubmit = async () => {
@@ -696,7 +696,7 @@ export const PosShiftPage: FC = () => {
   };
 
   return (
-    <div className="pos-shift-page-root flex flex-col h-full w-full min-h-0 overflow-hidden bg-[#F7FAFF]">
+    <div className="pos-shift-page-root flex flex-col flex-1 w-full min-h-0 overflow-hidden bg-[#F7FAFF]" style={{ minHeight: 0 }}>
       {/* ─── 1. HEADER DUY NHẤT ĐỒNG BỘ ─── */}
       <header className="pos-shift-unified-header" style={{ padding: '12px 24px', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -767,137 +767,121 @@ export const PosShiftPage: FC = () => {
       </header>
 
       {/* ─── 2. THÂN TRANG NỘI DUNG ─── */}
-      <main className="pos-shift-body-container flex-1 min-h-0 overflow-y-auto" style={{ padding: '20px 24px' }}>
-        {/* THANH BỘ LỌC THỜI GIAN */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: '#FFFFFF',
-            padding: '12px 18px',
-            borderRadius: 10,
-            border: '1px solid #E2E8F0',
-            marginBottom: 16,
-            flexWrap: 'wrap',
-            gap: 12,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Khoảng thời gian:</span>
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[
-                { key: 'today', label: 'Hôm nay' },
-                { key: '7days', label: '7 ngày qua' },
-                { key: '30days', label: '30 ngày qua' },
-                { key: 'all', label: 'Tất cả' },
-              ].map((btn) => (
-                <button
-                  key={btn.key}
-                  type="button"
-                  onClick={() => setTimePreset(btn.key as any)}
-                  style={{
-                    padding: '5px 12px',
-                    borderRadius: 6,
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    border: '1px solid',
-                    borderColor: timePreset === btn.key ? '#0F766E' : '#CBD5E1',
-                    backgroundColor: timePreset === btn.key ? '#F0FDFA' : '#FFFFFF',
-                    color: timePreset === btn.key ? '#0F766E' : '#475569',
-                    cursor: 'pointer',
+      <main className="pos-shift-body-container flex-1 min-h-0 flex flex-col overflow-hidden" style={{ padding: '12px 20px 4px 20px', minHeight: 0 }}>
+        {/* ── THANH BỘ LỌC CHUẨN SO-LIST-FILTER (GIỐNG STORE PRODUCT) ── */}
+        <div className="so-list-filter" style={{ flexShrink: 0, marginBottom: 12 }}>
+          <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
+            {/* 1. Ô Tìm kiếm Mã ca / Thu ngân */}
+            <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
+              <label className="so-list-filter-label">Tìm kiếm:</label>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
                   }}
-                >
-                  {btn.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ fontSize: 13, color: '#64748B' }}>
-            Tổng số: <b>{shifts.length}</b> phiên ca ghi nhận
-          </div>
-        </div>
-
-        {/* CẢNH BÁO CA ĐÃ ĐÓNG NHƯNG CHỦ CHƯA DUYỆT BÀN GIAO (TIỀN ĐANG TREO CHƯA VÀO SỔ QUỸ KÉT SẮT) */}
-        {isOwnerOrAdmin && pendingEmployeeShifts.length > 0 && (
-          <div
-            style={{
-              padding: '12px 16px',
-              backgroundColor: overduePendingShifts.length > 0 ? '#FEF2F2' : '#FFFBEB',
-              border: `1px solid ${overduePendingShifts.length > 0 ? '#FECACA' : '#FDE68A'}`,
-              borderRadius: 10,
-              marginBottom: 16,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 12,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <AlertTriangle
-                size={18}
-                color={overduePendingShifts.length > 0 ? '#DC2626' : '#D97706'}
-              />
-              <div style={{ fontSize: 13, color: overduePendingShifts.length > 0 ? '#991B1B' : '#92400E' }}>
-                <b>
-                  Cảnh báo tiền bàn giao đang treo ({pendingEmployeeShifts.length} ca đã đóng chưa duyệt
-                  {overduePendingShifts.length > 0 ? `, trong đó ${overduePendingShifts.length} ca quá hạn lâu` : ''}):
-                </b>{' '}
-                Tổng tiền mặt nhân viên nộp đang chờ vào Két sắt là{' '}
-                <b>{formatVND(pendingEmployeeCashDrop)}</b>. Vui lòng kiểm đếm và bấm Duyệt bàn giao để tiền chính thức vào Sổ quỹ.
+                  placeholder="Nhập mã ca, tên thu ngân..."
+                  className="so-list-filter-input"
+                  style={{ width: '100%', paddingLeft: 30, paddingRight: searchTerm ? 28 : 10 }}
+                />
+                <Search
+                  size={14}
+                  style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setCurrentPage(1);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 2,
+                    }}
+                    title="Xóa tìm kiếm"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
               </div>
             </div>
-          </div>
-        )}
 
-        {/* 4 THẺ KPI TỔNG HỢP LỊCH SỬ */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, marginBottom: 18 }}>
-          <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#0F766E', fontSize: 12.5, fontWeight: 600 }}>
-              <Clock size={16} />
-              <span>Tổng Số Phiên Ca</span>
+            {/* 2. Lọc Khoảng thời gian */}
+            <div className="so-list-filter-field">
+              <label className="so-list-filter-label">Thời gian:</label>
+              <select
+                value={timePreset}
+                onChange={(e) => {
+                  setTimePreset(e.target.value as any);
+                  setCurrentPage(1);
+                }}
+                className={`so-list-filter-select ${timePreset !== '7days' ? 'so-list-filter-select--active' : ''}`}
+              >
+                <option value="today">Hôm nay</option>
+                <option value="7days">7 ngày qua</option>
+                <option value="30days">30 ngày qua</option>
+                <option value="all">Tất cả thời gian</option>
+              </select>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', marginTop: 8 }}>
-              {kpiMetrics.totalCount} <span style={{ fontSize: 13, fontWeight: 500, color: '#64748B' }}>ca</span>
-            </div>
-          </div>
 
-          <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#2563EB', fontSize: 12.5, fontWeight: 600 }}>
-              <Wallet size={16} />
-              <span>Tổng Tiền Đầu Ca</span>
+            {/* 3. Lọc Trạng thái ca / Bàn giao */}
+            <div className="so-list-filter-field">
+              <label className="so-list-filter-label">Trạng thái:</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className={`so-list-filter-select ${statusFilter !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="OPEN">Đang mở (bán hàng)</option>
+                <option value="CLOSED">Đã chốt ca</option>
+                <option value="CONFIRMED">Đã duyệt bàn giao</option>
+                <option value="DISPUTED">Có chênh lệch / Khiếu nại</option>
+              </select>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', marginTop: 8 }}>
-              {formatVND(kpiMetrics.totalOpeningFloat)}
-            </div>
-          </div>
 
-          <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#059669', fontSize: 12.5, fontWeight: 600 }}>
-              <Banknote size={16} />
-              <span>Tổng Tiền Thực Đếm</span>
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#0F172A', marginTop: 8 }}>
-              {formatVND(kpiMetrics.totalActualCash)}
-            </div>
-          </div>
-
-          <div style={{ background: '#FFFFFF', padding: '16px', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: kpiMetrics.totalDiscrepancy < 0 ? '#DC2626' : '#D97706', fontSize: 12.5, fontWeight: 600 }}>
-              <TrendingUp size={16} />
-              <span>Chênh Lệch Két (Tổng)</span>
-            </div>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 700,
-                color: kpiMetrics.totalDiscrepancy < 0 ? '#DC2626' : kpiMetrics.totalDiscrepancy > 0 ? '#059669' : '#0F172A',
-                marginTop: 8,
-              }}
-            >
-              {kpiMetrics.totalDiscrepancy > 0 ? `+${formatVND(kpiMetrics.totalDiscrepancy)}` : formatVND(kpiMetrics.totalDiscrepancy)}
+            {/* Nút Thao tác Filter */}
+            <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              {(searchTerm || timePreset !== '7days' || statusFilter !== 'ALL') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setTimePreset('7days');
+                    setStatusFilter('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className="so-list-filter-reset"
+                  title="Đặt lại bộ lọc"
+                >
+                  <RotateCcw size={13} />
+                  <span>Đặt lại</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={fetchShiftHistory}
+                className="so-list-filter-search"
+                title="Tải lại dữ liệu"
+              >
+                <RefreshCw size={13} className={isLoading ? 'spin' : ''} />
+                <span>Làm mới</span>
+              </button>
             </div>
           </div>
         </div>
@@ -924,40 +908,51 @@ export const PosShiftPage: FC = () => {
         )}
 
         {/* BẢNG LỊCH SỬ CÁC CA LÀM VIỆC */}
-        <div style={{ background: '#FFFFFF', borderRadius: 10, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="so-list-table-card so-list-table-card--wrap" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', flexShrink: 0 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
               <History size={16} className="text-teal-700" />
-              <span>Danh Sách Các Phiên Ca Bán Hàng ({shifts.length})</span>
+              <span>Danh Sách Các Phiên Ca Bán Hàng ({filteredShifts.length})</span>
             </h3>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontWeight: 600 }}>
-                  <th style={{ padding: '10px 14px' }}>Mã ca</th>
-                  <th style={{ padding: '10px 14px' }}>Thời gian mở - đóng</th>
-                  <th style={{ padding: '10px 14px' }}>Thu ngân</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Tiền đầu ca</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Tiền lý thuyết</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Thực đếm</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Chênh lệch</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'center' }}>Xác nhận kết ca</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'center' }}>Thao tác</th>
+          <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
+            <table className="so-list-table" style={{ minWidth: 1230, width: '100%', tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: 120 }} />
+                <col style={{ width: 145 }} />
+                <col style={{ width: 200 }} />
+                <col style={{ width: 110 }} />
+                <col style={{ width: 115 }} />
+                <col style={{ width: 115 }} />
+                <col style={{ width: 115 }} />
+                <col style={{ width: 135 }} />
+                <col style={{ width: 175 }} />
+              </colgroup>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
+                <tr>
+                  <th style={{ width: 120, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Mã ca</th>
+                  <th style={{ width: 145, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thời gian mở - đóng</th>
+                  <th style={{ width: 200, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thu ngân</th>
+                  <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền đầu ca</th>
+                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền lý thuyết</th>
+                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Thực đếm</th>
+                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Chênh lệch</th>
+                  <th style={{ width: 135, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Xác nhận kết ca</th>
+                  <th style={{ width: 175, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64748B' }}>
+                    <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
                       <RefreshCw size={20} className="spin text-teal-700" style={{ margin: '0 auto 8px' }} />
                       <div>Đang tải lịch sử ca làm việc từ hệ thống...</div>
                     </td>
                   </tr>
                 ) : paginatedShifts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
+                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
                       <AlertCircle size={24} color="#94A3B8" style={{ margin: '0 auto 8px' }} />
                       <div style={{ fontWeight: 600, color: '#334155' }}>Không có ca làm việc nào trong khoảng thời gian này</div>
                       <div style={{ fontSize: 12, marginTop: 4 }}>Hãy chọn khoảng thời gian khác hoặc kiểm tra lại chi nhánh đã chọn.</div>
@@ -979,13 +974,26 @@ export const PosShiftPage: FC = () => {
                     const isLateClose = earlyLateText?.toUpperCase().includes('MUỘN');
 
                     return (
-                      <tr key={s.id} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background-color 0.15s' }}>
-                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
-                          {s.shiftCode}
+                      <tr
+                        key={s.id}
+                        className="so-list-row"
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: '#ffffff',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                        }}
+                      >
+                        <td className="so-list-td" style={{ overflow: 'hidden' }}>
+                          <span className="so-list-code font-mono font-bold">{s.shiftCode}</span>
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#334155', fontSize: 12 }}>
+                        <td className="so-list-td" style={{ color: '#334155', fontSize: 12, overflow: 'hidden', whiteSpace: 'nowrap' }}>
                           <div><b>Mở:</b> {formatDate(s.openedAtUtc)}</div>
-                          <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981' }}>Đang mở</span>}</div>
+                          <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981', fontWeight: 600 }}>Đang mở</span>}</div>
                           {earlyLateText && (
                             <div
                               style={{
@@ -1000,51 +1008,66 @@ export const PosShiftPage: FC = () => {
                                 backgroundColor: isEarlyClose ? '#FEF3C7' : isLateClose ? '#FEE2E2' : '#E0F2FE',
                                 color: isEarlyClose ? '#B45309' : isLateClose ? '#B91C1C' : '#0369A1',
                                 border: isEarlyClose ? '1px solid #FCD34D' : isLateClose ? '1px solid #FCA5A5' : '1px solid #BAE6FD',
-                                maxWidth: 240,
+                                maxWidth: 135,
                               }}
                               title={`Giải trình giờ chốt ca: ${earlyLateText}`}
                             >
-                              <span>{isEarlyClose ? '⚠️ Chốt sớm' : isLateClose ? '⏰ Chốt muộn' : '⏱ Giải trình giờ'}</span>
+                              <span>{isEarlyClose ? '⚠️ Chốt sớm' : isLateClose ? '⏰ Chốt muộn' : '⏱ Giải trình'}</span>
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#1E293B' }}>
+                        <td className="so-list-td" style={{ color: '#1E293B', overflow: 'hidden' }}>
                           {uniqueParticipants.length > 0 ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: 240 }} title={cashierDisplay}>
-                              {uniqueParticipants.map((p, pIdx) => (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%' }} title={cashierDisplay}>
+                              <span
+                                style={{
+                                  fontWeight: 600,
+                                  color: '#0F172A',
+                                  fontSize: 12.5,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  maxWidth: '100%',
+                                }}
+                                title={uniqueParticipants[0].fullName || uniqueParticipants[0].userName}
+                              >
+                                {uniqueParticipants[0].fullName || uniqueParticipants[0].userName}
+                              </span>
+                              {uniqueParticipants.length > 1 && (
                                 <span
-                                  key={p.id || pIdx}
                                   style={{
                                     display: 'inline-flex',
                                     alignItems: 'center',
+                                    gap: 3,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: '#0F766E',
                                     backgroundColor: '#F0FDFA',
                                     border: '1px solid #CCFBF1',
-                                    color: '#0F766E',
-                                    padding: '2px 8px',
-                                    borderRadius: 6,
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    whiteSpace: 'nowrap',
+                                    borderRadius: 4,
+                                    padding: '1px 6px',
+                                    width: 'fit-content',
                                   }}
+                                  title={`Danh sách nhân viên cùng trực: ${cashierDisplay}`}
                                 >
-                                  {p.fullName || p.userName}
+                                  +{uniqueParticipants.length - 1} nhân viên khác
                                 </span>
-                              ))}
+                              )}
                             </div>
                           ) : (
                             <span style={{ color: '#64748B', fontStyle: 'italic' }}>Thu ngân quầy</span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569', overflow: 'hidden' }}>
                           {formatVND(s.openingFloat)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600 }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600, overflow: 'hidden' }}>
                           {formatVND(s.expectedCash)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A' }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A', overflow: 'hidden' }}>
                           {s.actualCashCounted !== null && s.actualCashCounted !== undefined ? formatVND(s.actualCashCounted) : '---'}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, overflow: 'hidden' }}>
                           {diff === 0 ? (
                             <span style={{ color: '#059669' }}>Khớp (0 đ)</span>
                           ) : diff > 0 ? (
@@ -1053,27 +1076,15 @@ export const PosShiftPage: FC = () => {
                             <span style={{ color: '#DC2626' }}>{formatVND(diff)}</span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <td className="so-list-td" style={{ textAlign: 'center', overflow: 'hidden' }}>
                           {getHandoverBadge(s.handoverStatus)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                        <td className="so-list-td so-list-td--actions" style={{ textAlign: 'center', overflow: 'hidden' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center', width: '100%' }}>
                             <button
                               type="button"
+                              className="so-list-action-btn"
                               onClick={() => setSelectedDetailShift(s)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                padding: '4px 8px',
-                                borderRadius: 6,
-                                border: '1px solid #0F766E',
-                                backgroundColor: '#F0FDFA',
-                                color: '#0F766E',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                              }}
                               title="Xem chi tiết phiên ca & Lý do chênh lệch"
                             >
                               <Eye size={13} />
@@ -1088,7 +1099,8 @@ export const PosShiftPage: FC = () => {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: 4,
-                                  padding: '4px 8px',
+                                  height: 28,
+                                  padding: '0 8px',
                                   borderRadius: 6,
                                   border: '1px solid #DC2626',
                                   backgroundColor: '#FEF2F2',
@@ -1096,6 +1108,7 @@ export const PosShiftPage: FC = () => {
                                   fontSize: 12,
                                   fontWeight: 700,
                                   cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
                                 }}
                                 title="Nhân viên quên chốt ca: Chủ cửa hàng tự kiểm đếm tiền, nhập lý do và buộc đóng ca"
                               >
@@ -1116,7 +1129,8 @@ export const PosShiftPage: FC = () => {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: 4,
-                                  padding: '4px 8px',
+                                  height: 28,
+                                  padding: '0 8px',
                                   borderRadius: 6,
                                   border: '1px solid #059669',
                                   backgroundColor: '#ECFDF5',
@@ -1124,11 +1138,12 @@ export const PosShiftPage: FC = () => {
                                   fontSize: 12,
                                   fontWeight: 600,
                                   cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
                                 }}
                                 title="Chủ cửa hàng duyệt bàn giao & cộng tiền nộp két vào Sổ quỹ"
                               >
                                 <UserCheck size={13} />
-                                <span>Duyệt bàn giao</span>
+                                <span>Duyệt</span>
                               </button>
                             )}
                           </div>
@@ -1141,22 +1156,20 @@ export const PosShiftPage: FC = () => {
             </table>
           </div>
 
-          {/* PHÂN TRANG */}
-          {shifts.length > 0 && (
-            <div style={{ padding: '10px 16px', borderTop: '1px solid #E2E8F0' }}>
-              <TablePagination
-                currentPage={currentPage}
-                pageSize={pageSize}
-                totalItems={shifts.length}
-                itemLabel="ca làm việc"
-                pageSizeOptions={[10, 20, 50]}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={(newSize) => {
-                  setPageSize(newSize);
-                  setCurrentPage(1);
-                }}
-              />
-            </div>
+          {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
+          {filteredShifts.length > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalItems={filteredShifts.length}
+              itemLabel="ca làm việc"
+              pageSizeOptions={[15, 24, 36, 48]}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+            />
           )}
         </div>
       </main>
