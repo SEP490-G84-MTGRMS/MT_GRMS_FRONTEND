@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import type { TransferItem, BatchItem } from '../types';
 import type { Branch } from '../types';
-import { transferService } from '../services/transferService';
+import { getTransferErrorMessage, transferService } from '../services/transferService';
 import { SelectBatchModal } from '../components/SelectBatchModal';
 import { ImportTransferExcelModal } from '../components/ImportTransferExcelModal';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -56,9 +56,27 @@ export const CreateTransferPage: React.FC = () => {
   useEffect(() => {
     if (!fromBranchId || !products.length) return;
     transferService.batches(fromBranchId).then((batches) => {
-      setProducts((current) => current.map((product) => {
+      const withBatches = (product: TransferItem): TransferItem => {
         const ownBatches = batches.filter((batch) => batch.productId === product.productId);
-        return { ...product, hasBatchManagement: ownBatches.some((batch) => Boolean(batch.batchNumber)), batches: ownBatches.map((batch) => ({ id: batch.id, batchNumber: batch.batchNumber, expiryDate: batch.expiryDate, onHand: batch.onHand })) };
+        return {
+          ...product,
+          hasBatchManagement: ownBatches.some((batch) => Boolean(batch.batchNumber)),
+          batches: ownBatches.map((batch) => ({
+            id: batch.id,
+            batchNumber: batch.batchNumber,
+            expiryDate: batch.expiryDate,
+            onHand: batch.onHand,
+          })),
+        };
+      };
+      setProducts((current) => current.map(withBatches));
+      setItems((current) => current.map((item) => {
+        const updated = withBatches(item);
+        return {
+          ...updated,
+          batchNumber: item.batchNumber,
+          expiryDate: item.expiryDate,
+        };
       }));
     }).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không tải được tồn kho theo lô.', 'warning'));
   }, [fromBranchId, products.length]);
@@ -136,13 +154,27 @@ export const CreateTransferPage: React.FC = () => {
       return;
     }
 
+    if (status === 'In-Transit') {
+      const itemMissingBatch = items.find(
+        (item) => (item.hasBatchManagement || (item.batches && item.batches.length > 0)) && (!item.batchNumber?.trim() || !item.expiryDate?.trim())
+      );
+      if (itemMissingBatch) {
+        if (itemMissingBatch.batches?.length) setBatchModalItem(itemMissingBatch);
+        showToast(
+          `Vui lòng chọn lô hàng và hạn sử dụng chính xác cho "${itemMissingBatch.productName}" trước khi hoàn thành phiếu.`,
+          'warning',
+        );
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       await transferService.create({ fromBranchId, toBranchId, dispatchNow: status === 'In-Transit', note, items });
       showToast(status === 'Draft' ? 'Đã lưu phiếu nháp.' : 'Đã xuất chuyển phiếu thành công.');
       setTimeout(() => navigate('/store-owner/transfers'), 500);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Không thể tạo phiếu chuyển.', 'warning');
+      showToast(getTransferErrorMessage(error), 'warning');
     } finally {
       setIsSaving(false);
     }
@@ -347,7 +379,7 @@ export const CreateTransferPage: React.FC = () => {
                       </div>
 
                       {/* Thông tin Lô & Link chọn lô khác */}
-                      {it.hasBatchManagement && (
+                      {(it.hasBatchManagement || Boolean(it.batches?.length)) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                           <span
                             style={{
@@ -600,8 +632,33 @@ export const CreateTransferPage: React.FC = () => {
       <ImportTransferExcelModal
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
-        onConfirmUpload={(fileName) => {
-          showToast(`Đã nạp thành công dữ liệu từ file Excel: ${fileName}`);
+        onConfirmUpload={(rows) => {
+          const additions: TransferItem[] = [];
+          const missing: string[] = [];
+          for (const row of rows) {
+            const product = products.find((candidate) => candidate.productCode.toLowerCase() === row.productCode.toLowerCase());
+            if (!product) { missing.push(row.productCode); continue; }
+            const existing = items.find((item) => item.productId === product.productId) ?? additions.find((item) => item.productId === product.productId);
+            if (existing) {
+              const quantity = existing.sentQty + row.quantity;
+              if (quantity > product.onHandSender) { missing.push(`${row.productCode} (vượt tồn)`); continue; }
+              existing.sentQty = quantity;
+              existing.amount = quantity * existing.unitPrice;
+            } else {
+              if (row.quantity > product.onHandSender) { missing.push(`${row.productCode} (vượt tồn)`); continue; }
+              additions.push({ ...product, sentQty: row.quantity, amount: row.quantity * product.unitPrice });
+            }
+          }
+          setItems((current) => {
+            const next = [...current];
+            for (const added of additions) {
+              const existing = next.find((item) => item.productId === added.productId);
+              if (existing) { existing.sentQty = added.sentQty; existing.amount = added.amount; }
+              else next.push(added);
+            }
+            return next;
+          });
+          showToast(missing.length ? `Đã nhập một phần. Không hợp lệ: ${missing.join(', ')}` : `Đã thêm ${rows.length} dòng sản phẩm từ Excel.`, missing.length ? 'warning' : 'success');
         }}
       />
     </div>

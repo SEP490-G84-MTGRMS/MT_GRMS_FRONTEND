@@ -1,7 +1,7 @@
 import React from 'react';
-import { RefreshCw, Printer, BookOpen, Clock } from 'lucide-react';
+import { RefreshCw, BookOpen, Clock } from 'lucide-react';
 
-export type FinanceTabKey = 'all' | 'overview' | 'pnl';
+export type FinanceTabKey = 'overview' | 'pnl';
 
 interface FinanceHeaderProps {
   todayLabel: string;
@@ -10,9 +10,7 @@ interface FinanceHeaderProps {
   accountingMode: boolean;
   onToggleAccountingMode: () => void;
   isRefreshing: boolean;
-  canExport: boolean;
   onRefreshAll: () => void;
-  onOpenExportModal: () => void;
   onNavigateCashbook: () => void;
   onNavigateCashControl: () => void;
 }
@@ -28,9 +26,7 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
   accountingMode,
   onToggleAccountingMode,
   isRefreshing,
-  canExport,
   onRefreshAll,
-  onOpenExportModal,
   onNavigateCashbook,
   onNavigateCashControl,
 }) => {
@@ -71,18 +67,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
             <span>Cập nhật</span>
           </button>
 
-          {/* Export Report Action */}
-          <button
-            type="button"
-            onClick={onOpenExportModal}
-            disabled={!canExport}
-            className="finance-btn-secondary"
-            title="In và xuất báo cáo Lãi lỗ"
-          >
-            <Printer size={15} />
-            <span>In & Xuất Báo Cáo</span>
-          </button>
-
           {/* Navigate to Pending Shifts & Safes */}
           <button
             type="button"
@@ -110,15 +94,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
 
       {/* Sub-tabs Navigation Bar */}
       <nav className="finance-subtabs-bar" role="tablist" aria-label="Phân hệ tài chính">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'all'}
-          className={`finance-subtab-btn ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => onTabChange('all')}
-        >
-          Tổng hợp (Tiền mặt & P&L)
-        </button>
         <button
           type="button"
           role="tab"

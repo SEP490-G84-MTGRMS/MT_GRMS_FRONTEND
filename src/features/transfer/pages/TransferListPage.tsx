@@ -1,19 +1,18 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ExcelJS from 'exceljs';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import {
   Plus,
   Download,
-  Upload,
   Search,
   Truck,
-  ShieldCheck,
   CheckCircle,
   FileText,
 } from 'lucide-react';
 import type { Branch, TransferOrder, TransferStatus } from '../types';
 import { transferService } from '../services/transferService';
 import { TransferFilterSidebar } from '../components/TransferFilterSidebar';
-import { ImportTransferExcelModal } from '../components/ImportTransferExcelModal';
 import { TransferDetailModal } from '../components/TransferDetailModal';
 import { TablePagination } from '../../../components/common';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -29,8 +28,8 @@ export const TransferListPage: React.FC = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
 
   // User role & current branch context (BR-SEC-02 simulation)
-  const [userRole, setUserRole] = useState<'StoreOwner' | 'Employee'>('StoreOwner');
-  const [currentBranchId, setCurrentBranchId] = useState<string>('');
+  const user = useAuthStore((state) => state.user);
+  const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
 
   // Filters
   const [searchCode, setSearchCode] = useState('');
@@ -45,9 +44,9 @@ export const TransferListPage: React.FC = () => {
   const [timeRange, setTimeRange] = useState<'all' | 'this_month' | 'custom'>('this_month');
   const [customDate, setCustomDate] = useState('');
   const [recvStatus, setRecvStatus] = useState<'all' | 'match' | 'mismatch'>('all');
+  const [dateField, setDateField] = useState<'transfer' | 'receive'>('transfer');
 
   // Modals & Selection
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<TransferOrder | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -59,11 +58,29 @@ export const TransferListPage: React.FC = () => {
 
   const loadTransfers = useCallback(() => {
     setIsLoading(true);
-    transferService.list({ page: pageIndex, pageSize, search: searchCode || undefined, fromBranchId: fromBranchId || undefined, toBranchId: toBranchId || undefined })
+    if (selectedStatuses.length === 0) {
+      setTransfers([]);
+      setTotalItems(0);
+      setIsLoading(false);
+      return;
+    }
+    const activeStatuses = selectedStatuses.map((status) => status === 'In-Transit' ? 'InTransit' : status);
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
+    const date = timeRange === 'this_month' && dateField === 'transfer' ? monthStart : timeRange === 'custom' && customDate ? new Date(`${customDate}T00:00:00`).toISOString() : undefined;
+    transferService.list({
+      page: pageIndex, pageSize, search: searchCode.trim() || undefined,
+      fromBranchId: fromBranchId || undefined, toBranchId: toBranchId || undefined,
+      statuses: activeStatuses.length ? activeStatuses : undefined,
+      receiveStatus: recvStatus,
+      fromDate: date,
+      toDate: timeRange === 'custom' && customDate ? customDate : undefined,
+      dateField,
+    })
       .then((result) => { setTransfers(result.items); setTotalItems(result.totalItems); })
       .catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không tải được phiếu điều chuyển.', 'warning'))
       .finally(() => setIsLoading(false));
-  }, [pageIndex, pageSize, searchCode, fromBranchId, toBranchId]);
+  }, [pageIndex, pageSize, searchCode, fromBranchId, toBranchId, selectedStatuses, timeRange, customDate, dateField, recvStatus]);
 
   useEffect(() => { void loadTransfers(); }, [loadTransfers]);
 
@@ -72,14 +89,13 @@ export const TransferListPage: React.FC = () => {
       .branches()
       .then((data) => {
         setBranches(data);
-        if (data.length > 0) {
-          setCurrentBranchId((prev) => (prev ? prev : data[0].id));
-        }
       })
       .catch((error: unknown) => {
         showToast(error instanceof Error ? error.message : 'Không tải được danh sách chi nhánh.', 'warning');
       });
   }, []);
+
+  useEffect(() => { setPageIndex(1); }, [searchCode, fromBranchId, toBranchId, selectedStatuses, timeRange, customDate, recvStatus, dateField]);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
@@ -102,6 +118,7 @@ export const TransferListPage: React.FC = () => {
     setTimeRange('this_month');
     setCustomDate('');
     setRecvStatus('all');
+    setDateField('transfer');
   };
 
   const handleToggleFavorite = (_id: string, e: React.MouseEvent) => {
@@ -113,8 +130,8 @@ export const TransferListPage: React.FC = () => {
   const filteredTransfers = useMemo(() => {
     return transfers.filter((t) => {
       // BR-SEC-02: Branch Isolation for Employee
-      if (userRole === 'Employee') {
-        const isRelated = t.fromBranchId === currentBranchId || t.toBranchId === currentBranchId;
+      if (!isStoreOwner && user?.branchId) {
+        const isRelated = t.fromBranchId === user.branchId || t.toBranchId === user.branchId;
         if (!isRelated) return false;
       }
 
@@ -144,12 +161,34 @@ export const TransferListPage: React.FC = () => {
 
       return true;
     });
-  }, [transfers, userRole, currentBranchId, searchCode, fromBranchId, toBranchId, selectedStatuses, recvStatus]);
+  }, [transfers, isStoreOwner, user?.branchId, searchCode, fromBranchId, toBranchId, selectedStatuses, recvStatus]);
 
   const totalTransferValue = filteredTransfers.reduce((sum, t) => sum + t.totalAmount, 0);
   const pagedTransfers = useMemo(() => {
     return filteredTransfers;
   }, [filteredTransfers]);
+
+  const exportExcel = async () => {
+    if (!filteredTransfers.length) {
+      showToast('Không có phiếu chuyển để xuất.', 'warning');
+      return;
+    }
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Phiếu chuyển');
+    sheet.addRow(['Mã phiếu', 'Ngày chuyển', 'Chi nhánh gửi', 'Chi nhánh nhận', 'Trạng thái', 'Tổng tiền']);
+    filteredTransfers.forEach((transfer) => sheet.addRow([
+      transfer.transferCode, transfer.transferDate, transfer.fromBranchName, transfer.toBranchName, transfer.status, transfer.totalAmount,
+    ]));
+    sheet.getRow(1).font = { bold: true };
+    sheet.columns.forEach((column) => { column.width = 22; });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'danh-sach-phieu-chuyen.xlsx';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const renderStatus = (status: TransferStatus) => {
     switch (status) {
@@ -278,57 +317,7 @@ export const TransferListPage: React.FC = () => {
 
         {/* Hành động chính bên phải */}
         <div className="transfer-header-actions">
-          {/* RBAC Role Switcher (BR-SEC-02 Test) */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#f1f5f9',
-              padding: '4px 10px',
-              borderRadius: 9999,
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            <ShieldCheck size={14} color="#0F766E" />
-            <span>Vai trò:</span>
-            <select
-              value={userRole}
-              onChange={(e) => setUserRole(e.target.value as any)}
-              style={{
-                border: 'none',
-                background: 'none',
-                fontWeight: 700,
-                color: '#0F766E',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="StoreOwner">Chủ chuỗi (Toàn quyền)</option>
-              <option value="Employee">Nhân viên kho (BR-SEC-02)</option>
-            </select>
-            {userRole === 'Employee' && (
-              <select
-                value={currentBranchId}
-                onChange={(e) => setCurrentBranchId(e.target.value)}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  fontWeight: 600,
-                  color: '#334155',
-                  outline: 'none',
-                  cursor: 'pointer',
-                }}
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    Tại {b.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+          {/* User role and branch are taken from the authenticated session. */}
 
           <button
             type="button"
@@ -341,16 +330,7 @@ export const TransferListPage: React.FC = () => {
           <button
             type="button"
             className="btn-secondary-white"
-            onClick={() => setIsImportModalOpen(true)}
-            title="Nhập danh mục từ Excel"
-          >
-            <Upload size={15} /> Import file
-          </button>
-
-          <button
-            type="button"
-            className="btn-secondary-white"
-            onClick={() => showToast(`Đang xuất file Excel cho ${filteredTransfers.length} phiếu chuyển hàng...`)}
+            onClick={() => void exportExcel()}
             title="Xuất file Excel"
           >
             <Download size={15} /> Xuất file
@@ -373,6 +353,8 @@ export const TransferListPage: React.FC = () => {
           onChangeTimeRange={setTimeRange}
           customDate={customDate}
           onChangeCustomDate={setCustomDate}
+          dateField={dateField}
+          onChangeDateField={setDateField}
           recvStatus={recvStatus}
           onChangeRecvStatus={setRecvStatus}
           onResetFilters={handleResetFilters}
@@ -511,7 +493,7 @@ export const TransferListPage: React.FC = () => {
                 })}
 
                       {isLoading && <tr><td colSpan={9} style={{ padding: 28, textAlign: 'center' }}>Đang tải phiếu...</td></tr>}
-                      {!isLoading && filteredTransfers.length === 0 && (
+      {!isLoading && filteredTransfers.length === 0 && (
                   <tr>
                     <td colSpan={9} style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
                       <FileText size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
@@ -540,15 +522,6 @@ export const TransferListPage: React.FC = () => {
           />
         </div>
       </div>
-
-      {/* Modal Import Excel */}
-      <ImportTransferExcelModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onConfirmUpload={(fileName) => {
-          showToast(`Đã import thành công danh sách hàng từ file: ${fileName}`);
-        }}
-      />
 
       {/* Modal Pop-up Chi tiết phiếu chuyển hàng */}
       <TransferDetailModal

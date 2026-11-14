@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import ExcelJS from 'exceljs';
 import {
   X,
   Trash2,
@@ -76,12 +77,31 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
     navigate('/store-owner/transfers/create');
   };
 
-  const handleExport = () => {
-    alert(`Đang xuất file Excel cho phiếu chuyển ${currentTransfer.transferCode}...`);
+  const handleExport = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Chi tiết phiếu chuyển');
+    sheet.addRow(['Mã phiếu', currentTransfer.transferCode]);
+    sheet.addRow(['Chi nhánh gửi', currentTransfer.fromBranchName]);
+    sheet.addRow(['Chi nhánh nhận', currentTransfer.toBranchName]);
+    sheet.addRow(['Ngày chuyển', currentTransfer.transferDate]);
+    sheet.addRow([]);
+    sheet.addRow(['Mã SP', 'Tên sản phẩm', 'Lô', 'Số lượng gửi', 'Số lượng nhận', 'Đơn giá', 'Thành tiền']);
+    currentTransfer.items.forEach((item) => sheet.addRow([
+      item.productCode, item.productName, item.batchNumber ?? '', item.sentQty, item.receivedQty ?? 0, item.unitPrice, item.amount,
+    ]));
+    sheet.getRow(6).font = { bold: true };
+    sheet.columns.forEach((column) => { column.width = 22; });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${currentTransfer.transferCode}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const handlePrint = () => {
-    alert('Đang kết nối máy in để in Biên bản giao nhận hàng hóa...');
+    window.print();
   };
 
   const isTransit = currentTransfer.status === 'In-Transit';

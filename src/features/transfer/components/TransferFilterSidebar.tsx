@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import type { Branch, TransferStatus } from '../types';
 
 interface TransferFilterSidebarProps {
@@ -13,6 +13,8 @@ interface TransferFilterSidebarProps {
   onChangeTimeRange: (range: 'all' | 'this_month' | 'custom') => void;
   customDate?: string;
   onChangeCustomDate: (date: string) => void;
+  dateField: 'transfer' | 'receive';
+  onChangeDateField: (field: 'transfer' | 'receive') => void;
   recvStatus: 'all' | 'match' | 'mismatch';
   onChangeRecvStatus: (status: 'all' | 'match' | 'mismatch') => void;
   onResetFilters: () => void;
@@ -30,6 +32,8 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
   onChangeTimeRange,
   customDate,
   onChangeCustomDate,
+  dateField,
+  onChangeDateField,
   recvStatus,
   onChangeRecvStatus,
   onResetFilters,
@@ -41,8 +45,6 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
     { key: 'Cancelled', label: 'Đã hủy' },
   ];
 
-  const [filterTransferDate, setFilterTransferDate] = useState(true);
-  const [filterReceiveDate, setFilterReceiveDate] = useState(false);
 
   return (
     <aside className="transfer-sidebar">
@@ -149,8 +151,8 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input
               type="checkbox"
-              checked={filterTransferDate}
-              onChange={(e) => setFilterTransferDate(e.target.checked)}
+              checked={dateField === 'transfer'}
+              onChange={() => onChangeDateField('transfer')}
               style={{ accentColor: '#0F766E', cursor: 'pointer' }}
             />
             <span>Ngày chuyển</span>
@@ -158,8 +160,8 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input
               type="checkbox"
-              checked={filterReceiveDate}
-              onChange={(e) => setFilterReceiveDate(e.target.checked)}
+              checked={dateField === 'receive'}
+              onChange={() => onChangeDateField('receive')}
               style={{ accentColor: '#0F766E', cursor: 'pointer' }}
             />
             <span>Ngày nhận</span>

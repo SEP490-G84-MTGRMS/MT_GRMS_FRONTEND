@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { AlertCircle, BarChart3 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import {
   FinanceHeader,
   HeroCashCards,
@@ -97,16 +97,6 @@ function createInitialPnlFilter(): PnlFilterParams {
 }
 
 /**
- * Smoothly scrolls the viewport to the embedded Zone B P&L section.
- */
-function scrollToPnlSection(): void {
-  document.getElementById('pnl-section')?.scrollIntoView({
-    behavior: 'smooth',
-    block: 'start',
-  });
-}
-
-/**
  * Fetches an optional summary endpoint and rethrows on failure after logging.
  */
 async function fetchOptionalSummary<T>(
@@ -189,7 +179,6 @@ function buildPillarsSummary(
     ((expenses?.totalCount !== undefined && expenses?.paidCount !== undefined)
       ? Math.max(0, expenses.totalCount - expenses.paidCount)
       : (overduePayablesAmount > 0 ? 1 : 0));
-
   return {
     totalCustomerDebt: debts?.totalDebtAR || 0,
     overLimitCustomersCount: debts?.overLimitCount || 0,
@@ -241,46 +230,15 @@ function useOverviewToast() {
 }
 
 /**
- * Scrolls smoothly to the embedded P&L section when `?tab=pnl` or `#pnl` is active and Zone A is ready.
- */
-function usePnlDeepLinkScroll(isReady: boolean): void {
-  const [searchParams] = useSearchParams();
-  const location = useLocation();
-  const scrolledKeyRef = useRef<string | null>(null);
-  const tabParam = searchParams.get('tab') ?? '';
-  const hash = location.hash ?? '';
-  const isPnlDeepLink = tabParam === 'pnl' || hash === '#pnl';
-  const deepLinkKey = `${tabParam}|${hash}`;
-
-  useEffect(() => {
-    if (!isPnlDeepLink) {
-      scrolledKeyRef.current = null;
-      return;
-    }
-    if (!isReady || scrolledKeyRef.current === deepLinkKey) {
-      return;
-    }
-
-    const rafId = window.requestAnimationFrame(() => {
-      scrolledKeyRef.current = deepLinkKey;
-      scrollToPnlSection();
-    });
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-    };
-  }, [isPnlDeepLink, isReady, deepLinkKey]);
-}
-
-/**
  * Loads real-time Zone A cashbook, debt, expense, and tax queries.
  */
-function useZoneAQueries(currentYear: number, branchId?: string): ZoneAQueriesResult {
+function useZoneAQueries(currentYear: number, branchId?: string, enabled = true): ZoneAQueriesResult {
   const branchParam = branchId === 'ALL' ? undefined : branchId;
 
   const cashAccountsQuery = useQuery({
     queryKey: ['finance-overview-cash-accounts', branchId],
     queryFn: () => cashbookService.getCashAccounts(branchParam),
+    enabled,
   });
 
   const cashSummaryQuery = useQuery({
@@ -292,6 +250,7 @@ function useZoneAQueries(currentYear: number, branchId?: string): ZoneAQueriesRe
       );
       return res.data?.data;
     },
+    enabled,
   });
 
   const debtsSummaryQuery = useQuery({
@@ -301,6 +260,7 @@ function useZoneAQueries(currentYear: number, branchId?: string): ZoneAQueriesRe
         branchParam ? `/customers/debts/summary?branchId=${branchParam}` : '/customers/debts/summary',
         'debts summary'
       ),
+    enabled,
   });
 
   const expensesSummaryQuery = useQuery({
@@ -310,6 +270,7 @@ function useZoneAQueries(currentYear: number, branchId?: string): ZoneAQueriesRe
         branchParam ? `/expenses/summary?branchId=${branchParam}` : '/expenses/summary',
         'expenses summary'
       ),
+    enabled,
   });
 
   const taxSummaryQuery = useQuery({
@@ -321,6 +282,7 @@ function useZoneAQueries(currentYear: number, branchId?: string): ZoneAQueriesRe
         periodNumber: currentYear,
         calculationMethod: TaxCalculationMethod.RevenuePercentage,
       }),
+    enabled,
   });
 
   const pendingMovementsQuery = useQuery({
@@ -333,6 +295,7 @@ function useZoneAQueries(currentYear: number, branchId?: string): ZoneAQueriesRe
         return { pendingApprovalsCount: 0, unconfirmedDropsCount: 0, movements: [] };
       }
     },
+    enabled,
   });
 
   return {
@@ -348,10 +311,11 @@ function useZoneAQueries(currentYear: number, branchId?: string): ZoneAQueriesRe
 /**
  * Loads branch options and period P&L report data shared between Card #3 and Zone B.
  */
-function usePnlSectionQueries(pnlFilter: PnlFilterParams) {
+function usePnlSectionQueries(pnlFilter: PnlFilterParams, enabled = true) {
   const branchesQuery = useQuery<BranchOption[], Error>({
     queryKey: ['finance-pnl-branches'],
     queryFn: () => reportsPnlService.getBranches(),
+    enabled,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -364,6 +328,7 @@ function usePnlSectionQueries(pnlFilter: PnlFilterParams) {
       pnlFilter.endDate,
     ],
     queryFn: () => reportsPnlService.getPnlReportData(pnlFilter),
+    enabled,
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
   });
@@ -445,17 +410,6 @@ const OverviewErrorBanner: React.FC<{ onRetry: () => void }> = ({ onRetry }) => 
   </div>
 );
 
-const PnlZoneDivider: React.FC = () => (
-  <div className="finance-zone-divider" aria-hidden="true">
-    <div className="finance-zone-divider-line" />
-    <span className="finance-zone-divider-label">
-      <BarChart3 size={14} />
-      Phân tích Lãi lỗ &amp; Hiệu quả kinh doanh theo kỳ
-    </span>
-    <div className="finance-zone-divider-line" />
-  </div>
-);
-
 interface EmbeddedPnlSectionProps {
   filter: PnlFilterParams;
   onFilterChange: (newFilter: PnlFilterParams) => void;
@@ -518,13 +472,21 @@ function useFinanceOverviewController() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get('tab');
-  const activeTab: FinanceTabKey =
-    rawTab === 'overview' || rawTab === 'pnl' ? rawTab : 'all';
+  const activeTab: FinanceTabKey = rawTab === 'pnl' ? 'pnl' : 'overview';
+
+  useEffect(() => {
+    if (rawTab !== 'overview' && rawTab !== 'pnl') {
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', 'overview');
+      setSearchParams(next, { replace: true });
+    }
+  }, [rawTab, searchParams, setSearchParams]);
 
   const { toast, showToast, dismissToast } = useOverviewToast();
-  const zoneA = useZoneAQueries(currentYear, pnlFilter.branchId);
+  const zoneA = useZoneAQueries(currentYear, pnlFilter.branchId, activeTab === 'overview');
   const { branchesQuery, pnlReportQuery } = usePnlSectionQueries(pnlFilter);
   const refresh = useOverviewRefresh(zoneA, pnlReportQuery, showToast);
+  const isLoading = zoneA.cashAccountsQuery.isLoading || zoneA.cashSummaryQuery.isLoading;
 
   // Synchronize branch from global top navigation
   useEffect(() => {
@@ -544,9 +506,6 @@ function useFinanceOverviewController() {
       window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
     };
   }, []);
-
-  const isLoading = zoneA.cashAccountsQuery.isLoading || zoneA.cashSummaryQuery.isLoading;
-  usePnlDeepLinkScroll(!isLoading);
 
   const pendingMovements = zoneA.pendingMovementsQuery.data?.movements || [];
   const unconfirmedDropsCount = zoneA.pendingMovementsQuery.data?.unconfirmedDropsCount ??
@@ -582,16 +541,9 @@ function useFinanceOverviewController() {
   const handleTabChange = useCallback((tab: FinanceTabKey) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (tab === 'all') {
-        next.delete('tab');
-      } else {
-        next.set('tab', tab);
-      }
+      next.set('tab', tab);
       return next;
     });
-    if (tab === 'pnl') {
-      window.requestAnimationFrame(() => scrollToPnlSection());
-    }
   }, [setSearchParams]);
 
   const handleToggleAccountingMode = useCallback(() => {
@@ -644,8 +596,8 @@ export const FinanceOverviewPage: React.FC = () => {
   const navigate = useNavigate();
   const ctrl = useFinanceOverviewController();
 
-  const showZoneA = ctrl.activeTab === 'all' || ctrl.activeTab === 'overview';
-  const showZoneB = ctrl.activeTab === 'all' || ctrl.activeTab === 'pnl';
+  const showZoneA = ctrl.activeTab === 'overview';
+  const showZoneB = ctrl.activeTab === 'pnl';
 
   return (
     <div className="finance-overview-container">
@@ -659,9 +611,7 @@ export const FinanceOverviewPage: React.FC = () => {
           accountingMode={ctrl.accountingMode}
           onToggleAccountingMode={ctrl.handleToggleAccountingMode}
           isRefreshing={ctrl.isRefreshing}
-          canExport={Boolean(ctrl.pnlReportQuery.data)}
           onRefreshAll={ctrl.handleRefreshAll}
-          onOpenExportModal={() => ctrl.setIsExportModalOpen(true)}
           onNavigateCashbook={() => navigate('/store-owner/cashbook')}
           onNavigateCashControl={() => navigate('/store-owner/cash-control?tab=pending')}
         />
@@ -695,14 +645,12 @@ export const FinanceOverviewPage: React.FC = () => {
               pillars={ctrl.pillars}
               isPnlPending={ctrl.isPnlPending}
               onNavigate={navigate}
-              onScrollToPnl={scrollToPnlSection}
+              onScrollToPnl={() => navigate('/store-owner/finance?tab=pnl')}
             />
           </>
         )}
 
         {/* Zone Divider between Zone A and Zone B */}
-        {ctrl.activeTab === 'all' && <PnlZoneDivider />}
-
         {/* Zone B: Profit & Loss (P&L) Waterfall & Reports */}
         {showZoneB && (
           <EmbeddedPnlSection

@@ -40,11 +40,43 @@ export type ApiTransfer = {
 const unwrap = <T,>(response: ApiEnvelope<T>): T => (response?.data ?? response?.Data ?? response) as T;
 
 export const toIsoDate = (value?: string): string | undefined => {
-  if (!value) return undefined;
-  const vietnameseDate = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (vietnameseDate) return `${vietnameseDate[3]}-${vietnameseDate[2]}-${vietnameseDate[1]}T00:00:00Z`;
-  const date = new Date(value);
+  if (!value || !value.trim()) return undefined;
+  const trimmed = value.trim();
+  const vietnameseDate = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (vietnameseDate) {
+    const day = vietnameseDate[1].padStart(2, '0');
+    const month = vietnameseDate[2].padStart(2, '0');
+    const year = vietnameseDate[3];
+    return `${year}-${month}-${day}T00:00:00Z`;
+  }
+  const date = new Date(trimmed);
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
+export const getTransferErrorMessage = (error: unknown): string => {
+  if (typeof error !== 'object' || error === null) {
+    return error instanceof Error ? error.message : 'Không thể tạo phiếu chuyển.';
+  }
+
+  const response = (error as { response?: { data?: unknown } }).response;
+  const data = response?.data;
+  if (typeof data === 'object' && data !== null) {
+    const body = data as Record<string, unknown>;
+    for (const key of ['message', 'Message', 'detail', 'Detail', 'title', 'Title']) {
+      const message = body[key];
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+
+    const errors = body.errors ?? body.Errors;
+    if (typeof errors === 'object' && errors !== null) {
+      const firstError = Object.values(errors as Record<string, unknown>)
+        .flatMap((value) => Array.isArray(value) ? value : [value])
+        .find((value): value is string => typeof value === 'string' && Boolean(value.trim()));
+      if (firstError) return firstError;
+    }
+  }
+
+  return error instanceof Error ? error.message : 'Không thể tạo phiếu chuyển.';
 };
 
 export const mapTransfer = (dto: ApiTransfer): TransferOrder => ({
@@ -105,7 +137,7 @@ export const transferService = {
     const list = Array.isArray(page) ? page : (page?.items ?? page?.Items ?? []);
     return list
       .map((product) => {
-        const id = String(product.productId ?? product.id ?? '');
+      const id = String(product.productId ?? product.id ?? '');
         const stock = Number(product.currentStock ?? product.quantityOnHand ?? 0);
         const code = String(product.sku ?? product.productCode ?? product.code ?? '');
         const name = String(product.name ?? product.productName ?? '');
@@ -163,15 +195,24 @@ export const transferService = {
     if (queryParams.status === 'In-Transit') {
       queryParams.status = 'InTransit';
     }
+    if (Array.isArray(queryParams.statuses)) {
+      queryParams.statuses = queryParams.statuses.map((status) => status === 'In-Transit' ? 'InTransit' : status);
+    }
+    if (typeof queryParams.fromDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(queryParams.fromDate)) {
+      queryParams.fromDate = `${queryParams.fromDate}T00:00:00`;
+    }
+    if (typeof queryParams.toDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(queryParams.toDate)) {
+      queryParams.toDate = `${queryParams.toDate}T00:00:00`;
+    }
     const response = await httpClient.get<ApiEnvelope<ApiPage<ApiTransfer>>>('/transfers', {
       params: queryParams,
     });
     const page = unwrap(response.data);
-    const data = (page ?? {}) as ApiPage<ApiTransfer> & { totalItems?: number; TotalItems?: number };
+    const data = (page ?? {}) as ApiPage<ApiTransfer> & { totalItems?: number; TotalItems?: number; totalCount?: number; TotalCount?: number };
     const items = (data.items ?? data.Items ?? (Array.isArray(page) ? page : [])).map(mapTransfer);
     return {
       items,
-      totalItems: data.totalItems ?? data.TotalItems ?? items.length,
+      totalItems: data.totalItems ?? data.TotalItems ?? data.totalCount ?? data.TotalCount ?? items.length,
     };
   },
 
@@ -190,8 +231,8 @@ export const transferService = {
       items: input.items.map((item) => ({
         productId: item.productId,
         quantity: item.sentQty,
-        unit: item.unitName,
-        batchCode: item.batchNumber,
+        unit: item.unitName?.trim() || 'Cái',
+        batchCode: item.batchNumber?.trim() || undefined,
         expiryDate: toIsoDate(item.expiryDate),
         unitPrice: item.unitPrice,
       })),

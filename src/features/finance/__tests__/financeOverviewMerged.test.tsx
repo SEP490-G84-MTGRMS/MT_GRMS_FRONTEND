@@ -185,7 +185,6 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
   let scrollIntoViewMock: ReturnType<typeof vi.fn>;
   let httpGetSpy: ReturnType<typeof vi.spyOn>;
   let cashAccountsSpy: ReturnType<typeof vi.spyOn>;
-  let branchesSpy: ReturnType<typeof vi.spyOn>;
   let pnlReportSpy: ReturnType<typeof vi.spyOn>;
 
   const countHttpGetCalls = (endpoint: string): number =>
@@ -265,9 +264,7 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
       throw new Error(`Unexpected financeHttpClient.get call: ${url}`);
     });
 
-    branchesSpy = vi
-      .spyOn(reportsPnlService, 'getBranches')
-      .mockResolvedValue(MOCK_BRANCHES);
+    vi.spyOn(reportsPnlService, 'getBranches').mockResolvedValue(MOCK_BRANCHES);
 
     pnlReportSpy = vi
       .spyOn(reportsPnlService, 'getPnlReportData')
@@ -312,13 +309,12 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
     vi.restoreAllMocks();
   });
 
-  it('1. renders Zone A (Hero Cash Card, compact To-Do when 0 urgent tasks, 4 Summary cards) and Zone B (#pnl-section) on the same page', async () => {
+  it('1. defaults to the overview tab and does not render the P&L section alongside it', async () => {
     const { container } = renderPage();
 
-    // Wait for both Zone A and Zone B data to settle
     await waitFor(() => {
       expect(screen.getByText('348.950.000đ')).toBeDefined();
-      expect(screen.getByText('85.811.580đ')).toBeDefined();
+      expect(screen.getByTestId('router-location').textContent).toBe('/store-owner/finance?tab=overview');
     });
 
     // Zone A: Hero Cash Card
@@ -336,21 +332,15 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
     expect(screen.getByText('Lợi nhuận ròng PnL')).toBeDefined();
     expect(screen.getByText(/Thuế năm nay/i)).toBeDefined();
 
-    // Zone B: Embedded P&L section on the same page
-    const pnlSection = container.querySelector('#pnl-section');
-    expect(pnlSection).not.toBeNull();
-    expect(
-      screen.getByRole('heading', { level: 2, name: 'Báo cáo Lãi lỗ (P&L)' })
-    ).toBeDefined();
+    expect(container.querySelector('#pnl-section')).toBeNull();
+    expect(screen.queryByRole('tab', { name: /Tổng hợp/i })).toBeNull();
   });
 
-  it('2. deduplicates P&L API calls and shares reportData.kpiSummary with Card #3', async () => {
-    renderPage();
+  it('2. loads P&L summaries for the overview pillar cards', async () => {
+    renderPage('/store-owner/finance?tab=overview');
 
     await waitFor(() => {
-      expect(pnlReportSpy).toHaveBeenCalledTimes(1);
-      expect(branchesSpy).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('85.811.580đ')).toBeDefined();
+      expect(cashAccountsSpy).toHaveBeenCalledTimes(1);
     });
 
     // FinanceOverviewPage must not directly query /finance/reports/pnl/summary
@@ -358,66 +348,28 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
     expect(directGetUrls).not.toContain('/finance/reports/pnl/summary');
     expect(directGetUrls.some((url: string) => url.includes('/finance/reports/pnl'))).toBe(false);
 
-    // Card #3 displays exact netProfit and netMarginPct from unified reportData.kpiSummary
-    const card3Title = screen.getByText('Lợi nhuận ròng PnL');
-    const card3Element = card3Title.closest('.finance-summary-card') as HTMLElement;
-    expect(card3Element).not.toBeNull();
-    expect(card3Element.textContent).toContain('85.811.580đ');
-    expect(card3Element.textContent).toContain('Tỷ suất lợi nhuận: 25.6%');
+    expect(screen.getByText('Lợi nhuận ròng PnL')).toBeDefined();
+    expect(pnlReportSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('3. clicking Card #3 scrolls smoothly to #pnl-section instead of navigating away', async () => {
-    const { container } = renderPage('/store-owner/finance');
-
+  it('3. defaults invalid and missing tab values to the overview tab', async () => {
+    renderPage('/store-owner/finance?tab=all');
     await waitFor(() => {
-      expect(screen.getByText('85.811.580đ')).toBeDefined();
+      expect(screen.getByTestId('router-location').textContent).toBe('/store-owner/finance?tab=overview');
     });
-
-    const card3Element = screen
-      .getByText('Lợi nhuận ròng PnL')
-      .closest('.finance-summary-card') as HTMLElement;
-    fireEvent.click(card3Element);
-
-    const pnlSection = container.querySelector('#pnl-section');
-    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
-    expect(scrollIntoViewMock).toHaveBeenCalledWith({
-      behavior: 'smooth',
-      block: 'start',
-    });
-    expect(scrolledElements[0]).toBe(pnlSection);
-    expect(screen.getByTestId('router-location').textContent).toBe('/store-owner/finance');
   });
 
-  it('4a. deep-linking with ?tab=pnl triggers smooth scroll to #pnl-section on mount', async () => {
+  it('4a. the P&L tab renders the P&L report without overview cards', async () => {
     const { container } = renderPage('/store-owner/finance?tab=pnl');
-    const pnlSection = container.querySelector('#pnl-section');
-
     await waitFor(() => {
-      expect(scrollIntoViewMock).toHaveBeenCalledWith({
-        behavior: 'smooth',
-        block: 'start',
-      });
+      expect(screen.getByText('Bậc thang Lợi nhuận P&L (Thực thu thực chi)')).toBeDefined();
     });
-
-    expect(scrolledElements[0]).toBe(pnlSection);
-  });
-
-  it('4b. deep-linking with #pnl hash triggers smooth scroll to #pnl-section on mount', async () => {
-    const { container } = renderPage('/store-owner/finance#pnl');
-    const pnlSection = container.querySelector('#pnl-section');
-
-    await waitFor(() => {
-      expect(scrollIntoViewMock).toHaveBeenCalledWith({
-        behavior: 'smooth',
-        block: 'start',
-      });
-    });
-
-    expect(scrolledElements[0]).toBe(pnlSection);
+    expect(container.querySelector('#pnl-section')).not.toBeNull();
+    expect(screen.queryByText(/Tiền hiện có hôm nay/i)).toBeNull();
   });
 
   it('5. supports progressive disclosure, view mode tabs, and accounting basis toggle updating Waterfall title', async () => {
-    renderPage();
+    renderPage('/store-owner/finance?tab=pnl');
 
     await waitFor(() => {
       expect(screen.getByText('Bậc thang Lợi nhuận P&L (Thực thu thực chi)')).toBeDefined();
@@ -460,31 +412,23 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
     expect(screen.getByText('Cơ sở hạch toán: Dồn tích')).toBeDefined();
   });
 
-  it('6. unified header refresh refetches both Zone A and Zone B endpoints with toast, and header export opens P&L export modal', async () => {
-    renderPage();
+  it('6. P&L header refresh refetches report data and toolbar opens export modal', async () => {
+    renderPage('/store-owner/finance?tab=pnl');
 
     await waitFor(() => {
-      expect(cashAccountsSpy).toHaveBeenCalledTimes(1);
+      expect(cashAccountsSpy).toHaveBeenCalledTimes(0);
       expect(pnlReportSpy).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('348.950.000đ')).toBeDefined();
-      expect(screen.getByText('85.811.580đ')).toBeDefined();
+      expect(screen.queryByText('348.950.000đ')).toBeNull();
     });
 
-    expect(countHttpGetCalls('/cashbook/summary')).toBe(1);
+    expect(countHttpGetCalls('/cashbook/summary')).toBe(0);
 
-    // Click unified header "Cập nhật" button
+    // Refresh only the active P&L report.
     fireEvent.click(screen.getByRole('button', { name: /Cập nhật/i }));
 
-    await waitFor(() => {
-      expect(cashAccountsSpy).toHaveBeenCalledTimes(2);
-      expect(pnlReportSpy).toHaveBeenCalledTimes(2);
-      expect(countHttpGetCalls('/cashbook/summary')).toBe(2);
-      expect(screen.getByText('Đã cập nhật số liệu tài chính mới nhất!')).toBeDefined();
-    });
-
-    // Click header export button to open P&L Export modal
-    const headerExportBtn = screen.getByTitle('In và xuất báo cáo Lãi lỗ');
-    fireEvent.click(headerExportBtn);
+    // Keep export in the P&L toolbar, avoiding a duplicate action in the page header.
+    expect(screen.queryByTitle('In và xuất báo cáo Lãi lỗ')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /In & Xuất Báo Cáo/i }));
     expect(screen.getByRole('dialog')).toBeDefined();
     expect(screen.getByText('In & Xuất Báo Cáo Tài Chính P&L')).toBeDefined();
   });
@@ -504,7 +448,7 @@ describe('FinanceOverviewPage — Unified Zone A + Zone B (P&L) Integration Suit
     // Retry button and page layout remain intact without crashing
     expect(screen.getByRole('button', { name: 'Thử lại' })).toBeDefined();
     expect(screen.getByText(/Tiền hiện có hôm nay/i)).toBeDefined();
-    expect(container.querySelector('#pnl-section')).not.toBeNull();
+    expect(container.querySelector('#pnl-section')).toBeNull();
     expect(screen.getByText('85.811.580đ')).toBeDefined();
   });
 

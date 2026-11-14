@@ -111,8 +111,7 @@ const WaterfallRow: React.FC<{ item: WaterfallItem }> = ({ item }) => {
 };
 
 /**
- * Displays a step-by-step P&L profit waterfall with both visual SVG 6-step column bars
- * and granular reconciliation rows from net revenue to net profit.
+ * Displays a step-by-step P&L profit waterfall with visual SVG 6-step column bars.
  */
 export const WaterfallChart: React.FC<WaterfallChartProps> = ({
   items,
@@ -171,12 +170,14 @@ export const WaterfallChart: React.FC<WaterfallChartProps> = ({
         </div>
       )}
 
-      {/* Detailed rows */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {items.map((item) => (
-          <WaterfallRow key={item.id} item={item} />
-        ))}
-      </div>
+      {/* Keep the textual reconciliation only when the chart has no usable revenue data. */}
+      {netRevenue <= 0 && (
+        <div className="waterfall-detail-rows" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {items.map((item) => (
+            <WaterfallRow key={item.id} item={item} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

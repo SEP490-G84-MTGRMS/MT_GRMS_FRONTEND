@@ -7,7 +7,6 @@ import {
   PackageIcon,
   ChevronRightIcon,
   MenuIcon,
-  TrendingUpIcon,
 } from "../../features/admin/components";
 import {
   Gift,
@@ -90,6 +89,11 @@ const StoreNavIcon: FC<{ size?: number; color?: string }> = ({
   size = 18,
   color = "currentColor",
 }) => <Store size={size} color={color} strokeWidth={1.8} />;
+
+const WalletNavIcon: FC<{ size?: number; color?: string }> = ({
+  size = 18,
+  color = "currentColor",
+}) => <Wallet size={size} color={color} strokeWidth={1.8} />;
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -231,44 +235,35 @@ const NAV_GROUPS: NavGroup[] = [
   {
     id: "finance",
     label: "Tiền & Báo cáo",
-    icon: TrendingUpIcon,
-    children: [
+    icon: WalletNavIcon,
+    sections: [
       {
-        label: "Tổng quan tài chính & lãi lỗ",
-        to: "/store-owner/finance",
-        desc: "Số dư thực, việc cần duyệt & báo cáo P&L",
-        icon: "📊",
+        title: "Tiền",
+        items: [
+          { label: "Sổ quỹ", to: "/store-owner/cashbook" },
+          {
+            label: "Ca & két (duyệt chi, rút két)",
+            to: "/store-owner/cash-control",
+          },
+          {
+            label: "Chi phí & hóa đơn phải trả",
+            to: "/store-owner/expenses",
+          },
+          {
+            label: "Khách nợ & Thu công nợ",
+            to: "/store-owner/customers",
+          },
+        ],
       },
       {
-        label: "Sổ quỹ",
-        to: "/store-owner/cashbook",
-        desc: "Két quầy, két sắt, ngân hàng & phân loại chi",
-        icon: "💰",
-      },
-      {
-        label: "Ca & két (duyệt chi, rút két)",
-        to: "/store-owner/cash-control",
-        desc: "Lịch sử ca POS, duyệt chi vượt mức & hạn mức",
-        icon: "🔐",
-        badgeType: "orange",
-      },
-      {
-        label: "Chi phí & hóa đơn phải trả",
-        to: "/store-owner/expenses",
-        desc: "Tiền điện, mặt bằng, bảo trì",
-        icon: "🧾",
-      },
-      {
-        label: "Thuế & sổ sách",
-        to: "/store-owner/tax-snapshots",
-        desc: "Tờ khai 01/CNKD & 7 sổ TT152 theo ngưỡng 1 tỷ",
-        icon: "🏛️",
-      },
-      {
-        label: "Khách nợ & Thu công nợ",
-        to: "/store-owner/customers",
-        desc: "Sổ nợ, hạn mức tín dụng & thu nợ VietQR",
-        icon: "👥",
+        title: "Báo cáo",
+        items: [
+          {
+            label: "Tổng quan tài chính & lãi lỗ",
+            to: "/store-owner/finance",
+          },
+          { label: "Thuế & sổ sách", to: "/store-owner/tax-snapshots" },
+        ],
       },
     ],
   },
