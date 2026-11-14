@@ -428,7 +428,6 @@ export const EmployeeListPage: React.FC = () => {
       <div style={{ marginBottom: 16 }}>
         <h2 className="emp-header-title" style={{ margin: 0 }}>
           <span>Danh sách nhân viên</span>
-          <span className="count-badge">{totalItems}</span>
         </h2>
       </div>
 

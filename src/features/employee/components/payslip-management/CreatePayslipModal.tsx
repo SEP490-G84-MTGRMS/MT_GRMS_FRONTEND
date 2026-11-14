@@ -118,15 +118,10 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 650 }}>
+      <div className="emp-modal-card" style={{ maxWidth: 680, width: '100%' }}>
         {/* Header */}
         <div className="emp-modal-header">
-          <div>
-            <h3 style={{ margin: 0 }}>Khởi tạo phiếu lương hàng loạt theo kỳ tháng</h3>
-            <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-              Áp dụng chính sách chấm công & cấu hình lương tự động cho nhân viên
-            </div>
-          </div>
+          <h3 style={{ margin: 0 }}>Khởi tạo bảng lương</h3>
           <button type="button" className="emp-modal-close-btn" onClick={onClose} disabled={isSubmitting}>
             &times;
           </button>
@@ -134,20 +129,19 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
 
         {/* Body */}
         <form onSubmit={handleSubmit}>
-          <div className="emp-modal-body">
+          <div className="emp-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {submitError && (
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  padding: '10px 14px',
+                  padding: '10px 12px',
                   background: '#FEF2F2',
                   border: '1px solid #FCA5A5',
                   borderRadius: 8,
                   color: '#991B1B',
                   fontSize: 13,
-                  marginBottom: 14,
                 }}
               >
                 <AlertCircle size={16} color="#DC2626" style={{ flexShrink: 0 }} />
@@ -157,9 +151,9 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
 
             {/* Hàng 1: Kỳ tháng & Chi nhánh */}
             <div className="emp-grid-2">
-              <div className="emp-form-group">
+              <div className="emp-form-group" style={{ marginBottom: 0 }}>
                 <label className="emp-form-label">
-                  Kỳ tháng tính lương <span className="required">*</span>
+                  Kỳ lương <span className="required">*</span>
                 </label>
                 <input
                   type="month"
@@ -170,8 +164,8 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
                 />
               </div>
 
-              <div className="emp-form-group">
-                <label className="emp-form-label">Chi nhánh áp dụng</label>
+              <div className="emp-form-group" style={{ marginBottom: 0 }}>
+                <label className="emp-form-label">Chi nhánh</label>
                 <select
                   className="emp-form-select"
                   value={branchId}
@@ -180,7 +174,7 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
                     setPolicyFeedback(null);
                   }}
                 >
-                  <option value="ALL">-- Tất cả chi nhánh --</option>
+                  <option value="ALL">Tất cả chi nhánh</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
@@ -190,53 +184,68 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
               </div>
             </div>
 
-            {/* Banner trạng thái chính sách chấm công & nút cấu hình trực tiếp */}
+            {/* Hình thức lương (chọn nhanh 1 chạm) */}
+            <div className="emp-form-group" style={{ marginBottom: 0 }}>
+              <label className="emp-form-label">Hình thức lương</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                {(
+                  [
+                    { value: 'ALL', label: 'Tất cả' },
+                    { value: 'MONTHLY', label: 'Theo tháng' },
+                    { value: 'SHIFT', label: 'Theo ca' },
+                    { value: 'HOURLY', label: 'Theo giờ' },
+                  ] as const
+                ).map((opt) => {
+                  const active = salaryTypeFilter === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setSalaryTypeFilter(opt.value)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        border: active ? '1.5px solid #0F766E' : '1px solid #CBD5E1',
+                        background: active ? '#F0FDFA' : '#FFFFFF',
+                        color: active ? '#0F766E' : '#475569',
+                        fontSize: 13,
+                        fontWeight: active ? 600 : 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Thanh cấu hình chính sách gọn */}
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '10px 14px',
-                background: '#F0FDFA',
-                border: '1px solid #CCFBF1',
-                borderRadius: 10,
-                marginTop: -4,
-                marginBottom: 12,
+                gap: 12,
+                padding: '9px 12px',
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: 8,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    background: '#CCFBF1',
-                    color: '#0F766E',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Sliders size={16} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#0F766E' }}>
-                    CHÍNH SÁCH CHẤM CÔNG & CẤU HÌNH LƯƠNG
-                  </div>
-                  <div style={{ fontSize: 12, color: '#334155', marginTop: 1 }}>
-                    {policyFeedback ? (
-                      <span style={{ color: '#047857', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <CheckCircle2 size={13} />
-                        {policyFeedback}
-                      </span>
-                    ) : branchId === 'ALL' ? (
-                      'Mặc định hệ thống: 8.0 giờ/công'
-                    ) : (
-                      `Chi nhánh: ${branches.find((b) => b.id === branchId)?.name || 'Chi nhánh'} • Chuẩn ${standardDayHours.toFixed(1)} giờ/công`
-                    )}
-                  </div>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, fontSize: 13, color: '#334155' }}>
+                <Sliders size={15} color="#0F766E" style={{ flexShrink: 0 }} />
+                {policyFeedback ? (
+                  <span style={{ color: '#047857', display: 'inline-flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+                    {policyFeedback}
+                  </span>
+                ) : (
+                  <span>
+                    Chuẩn công: <strong>{standardDayHours.toFixed(1)}h/ngày</strong>
+                  </span>
+                )}
               </div>
 
               <button
@@ -244,89 +253,45 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
                 className="emp-btn emp-btn-secondary"
                 style={{
                   fontSize: 12,
-                  padding: '5px 12px',
+                  padding: '4px 10px',
                   height: 'auto',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
-                  borderColor: '#0D9488',
-                  color: '#0F766E',
-                  background: '#FFFFFF',
-                  fontWeight: 600,
+                  gap: 5,
                   whiteSpace: 'nowrap',
-                  cursor: 'pointer',
+                  flexShrink: 0,
                 }}
                 onClick={() => setIsAttendanceConfigOpen(true)}
-                title="Cấu hình số giờ chuẩn, quy đổi công, dung sai đi muộn & làm thêm giờ (OT)"
+                title="Cấu hình giờ chuẩn, quy đổi công & OT"
               >
-                <Settings size={14} />
-                {branchId === 'ALL' ? 'Cấu hình chính sách' : 'Cấu hình chi nhánh này'}
+                <Settings size={13} />
+                Cấu hình
               </button>
             </div>
 
-            {/* Hàng 2: Hình thức lương & Trạng thái */}
-            <div className="emp-grid-2">
-              <div className="emp-form-group">
-                <label className="emp-form-label">Hình thức trả lương áp dụng</label>
-                <select
-                  className="emp-form-select"
-                  value={salaryTypeFilter}
-                  onChange={(e) => setSalaryTypeFilter(e.target.value as any)}
-                >
-                  <option value="ALL">Tất cả hình thức (Tháng, Ca, Giờ)</option>
-                  <option value="MONTHLY">Lương cố định theo tháng (Monthly)</option>
-                  <option value="SHIFT">Lương theo ca làm việc (Shift)</option>
-                  <option value="HOURLY">Lương theo giờ làm việc (Hourly)</option>
-                </select>
-              </div>
-
-              <div className="emp-form-group">
-                <label className="emp-form-label">Trạng thái khởi tạo</label>
-                <div style={{ paddingTop: 6 }}>
-                  <span className="emp-status-pill warning" style={{ padding: '6px 12px', fontSize: 13 }}>
-                    Unpaid (Chưa thanh toán)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tùy chọn cấu hình tự động */}
-            <div className="emp-section-card" style={{ marginTop: 8 }}>
-              <div className="emp-section-title" style={{ fontSize: 13, marginBottom: 8 }}>
-                Quy tắc tính toán tự động
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>Tự động tổng hợp ngày công, tổng giờ và giờ OT từ bảng phân ca và chấm công thực tế</span>
-                </label>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>Tự động nạp danh sách phụ cấp định kỳ (ăn trưa, trách nhiệm...) từ hồ sơ nhân viên</span>
-                </label>
-
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>Tự động cấn trừ các khoản tạm ứng lương đã chi trong kỳ và cập nhật công nợ còn lại</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Ghi chú chung đợt tính lương */}
-            <div className="emp-form-group" style={{ marginTop: 8 }}>
+            {/* Ghi chú */}
+            <div className="emp-form-group" style={{ marginBottom: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <label className="emp-form-label" style={{ marginBottom: 0 }}>Ghi chú đợt khởi tạo bảng lương</label>
-                <span style={{ fontSize: 11, color: batchNote.length > 500 ? '#EF4444' : '#94A3B8' }}>
-                  {batchNote.length}/500
-                </span>
+                <label className="emp-form-label" style={{ marginBottom: 0 }}>Ghi chú</label>
+                {batchNote.length > 0 && (
+                  <span style={{ fontSize: 11, color: batchNote.length > 500 ? '#EF4444' : '#94A3B8' }}>
+                    {batchNote.length}/500
+                  </span>
+                )}
               </div>
               <input
                 type="text"
                 className="emp-form-input"
                 maxLength={500}
-                placeholder="Ví dụ: Bảng lương tháng 11/2026 - Quyết toán kỳ chuẩn"
+                placeholder="Ghi chú kỳ lương (không bắt buộc)"
                 value={batchNote}
                 onChange={(e) => setBatchNote(e.target.value)}
                 style={{ borderColor: batchNote.length > 500 ? '#EF4444' : undefined }}
               />
+            </div>
+
+            <div style={{ fontSize: 12, color: '#64748B' }}>
+              Tự động tổng hợp công, OT, phụ cấp và cấn trừ tạm ứng trong kỳ.
             </div>
           </div>
 
@@ -341,7 +306,7 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             >
               {isSubmitting && <Loader2 size={16} className="animate-spin" />}
-              <span>{isSubmitting ? 'Đang tính toán...' : 'Bắt đầu tính toán'}</span>
+              <span>{isSubmitting ? 'Đang tính lương...' : 'Tính lương'}</span>
             </button>
           </div>
         </form>

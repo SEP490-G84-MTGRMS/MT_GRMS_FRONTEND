@@ -121,23 +121,23 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
 
   return (
     <div className="emp-modal-overlay">
-      <div className="emp-modal-card" style={{ maxWidth: 820 }}>
-        {/* Header phiếu lương chứng từ */}
+      <div className="emp-modal-card" style={{ maxWidth: 780, width: '100%' }}>
+        {/* Header */}
         <div
           className="emp-modal-header"
           style={{
-            padding: '18px 24px',
+            padding: '14px 22px',
             borderBottom: '1px solid #E2E8F0',
             background: '#FFFFFF',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div
               style={{
-                width: 40,
-                height: 40,
+                width: 34,
+                height: 34,
                 borderRadius: 8,
-                background: '#F1F5F9',
+                background: '#F0FDFA',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -145,39 +145,29 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                 flexShrink: 0,
               }}
             >
-              <Receipt size={22} />
+              <Receipt size={18} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
-                  Phiếu lương nhân viên
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
+                  Phiếu lương {effectivePayslip ? `· ${effectivePayslip.periodMonth}` : ''}
                 </h3>
                 {effectivePayslip && (
                   <>
-                    <span style={{ fontSize: 13, color: '#64748B', fontWeight: 600 }}>
-                      #{effectivePayslip.id.substring(0, 8)}
+                    <span style={{ fontSize: 12.5, color: '#64748B', fontWeight: 500 }}>
+                      {effectivePayslip.payslipCode || `#${effectivePayslip.id.substring(0, 8)}`}
                     </span>
                     <span
                       style={{
-                        fontSize: 12,
-                        padding: '2px 9px',
-                        borderRadius: 999,
-                        background: isPaid ? '#ECFDF5' : '#FFFBEB',
-                        color: isPaid ? '#065F46' : '#92400E',
-                        border: `1px solid ${isPaid ? '#A7F3D0' : '#FDE68A'}`,
+                        fontSize: 12.5,
+                        color: isPaid ? 'var(--green-money)' : 'var(--orange-accent)',
                         fontWeight: 600,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 5,
                       }}
                     >
-                      {isPaid ? 'ĐÃ THANH TOÁN' : 'CHỜ THANH TOÁN'}
+                      {isPaid ? 'Đã thanh toán' : 'Chờ thanh toán'}
                     </span>
                   </>
                 )}
-              </div>
-              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                Kỳ lương: {effectivePayslip ? effectivePayslip.periodMonth : '...'} • {effectivePayslip?.branchName}
               </div>
             </div>
           </div>
@@ -187,7 +177,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="emp-modal-body" style={{ padding: '20px 24px', background: '#F8FAFC' }}>
+        <div className="emp-modal-body" style={{ padding: '16px 22px', background: '#F8FAFC', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {isLoading ? (
             <div
               style={{
@@ -195,14 +185,12 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '60px 20px',
-                gap: 12,
+                padding: '50px 20px',
+                gap: 10,
               }}
             >
-              <Loader2 size={36} className="animate-spin" color="#0F766E" />
-              <span style={{ fontSize: 13, color: '#64748B', fontWeight: 500 }}>
-                Đang tải chi tiết phiếu lương...
-              </span>
+              <Loader2 size={32} className="animate-spin" color="#0F766E" />
+              <span style={{ fontSize: 13, color: '#64748B' }}>Đang tải...</span>
             </div>
           ) : errorMessage ? (
             <div
@@ -210,7 +198,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
-                padding: '16px',
+                padding: '12px 14px',
                 background: '#FEF2F2',
                 border: '1px solid #FCA5A5',
                 borderRadius: 8,
@@ -218,147 +206,148 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                 fontSize: 13,
               }}
             >
-              <AlertCircle size={18} color="#DC2626" />
+              <AlertCircle size={17} color="#DC2626" />
               <span>{errorMessage}</span>
             </div>
           ) : !effectivePayslip ? null : (
             <>
-              {/* Thẻ thông tin nhân viên & hình thức lương */}
+              {/* Thanh thông tin nhân viên gọn */}
               <div
                 style={{
                   background: '#FFFFFF',
                   borderRadius: 10,
                   border: '1px solid #E2E8F0',
-                  padding: '16px 20px',
-                  marginBottom: 16,
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                  gap: 16,
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12,
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>Mã nhân viên</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0F766E', marginTop: 2 }}>
-                    {effectivePayslip.employeeCode}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>Họ và tên</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>
                     {effectivePayslip.employeeName}
-                  </div>
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: '#0F766E',
+                      background: '#F0FDFA',
+                      padding: '2px 8px',
+                      borderRadius: 6,
+                    }}
+                  >
+                    {effectivePayslip.employeeCode}
+                  </span>
                 </div>
-                <div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>Chi nhánh làm việc</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginTop: 2 }}>
-                    {effectivePayslip.branchName}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>Hình thức trả lương</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginTop: 2 }}>
-                    {salaryTypeLabel}
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#475569' }}>
+                  <span>{effectivePayslip.branchName}</span>
+                  <span style={{ color: '#CBD5E1' }}>•</span>
+                  <span style={{ fontWeight: 600, color: '#0F172A' }}>{salaryTypeLabel}</span>
                 </div>
               </div>
 
-              {/* Thông số chấm công & Công chuẩn */}
+              {/* Thông số chấm công */}
               <div
                 style={{
                   background: '#FFFFFF',
                   borderRadius: 10,
                   border: '1px solid #E2E8F0',
-                  padding: '14px 20px',
-                  marginBottom: 16,
+                  padding: '12px 16px',
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0F766E', marginBottom: 10 }}>
-                  THÔNG SỐ CÔNG & CHẤM CÔNG THỰC TẾ
-                </div>
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                    gap: 12,
-                    fontSize: 13,
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                    gap: '10px 14px',
                   }}
                 >
                   <div>
-                    <span style={{ color: '#64748B' }}>Mức lương thỏa thuận: </span>
-                    <strong style={{ color: '#0F172A' }}>
-                      {formatVND(effectiveBaseRate)} {rateUnitLabel}
-                    </strong>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Đơn giá</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
+                      {formatVND(effectiveBaseRate)} <span style={{ fontSize: 11.5, fontWeight: 500, color: '#64748B' }}>{rateUnitLabel}</span>
+                    </div>
                   </div>
 
-                  {/* Nhân viên làm theo giờ (HOURLY) không hiển thị Công chuẩn và Công thực tế */}
                   {effectivePayslip.salaryType !== 'HOURLY' && (
                     <>
                       <div>
-                        <span style={{ color: '#64748B' }}>Công chuẩn: </span>
-                        <strong style={{ color: '#0F172A' }}>{effectivePayslip.standardDays} ngày</strong>
+                        <div style={{ fontSize: 11.5, color: '#64748B' }}>Ca được giao</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
+                          {effectivePayslip.standardDays} ca
+                        </div>
                       </div>
                       <div>
-                        <span style={{ color: '#64748B' }}>Công thực tế: </span>
-                        <strong style={{ color: '#0F766E' }}>{effectivePayslip.workedDays} ngày</strong>
+                        <div style={{ fontSize: 11.5, color: '#64748B' }}>Công thực tế</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F766E', marginTop: 2 }}>
+                          {effectivePayslip.workedDays} ngày
+                        </div>
                       </div>
                     </>
                   )}
 
                   <div>
-                    <span style={{ color: '#64748B' }}>Tổng giờ làm: </span>
-                    <strong style={{ color: '#0F172A' }}>{effectivePayslip.totalWorkHours || 0} giờ</strong>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Tổng giờ</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
+                      {effectivePayslip.totalWorkHours || 0} giờ
+                    </div>
                   </div>
 
                   {effectivePayslip.salaryType === 'SHIFT' && (
                     <div>
-                      <span style={{ color: '#64748B' }}>Tổng số ca: </span>
-                      <strong style={{ color: '#0F172A' }}>{effectivePayslip.totalShifts || 0} ca</strong>
+                      <div style={{ fontSize: 11.5, color: '#64748B' }}>Số ca</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
+                        {effectivePayslip.totalShifts || 0} ca
+                      </div>
                     </div>
                   )}
 
                   <div>
-                    <span style={{ color: '#64748B' }}>Giờ làm thêm (OT): </span>
-                    <strong style={{ color: effectivePayslip.otHours > 0 ? '#D97706' : '#64748B' }}>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Giờ OT</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: effectivePayslip.otHours > 0 ? '#D97706' : '#64748B', marginTop: 2 }}>
                       {effectivePayslip.otHours} giờ
-                    </strong>
+                    </div>
                   </div>
 
                   <div>
-                    <span style={{ color: '#64748B' }}>% Lương OT: </span>
-                    <strong style={{ color: '#0F766E' }}>
-                      {effectivePayslip.otRateWeekday || '150%'} (Thường) / {effectivePayslip.otRateSunday || '200%'} (CN)
-                    </strong>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>% Lương OT</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0F766E', marginTop: 2 }}>
+                      {effectivePayslip.otRateWeekday || '150%'} / {effectivePayslip.otRateSunday || '200%'} (CN)
+                    </div>
                   </div>
 
                   <div>
-                    <span style={{ color: '#64748B' }}>Đi muộn: </span>
-                    <strong style={{ color: (effectivePayslip.totalLateMinutes || 0) > 0 ? '#DC2626' : '#0F172A' }}>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Đi muộn</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: (effectivePayslip.totalLateMinutes || 0) > 0 ? '#DC2626' : '#0F172A', marginTop: 2 }}>
                       {effectivePayslip.totalLateMinutes || 0} phút
-                    </strong>
+                    </div>
                   </div>
 
                   <div>
-                    <span style={{ color: '#64748B' }}>Về sớm: </span>
-                    <strong style={{ color: (effectivePayslip.totalEarlyLeaveMinutes || 0) > 0 ? '#DC2626' : '#0F172A' }}>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Về sớm</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: (effectivePayslip.totalEarlyLeaveMinutes || 0) > 0 ? '#DC2626' : '#0F172A', marginTop: 2 }}>
                       {effectivePayslip.totalEarlyLeaveMinutes || 0} phút
-                    </strong>
+                    </div>
                   </div>
 
                   {effectivePayslip.salaryType !== 'HOURLY' && (
                     <div>
-                      <span style={{ color: '#64748B' }}>Nghỉ không lương: </span>
-                      <strong style={{ color: (effectivePayslip.unpaidLeaveDays || 0) > 0 ? '#D97706' : '#0F172A' }}>
+                      <div style={{ fontSize: 11.5, color: '#64748B' }}>Nghỉ không lương</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: (effectivePayslip.unpaidLeaveDays || 0) > 0 ? '#D97706' : '#0F172A', marginTop: 2 }}>
                         {effectivePayslip.unpaidLeaveDays || 0} ngày
-                      </strong>
+                      </div>
                     </div>
                   )}
 
                   {effectivePayslip.salaryType !== 'HOURLY' && (effectivePayslip.paidLeaveDays || 0) > 0 && (
                     <div>
-                      <span style={{ color: '#64748B' }}>Nghỉ có lương: </span>
-                      <strong style={{ color: '#059669' }}>
+                      <div style={{ fontSize: 11.5, color: '#64748B' }}>Nghỉ có lương</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#059669', marginTop: 2 }}>
                         {effectivePayslip.paidLeaveDays} ngày
-                      </strong>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -369,46 +358,47 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
-                  gap: 16,
-                  marginBottom: 16,
+                  gap: 12,
                 }}
               >
-                {/* Cột trái: Thu nhập (A) */}
+                {/* Thu nhập */}
                 <div
                   style={{
                     background: '#FFFFFF',
                     borderRadius: 10,
                     border: '1px solid #E2E8F0',
                     overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
                   }}
                 >
                   <div
                     style={{
-                      padding: '10px 16px',
+                      padding: '8px 14px',
                       background: '#F0FDFA',
                       borderBottom: '1px solid #CCFBF1',
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: 700,
                       color: '#0F766E',
                     }}
                   >
-                    1. CÁC KHOẢN THU NHẬP (A)
+                    Thu nhập
                   </div>
-                  <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                      <span style={{ color: '#475569' }}>Lương theo ngày công / giờ</span>
+                      <span style={{ color: '#475569' }}>Lương chính</span>
                       <strong style={{ color: '#0F172A' }}>{formatVND(effectivePayslip.baseSalaryEarned)}</strong>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                      <div>
-                        <span style={{ color: '#475569' }}>Lương làm thêm giờ (OT)</span>
+                      <span style={{ color: '#475569' }}>
+                        Lương OT
                         {effectivePayslip.otHours > 0 && (
-                          <span style={{ fontSize: 11.5, color: '#64748B', marginLeft: 6 }}>
-                            ({effectivePayslip.otHours}h × {effectivePayslip.otRateWeekday || '150%'})
+                          <span style={{ fontSize: 11.5, color: '#64748B', marginLeft: 4 }}>
+                            ({effectivePayslip.otHours}h)
                           </span>
                         )}
-                      </div>
+                      </span>
                       <strong style={{ color: effectivePayslip.overtimePay > 0 ? '#0F766E' : '#64748B' }}>
                         {formatVND(effectivePayslip.overtimePay)}
                       </strong>
@@ -423,7 +413,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
 
                     {effectivePayslip.bonus !== undefined && effectivePayslip.bonus > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                        <span style={{ color: '#475569' }}>Thưởng doanh số / chuyên cần</span>
+                        <span style={{ color: '#475569' }}>Thưởng</span>
                         <strong style={{ color: '#059669' }}>{formatVND(effectivePayslip.bonus)}</strong>
                       </div>
                     )}
@@ -431,7 +421,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
 
                   <div
                     style={{
-                      padding: '10px 16px',
+                      padding: '8px 14px',
                       background: '#F8FAFC',
                       borderTop: '1px solid #E2E8F0',
                       display: 'flex',
@@ -442,37 +432,37 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                       color: '#0F172A',
                     }}
                   >
-                    <span>TỔNG THU NHẬP (A)</span>
-                    <span style={{ fontSize: 14, color: '#0F766E' }}>
-                      {formatVND(effectivePayslip.totalEarnings)}
-                    </span>
+                    <span>Tổng thu nhập</span>
+                    <span style={{ color: '#0F766E' }}>{formatVND(effectivePayslip.totalEarnings)}</span>
                   </div>
                 </div>
 
-                {/* Cột phải: Các khoản giảm trừ (B) */}
+                {/* Khấu trừ */}
                 <div
                   style={{
                     background: '#FFFFFF',
                     borderRadius: 10,
                     border: '1px solid #E2E8F0',
                     overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
                   }}
                 >
                   <div
                     style={{
-                      padding: '10px 16px',
+                      padding: '8px 14px',
                       background: '#FEF2F2',
                       borderBottom: '1px solid #FEE2E2',
-                      fontSize: 13,
+                      fontSize: 12.5,
                       fontWeight: 700,
                       color: '#991B1B',
                     }}
                   >
-                    2. CÁC KHOẢN GIẢM TRỪ (B)
+                    Khấu trừ
                   </div>
-                  <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                      <span style={{ color: '#475569' }}>Khấu trừ tạm ứng lương</span>
+                      <span style={{ color: '#475569' }}>Tạm ứng</span>
                       <span style={{ color: effectivePayslip.advanceDeduction > 0 ? '#DC2626' : '#64748B', fontWeight: 600 }}>
                         {effectivePayslip.advanceDeduction > 0 ? `-${formatVND(effectivePayslip.advanceDeduction)}` : '0 đ'}
                       </span>
@@ -500,8 +490,8 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                     </div>
 
                     {effectivePayslip.remainingDebt !== undefined && effectivePayslip.remainingDebt > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, color: '#B45309' }}>
-                        <span>Dư nợ tạm ứng còn lại sau kỳ</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#B45309' }}>
+                        <span>Dư nợ tạm ứng còn lại</span>
                         <span>{formatVND(effectivePayslip.remainingDebt)}</span>
                       </div>
                     )}
@@ -509,7 +499,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
 
                   <div
                     style={{
-                      padding: '10px 16px',
+                      padding: '8px 14px',
                       background: '#F8FAFC',
                       borderTop: '1px solid #E2E8F0',
                       display: 'flex',
@@ -520,102 +510,78 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                       color: '#0F172A',
                     }}
                   >
-                    <span>TỔNG GIẢM TRỪ (B)</span>
-                    <span style={{ fontSize: 14, color: '#DC2626' }}>
+                    <span>Tổng khấu trừ</span>
+                    <span style={{ color: '#DC2626' }}>
                       {effectivePayslip.totalDeductions > 0 ? `-${formatVND(effectivePayslip.totalDeductions)}` : '0 đ'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Dòng chốt Thực lĩnh (Net Salary) */}
+              {/* Thực lĩnh */}
               <div
                 style={{
                   background: '#F0FDFA',
                   border: '1px solid #0D9488',
                   borderRadius: 10,
-                  padding: '14px 20px',
+                  padding: '12px 18px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: 16,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div
-                    style={{
-                      width: 4,
-                      height: 38,
-                      borderRadius: 2,
-                      background: '#0D9488',
-                    }}
-                  />
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#0F766E', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Lương thực lĩnh (Net Salary)
-                    </div>
-                    <div style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
-                      Tổng thu nhập ({formatVND(effectivePayslip.totalEarnings)}) − Tổng giảm trừ ({formatVND(effectivePayslip.totalDeductions)})
-                    </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0F766E' }}>Thực lĩnh</div>
+                  <div style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                    {formatVND(effectivePayslip.totalEarnings)} − {formatVND(effectivePayslip.totalDeductions)}
                   </div>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 24, fontWeight: 800, color: '#0F766E', lineHeight: 1.1 }}>
-                    {formatVND(effectivePayslip.netSalary)}
-                  </div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: '#0F766E' }}>
+                  {formatVND(effectivePayslip.netSalary)}
                 </div>
               </div>
 
-              {/* Thông tin chứng từ & Kế toán */}
+              {/* Thông tin thanh toán & ghi chú */}
               <div
                 style={{
                   background: '#FFFFFF',
                   border: '1px solid #E2E8F0',
                   borderRadius: 10,
-                  padding: '12px 18px',
+                  padding: '10px 14px',
                   fontSize: 12,
                   color: '#64748B',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   flexWrap: 'wrap',
-                  gap: 12,
+                  gap: 8,
                 }}
               >
                 <div>
-                  <span>Người thụ hưởng: </span>
                   <strong style={{ color: '#1E293B' }}>{effectivePayslip.bankAccountName || effectivePayslip.employeeName}</strong>
-                  <span style={{ margin: '0 8px', color: '#CBD5E1' }}>•</span>
-                  <span>Ngân hàng: </span>
-                  <strong style={{ color: '#1E293B' }}>{effectivePayslip.bankName || 'Techcombank'}</strong>
+                  <span style={{ margin: '0 6px', color: '#CBD5E1' }}>•</span>
+                  <span>{effectivePayslip.bankName || 'Techcombank'}</span>
                   {effectivePayslip.bankAccountNumber && (
                     <>
-                      <span style={{ margin: '0 8px', color: '#CBD5E1' }}>•</span>
-                      <span>STK: </span>
+                      <span style={{ margin: '0 6px', color: '#CBD5E1' }}>•</span>
                       <strong style={{ color: '#1E293B' }}>{effectivePayslip.bankAccountNumber}</strong>
                     </>
                   )}
                 </div>
 
-                {isPaid ? (
+                {isPaid && (
                   <div>
-                    <span>Phiếu chi Sổ quỹ: </span>
+                    <span>Phiếu chi: </span>
                     <strong style={{ color: '#0284C7' }}>{effectivePayslip.cashbookVoucherCode || 'PC-CHUA-TAO'}</strong>
-                    <span style={{ margin: '0 8px', color: '#CBD5E1' }}>•</span>
-                    <span>Ngày chi: </span>
-                    <strong style={{ color: '#1E293B' }}>{effectivePayslip.paidAt || '—'}</strong>
-                  </div>
-                ) : (
-                  <div>
-                    <span>Trạng thái: </span>
-                    <span style={{ color: '#B45309', fontWeight: 600 }}>Chờ chi trả lương</span>
+                    <span style={{ margin: '0 6px', color: '#CBD5E1' }}>•</span>
+                    <span>{effectivePayslip.paidAt || '—'}</span>
                   </div>
                 )}
               </div>
 
               {effectivePayslip.note && (
-                <div style={{ marginTop: 8, fontSize: 12, color: '#64748B', fontStyle: 'italic' }}>
+                <div style={{ fontSize: 12, color: '#64748B', fontStyle: 'italic' }}>
                   Ghi chú: {effectivePayslip.note}
                 </div>
               )}
@@ -624,7 +590,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="emp-modal-footer" style={{ padding: '14px 24px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0' }}>
+        <div className="emp-modal-footer" style={{ padding: '12px 22px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0' }}>
           <button
             type="button"
             className="emp-btn emp-btn-secondary"
@@ -633,7 +599,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
             disabled={!effectivePayslip || isLoading}
           >
             <Printer size={15} />
-            <span>In phiếu lương</span>
+            <span>In</span>
           </button>
 
           {!isPaid && effectivePayslip && (
@@ -644,13 +610,13 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                padding: '8px 18px',
+                padding: '8px 16px',
                 fontSize: 13,
               }}
               onClick={() => onPayNow(effectivePayslip)}
             >
               <CreditCard size={15} />
-              <span>Thanh toán ngay</span>
+              <span>Thanh toán</span>
             </button>
           )}
 

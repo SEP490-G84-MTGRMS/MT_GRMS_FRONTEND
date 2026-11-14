@@ -296,7 +296,6 @@ export const ApprovalRequestsPage: React.FC = () => {
       >
         <h2 className="emp-header-title" style={{ margin: 0 }}>
           <span>Duyệt đơn yêu cầu</span>
-          <span className="count-badge">{totalItems}</span>
         </h2>
 
         <button

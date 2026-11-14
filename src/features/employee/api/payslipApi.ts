@@ -199,6 +199,7 @@ export function mapBackendDetailToDetailedRecord(dto: PayslipResponse): PayslipD
 
   return {
     id: dto.id,
+    payslipCode: dto.payslipCode,
     employeeId: dto.employeeId,
     employeeCode: dto.employeeCode,
     employeeName: dto.employeeName,

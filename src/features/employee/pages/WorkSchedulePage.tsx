@@ -804,9 +804,6 @@ export const WorkSchedulePage: React.FC = () => {
         <div>
           <h2 className="emp-header-title" style={{ margin: 0 }}>
             <span>Lịch làm việc</span>
-            <span className="count-badge">
-              {viewMode === 'by_employee' ? filteredEmployees.length : filteredShifts.length}
-            </span>
           </h2>
         </div>
 

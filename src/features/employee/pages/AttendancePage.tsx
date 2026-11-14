@@ -631,22 +631,24 @@ export const AttendancePage: React.FC = () => {
               <span>{isSelfCheckingIn ? 'Đang chấm công...' : 'Chấm công vào ca'}</span>
             </button>
           )}
-          <button
-            type="button"
-            className="emp-btn emp-btn-primary"
-            onClick={() => {
-              if (!user) {
-                alert('Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.');
-                return;
-              }
-              setIsFaceIdModalOpen(true);
-            }}
-            title="Chấm công AI FaceID"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#0F766E', borderColor: '#0F766E' }}
-          >
-            <Camera size={16} />
-            <span>Chấm công AI FaceID</span>
-          </button>
+          {!isStoreOwnerOrAdmin && (
+            <button
+              type="button"
+              className="emp-btn emp-btn-primary"
+              onClick={() => {
+                if (!user) {
+                  alert('Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.');
+                  return;
+                }
+                setIsFaceIdModalOpen(true);
+              }}
+              title="Chấm công AI FaceID"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#0F766E', borderColor: '#0F766E' }}
+            >
+              <Camera size={16} />
+              <span>Chấm công AI FaceID</span>
+            </button>
+          )}
           <button
             type="button"
             className="emp-btn emp-btn-secondary"

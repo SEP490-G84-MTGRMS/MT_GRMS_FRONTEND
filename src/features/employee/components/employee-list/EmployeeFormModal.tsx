@@ -375,6 +375,24 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     return null;
   }, [baseSalary]);
 
+  const otWeekdayError = useMemo(() => {
+    if (!otWeekday) return null;
+    const num = parseInt(otWeekday.replace('%', ''), 10);
+    if (isNaN(num) || num < 100) {
+      return 'Hệ số OT ngày thường không được nhỏ hơn 100%.';
+    }
+    return null;
+  }, [otWeekday]);
+
+  const otSundayError = useMemo(() => {
+    if (!otSunday) return null;
+    const num = parseInt(otSunday.replace('%', ''), 10);
+    if (isNaN(num) || num < 100) {
+      return 'Hệ số OT Chủ nhật / Nghỉ tuần không được nhỏ hơn 100%.';
+    }
+    return null;
+  }, [otSunday]);
+
   const noteError = useMemo(() => {
     if (note && note.length > 500) return 'Ghi chú không vượt quá 500 ký tự.';
     return null;
@@ -732,6 +750,18 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
     if (baseSalaryError) {
       setFormError(baseSalaryError);
+      setActiveTab('salary');
+      return;
+    }
+
+    if (otWeekdayError) {
+      setFormError(otWeekdayError);
+      setActiveTab('salary');
+      return;
+    }
+
+    if (otSundayError) {
+      setFormError(otSundayError);
       setActiveTab('salary');
       return;
     }
@@ -1884,18 +1914,29 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           max={500}
                           step={10}
                           className="emp-form-input"
-                          style={{ paddingRight: 36, fontWeight: 600 }}
+                          style={{
+                            paddingRight: 36,
+                            fontWeight: 600,
+                            borderColor: (touched.otWeekday || hasSubmitted) && otWeekdayError ? '#EF4444' : undefined,
+                          }}
                           value={otWeekday ? otWeekday.replace('%', '') : ''}
                           onChange={(e) => {
                             const val = e.target.value.replace(/[^0-9]/g, '');
                             setOtWeekday(val ? `${val}%` : '');
+                            if (!touched.otWeekday) markTouched('otWeekday');
                           }}
+                          onBlur={() => markTouched('otWeekday')}
                           placeholder="150"
                         />
                         <span style={{ position: 'absolute', right: 12, color: '#64748B', fontWeight: 600, pointerEvents: 'none' }}>
                           %
                         </span>
                       </div>
+                      {(touched.otWeekday || hasSubmitted) && otWeekdayError && (
+                        <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {otWeekdayError}
+                        </div>
+                      )}
                     </div>
 
                     {/* Tăng ca Chủ nhật / Ngày nghỉ */}
@@ -1915,19 +1956,30 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           max={500}
                           step={10}
                           className="emp-form-input"
-                          style={{ paddingRight: 36, fontWeight: 600 }}
+                          style={{
+                            paddingRight: 36,
+                            fontWeight: 600,
+                            borderColor: (touched.otSunday || hasSubmitted) && otSundayError ? '#EF4444' : undefined,
+                          }}
                           value={otSunday ? otSunday.replace('%', '') : ''}
                           onChange={(e) => {
                             const val = e.target.value.replace(/[^0-9]/g, '');
                             setOtSunday(val ? `${val}%` : '');
                             setOtDayOff(val ? `${val}%` : '');
+                            if (!touched.otSunday) markTouched('otSunday');
                           }}
+                          onBlur={() => markTouched('otSunday')}
                           placeholder="200"
                         />
                         <span style={{ position: 'absolute', right: 12, color: '#64748B', fontWeight: 600, pointerEvents: 'none' }}>
                           %
                         </span>
                       </div>
+                      {(touched.otSunday || hasSubmitted) && otSundayError && (
+                        <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {otSundayError}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

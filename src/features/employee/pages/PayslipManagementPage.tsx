@@ -11,9 +11,6 @@ import {
   Check,
   Inbox,
   Building2,
-  Clock,
-  DollarSign,
-  Users,
   AlertCircle,
   Loader2,
 } from 'lucide-react';
@@ -133,7 +130,7 @@ export const PayslipManagementPage: React.FC = () => {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
   const showNotification = (
@@ -224,29 +221,6 @@ export const PayslipManagementPage: React.FC = () => {
   useEffect(() => {
     setSelectedIds([]);
   }, [keyword]);
-
-  // Financial Summary Cards
-  const financialSummary = useMemo(() => {
-    let totalPayroll = 0;
-    let totalPaid = 0;
-    let totalRemaining = 0;
-
-    filteredPayslips.forEach((item) => {
-      totalPayroll += item.netSalary;
-      if (item.status === 'PAID') {
-        totalPaid += item.netSalary;
-      } else {
-        totalRemaining += item.netSalary;
-      }
-    });
-
-    return {
-      totalPayroll,
-      totalPaid,
-      totalRemaining,
-      totalEmployees: filteredPayslips.length,
-    };
-  }, [filteredPayslips]);
 
   // Format Helpers
   const formatVND = (num?: number) => {
@@ -455,7 +429,6 @@ export const PayslipManagementPage: React.FC = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <h2 className="emp-header-title">
           <span>{isOwnerOrAdmin ? 'Bảng tính lương' : 'Phiếu lương của tôi'}</span>
-          <span className="count-badge">{filteredPayslips.length}</span>
         </h2>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -484,161 +457,6 @@ export const PayslipManagementPage: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* ─── 2. FINANCIAL SUMMARY CARDS (Chỉ hiển thị cho Quản lý / Chủ cửa hàng) ─── */}
-      {isOwnerOrAdmin && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 16,
-          }}
-        >
-          {/* Card 1: Tổng quỹ lương */}
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderRadius: 12,
-              padding: '16px 20px',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 4px rgba(15, 118, 110, 0.04)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 10,
-                background: '#CCFBF1',
-                color: '#0F766E',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <DollarSign size={22} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Tổng quỹ lương</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
-                {formatVND(financialSummary.totalPayroll)}
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Đã thanh toán */}
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderRadius: 12,
-              padding: '16px 20px',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 4px rgba(16, 185, 129, 0.04)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 10,
-                background: '#ECFDF5',
-                color: '#059669',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Check size={22} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Đã thanh toán</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#059669', marginTop: 2 }}>
-                {formatVND(financialSummary.totalPaid)}
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Còn phải trả */}
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderRadius: 12,
-              padding: '16px 20px',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 4px rgba(245, 158, 11, 0.04)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 10,
-                background: '#FEF3C7',
-                color: '#D97706',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Clock size={22} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Còn phải trả</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#D97706', marginTop: 2 }}>
-                {formatVND(financialSummary.totalRemaining)}
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: Tổng nhân sự */}
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderRadius: 12,
-              padding: '16px 20px',
-              border: '1px solid #E2E8F0',
-              boxShadow: '0 2px 4px rgba(59, 130, 246, 0.04)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 10,
-                background: '#EFF6FF',
-                color: '#2563EB',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Users size={22} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: '#64748B', fontWeight: 500 }}>Tổng nhân sự</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', marginTop: 2 }}>
-                {financialSummary.totalEmployees} người
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── 3. FILTER & TOOLBAR ─── */}
       <div className="emp-header-bar">
@@ -1007,7 +825,7 @@ export const PayslipManagementPage: React.FC = () => {
                   />
                 </th>
               )}
-              <th style={{ width: 120, whiteSpace: 'nowrap' }}>Mã NV</th>
+              <th style={{ width: 150, whiteSpace: 'nowrap' }}>Mã Payslip</th>
               <th style={{ minWidth: 200, whiteSpace: 'nowrap' }}>Nhân viên</th>
               <th style={{ width: 110, textAlign: 'center', whiteSpace: 'nowrap' }}>Kỳ lương</th>
               <th style={{ width: 120, textAlign: 'center', whiteSpace: 'nowrap' }}>Công / Giờ</th>
@@ -1095,7 +913,7 @@ export const PayslipManagementPage: React.FC = () => {
                       </td>
                     )}
                     <td style={{ whiteSpace: 'nowrap', fontWeight: 600, color: '#0F766E' }}>
-                      {item.employeeCode}
+                      {item.payslipCode || `#${item.id.substring(0, 8)}`}
                     </td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1176,19 +994,12 @@ export const PayslipManagementPage: React.FC = () => {
                       {isPaid ? (
                         <span
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 5,
                             fontSize: 13,
                             fontWeight: 600,
-                            color: '#059669',
-                            background: '#ECFDF5',
-                            padding: '3px 8px',
-                            borderRadius: 6,
+                            color: 'var(--green-money)',
                           }}
                         >
-                          <Check size={14} strokeWidth={2.5} />
-                          <span>Đã thanh toán</span>
+                          Đã thanh toán
                         </span>
                       ) : isOwnerOrAdmin ? (
                         <button
@@ -1198,39 +1009,28 @@ export const PayslipManagementPage: React.FC = () => {
                             setPayingPayslip(item);
                           }}
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 5,
-                            fontSize: 12,
+                            background: 'transparent',
+                            border: 'none',
+                            padding: 0,
+                            margin: 0,
+                            fontSize: 13,
                             fontWeight: 600,
-                            color: '#D97706',
-                            background: '#FEF3C7',
-                            border: '1px solid #FCD34D',
-                            padding: '3px 10px',
-                            borderRadius: 6,
+                            color: 'var(--orange-accent)',
                             cursor: 'pointer',
                           }}
                           title="Nhấn để chi trả phiếu lương này"
                         >
-                          <Clock size={13} strokeWidth={2.2} />
-                          <span>Chi trả ngay</span>
+                          Chi trả ngay
                         </button>
                       ) : (
                         <span
                           style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 5,
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: 600,
-                            color: '#D97706',
-                            background: '#FEF3C7',
-                            padding: '3px 8px',
-                            borderRadius: 6,
+                            color: 'var(--orange-accent)',
                           }}
                         >
-                          <Clock size={13} strokeWidth={2} />
-                          <span>Chưa thanh toán</span>
+                          Chưa thanh toán
                         </span>
                       )}
                     </td>
