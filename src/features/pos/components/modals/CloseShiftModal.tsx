@@ -45,7 +45,6 @@ export const CloseShiftModal: FC<Props> = ({
   // Phân bổ tiền cuối ca
   const [retainedFloat, setRetainedFloat] = useState<number>(1500000);
   const [droppedToSafe, setDroppedToSafe] = useState<number>(0);
-  const [receiverUserId, setReceiverUserId] = useState<string>('');
   const [discrepancyReason, setDiscrepancyReason] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [earlyOrLateReason, setEarlyOrLateReason] = useState<string>('');
@@ -112,7 +111,7 @@ export const CloseShiftModal: FC<Props> = ({
             setPlannedEndTime(res.activeSchedule.plannedEndTime);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [isOpen, shift.id, shift.branchId]);
 
@@ -345,8 +344,8 @@ export const CloseShiftModal: FC<Props> = ({
       setErrorMsg('Tiền để lại két và tiền nộp két phải là số nguyên không âm.');
       return;
     }
-    if (receiverUserId.trim().length > 100 || notes.trim().length > 500 || earlyOrLateReason.trim().length > 500 || discrepancyReason.trim().length > 500) {
-      setErrorMsg('Người nhận tối đa 100 ký tự; ghi chú và giải trình tối đa 500 ký tự.');
+    if (notes.trim().length > 500 || earlyOrLateReason.trim().length > 500 || discrepancyReason.trim().length > 500) {
+      setErrorMsg('Ghi chú và giải trình tối đa 500 ký tự.');
       return;
     }
     if (hasPending) {
@@ -383,7 +382,6 @@ export const CloseShiftModal: FC<Props> = ({
         actualCashCounted,
         retainedFloatAmount: retainedFloat,
         droppedToSafeAmount: droppedToSafe,
-        receiverUserId: receiverUserId.trim() || undefined,
         notes: notes.trim() || undefined,
         earlyOrLateReason: formattedEarlyLateReason,
         discrepancyReason: discrepancyReason.trim() || undefined,
@@ -918,94 +916,77 @@ export const CloseShiftModal: FC<Props> = ({
                   )}
                 </div>
 
-                {/* 5. KIỂM SOÁT THỜI GIAN TRỰC CA */}
-                <div
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    backgroundColor: isEarlyOrLate ? '#fffbeb' : '#f8fafc',
-                    border: isEarlyOrLate ? '1px solid #f59e0b' : '1px solid #e2e8f0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 12.5, color: isEarlyOrLate ? '#b45309' : '#334155' }}>
-                      <Clock size={14} color={isEarlyOrLate ? '#d97706' : '#0f766e'} />
-                      <span>Thời gian trực ca: {shiftTimingStatus.label}</span>
-                    </div>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: 999,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        backgroundColor: shiftTimingStatus.type === 'EARLY' ? '#fef3c7' : shiftTimingStatus.type === 'LATE' ? '#fee2e2' : '#dcfce7',
-                        color: shiftTimingStatus.type === 'EARLY' ? '#b45309' : shiftTimingStatus.type === 'LATE' ? '#b91c1c' : '#15803d',
-                        border: shiftTimingStatus.type === 'EARLY' ? '1px solid #fcd34d' : shiftTimingStatus.type === 'LATE' ? '1px solid #fca5a5' : '1px solid #86efac',
-                      }}
-                    >
-                      {shiftTimingStatus.type === 'EARLY' ? 'CHỐT CA SỚM' : shiftTimingStatus.type === 'LATE' ? 'CHỐT CA MUỘN' : 'ĐÚNG GIỜ'}
-                    </span>
-                  </div>
-
-                  {isEarlyOrLate && (
-                    <>
-                      <div style={{ fontSize: 11.5, color: '#92400e' }}>
-                        Chốt ca <b>{shiftTimingStatus.type === 'EARLY' ? 'sớm hơn' : 'muộn hơn'}</b> khung giờ ({shiftTimingStatus.targetEndStr}). Bắt buộc nhập lý do giải trình:
+                {/* 5. CẢNH BÁO GIẢI TRÌNH KHI CHỐT CA SỚM / MUỘN (CHỈ HIỂN THỊ KHI CÓ BẤT THƯỜNG) */}
+                {isEarlyOrLate && (
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 8,
+                      backgroundColor: '#fffbeb',
+                      border: '1px solid #f59e0b',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 12.5, color: '#b45309' }}>
+                        <Clock size={14} color="#d97706" />
+                        <span>Thời gian trực ca: {shiftTimingStatus.label}</span>
                       </div>
-                      <input
-                        type="text"
-                        value={earlyOrLateReason}
-                        onChange={(e) => setEarlyOrLateReason(e.target.value)}
-                        maxLength={500}
-                        placeholder={`Nhập lý do ${shiftTimingStatus.type === 'EARLY' ? 'chốt ca sớm' : 'chốt ca muộn'} (Bắt buộc)...`}
-                        className="modal-input"
+                      <span
                         style={{
-                          height: 34,
-                          fontSize: 12,
-                          borderColor: !earlyOrLateReason.trim() ? '#f59e0b' : '#10b981',
-                          backgroundColor: '#ffffff',
+                          padding: '2px 8px',
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          backgroundColor: shiftTimingStatus.type === 'EARLY' ? '#fef3c7' : '#fee2e2',
+                          color: shiftTimingStatus.type === 'EARLY' ? '#b45309' : '#b91c1c',
+                          border: shiftTimingStatus.type === 'EARLY' ? '1px solid #fcd34d' : '1px solid #fca5a5',
                         }}
-                        required={isEarlyOrLate}
-                      />
-                      {!earlyOrLateReason.trim() && (
-                        <div style={{ fontSize: 11, color: '#b45309', fontWeight: 600, marginTop: 2 }}>
-                          * Vui lòng nhập lý do giải trình để hoàn tất chốt ca.
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
+                      >
+                        {shiftTimingStatus.type === 'EARLY' ? 'CHỐT CA SỚM' : 'CHỐT CA MUỘN'}
+                      </span>
+                    </div>
 
-                {/* 6. THÔNG TIN BÀN GIAO & GHI CHÚ */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label className="modal-label" style={{ fontSize: 11.5 }}>Người nhận (tùy chọn):</label>
+                    <div style={{ fontSize: 11.5, color: '#92400e' }}>
+                      Chốt ca <b>{shiftTimingStatus.type === 'EARLY' ? 'sớm hơn' : 'muộn hơn'}</b> khung giờ ({shiftTimingStatus.targetEndStr}). Bắt buộc nhập lý do giải trình:
+                    </div>
                     <input
                       type="text"
-                      value={receiverUserId}
-                      onChange={(e) => setReceiverUserId(e.target.value)}
-                      maxLength={100}
-                      className="modal-input"
-                      placeholder="Người nhận ca tiếp..."
-                      style={{ height: 34, fontSize: 12 }}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="modal-label" style={{ fontSize: 11.5 }}>Ghi chú ca (tùy chọn):</label>
-                    <input
-                      type="text"
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
+                      value={earlyOrLateReason}
+                      onChange={(e) => setEarlyOrLateReason(e.target.value)}
                       maxLength={500}
+                      placeholder={`Nhập lý do ${shiftTimingStatus.type === 'EARLY' ? 'chốt ca sớm' : 'chốt ca muộn'} (Bắt buộc)...`}
                       className="modal-input"
-                      placeholder="Tình hình quầy ca này..."
-                      style={{ height: 34, fontSize: 12 }}
+                      style={{
+                        height: 34,
+                        fontSize: 12,
+                        borderColor: !earlyOrLateReason.trim() ? '#f59e0b' : '#10b981',
+                        backgroundColor: '#ffffff',
+                      }}
+                      required={isEarlyOrLate}
                     />
+                    {!earlyOrLateReason.trim() && (
+                      <div style={{ fontSize: 11, color: '#b45309', fontWeight: 600, marginTop: 2 }}>
+                        * Vui lòng nhập lý do giải trình để hoàn tất chốt ca.
+                      </div>
+                    )}
                   </div>
+                )}
+
+                {/* 6. GHI CHÚ CA BÁN HÀNG & BÀN GIAO */}
+                <div>
+                  <label className="modal-label" style={{ fontSize: 11.5 }}>Ghi chú ca bán hàng / bàn giao (tùy chọn):</label>
+                  <input
+                    type="text"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    maxLength={500}
+                    className="modal-input"
+                    placeholder="Ghi chú về tình hình quầy, dặn dò hoặc bàn giao ca sau..."
+                    style={{ height: 34, fontSize: 12 }}
+                  />
                 </div>
               </div>
             </div>
