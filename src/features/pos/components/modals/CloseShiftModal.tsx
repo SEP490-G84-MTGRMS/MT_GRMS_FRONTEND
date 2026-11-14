@@ -400,7 +400,7 @@ export const CloseShiftModal: FC<Props> = ({
   return (
     <div className="pos-modal-overlay">
       <div
-        className="pos-modal-dialog"
+        className="pos-modal-dialog pos-close-shift-dialog"
         style={{
           maxWidth: 'min(96vw, 1040px)',
           width: '100%',
@@ -411,6 +411,8 @@ export const CloseShiftModal: FC<Props> = ({
           borderRadius: 14,
           boxShadow: '0 20px 40px -15px rgba(0,0,0,0.3)',
           overflow: 'hidden',
+          fontFamily: 'var(--font-sans, "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
+          fontVariantNumeric: 'normal',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -702,6 +704,8 @@ export const CloseShiftModal: FC<Props> = ({
                             border: '2px solid #0f766e',
                             outline: 'none',
                             boxSizing: 'border-box',
+                            fontFamily: 'inherit',
+                            fontVariantNumeric: 'normal',
                           }}
                           autoFocus
                         />
@@ -762,7 +766,7 @@ export const CloseShiftModal: FC<Props> = ({
                                   max={Number.MAX_SAFE_INTEGER}
                                   step={1}
                                   value={count === 0 ? '' : count}
-                                  onChange={(e) => handleCountChange(denom, parseInt(e.target.value, 10) || 0)}
+                                  onChange={(e) => handleCountChange(denom, Math.max(0, parseInt(e.target.value, 10) || 0))}
                                   placeholder="0"
                                   style={{
                                     width: 48,
@@ -771,6 +775,8 @@ export const CloseShiftModal: FC<Props> = ({
                                     fontSize: 12,
                                     borderRadius: 4,
                                     border: '1px solid #cbd5e1',
+                                    fontFamily: 'inherit',
+                                    fontVariantNumeric: 'normal',
                                   }}
                                 />
                                 <span style={{ fontSize: 10.5, color: '#64748b', minWidth: 38, textAlign: 'right' }}>
@@ -850,7 +856,10 @@ export const CloseShiftModal: FC<Props> = ({
 
                   {discrepancy !== 0 && (
                     <div style={{ marginTop: 4 }}>
-                      <label className="modal-label" style={{ fontSize: 12, color: '#dc2626' }}>Lý do chênh lệch (*):</label>
+                      <label className="modal-label" style={{ fontSize: 12, color: '#dc2626' }}>
+                        Lý do chênh lệch (*)
+                        {!discrepancyReason.trim() && <span style={{ fontSize: 11, fontWeight: 500, color: '#dc2626' }}> — Bắt buộc nhập giải trình</span>}
+                      </label>
                       <textarea
                         value={discrepancyReason}
                         onChange={(e) => setDiscrepancyReason(e.target.value)}
@@ -880,9 +889,9 @@ export const CloseShiftModal: FC<Props> = ({
                         max={Number.MAX_SAFE_INTEGER}
                         step={1000}
                         value={retainedFloat}
-                        onChange={(e) => setRetainedFloat(Number(e.target.value) || 0)}
-                        className="modal-input tabular-nums font-bold"
-                        style={{ fontSize: 13, height: 36 }}
+                        onChange={(e) => setRetainedFloat(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="modal-input font-bold"
+                        style={{ fontSize: 13, height: 36, fontFamily: 'inherit', fontVariantNumeric: 'normal' }}
                       />
                     </div>
 
@@ -894,9 +903,9 @@ export const CloseShiftModal: FC<Props> = ({
                         max={Number.MAX_SAFE_INTEGER}
                         step={1000}
                         value={droppedToSafe}
-                        onChange={(e) => setDroppedToSafe(Number(e.target.value) || 0)}
-                        className="modal-input tabular-nums font-bold"
-                        style={{ fontSize: 13, height: 36 }}
+                        onChange={(e) => setDroppedToSafe(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="modal-input font-bold"
+                        style={{ fontSize: 13, height: 36, fontFamily: 'inherit', fontVariantNumeric: 'normal' }}
                       />
                     </div>
                   </div>
@@ -961,6 +970,11 @@ export const CloseShiftModal: FC<Props> = ({
                         }}
                         required={isEarlyOrLate}
                       />
+                      {!earlyOrLateReason.trim() && (
+                        <div style={{ fontSize: 11, color: '#b45309', fontWeight: 600, marginTop: 2 }}>
+                          * Vui lòng nhập lý do giải trình để hoàn tất chốt ca.
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

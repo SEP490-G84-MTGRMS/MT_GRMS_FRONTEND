@@ -1436,6 +1436,18 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Chốt ca: Font chữ số tự nhiên tiêu chuẩn hệ thống (không dùng font mono hay tabular-nums thô) */
+.pos-close-shift-dialog,
+.pos-close-shift-dialog input,
+.pos-close-shift-dialog button,
+.pos-close-shift-dialog span,
+.pos-close-shift-dialog b,
+.pos-close-shift-dialog div,
+.pos-close-shift-dialog textarea {
+  font-family: var(--font-sans, 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif) !important;
+  font-variant-numeric: normal !important;
+}
+
 @keyframes posModalFadeIn {
   from {
     opacity: 0;
