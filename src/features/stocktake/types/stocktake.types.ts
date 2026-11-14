@@ -138,6 +138,7 @@ export interface CreateStocktakePayload {
   scopeReference?: string | null;
   note?: string | null;
   submitImmediately: boolean;
+  createdByName?: string | null;
   lines: UpsertStocktakeLineInput[];
 }
 

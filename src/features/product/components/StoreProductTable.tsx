@@ -64,13 +64,23 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
     return String(Math.round(n));
   };
 
-  /** One product row → all units on one line: Chai:10k Lốc:60k Thùng:200k */
+  /** One product row → all units on one line: Chai:10k Lốc:60k · Khay:50k/kg */
   const formatUnitPrices = (item: StoreProductItem) => {
     const units = item.unitPrices?.filter((u) => u.unitName?.trim()) ?? [];
-    if (units.length === 0) {
-      return `${item.unit || 'Cái'}:${fmtCompact(item.retailPrice)}`;
+    const parts =
+      units.length === 0
+        ? [`${item.unit || 'Cái'}:${fmtCompact(item.retailPrice)}`]
+        : units.map((u) => `${u.unitName}:${fmtCompact(u.price)}`);
+
+    if (item.allowRepack) {
+      const trayPerKg =
+        item.processedSellingPricePerKg && item.processedSellingPricePerKg > 0
+          ? item.processedSellingPricePerKg
+          : item.retailPrice;
+      parts.push(`Khay:${fmtCompact(trayPerKg)}/kg`);
     }
-    return units.map((u) => `${u.unitName}:${fmtCompact(u.price)}`).join(' ');
+
+    return parts.join(' ');
   };
 
   const handleSort = (field: SortField) => {

@@ -1,17 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type { CSSProperties, FC } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import type { FC } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import {
-  Save,
-  Send,
-  Trash2,
-  ClipboardCheck,
-  ClipboardList,
-  AlertTriangle,
-  Plus,
-  RotateCcw,
-  Loader2,
-} from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { branchApi } from '../../purchase-order/api/branchApi';
@@ -19,58 +9,69 @@ import { batchApi } from '../../batch/api/batchApi';
 import type { BatchItem } from '../../batch/types/batch.types';
 import { stocktakeApi } from '../api/stocktakeApi';
 import { type UpsertStocktakeLineInput } from '../types/stocktake.types';
-import '../../purchase-order/purchase-order.css';
-import '../../../styles/so-list-page.css';
+import { uploadImageToCloudinary } from '../../../utils/cloudinary';
+import { StocktakeAddProductModal } from '../components/StocktakeAddProductModal';
+import {
+  StocktakeFormHeaderCard,
+  type StocktakeBranchOption,
+} from '../components/form/StocktakeFormHeaderCard';
+import {
+  StocktakeProductEntryTable,
+  type StocktakeCountPatch,
+} from '../components/form/StocktakeProductEntryTable';
+import { StocktakeFormFooter } from '../components/form/StocktakeFormFooter';
+import { fetchLotsForProduct } from '../utils/stocktakeLotExpand';
 
 interface LocationState {
   preselectedBatches?: Array<BatchItem & { confirmQty?: number }>;
   branchId?: string;
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Bản nháp',
+  PENDING_APPROVAL: 'Chờ Store Owner duyệt',
+  APPROVED: 'Đã duyệt kiểm kê',
+  REJECTED: 'Đã từ chối',
+  NEEDS_RECOUNT: 'Yêu cầu kiểm kê lại',
+};
+
 const lineActualQty = (l: UpsertStocktakeLineInput) =>
   l.goodQty + l.defectiveQty + l.damagedQty + l.expiredQty;
 
-const lineIssueQty = (l: UpsertStocktakeLineInput) => l.defectiveQty + l.damagedQty;
-
-const lineIssueKind = (l: UpsertStocktakeLineInput): 'defective' | 'damaged' =>
-  l.defectiveQty > 0 ? 'defective' : 'damaged';
+const lineKey = (l: UpsertStocktakeLineInput) =>
+  l.branchStockId || `${l.productId}_${l.batchCode || ''}`;
 
 const applyCount = (
   line: UpsertStocktakeLineInput,
-  patch: {
-    actualQty?: number;
-    expiredQty?: number;
-    issueQty?: number;
-    issueKind?: 'defective' | 'damaged';
-  }
+  patch: StocktakeCountPatch
 ): UpsertStocktakeLineInput => {
-  const kind = patch.issueKind ?? lineIssueKind(line);
   let actual = patch.actualQty ?? lineActualQty(line);
   let expired = patch.expiredQty ?? line.expiredQty;
-  let issue = patch.issueQty ?? lineIssueQty(line);
+  let damaged = patch.damagedQty ?? line.damagedQty;
 
   actual = Math.max(0, actual);
   expired = Math.max(0, expired);
-  issue = Math.max(0, issue);
-  if (expired + issue > actual) {
-    if (patch.actualQty !== undefined) actual = expired + issue;
-    else if (patch.expiredQty !== undefined) expired = Math.max(0, actual - issue);
-    else issue = Math.max(0, actual - expired);
+  damaged = Math.max(0, damaged);
+  if (expired + damaged > actual) {
+    if (patch.actualQty !== undefined) actual = expired + damaged;
+    else if (patch.expiredQty !== undefined) expired = Math.max(0, actual - damaged);
+    else damaged = Math.max(0, actual - expired);
   }
+
+  const evidenceUrl =
+    patch.evidenceUrl !== undefined ? patch.evidenceUrl : line.evidenceUrl;
 
   return {
     ...line,
-    goodQty: Math.max(0, actual - expired - issue),
+    goodQty: Math.max(0, actual - expired - damaged),
     expiredQty: expired,
-    defectiveQty: kind === 'defective' ? issue : 0,
-    damagedQty: kind === 'damaged' ? issue : 0,
+    damagedQty: damaged,
+    defectiveQty: 0,
     nearExpiryQty: 0,
     nearExpiryAction: null,
-    defectiveReasonCode:
-      kind === 'defective' && issue > 0
-        ? line.defectiveReasonCode || 'MANUFACTURING_DEFECT'
-        : null,
-    defectiveReasonDetail: kind === 'defective' ? line.defectiveReasonDetail : null,
+    defectiveReasonCode: null,
+    defectiveReasonDetail: null,
+    evidenceUrl: evidenceUrl ?? null,
   };
 };
 
@@ -110,6 +111,9 @@ const mapBatchToLine = (
   };
 };
 
+const formatBranchLabel = (code?: string | null, name?: string | null) =>
+  `${code || ''} — ${name || ''}`.replace(/^ — /, '').replace(/ — $/, '').trim();
+
 export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }> = ({
   defaultRole = 'store_owner',
 }) => {
@@ -119,31 +123,34 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
   const location = useLocation();
   const locState = (location.state as LocationState | null) || null;
 
-  const userRole = useAuthStore((s) => s.user?.role);
-  const userBranchId = useAuthStore((s) => s.user?.branchId);
+  const user = useAuthStore((s) => s.user);
+  const userRole = user?.role;
+  const userBranchId = user?.branchId || '';
   const isStoreOwner =
-    defaultRole === 'store_owner' &&
-    (userRole === 'STORE_OWNER' || userRole === 'ADMIN' || !userRole);
+    defaultRole === 'store_owner' ||
+    userRole === 'STORE_OWNER' ||
+    userRole === 'ADMIN';
+  const canPickBranch = isStoreOwner && !isEditMode;
   const basePath = defaultRole === 'employee' ? '/employee/stocktakes' : '/store-owner/stocktakes';
 
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
-  const [branchId, setBranchId] = useState<string>(
-    locState?.branchId || userBranchId || ''
+  const [branches, setBranches] = useState<StocktakeBranchOption[]>([]);
+  const [branchId, setBranchId] = useState<string>(userBranchId || locState?.branchId || '');
+  const [stocktakeCode, setStocktakeCode] = useState<string>('');
+  const [createdByName, setCreatedByName] = useState<string>(
+    user?.fullName || (isStoreOwner ? 'Chủ cửa hàng' : 'Nhân viên')
   );
-  const [scopeType, setScopeType] = useState<string>('SELECTED_ITEMS');
-  const [scopeReference, setScopeReference] = useState<string>('');
+  const [createdAt, setCreatedAt] = useState<string>(new Date().toISOString());
+  const [status, setStatus] = useState<string>('DRAFT');
   const [note, setNote] = useState<string>('');
-  const [lines, setLines] = useState<UpsertStocktakeLineInput[]>(() =>
-    locState?.preselectedBatches?.length
-      ? locState.preselectedBatches.map(mapBatchToLine)
-      : []
-  );
-  const [searchKeyword, setSearchKeyword] = useState<string>('');
-  const [isLoadingBatches, setIsLoadingBatches] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string>('');
+  const [lines, setLines] = useState<UpsertStocktakeLineInput[]>([]);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
+  const [addProductOpen, setAddProductOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [toast, setToast] = useState<ToastState | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = useCallback(
     (message: string, type: ToastState['type'] = 'error') => {
@@ -154,92 +161,165 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     []
   );
 
-  // Load branches
+  // Resolve branch list (Owner chọn CN; Employee dùng CN tài khoản)
   useEffect(() => {
+    if (isEditMode) return;
     let mounted = true;
     branchApi
       .getBranches({ status: 'active', pageIndex: 1, pageSize: 100 })
       .then((res) => {
         if (!mounted) return;
-        if (res.items?.length) {
-          const list = res.items.map((b) => ({
-            id: b.id,
-            name: `${b.code || ''} — ${b.name}`.trim(),
-          }));
-          setBranches(list);
-          if (!branchId && list[0]) {
-            setBranchId(list[0].id);
-          }
+        const list = (res.items || []).map((b) => ({
+          id: b.id,
+          label: formatBranchLabel(b.code, b.name) || b.name,
+        }));
+        setBranches(list);
+
+        const preferred = userBranchId || locState?.branchId || '';
+        const preferredOk = preferred && list.some((b) => b.id === preferred) ? preferred : '';
+        const resolved = preferredOk || (isStoreOwner ? list[0]?.id || '' : '');
+
+        if (!resolved) {
+          setErrorMsg(
+            isStoreOwner
+              ? 'Chưa có chi nhánh nào trong hệ thống — hãy tạo chi nhánh trước.'
+              : 'Tài khoản chưa được gán chi nhánh — không thể lập phiếu kiểm kê.'
+          );
+          return;
+        }
+        setBranchId(resolved);
+
+        // Deep-link từ Batches: prefill các lô đã chọn — không load toàn bộ tồn
+        const preselected = locState?.preselectedBatches;
+        if (preselected?.length) {
+          setLines(preselected.map(mapBatchToLine));
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!mounted) return;
+        setErrorMsg('Không thể tải danh sách chi nhánh.');
+      });
     return () => {
       mounted = false;
     };
-  }, [branchId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode]);
 
-  // Load existing stocktake when in edit mode
+  // Edit mode
   useEffect(() => {
     if (!id) return;
+    setIsLoadingEdit(true);
     stocktakeApi
       .getById(id)
       .then((detail) => {
         setBranchId(detail.branchId);
-        setScopeType(detail.scopeType === 'BY_SHELF' ? 'FULL_BRANCH' : detail.scopeType);
-        setScopeReference(detail.scopeType === 'BY_SHELF' ? '' : detail.scopeReference || '');
+        setBranches((prev) => {
+          if (prev.some((b) => b.id === detail.branchId)) return prev;
+          const label =
+            formatBranchLabel(detail.branchCode, detail.branchName) || detail.branchName;
+          return [...prev, { id: detail.branchId, label }];
+        });
+        setStocktakeCode(detail.code || '');
+        setCreatedByName(
+          detail.createdByName || user?.fullName || (isStoreOwner ? 'Chủ cửa hàng' : 'Nhân viên')
+        );
+        setCreatedAt(detail.createdAt || new Date().toISOString());
+        setStatus(detail.status);
         setNote(detail.note || '');
         setLines(
-          detail.lines.map((l) => ({
-            branchStockId: l.branchStockId,
-            productId: l.productId,
-            sku: l.sku,
-            productName: l.productName,
-            unit: l.unit,
-            batchCode: l.batchCode,
-            expiryDate: l.expiryDate,
-            shelfLocation: l.shelfLocation,
-            supplierId: l.supplierId,
-            supplierName: l.supplierName,
-            goodsReceiptId: l.goodsReceiptId,
-            goodsReceiptNo: l.goodsReceiptNo,
-            goodsReceiptLineId: l.goodsReceiptLineId,
-            unitCost: l.unitCost,
-            systemQty: l.systemQty,
-            goodQty: l.goodQty + (l.nearExpiryQty || 0),
-            defectiveQty: l.defectiveQty,
-            damagedQty: l.damagedQty,
-            nearExpiryQty: 0,
-            expiredQty: l.expiredQty,
-            defectiveReasonCode: l.defectiveReasonCode || null,
-            defectiveReasonDetail: l.defectiveReasonDetail || null,
-            nearExpiryAction: null,
-            discountPercent: l.discountPercent || null,
-            evidenceUrl: l.evidenceUrl || null,
-            note: l.note || null,
-          }))
+          sortLinesByProduct(
+            detail.lines.map((l) => ({
+              branchStockId: l.branchStockId,
+              productId: l.productId,
+              sku: l.sku,
+              productName: l.productName,
+              unit: l.unit,
+              batchCode: l.batchCode,
+              expiryDate: l.expiryDate,
+              shelfLocation: l.shelfLocation,
+              supplierId: l.supplierId,
+              supplierName: l.supplierName,
+              goodsReceiptId: l.goodsReceiptId,
+              goodsReceiptNo: l.goodsReceiptNo,
+              goodsReceiptLineId: l.goodsReceiptLineId,
+              unitCost: l.unitCost,
+              systemQty: l.systemQty,
+              goodQty: l.goodQty + (l.nearExpiryQty || 0),
+              defectiveQty: 0,
+              damagedQty: l.damagedQty + (l.defectiveQty || 0),
+              nearExpiryQty: 0,
+              expiredQty: l.expiredQty,
+              defectiveReasonCode: null,
+              defectiveReasonDetail: null,
+              nearExpiryAction: null,
+              discountPercent: l.discountPercent || null,
+              evidenceUrl: l.evidenceUrl || null,
+              note: l.note || null,
+            }))
+          )
         );
       })
       .catch((err) => {
         const msg =
           err instanceof Error ? err.message : 'Không thể tải phiếu kiểm kê để chỉnh sửa.';
         showToast(msg, 'error');
-      });
-  }, [id, showToast]);
+      })
+      .finally(() => setIsLoadingEdit(false));
+  }, [id, showToast, user?.fullName, isStoreOwner]);
 
-  const addProductsFromSearch = useCallback(async () => {
+  const sortLinesByProduct = (list: UpsertStocktakeLineInput[]) =>
+    [...list].sort((a, b) => {
+      const c = (a.sku || '').localeCompare(b.sku || '');
+      if (c !== 0) return c;
+      return (a.batchCode || '').localeCompare(b.batchCode || '');
+    });
+
+  const addBatchesToLines = useCallback(
+    (batches: BatchItem[], toastOk = true) => {
+      const withStock = batches.filter((b) => b.qtyCurrent > 0);
+      if (withStock.length === 0) {
+        showToast('Không có lô tồn kho (số lượng > 0) phù hợp để thêm.', 'warning');
+        return;
+      }
+      setLines((prev) => {
+        const existing = new Set(prev.map(lineKey));
+        const mapped = withStock.map(mapBatchToLine).filter((m) => !existing.has(lineKey(m)));
+        if (mapped.length === 0) {
+          showToast('Sản phẩm này đã có đủ lô trên phiếu kiểm kê.', 'warning');
+          return prev;
+        }
+        const productCount = new Set(mapped.map((m) => m.productId)).size;
+        if (toastOk) {
+          showToast(
+            productCount === 1
+              ? `Đã thêm ${mapped.length} lô của "${mapped[0].productName}".`
+              : `Đã thêm ${mapped.length} lô từ ${productCount} sản phẩm.`,
+            'success'
+          );
+        }
+        return sortLinesByProduct([...prev, ...mapped]);
+      });
+    },
+    [showToast]
+  );
+
+  const handleQuickSearch = async () => {
     if (!branchId) {
-      showToast('Vui lòng chọn chi nhánh kiểm kê trước.', 'warning');
+      showToast(
+        isStoreOwner
+          ? 'Vui lòng chọn chi nhánh trước.'
+          : 'Tài khoản chưa được gán chi nhánh.',
+        'warning'
+      );
       return;
     }
     const kw = searchKeyword.trim();
     if (!kw) {
-      showToast('Quét mã vạch hoặc nhập SKU / tên sản phẩm để thêm vào phiếu.', 'warning');
-      searchInputRef.current?.focus();
+      showToast('Nhập SKU hoặc tên sản phẩm để thêm vào phiếu.', 'warning');
       return;
     }
 
-    setIsLoadingBatches(true);
-    setErrorMsg('');
+    setIsSearching(true);
     try {
       const res = await batchApi.getBatches({
         keyword: kw,
@@ -252,67 +332,42 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         pageIndex: 1,
         pageSize: 50,
       });
-
-      let matched = res.items;
-      if (scopeType === 'BY_CATEGORY' && scopeReference.trim()) {
-        const cat = scopeReference.trim().toLowerCase();
-        matched = matched.filter((b) => b.categoryName.toLowerCase().includes(cat));
-      }
-
-      const kwLower = kw.toLowerCase();
-      const exact = matched.filter(
-        (b) =>
-          b.sku.toLowerCase() === kwLower ||
-          (b.batchCode && b.batchCode !== '—' && b.batchCode.toLowerCase() === kwLower)
-      );
-      const toAdd = exact.length > 0 ? exact : matched;
-
-      if (toAdd.length === 0) {
-        showToast(`Không tìm thấy lô tồn kho khớp "${kw}".`, 'warning');
-        searchInputRef.current?.select();
+      const matched = (res.items || []).filter((b) => b.qtyCurrent > 0);
+      if (matched.length === 0) {
+        showToast(`Không tìm thấy tồn kho khớp "${kw}".`, 'warning');
         return;
       }
 
-      const mapped = toAdd.map(mapBatchToLine);
-      const existingKeys = new Set(
-        lines.map((p) => p.branchStockId || `${p.productId}_${p.batchCode || ''}`)
-      );
-      const added = mapped.filter(
-        (m) => !existingKeys.has(m.branchStockId || `${m.productId}_${m.batchCode || ''}`)
-      );
-
-      if (added.length === 0) {
-        showToast('Sản phẩm / lô này đã có trên phiếu kiểm kê.', 'warning');
-      } else {
-        setLines((prev) => [...prev, ...added]);
-        showToast(
-          added.length === 1
-            ? `Đã thêm ${added[0].productName} vào phiếu.`
-            : `Đã thêm ${added.length} lô vào phiếu kiểm kê.`,
-          'success'
-        );
+      const kwLower = kw.toLowerCase();
+      const exactSku = matched.filter((b) => b.sku.toLowerCase() === kwLower);
+      const seed = exactSku.length > 0 ? exactSku : matched;
+      // Chọn theo sản phẩm: expand mọi lô tồn của từng productId khớp
+      const productMap = new Map<string, BatchItem>();
+      for (const b of seed) {
+        if (!productMap.has(b.productId)) productMap.set(b.productId, b);
       }
 
+      const allLots: BatchItem[] = [];
+      for (const [, sample] of productMap) {
+        const lots = await fetchLotsForProduct(branchId, sample.productId, sample.sku);
+        allLots.push(...lots);
+      }
+
+      if (allLots.length === 0) {
+        showToast(`Không tìm thấy lô tồn kho cho "${kw}".`, 'warning');
+        return;
+      }
+      addBatchesToLines(allLots);
       setSearchKeyword('');
-      requestAnimationFrame(() => searchInputRef.current?.focus());
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Không thể tìm sản phẩm trong tồn kho.';
+      const msg = err instanceof Error ? err.message : 'Không thể tìm sản phẩm trong tồn kho.';
       showToast(msg, 'error');
     } finally {
-      setIsLoadingBatches(false);
+      setIsSearching(false);
     }
-  }, [branchId, scopeType, scopeReference, searchKeyword, lines, showToast]);
+  };
 
-  const handleCountChange = (
-    idx: number,
-    patch: {
-      actualQty?: number;
-      expiredQty?: number;
-      issueQty?: number;
-      issueKind?: 'defective' | 'damaged';
-    }
-  ) => {
+  const handleCountChange = (idx: number, patch: StocktakeCountPatch) => {
     setLines((prev) => prev.map((line, i) => (i === idx ? applyCount(line, patch) : line)));
   };
 
@@ -320,23 +375,57 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     setLines((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleEvidenceUpload = async (idx: number, file: File | null) => {
+    if (!file) return;
+    setUploadingIdx(idx);
+    try {
+      const url = await uploadImageToCloudinary(file, 'mtgrms/stocktakes');
+      handleCountChange(idx, { evidenceUrl: url });
+      showToast('Đã tải ảnh minh chứng lên thành công.', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể tải ảnh minh chứng.';
+      showToast(msg, 'error');
+    } finally {
+      setUploadingIdx(null);
+    }
+  };
+
+  const handleBranchChange = (nextBranchId: string) => {
+    if (nextBranchId === branchId) return;
+    setBranchId(nextBranchId);
+    setLines([]);
+    setSearchKeyword('');
+    setErrorMsg('');
+  };
+
   const handleSave = async (submitImmediately: boolean) => {
     setErrorMsg('');
     if (!branchId) {
-      showToast('Vui lòng chọn chi nhánh thực hiện kiểm kê.', 'error');
+      showToast(
+        isStoreOwner
+          ? 'Vui lòng chọn chi nhánh để lập phiếu kiểm kê.'
+          : 'Tài khoản chưa được gán chi nhánh — không thể lưu phiếu kiểm kê.',
+        'error'
+      );
       return;
     }
     if (lines.length === 0) {
-      showToast('Phiếu kiểm kê phải có ít nhất 1 dòng hàng hóa.', 'error');
+      showToast('Phiếu kiểm kê phải có ít nhất 1 dòng hàng hóa. Hãy tìm và thêm sản phẩm.', 'error');
       return;
     }
 
     for (const l of lines) {
       const actual = lineActualQty(l);
-      const issue = lineIssueQty(l);
-      if (l.expiredQty + issue > actual) {
+      if (l.expiredQty + l.damagedQty > actual) {
         showToast(
-          `Dòng "${l.productName}": hết hạn + lỗi/hỏng không được lớn hơn số lượng thực tế.`,
+          `Dòng "${l.productName}": hết hạn + hư hỏng không được lớn hơn số lượng thực tế.`,
+          'error'
+        );
+        return;
+      }
+      if ((l.expiredQty > 0 || l.damagedQty > 0) && !l.evidenceUrl) {
+        showToast(
+          `Dòng "${l.productName}": cần ảnh minh chứng khi có số lượng hết hạn hoặc hư hỏng.`,
           'error'
         );
         return;
@@ -347,10 +436,11 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     try {
       const payload = {
         branchId,
-        scopeType,
-        scopeReference: scopeReference.trim() || null,
+        scopeType: 'SELECTED_ITEMS',
+        scopeReference: null,
         note: note.trim() || null,
         submitImmediately,
+        createdByName: createdByName || user?.fullName || null,
         lines: lines.map((l) => applyCount(l, {})),
       };
 
@@ -380,146 +470,107 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       };
       const rawMsg =
         e.response?.data?.message || e.message || 'Lỗi khi lưu phiếu kiểm kê hàng hóa.';
-      const friendlyMsg =
-        e.response?.status === 404
-          ? `Không tìm thấy API /api/stocktakes (404) — vui lòng khởi động lại Backend để nạp StocktakesController (${rawMsg}).`
-          : rawMsg;
-      showToast(friendlyMsg, 'error');
+      showToast(rawMsg, 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleResetFilters = () => {
-    setSearchKeyword('');
-    setScopeType('SELECTED_ITEMS');
-    setScopeReference('');
-    searchInputRef.current?.focus();
-  };
+  const createdAtLabel = (() => {
+    try {
+      return new Date(createdAt).toLocaleString('vi-VN');
+    } catch {
+      return createdAt;
+    }
+  })();
 
-  const tableMinWidth = 1180;
-  const tableFitStyle: CSSProperties = {
-    width: '100%',
-    minWidth: tableMinWidth,
-    tableLayout: 'fixed',
-  };
-  const filterFieldStyle: CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    minWidth: 0,
-  };
-  const filterLabelStyle: CSSProperties = {
-    width: 84,
-    fontSize: 12,
-    fontWeight: 700,
-    color: '#475569',
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-  };
-  const filterControlStyle: CSSProperties = {
-    height: 32,
-    flex: 1,
-    minWidth: 0,
-    width: '100%',
-    padding: '0 8px',
-    borderRadius: 6,
-    border: '1px solid #cbd5e1',
-    fontSize: 12.5,
-    fontWeight: 600,
-    color: '#1e293b',
-    backgroundColor: '#ffffff',
-    boxSizing: 'border-box',
-  };
+  const existingProductIds = new Set(lines.map((l) => l.productId));
 
-  const tableColGroup = (
-    <colgroup>
-      <col style={{ width: 44 }} />
-      <col style={{ width: 210 }} />
-      <col style={{ width: 160 }} />
-      <col style={{ width: 140 }} />
-      <col style={{ width: 80 }} />
-      <col style={{ width: 96 }} />
-      <col style={{ width: 88 }} />
-      <col style={{ width: 150 }} />
-      <col style={{ width: 88 }} />
-      <col style={{ width: 48 }} />
-    </colgroup>
-  );
-
-  const qtyInputStyle = (active?: boolean, color?: string): CSSProperties => ({
-    width: '100%',
-    maxWidth: 88,
-    height: 30,
-    textAlign: 'right',
-    padding: '0 6px',
-    borderRadius: 5,
-    border: active && color ? `1.5px solid ${color}` : '1px solid #cbd5e1',
-    backgroundColor: '#ffffff',
-    fontWeight: 700,
-    color: active && color ? color : '#0f172a',
-  });
+  if (isLoadingEdit) {
+    return (
+      <div
+        style={{
+          padding: 48,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          color: '#64748b',
+        }}
+      >
+        <Loader2 size={20} className="animate-spin" color="#0d9488" />
+        Đang tải phiếu kiểm kê…
+      </div>
+    );
+  }
 
   return (
     <div
-      className="po-matrix-container"
       style={{
-        width: '100%',
-        height: '100%',
-        maxHeight: '100%',
+        padding: '16px 24px 24px',
+        backgroundColor: '#f8fafc',
+        height: 'calc(100vh - 60px)',
+        maxHeight: 'calc(100vh - 60px)',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 0,
-        flex: 1,
+        gap: 12,
         overflow: 'hidden',
       }}
     >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      <div className="so-list-header">
+      <StocktakeAddProductModal
+        isOpen={addProductOpen}
+        branchId={branchId}
+        existingProductIds={existingProductIds}
+        onClose={() => setAddProductOpen(false)}
+        onAdd={(batches) => addBatchesToLines(batches)}
+      />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={() => navigate(basePath)}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border: '1px solid #cbd5e1',
+            backgroundColor: '#ffffff',
+            color: '#334155',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          title="Quay lại danh sách phiếu kiểm kê"
+        >
+          <ArrowLeft size={16} />
+        </button>
+
         <div>
-          <h1 className="so-list-title">
-            <ClipboardCheck size={22} color="var(--blue-primary, #0f766e)" />
+          <h1
+            style={{
+              fontSize: 18,
+              fontWeight: 800,
+              color: '#0f172a',
+              margin: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <ClipboardCheck size={20} color="#0d9488" />
             <span>
-              {isEditMode ? 'Cập nhật phiếu kiểm kê' : 'Lập phiếu kiểm kê'}
+              {isEditMode
+                ? `Cập nhật phiếu kiểm kê ${stocktakeCode || ''}`.trim()
+                : 'Lập phiếu kiểm kê hàng hóa'}
             </span>
-            {(isLoadingBatches || isSaving) && (
-              <Loader2
-                size={16}
-                className="animate-spin"
-                style={{ color: 'var(--blue-primary, #0f766e)' }}
-              />
+            {(isSaving || isSearching) && (
+              <Loader2 size={16} className="animate-spin" color="#0d9488" />
             )}
           </h1>
-        </div>
-
-        <div className="so-list-header-actions">
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            onClick={() => navigate(basePath)}
-          >
-            <ClipboardList size={14} />
-            <span>Danh sách phiếu</span>
-          </button>
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            disabled={isSaving}
-            onClick={() => void handleSave(false)}
-          >
-            <Save size={14} />
-            <span>Lưu nháp</span>
-          </button>
-          <button
-            type="button"
-            className="po-btn po-btn-primary"
-            disabled={isSaving}
-            onClick={() => void handleSave(true)}
-          >
-            <Send size={14} />
-            <span>Gửi duyệt</span>
-          </button>
         </div>
       </div>
 
@@ -527,7 +578,6 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         <div
           style={{
             flexShrink: 0,
-            marginBottom: 8,
             padding: '8px 12px',
             borderRadius: 8,
             backgroundColor: '#fef2f2',
@@ -544,325 +594,74 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         </div>
       )}
 
-      <div style={{ flexShrink: 0, marginBottom: 8 }}>
-        <div className="so-list-filter">
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-              gap: '10px 14px',
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 10,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <StocktakeFormHeaderCard
+            stocktakeCode={stocktakeCode}
+            branchId={branchId}
+            branches={branches}
+            createdBy={createdByName}
+            createdAtLabel={createdAtLabel}
+            statusLabel={STATUS_LABELS[status] || status}
+            canPickBranch={canPickBranch}
+            disabled={isSaving}
+            onBranchChange={handleBranchChange}
+          />
+
+          <StocktakeProductEntryTable
+            lines={lines}
+            branchId={branchId}
+            isSearching={isSearching}
+            uploadingIdx={uploadingIdx}
+            searchKeyword={searchKeyword}
+            onSearchKeywordChange={setSearchKeyword}
+            onQuickSearch={() => void handleQuickSearch()}
+            onOpenFindModal={() => {
+              if (!branchId) {
+                showToast('Vui lòng chọn chi nhánh trước.', 'warning');
+                return;
+              }
+              setAddProductOpen(true);
             }}
-          >
-            <div style={filterFieldStyle}>
-              <label style={filterLabelStyle} htmlFor="stocktake-branch">
-                Chi nhánh:
-              </label>
-              <select
-                id="stocktake-branch"
-                value={branchId}
-                disabled={!isStoreOwner && Boolean(userBranchId)}
-                onChange={(e) => setBranchId(e.target.value)}
-                style={{
-                  ...filterControlStyle,
-                  border: branchId ? '1px solid #0d9488' : '1px solid #cbd5e1',
-                  color: branchId ? '#0f766e' : '#1e293b',
-                  backgroundColor: branchId ? '#f0fdfa' : '#ffffff',
-                }}
-              >
-                <option value="">-- Chọn chi nhánh --</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={filterFieldStyle}>
-              <label style={filterLabelStyle} htmlFor="stocktake-scope">
-                Phạm vi:
-              </label>
-              <select
-                id="stocktake-scope"
-                value={scopeType}
-                onChange={(e) => setScopeType(e.target.value)}
-                style={{
-                  ...filterControlStyle,
-                  border: '1px solid #0d9488',
-                  color: '#0f766e',
-                  backgroundColor: '#f0fdfa',
-                }}
-              >
-                <option value="FULL_BRANCH">Toàn bộ chi nhánh</option>
-                <option value="BY_CATEGORY">Theo ngành hàng</option>
-                <option value="SELECTED_ITEMS">Theo lô / sản phẩm chọn</option>
-              </select>
-            </div>
-
-            <div style={filterFieldStyle}>
-              <label style={filterLabelStyle} htmlFor="stocktake-category">
-                Ngành hàng:
-              </label>
-              <input
-                id="stocktake-category"
-                type="text"
-                value={scopeReference}
-                disabled={scopeType !== 'BY_CATEGORY'}
-                onChange={(e) => setScopeReference(e.target.value)}
-                placeholder={scopeType === 'BY_CATEGORY' ? 'VD: Sữa, Đồ uống...' : 'Chỉ dùng khi lọc ngành hàng'}
-                style={{
-                  ...filterControlStyle,
-                  backgroundColor: scopeType === 'BY_CATEGORY' ? '#ffffff' : '#f8fafc',
-                }}
-              />
-            </div>
-
-            <div style={filterFieldStyle}>
-              <label style={filterLabelStyle} htmlFor="stocktake-keyword">
-                Tìm / quét:
-              </label>
-              <input
-                id="stocktake-keyword"
-                ref={searchInputRef}
-                type="text"
-                autoComplete="off"
-                autoFocus
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    void addProductsFromSearch();
-                  }
-                }}
-                placeholder="Quét mã vạch hoặc nhập SKU, tên SP, mã lô..."
-                style={filterControlStyle}
-              />
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              paddingTop: 8,
-              borderTop: '1px dashed #f1f5f9',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div className="so-list-filter-actions" style={{ marginLeft: 'auto', flexWrap: 'nowrap' }}>
-              <button
-                type="button"
-                className="so-list-filter-search"
-                disabled={isLoadingBatches}
-                onClick={() => void addProductsFromSearch()}
-                title="Quét mã hoặc tìm SKU/tên rồi thêm vào phiếu kiểm kê"
-              >
-                {isLoadingBatches ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                <span>Thêm sản phẩm</span>
-              </button>
-              <button
-                type="button"
-                className="so-list-filter-reset"
-                onClick={handleResetFilters}
-              >
-                <RotateCcw size={13} />
-                <span>Đặt lại</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="so-list-table-card so-list-table-card--wrap">
-        <div className="so-list-table-head">
-          <table className="so-list-table" style={tableFitStyle}>
-            {tableColGroup}
-            <thead>
-              <tr>
-                <th className="so-list-th" style={{ textAlign: 'center' }}>#</th>
-                <th className="so-list-th">Sản phẩm / SKU</th>
-                <th className="so-list-th">Mã lô / HSD / Kệ</th>
-                <th className="so-list-th">Nguồn nhập</th>
-                <th className="so-list-th" style={{ textAlign: 'right' }}>Tồn HT</th>
-                <th className="so-list-th" style={{ textAlign: 'right' }}>Thực tế</th>
-                <th className="so-list-th" style={{ textAlign: 'right', color: '#be123c' }}>Hết hạn</th>
-                <th className="so-list-th" style={{ textAlign: 'right', color: '#b45309' }}>Lỗi / hư hỏng</th>
-                <th className="so-list-th" style={{ textAlign: 'right' }}>Chênh lệch</th>
-                <th className="so-list-th" />
-              </tr>
-            </thead>
-          </table>
+            onCountChange={handleCountChange}
+            onRemoveLine={handleRemoveLine}
+            onEvidenceUpload={(idx, file) => void handleEvidenceUpload(idx, file)}
+            lineActualQty={lineActualQty}
+          />
         </div>
 
-        <div className="so-list-table-body">
-          <table className="so-list-table" style={tableFitStyle}>
-            {tableColGroup}
-            <tbody>
-              {lines.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={10}
-                    style={{ padding: '40px 16px', textAlign: 'center', color: '#64748b' }}
-                  >
-                    Phiếu đang trống. Quét mã vạch hoặc nhập SKU / tên sản phẩm rồi bấm Thêm sản phẩm.
-                  </td>
-                </tr>
-              ) : (
-                lines.map((line, idx) => {
-                  const actualQty = lineActualQty(line);
-                  const issueQty = lineIssueQty(line);
-                  const issueKind = lineIssueKind(line);
-                  const varianceQty = actualQty - line.systemQty;
-                  const hasIssue = issueQty > 0 || line.expiredQty > 0 || varianceQty !== 0;
-
-                  return (
-                    <tr
-                      key={`${line.branchStockId || line.productId}_${idx}`}
-                      style={{
-                        borderBottom: '1px solid #e2e8f0',
-                        backgroundColor: hasIssue ? '#fffbeb' : '#ffffff',
-                      }}
-                    >
-                      <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748b' }}>
-                        {idx + 1}
-                      </td>
-                      <td>
-                        <div className="so-list-name">{line.productName}</div>
-                        <div style={{ fontSize: 11.5, color: '#64748b', fontFamily: 'monospace' }}>
-                          {line.sku} · ĐVT: {line.unit}
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f766e' }}>
-                          {line.batchCode || '—'}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>
-                          HSD:{' '}
-                          {line.expiryDate
-                            ? new Date(line.expiryDate).toLocaleDateString('vi-VN')
-                            : '—'}{' '}
-                          · Kệ: {line.shelfLocation || '—'}
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#2563eb', fontFamily: 'monospace' }}>
-                          {line.goodsReceiptNo || '—'}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>
-                          {line.supplierName || '—'}
-                        </div>
-                      </td>
-                      <td
-                        style={{
-                          padding: '8px 10px',
-                          textAlign: 'right',
-                          fontFamily: 'monospace',
-                          fontWeight: 800,
-                          color: '#0f172a',
-                        }}
-                      >
-                        {line.systemQty}
-                      </td>
-
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          value={actualQty}
-                          onChange={(e) =>
-                            handleCountChange(idx, { actualQty: Math.max(0, Number(e.target.value) || 0) })
-                          }
-                          style={qtyInputStyle()}
-                        />
-                      </td>
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          value={line.expiredQty}
-                          onChange={(e) =>
-                            handleCountChange(idx, {
-                              expiredQty: Math.max(0, Number(e.target.value) || 0),
-                            })
-                          }
-                          style={qtyInputStyle(line.expiredQty > 0, '#be123c')}
-                        />
-                      </td>
-                      <td style={{ padding: '8px 6px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
-                          <input
-                            type="number"
-                            min={0}
-                            value={issueQty}
-                            onChange={(e) =>
-                              handleCountChange(idx, {
-                                issueQty: Math.max(0, Number(e.target.value) || 0),
-                              })
-                            }
-                            style={qtyInputStyle(issueQty > 0, '#b45309')}
-                          />
-                          {issueQty > 0 && (
-                            <select
-                              value={issueKind}
-                              onChange={(e) =>
-                                handleCountChange(idx, {
-                                  issueKind: e.target.value as 'defective' | 'damaged',
-                                })
-                              }
-                              style={{
-                                width: '100%',
-                                height: 26,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                borderRadius: 4,
-                                border: '1px solid #fcd34d',
-                                backgroundColor: '#fffbeb',
-                                color: '#92400e',
-                              }}
-                            >
-                              <option value="damaged">Hỏng tại CH</option>
-                              <option value="defective">Lỗi NCC</option>
-                            </select>
-                          )}
-                        </div>
-                      </td>
-                      <td
-                        style={{
-                          padding: '8px 10px',
-                          textAlign: 'right',
-                          fontFamily: 'monospace',
-                          fontWeight: 800,
-                          color:
-                            varianceQty < 0 ? '#dc2626' : varianceQty > 0 ? '#2563eb' : '#15803d',
-                        }}
-                      >
-                        {varianceQty > 0 ? `+${varianceQty}` : varianceQty}
-                      </td>
-
-                      <td className="so-list-td--actions" style={{ textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          className="so-list-action-btn"
-                          onClick={() => handleRemoveLine(idx)}
-                          title="Xóa dòng này khỏi phiếu kiểm kê"
-                          style={{ width: 28, padding: 0 }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <StocktakeFormFooter
+          notes={note}
+          isSaving={isSaving}
+          disabled={!branchId}
+          onNotesChange={setNote}
+          onCancel={() => navigate(basePath)}
+          onSaveDraft={() => void handleSave(false)}
+          onSubmit={() => void handleSave(true)}
+        />
       </div>
     </div>
   );
 };
 
 export default StocktakeFormPage;
-

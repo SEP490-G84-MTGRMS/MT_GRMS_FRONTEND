@@ -136,10 +136,21 @@ export const BatchTable: FC<BatchTableProps> = ({
           valA = a.daysLeft;
           valB = b.daysLeft;
           break;
-        case 'qtyCurrent':
-          valA = a.qtyCurrent;
-          valB = b.qtyCurrent;
+        case 'qtyCurrent': {
+          const qtyOf = (r: BatchItem) => {
+            if (isKgBatch(r)) {
+              return Number(
+                r.rawSellableQty ??
+                  r.qtyAvailable ??
+                  Math.max(0, (Number(r.qtyCurrent) || 0) - (Number(r.packagedQty) || 0))
+              );
+            }
+            return Number(r.qtyCurrent) || 0;
+          };
+          valA = qtyOf(a);
+          valB = qtyOf(b);
           break;
+        }
         case 'costPrice':
           valA = a.costPrice;
           valB = b.costPrice;
@@ -463,11 +474,23 @@ export const BatchTable: FC<BatchTableProps> = ({
                     {(() => {
                       const { stockUnit, purchaseUnit, rate, sameUnit, rateLabel } = getUnitMeta(row);
                       const stockQty = Number(row.qtyCurrent) || 0;
-                      const purchaseQty = getPurchaseQty(stockQty, rate);
+                      const packagedQty = Number(row.packagedQty) || 0;
+                      const isWeight = isKgBatch(row);
+                      // SP kg: Tồn = nguyên quả còn (đã trừ kg đóng khay). QOH vẫn gồm kg trong khay.
+                      const displayStock = isWeight
+                        ? Number(
+                            row.rawSellableQty ??
+                              row.qtyAvailable ??
+                              Math.max(0, stockQty - packagedQty)
+                          ) || 0
+                        : stockQty;
+                      const purchaseQty = getPurchaseQty(displayStock, rate);
                       const availStock = row.qtyAvailable ?? stockQty;
                       const availPurchase = getPurchaseQty(Number(availStock) || 0, rate);
                       const hasHold =
-                        (row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0;
+                        !isWeight &&
+                        ((row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0);
+                      const packagedPurchase = getPurchaseQty(packagedQty, rate);
 
                       return (
                         <>
@@ -496,15 +519,26 @@ export const BatchTable: FC<BatchTableProps> = ({
                               color: '#0f172a',
                             }}
                             title={
-                              sameUnit
-                                ? undefined
-                                : `Tồn gốc: ${fmtQty(stockQty)} ${stockUnit}`
+                              isWeight
+                                ? `Nguyên quả còn: ${fmtQty(displayStock)} ${stockUnit}` +
+                                  (packagedQty > 0
+                                    ? ` · Đã đóng khay: ${fmtQty(packagedQty)} ${stockUnit}` +
+                                      ` · Tổng tồn: ${fmtQty(stockQty)} ${stockUnit}`
+                                    : ` · Tổng tồn: ${fmtQty(stockQty)} ${stockUnit}`)
+                                : sameUnit
+                                  ? undefined
+                                  : `Tồn gốc: ${fmtQty(stockQty)} ${stockUnit}`
                             }
                           >
                             <div>
                               {fmtQty(purchaseQty)}{' '}
                               <span style={{ fontWeight: 600, color: '#64748b' }}>{purchaseUnit}</span>
                             </div>
+                            {isWeight && packagedQty > 0 && (
+                              <div style={{ fontSize: 10, fontWeight: 600, color: '#0f766e', lineHeight: 1.2 }}>
+                                Khay: {fmtQty(packagedPurchase)} {purchaseUnit}
+                              </div>
+                            )}
                             {hasHold && (
                               <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
                                 KD: {fmtQty(availPurchase)} {purchaseUnit}
@@ -568,8 +602,8 @@ export const BatchTable: FC<BatchTableProps> = ({
                             type="button"
                             className="so-list-action-btn so-list-action-btn--icon"
                             onClick={() => onProcessBatch(row)}
-                            title="Chế biến khay"
-                            aria-label="Chế biến khay"
+                            title="Quản lý / chế biến khay"
+                            aria-label="Quản lý khay"
                             style={{
                               color: '#b45309',
                               borderColor: '#fde68a',

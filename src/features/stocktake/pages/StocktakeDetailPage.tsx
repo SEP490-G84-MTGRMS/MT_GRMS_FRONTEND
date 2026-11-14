@@ -929,7 +929,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
               borderRadius: 12,
               padding: 20,
               width: '100%',
-              maxWidth: 460,
+              maxWidth: 560,
             }}
           >
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
@@ -941,9 +941,71 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
             </h3>
             <p style={{ fontSize: 12.5, color: '#475569', marginTop: 8 }}>
               {reviewAction === 'APPROVE'
-                ? 'Khi phê duyệt: write-off hỏng/hết hạn; giảm tồn nếu thiếu; giữ cách ly hàng lỗi NCC (chờ trả). Hàng cận hạn markdown vẫn bán được. Hàng thừa chỉ cộng tồn sau khi bạn xác minh.'
-                : 'Khi từ chối hoặc yêu cầu kiểm kê lại: Số lượng đang tạm cách ly sẽ được hoàn lại để kiểm đếm lại.'}
+                ? 'Khi phê duyệt: điều chỉnh tồn đúng từng lô (BranchStock). Write-off hết hạn/hư hỏng; giảm tồn nếu thiếu; hàng thừa chỉ cộng sau khi xác minh. Không phân bổ chênh lệch sang lô khác / FEFO.'
+                : 'Từ chối hoặc yêu cầu kiểm kê lại: không đổi tồn kho. Nhân viên sửa số liệu và gửi lại.'}
             </p>
+            {reviewAction === 'APPROVE' && detail && (
+              <div
+                style={{
+                  marginTop: 12,
+                  maxHeight: 180,
+                  overflow: 'auto',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+              >
+                <div
+                  style={{
+                    padding: '6px 10px',
+                    background: '#f8fafc',
+                    fontWeight: 700,
+                    color: '#334155',
+                    borderBottom: '1px solid #e2e8f0',
+                  }}
+                >
+                  Chênh lệch theo từng lô
+                </div>
+                {detail.lines.map((l) => (
+                  <div
+                    key={l.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      padding: '6px 10px',
+                      borderBottom: '1px solid #f1f5f9',
+                      background: l.varianceQty !== 0 ? '#fffbeb' : '#fff',
+                    }}
+                  >
+                    <span style={{ color: '#0f172a' }}>
+                      <b style={{ fontFamily: 'monospace' }}>{l.sku}</b>
+                      {' · '}
+                      <span style={{ fontFamily: 'monospace', color: '#0f766e' }}>
+                        {l.batchCode || '—'}
+                      </span>
+                      <span style={{ color: '#64748b' }}>
+                        {' '}
+                        (HT {fmt(l.systemQty)} → TT {fmt(l.actualQty)})
+                      </span>
+                    </span>
+                    <b
+                      style={{
+                        fontFamily: 'monospace',
+                        color:
+                          l.varianceQty < 0
+                            ? '#dc2626'
+                            : l.varianceQty > 0
+                              ? '#2563eb'
+                              : '#15803d',
+                      }}
+                    >
+                      {l.varianceQty > 0 ? `+${fmt(l.varianceQty)}` : fmt(l.varianceQty)}
+                    </b>
+                  </div>
+                ))}
+              </div>
+            )}
             {reviewAction === 'APPROVE' &&
               detail &&
               ((detail.totalVarianceQty ?? 0) > 0 || detail.lines.some((l) => l.varianceQty > 0)) && (
@@ -974,7 +1036,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                     {fmt(
                       detail.lines.reduce((s, l) => s + Math.max(0, l.varianceQty), 0)
                     )}
-                    ). Tôi xác nhận đã kiểm tra nguồn → cho phép cộng tồn khi duyệt.
+                    ). Tôi xác nhận đã kiểm tra nguồn → cho phép cộng tồn đúng lô khi duyệt.
                   </span>
                 </label>
               )}

@@ -366,6 +366,7 @@ export const stocktakeApi = {
         note: l.note || null,
       })),
       autoSubmit: payload.submitImmediately,
+      createdByName: payload.createdByName || null,
     };
 
     try {

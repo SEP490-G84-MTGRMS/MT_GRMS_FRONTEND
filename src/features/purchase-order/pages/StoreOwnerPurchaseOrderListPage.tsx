@@ -8,7 +8,7 @@ import { supplierApi } from '../../supplier/api/supplierApi';
 import type { PurchaseOrderListItem, PoListFilterState, PurchaseOrderStatus } from '../types/po-list.types';
 import { PoListFilterBar } from '../components/po-list/PoListFilterBar';
 import { PoListTable } from '../components/po-list/PoListTable';
-import { PoDetailDrawer } from '../components/po-list/PoDetailDrawer';
+import { downloadPoInvoicePdf } from '../lib/poInvoicePdf';
 import { AdminToast, type ToastState } from '../../admin/components';
 import {
   formatDeliveryDateGateMessage,
@@ -120,7 +120,7 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderListItem | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
@@ -375,7 +375,18 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           setPageSize(size);
           setPageIndex(1);
         }}
-        onViewDetail={(order) => setSelectedOrder(order)}
+        onPrintOrder={async (order) => {
+          if (isPrinting) return;
+          setIsPrinting(true);
+          try {
+            const fileName = await downloadPoInvoicePdf(order);
+            showToast(`Đã tải hóa đơn ${fileName}.`, 'success');
+          } catch (err: any) {
+            showToast(err?.message || 'Không thể tạo file PDF hóa đơn PO.', 'error');
+          } finally {
+            setIsPrinting(false);
+          }
+        }}
         onEditOrder={(order) => {
           // Sửa SL trên matrix trước cutoff → chốt lại ở dispatch-hub để amend PO
           const params = new URLSearchParams();
@@ -388,13 +399,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           navigate(`/store-owner/purchase-orders/create-matrix?${params.toString()}`);
         }}
         onReceiveOrder={handleReceiveOrder}
-      />
-
-      <PoDetailDrawer
-        order={selectedOrder}
-        isOpen={Boolean(selectedOrder)}
-        onClose={() => setSelectedOrder(null)}
-        onReceiveNow={handleReceiveOrder}
       />
     </div>
   );

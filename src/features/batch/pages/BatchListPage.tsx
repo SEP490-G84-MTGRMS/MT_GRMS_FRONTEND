@@ -21,7 +21,6 @@ import { BatchFilterBar } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
 import { BatchDiscountModal } from '../components/BatchDiscountModal';
-import { BatchRepackModal } from '../components/BatchRepackModal';
 import {
   BatchExpiryAlertModal,
   type BatchAlertMode,
@@ -65,7 +64,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [discountBatch, setDiscountBatch] = useState<BatchItem | null>(null);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
-  const [repackBatch, setRepackBatch] = useState<BatchItem | null>(null);
   const [kpi, setKpi] = useState<BatchKpiSummary | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [alertMode, setAlertMode] = useState<BatchAlertMode>('near_expiry');
@@ -351,7 +349,10 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         pageIndex={pageIndex}
         pageSize={pageSize}
         onQuickStocktake={(b) => handleCreateStocktake(b)}
-        onProcessBatch={(b) => setRepackBatch(b)}
+        onProcessBatch={(b) => {
+          const base = role === 'employee' ? '/employee/batches' : '/store-owner/batches';
+          navigate(`${base}/${b.id}/packages`);
+        }}
         onPageChange={(p) => setPageIndex(p)}
         onPageSizeChange={(s) => {
           setPageSize(s);
@@ -362,18 +363,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         onWriteOffClick={handleWriteOff}
         onResetFilters={handleReset}
       />
-
-      {repackBatch && (
-        <BatchRepackModal
-          batch={repackBatch}
-          onClose={() => setRepackBatch(null)}
-          onDone={() => {
-            setRepackBatch(null);
-            setToast({ type: 'success', message: 'Chế biến khay thành công.' });
-            void loadBatches();
-          }}
-        />
-      )}
 
       <BatchDetailDrawer
         isOpen={isDrawerOpen}

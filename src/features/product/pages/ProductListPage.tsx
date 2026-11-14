@@ -393,13 +393,6 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Cập nhật hàng hóa "${data.productName}" thành công.`);
-        setNotificationModal({
-          isOpen: true,
-          type: 'success',
-          title: 'Cập nhật hàng hóa thành công',
-          message: `Thông tin hàng hóa "${data.productName}" đã được cập nhật thành công vào hệ thống.`,
-          itemCode: data.productCode,
-        });
         setProducts((prev) =>
           prev.map((p) =>
             p.id === productToEdit.id

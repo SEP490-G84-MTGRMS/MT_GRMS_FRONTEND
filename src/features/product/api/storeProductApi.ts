@@ -95,6 +95,11 @@ export const storeProductApi = {
               isBaseUnit: Boolean(u.isBaseUnit),
             }))
           : undefined,
+        allowRepack: Boolean(x.allowRepack),
+        processedSellingPricePerKg:
+          x.processedSellingPricePerKg != null && Number(x.processedSellingPricePerKg) > 0
+            ? Number(x.processedSellingPricePerKg)
+            : null,
       }));
       return { items, total: paged.totalItems };
     }
