@@ -150,21 +150,34 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
     }
   };
 
+  const thStyle: React.CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '8px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+    boxSizing: 'border-box',
+  };
+
   return (
-    <div className="promotion-card">
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card">
       <div className="table-responsive">
-        <table className="promotion-table">
+        <table className="so-list-table promotion-table">
           <thead>
             <tr>
-              <th style={{ width: 44 }}></th>
-              <th style={{ width: 120 }}>Mã đợt</th>
-              <th style={{ minWidth: 200 }}>Tên đợt Voucher / Coupon</th>
-              <th style={{ width: 140 }}>Loại ưu đãi</th>
-              <th style={{ width: 170 }}>Điều kiện áp dụng</th>
-              <th style={{ width: 140 }}>Đã dùng / Phát hành</th>
-              <th style={{ width: 180 }}>Thời gian hiệu lực</th>
-              <th style={{ width: 140 }}>Trạng thái</th>
-              <th style={{ width: 110, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
+              <th style={{ ...thStyle, width: 120 }}>Mã đợt</th>
+              <th style={{ ...thStyle, minWidth: 200 }}>Tên đợt Voucher / Coupon</th>
+              <th style={{ ...thStyle, width: 140 }}>Loại ưu đãi</th>
+              <th style={{ ...thStyle, width: 170 }}>Điều kiện áp dụng</th>
+              <th style={{ ...thStyle, width: 140 }}>Đã dùng / Phát hành</th>
+              <th style={{ ...thStyle, width: 180 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 140 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 110, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -184,8 +197,20 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
 
                 return (
                   <Fragment key={batch.id}>
-                    <tr className={isExpanded ? 'row-expanded' : ''}>
-                      <td>
+                    <tr
+                      className={`so-list-row ${isExpanded ? 'row-expanded' : ''}`}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        backgroundColor: isExpanded ? '#f0fdfa' : '#ffffff',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isExpanded) e.currentTarget.style.backgroundColor = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isExpanded) e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
+                    >
+                      <td className="so-list-td" style={{ textAlign: 'center' }}>
                         <button
                           onClick={() => toggleExpand(batch.id)}
                           className="btn-table-icon"
@@ -198,13 +223,13 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           )}
                         </button>
                       </td>
-                      <td>
-                        <span className="promo-code-text">{batch.batchCode}</span>
+                      <td className="so-list-td">
+                        <span className="so-list-code">{batch.batchCode}</span>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-title-box">
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span className="promo-title-main">{batch.name}</span>
+                            <span className="promo-title-main so-list-name">{batch.name}</span>
                             {batch.allowWithPromotions !== false ? (
                               <span
                                 style={{
@@ -242,8 +267,8 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td>{renderDiscountType(batch.discountType, batch.discountValue)}</td>
-                      <td>
+                      <td className="so-list-td">{renderDiscountType(batch.discountType, batch.discountValue)}</td>
+                      <td className="so-list-td">
                         <div className="voucher-conditions">
                           <div>
                             Đơn tối thiểu: <strong>{batch.minOrderValue.toLocaleString('vi-VN')} đ</strong>
@@ -255,7 +280,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="voucher-usage-container">
                           <div className="voucher-usage-text">
                             <span>{batch.usedQuantity} / {batch.totalQuantity}</span>
@@ -269,7 +294,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-date-badge">
                           <Calendar size={13} />
                           <span className="promo-date-text">{batch.startDate}</span>
@@ -277,7 +302,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           <span className="promo-date-text">{batch.endDate}</span>
                         </div>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-status-cell">
                           <div
                             className="switch-container"
@@ -291,7 +316,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           {renderBatchStatus(batch.status)}
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right' }}>
                         <div className="table-actions">
                           <button
                             onClick={() => onOpenGenerateCodes(batch)}
@@ -445,12 +470,12 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
         </table>
       </div>
 
-      {/* Shared Enterprise Pagination */}
+      {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
       <TablePagination
         currentPage={currentPage}
         pageSize={pageSize}
         totalItems={batches.length}
-        pageSizeOptions={[5, 10, 20]}
+        pageSizeOptions={[10, 20, 50]}
         itemLabel="đợt voucher"
         onPageChange={setCurrentPage}
         onPageSizeChange={(newSize) => {
