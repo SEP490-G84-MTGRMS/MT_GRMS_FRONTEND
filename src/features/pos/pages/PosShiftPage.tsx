@@ -924,40 +924,40 @@ export const PosShiftPage: FC = () => {
         )}
 
         {/* BẢNG LỊCH SỬ CÁC CA LÀM VIỆC */}
-        <div style={{ background: '#FFFFFF', borderRadius: 10, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="so-list-table-card so-list-table-card--wrap">
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
               <History size={16} className="text-teal-700" />
               <span>Danh Sách Các Phiên Ca Bán Hàng ({shifts.length})</span>
             </h3>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+          <div className="table-responsive">
+            <table className="so-list-table">
               <thead>
-                <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontWeight: 600 }}>
-                  <th style={{ padding: '10px 14px' }}>Mã ca</th>
-                  <th style={{ padding: '10px 14px' }}>Thời gian mở - đóng</th>
-                  <th style={{ padding: '10px 14px' }}>Thu ngân</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Tiền đầu ca</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Tiền lý thuyết</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Thực đếm</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Chênh lệch</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'center' }}>Xác nhận kết ca</th>
-                  <th style={{ padding: '10px 14px', textAlign: 'center' }}>Thao tác</th>
+                <tr>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1' }}>Mã ca</th>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1' }}>Thời gian mở - đóng</th>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1' }}>Thu ngân</th>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Tiền đầu ca</th>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Tiền lý thuyết</th>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Thực đếm</th>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Chênh lệch</th>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Xác nhận kết ca</th>
+                  <th style={{ backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64748B' }}>
+                    <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
                       <RefreshCw size={20} className="spin text-teal-700" style={{ margin: '0 auto 8px' }} />
                       <div>Đang tải lịch sử ca làm việc từ hệ thống...</div>
                     </td>
                   </tr>
                 ) : paginatedShifts.length === 0 ? (
                   <tr>
-                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
+                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
                       <AlertCircle size={24} color="#94A3B8" style={{ margin: '0 auto 8px' }} />
                       <div style={{ fontWeight: 600, color: '#334155' }}>Không có ca làm việc nào trong khoảng thời gian này</div>
                       <div style={{ fontSize: 12, marginTop: 4 }}>Hãy chọn khoảng thời gian khác hoặc kiểm tra lại chi nhánh đã chọn.</div>
@@ -979,13 +979,26 @@ export const PosShiftPage: FC = () => {
                     const isLateClose = earlyLateText?.toUpperCase().includes('MUỘN');
 
                     return (
-                      <tr key={s.id} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background-color 0.15s' }}>
-                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
-                          {s.shiftCode}
+                      <tr
+                        key={s.id}
+                        className="so-list-row"
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: '#ffffff',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f8fafc';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ffffff';
+                        }}
+                      >
+                        <td className="so-list-td">
+                          <span className="so-list-code font-mono font-bold">{s.shiftCode}</span>
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#334155', fontSize: 12 }}>
+                        <td className="so-list-td" style={{ color: '#334155', fontSize: 12 }}>
                           <div><b>Mở:</b> {formatDate(s.openedAtUtc)}</div>
-                          <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981' }}>Đang mở</span>}</div>
+                          <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981', fontWeight: 600 }}>Đang mở</span>}</div>
                           {earlyLateText && (
                             <div
                               style={{
@@ -1008,7 +1021,7 @@ export const PosShiftPage: FC = () => {
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#1E293B' }}>
+                        <td className="so-list-td" style={{ color: '#1E293B' }}>
                           {uniqueParticipants.length > 0 ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: 240 }} title={cashierDisplay}>
                               {uniqueParticipants.map((p, pIdx) => (
@@ -1035,16 +1048,16 @@ export const PosShiftPage: FC = () => {
                             <span style={{ color: '#64748B', fontStyle: 'italic' }}>Thu ngân quầy</span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>
                           {formatVND(s.openingFloat)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600 }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600 }}>
                           {formatVND(s.expectedCash)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A' }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A' }}>
                           {s.actualCashCounted !== null && s.actualCashCounted !== undefined ? formatVND(s.actualCashCounted) : '---'}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
                           {diff === 0 ? (
                             <span style={{ color: '#059669' }}>Khớp (0 đ)</span>
                           ) : diff > 0 ? (
@@ -1053,27 +1066,15 @@ export const PosShiftPage: FC = () => {
                             <span style={{ color: '#DC2626' }}>{formatVND(diff)}</span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <td className="so-list-td" style={{ textAlign: 'center' }}>
                           {getHandoverBadge(s.handoverStatus)}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <td className="so-list-td so-list-td--actions" style={{ textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
                             <button
                               type="button"
+                              className="so-list-action-btn"
                               onClick={() => setSelectedDetailShift(s)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 4,
-                                padding: '4px 8px',
-                                borderRadius: 6,
-                                border: '1px solid #0F766E',
-                                backgroundColor: '#F0FDFA',
-                                color: '#0F766E',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                              }}
                               title="Xem chi tiết phiên ca & Lý do chênh lệch"
                             >
                               <Eye size={13} />
@@ -1088,7 +1089,8 @@ export const PosShiftPage: FC = () => {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: 4,
-                                  padding: '4px 8px',
+                                  height: 28,
+                                  padding: '0 10px',
                                   borderRadius: 6,
                                   border: '1px solid #DC2626',
                                   backgroundColor: '#FEF2F2',
@@ -1096,6 +1098,7 @@ export const PosShiftPage: FC = () => {
                                   fontSize: 12,
                                   fontWeight: 700,
                                   cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
                                 }}
                                 title="Nhân viên quên chốt ca: Chủ cửa hàng tự kiểm đếm tiền, nhập lý do và buộc đóng ca"
                               >
@@ -1116,7 +1119,8 @@ export const PosShiftPage: FC = () => {
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   gap: 4,
-                                  padding: '4px 8px',
+                                  height: 28,
+                                  padding: '0 10px',
                                   borderRadius: 6,
                                   border: '1px solid #059669',
                                   backgroundColor: '#ECFDF5',
@@ -1124,6 +1128,7 @@ export const PosShiftPage: FC = () => {
                                   fontSize: 12,
                                   fontWeight: 600,
                                   cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
                                 }}
                                 title="Chủ cửa hàng duyệt bàn giao & cộng tiền nộp két vào Sổ quỹ"
                               >
@@ -1141,22 +1146,20 @@ export const PosShiftPage: FC = () => {
             </table>
           </div>
 
-          {/* PHÂN TRANG */}
+          {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
           {shifts.length > 0 && (
-            <div style={{ padding: '10px 16px', borderTop: '1px solid #E2E8F0' }}>
-              <TablePagination
-                currentPage={currentPage}
-                pageSize={pageSize}
-                totalItems={shifts.length}
-                itemLabel="ca làm việc"
-                pageSizeOptions={[10, 20, 50]}
-                onPageChange={setCurrentPage}
-                onPageSizeChange={(newSize) => {
-                  setPageSize(newSize);
-                  setCurrentPage(1);
-                }}
-              />
-            </div>
+            <TablePagination
+              currentPage={currentPage}
+              pageSize={pageSize}
+              totalItems={shifts.length}
+              itemLabel="ca làm việc"
+              pageSizeOptions={[10, 20, 50]}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+            />
           )}
         </div>
       </main>
