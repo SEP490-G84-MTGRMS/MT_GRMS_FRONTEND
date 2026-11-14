@@ -148,14 +148,17 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
     if (val === undefined || val === null || isNaN(val) || val <= 0 || val > 24) {
       return 'Số giờ chuẩn của 1 ngày công phải lớn hơn 0 và không vượt quá 24 giờ.';
     }
+    if (Math.abs(Math.round(val * 100) - val * 100) > 1e-9) {
+      return 'Số giờ chuẩn chỉ được phép tối đa 2 chữ số thập phân.';
+    }
     return null;
   }, [currentConfig.standardDayHours]);
 
   const lateThresholdError = useMemo(() => {
     if (!currentConfig.enableLateThreshold) return null;
     const val = currentConfig.lateThresholdMinutes;
-    if (val === undefined || val === null || isNaN(val) || val < 0 || val > 240) {
-      return 'Số phút đi muộn tối đa không được âm và không vượt quá 240 phút (4 giờ).';
+    if (val === undefined || val === null || isNaN(val) || !Number.isInteger(val) || val < 0 || val > 240) {
+      return 'Số phút đi muộn tối đa phải là số nguyên từ 0 đến 240 phút (4 giờ).';
     }
     return null;
   }, [currentConfig.enableLateThreshold, currentConfig.lateThresholdMinutes]);
@@ -163,8 +166,8 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   const earlyLeaveThresholdError = useMemo(() => {
     if (!currentConfig.enableEarlyLeaveThreshold) return null;
     const val = currentConfig.earlyLeaveThresholdMinutes;
-    if (val === undefined || val === null || isNaN(val) || val < 0 || val > 240) {
-      return 'Số phút về sớm tối đa không được âm và không vượt quá 240 phút (4 giờ).';
+    if (val === undefined || val === null || isNaN(val) || !Number.isInteger(val) || val < 0 || val > 240) {
+      return 'Số phút về sớm tối đa phải là số nguyên từ 0 đến 240 phút (4 giờ).';
     }
     return null;
   }, [currentConfig.enableEarlyLeaveThreshold, currentConfig.earlyLeaveThresholdMinutes]);
@@ -173,16 +176,37 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   const getRuleErrors = useCallback((r: WorkHourConversionRule) => {
     const fromH = r.fromHours ?? 0;
     const fromM = r.fromMinutes ?? 0;
-    const isFromInvalid = isNaN(fromH) || fromH < 0 || fromH > 24 || isNaN(fromM) || fromM < 0 || fromM > 59;
-    const isWorkUnitsInvalid = isNaN(r.workUnits) || r.workUnits <= 0 || r.workUnits > 5;
+    const fromTotal = fromH * 60 + fromM;
+    const isFromInvalid =
+      !Number.isInteger(fromH) ||
+      !Number.isInteger(fromM) ||
+      fromH < 0 ||
+      fromH > 24 ||
+      fromM < 0 ||
+      fromM > 59 ||
+      fromTotal > 1440 ||
+      (r.type === 'gte' && fromTotal >= 1440);
+    const isWorkUnitsInvalid =
+      isNaN(r.workUnits) ||
+      r.workUnits <= 0 ||
+      r.workUnits > 5 ||
+      Math.abs(Math.round(r.workUnits * 100) - r.workUnits * 100) > 1e-9;
     let isToInvalid = false;
     let isRangeOrderInvalid = false;
 
     if (r.type === 'range') {
       const toH = r.toHours ?? 0;
       const toM = r.toMinutes ?? 0;
-      isToInvalid = isNaN(toH) || toH < 0 || toH > 24 || isNaN(toM) || toM < 0 || toM > 59;
-      if (!isFromInvalid && !isToInvalid && toH * 60 + toM <= fromH * 60 + fromM) {
+      const toTotal = toH * 60 + toM;
+      isToInvalid =
+        !Number.isInteger(toH) ||
+        !Number.isInteger(toM) ||
+        toH < 0 ||
+        toH > 24 ||
+        toM < 0 ||
+        toM > 59 ||
+        toTotal > 1440;
+      if (!isFromInvalid && !isToInvalid && toTotal <= fromTotal) {
         isRangeOrderInvalid = true;
       }
     }
@@ -196,26 +220,88 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
     };
   }, []);
 
-  const rulesError = useMemo(() => {
-    if (!currentConfig.isConvertHoursToDays) return null;
+  const rulesValidation = useMemo(() => {
+    const emptyResult = { error: null as string | null, overlappingIds: new Set<string>() };
+    if (!currentConfig.isConvertHoursToDays) return emptyResult;
     if (!rules || rules.length === 0) {
-      return 'Vui lòng thêm ít nhất một quy tắc quy đổi giờ làm thành ngày công.';
+      return {
+        error: 'Vui lòng thêm ít nhất một quy tắc quy đổi giờ làm thành ngày công.',
+        overlappingIds: new Set<string>(),
+      };
     }
+
+    const ranges: { index: number; id: string; fromTotal: number; toTotal: number }[] = [];
+    const gteRules: { index: number; id: string; fromTotal: number }[] = [];
+
     for (let i = 0; i < rules.length; i++) {
       const r = rules[i];
       const err = getRuleErrors(r);
-      if (err.isWorkUnitsInvalid || err.isRangeOrderInvalid) {
-        return 'Quy tắc quy đổi công không hợp lệ: mốc giờ kết thúc phải lớn hơn mốc giờ bắt đầu và số công phải lớn hơn 0.';
+      if (err.isWorkUnitsInvalid) {
+        return {
+          error: `Số công quy đổi ở Dòng ${i + 1} phải lớn hơn 0, không vượt quá 5 và tối đa 2 chữ số thập phân.`,
+          overlappingIds: new Set<string>(),
+        };
+      }
+      if (err.isRangeOrderInvalid) {
+        return {
+          error: `Quy tắc quy đổi công không hợp lệ ở Dòng ${i + 1}: mốc giờ kết thúc phải lớn hơn mốc giờ bắt đầu.`,
+          overlappingIds: new Set<string>(),
+        };
       }
       if (err.isFromInvalid) {
-        return `Mốc giờ/phút bắt đầu trong quy tắc quy đổi công không hợp lệ (Dòng ${i + 1}).`;
+        return {
+          error: `Mốc giờ/phút bắt đầu trong quy tắc quy đổi công không hợp lệ (Dòng ${i + 1}, tối đa 24:00).`,
+          overlappingIds: new Set<string>(),
+        };
       }
       if (err.isToInvalid) {
-        return `Mốc giờ/phút kết thúc trong quy tắc quy đổi công không hợp lệ (Dòng ${i + 1}).`;
+        return {
+          error: `Mốc giờ/phút kết thúc trong quy tắc quy đổi công không hợp lệ (Dòng ${i + 1}, tối đa 24:00).`,
+          overlappingIds: new Set<string>(),
+        };
+      }
+
+      const fromTotal = (r.fromHours ?? 0) * 60 + (r.fromMinutes ?? 0);
+      if (r.type === 'gte') {
+        gteRules.push({ index: i + 1, id: r.id, fromTotal });
+      } else {
+        const toTotal = (r.toHours ?? 0) * 60 + (r.toMinutes ?? 0);
+        ranges.push({ index: i + 1, id: r.id, fromTotal, toTotal });
       }
     }
-    return null;
+
+    const overlappingIds = new Set<string>();
+    let firstCrossError: string | null = null;
+
+    if (gteRules.length > 1) {
+      gteRules.forEach((g) => overlappingIds.add(g.id));
+      firstCrossError = "Chỉ được cấu hình tối đa một quy tắc dạng 'Từ ... giờ trở lên'.";
+    }
+
+    const activeGte = gteRules.length === 1 ? gteRules[0] : null;
+    for (let i = 0; i < ranges.length; i++) {
+      if (activeGte && ranges[i].toTotal > activeGte.fromTotal) {
+        overlappingIds.add(ranges[i].id);
+        overlappingIds.add(activeGte.id);
+        if (!firstCrossError) {
+          firstCrossError = `Khoảng giờ quy đổi ở Dòng ${ranges[i].index} đang chồng lấn lên mốc 'Từ ... giờ trở lên'.`;
+        }
+      }
+      for (let j = i + 1; j < ranges.length; j++) {
+        if (Math.max(ranges[i].fromTotal, ranges[j].fromTotal) < Math.min(ranges[i].toTotal, ranges[j].toTotal)) {
+          overlappingIds.add(ranges[i].id);
+          overlappingIds.add(ranges[j].id);
+          if (!firstCrossError) {
+            firstCrossError = `Các khoảng giờ quy đổi công không được chồng lấn lên nhau (Dòng ${ranges[i].index} và Dòng ${ranges[j].index}).`;
+          }
+        }
+      }
+    }
+
+    return { error: firstCrossError, overlappingIds };
   }, [currentConfig.isConvertHoursToDays, rules, getRuleErrors]);
+
+  const rulesError = rulesValidation.error;
 
   const validatePolicyConfig = (): string | null => {
     if (branchError) return branchError;

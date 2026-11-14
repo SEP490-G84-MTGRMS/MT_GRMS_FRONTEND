@@ -111,6 +111,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   // Tab 2: Lương
   const [salaryType, setSalaryType] = useState<SalaryType>('monthly');
   const [baseSalary, setBaseSalary] = useState<number | ''>('');
+  const [hasLaborContract, setHasLaborContract] = useState<boolean>(false);
+  const [insuranceBaseSalary, setInsuranceBaseSalary] = useState<number | ''>('');
   const [otWeekday, setOtWeekday] = useState('');
   const [otSunday, setOtSunday] = useState('');
   const [otDayOff, setOtDayOff] = useState('');
@@ -209,6 +211,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       if (employee.salaryConfig) {
         setSalaryType(employee.salaryConfig.salaryType);
         setBaseSalary(employee.salaryConfig.baseSalary ?? '');
+        setHasLaborContract(Boolean(employee.salaryConfig.hasLaborContract));
+        setInsuranceBaseSalary(employee.salaryConfig.insuranceBaseSalary ?? '');
         setOtWeekday(employee.salaryConfig.otWeekday || '');
         setOtSunday(employee.salaryConfig.otSunday || '');
         setOtDayOff(employee.salaryConfig.otDayOff || '');
@@ -248,6 +252,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
       setSalaryType('monthly');
       setBaseSalary('');
+      setHasLaborContract(false);
+      setInsuranceBaseSalary('');
       setOtWeekday('');
       setOtSunday('');
       setOtDayOff('');
@@ -387,6 +393,21 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     if (num > 1000000000) return 'Mức lương cơ bản không được vượt quá 1.000.000.000 đ.';
     return null;
   }, [baseSalary]);
+
+  const insuranceBaseSalaryError = useMemo(() => {
+    if (salaryType !== 'monthly' || !hasLaborContract) return null;
+    const effective =
+      insuranceBaseSalary === '' || insuranceBaseSalary === undefined
+        ? Number(baseSalary) || 0
+        : Number(insuranceBaseSalary);
+    if (isNaN(effective) || effective <= 0) {
+      return 'Mức lương đóng bảo hiểm phải lớn hơn 0 khi có hợp đồng lao động.';
+    }
+    if (effective > 1000000000) {
+      return 'Mức lương đóng bảo hiểm không được vượt quá 1.000.000.000 đ.';
+    }
+    return null;
+  }, [salaryType, hasLaborContract, insuranceBaseSalary, baseSalary]);
 
   const otWeekdayError = useMemo(() => {
     if (!otWeekday) return null;
@@ -765,6 +786,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       return;
     }
 
+    if (insuranceBaseSalaryError) {
+      setFormError(insuranceBaseSalaryError);
+      setActiveTab('salary');
+      return;
+    }
+
     if (otWeekdayError) {
       setFormError(otWeekdayError);
       setActiveTab('salary');
@@ -833,6 +860,13 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       {
         salaryType,
         baseSalary: Number(baseSalary) || 0,
+        hasLaborContract: salaryType === 'monthly' && hasLaborContract,
+        insuranceBaseSalary:
+          salaryType === 'monthly' && hasLaborContract
+            ? insuranceBaseSalary === ''
+              ? Number(baseSalary) || 0
+              : Number(insuranceBaseSalary)
+            : undefined,
         otWeekday: otWeekday || '150%',
         otSunday: otSunday || '200%',
         otDayOff: otDayOff || '200%',
@@ -1897,6 +1931,96 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                       )}
                     </div>
                   </div>
+
+                  {salaryType === 'monthly' && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        paddingTop: 14,
+                        borderTop: '1px dashed #E2E8F0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12,
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          cursor: 'pointer',
+                          fontSize: 13.5,
+                          fontWeight: 600,
+                          color: '#0F172A',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={hasLaborContract}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setHasLaborContract(checked);
+                            if (checked && insuranceBaseSalary === '' && baseSalary !== '') {
+                              setInsuranceBaseSalary(baseSalary);
+                            }
+                            if (!touched.insuranceBaseSalary) markTouched('insuranceBaseSalary');
+                          }}
+                          style={{ width: 16, height: 16, accentColor: '#0F766E' }}
+                        />
+                        <span>Có hợp đồng lao động (Trích đóng BHXH 8% + BHYT 1.5% + BHTN 1% = 10.5%)</span>
+                      </label>
+
+                      {hasLaborContract && (
+                        <div className="emp-form-group" style={{ marginBottom: 0, maxWidth: 380 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <label className="emp-form-label" style={{ marginBottom: 0 }}>
+                              Mức lương đóng bảo hiểm (VNĐ/tháng) <span className="emp-required">*</span>
+                            </label>
+                            {insuranceBaseSalary !== '' && !isNaN(Number(insuranceBaseSalary)) && (
+                              <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 600 }}>
+                                {Number(insuranceBaseSalary).toLocaleString('vi-VN')} đ
+                              </span>
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            step="50000"
+                            min="0"
+                            max="1000000000"
+                            className="emp-form-input"
+                            placeholder="VD: 5,000,000"
+                            value={insuranceBaseSalary === '' ? '' : insuranceBaseSalary}
+                            onChange={(e) => {
+                              setInsuranceBaseSalary(e.target.value === '' ? '' : Number(e.target.value));
+                              if (!touched.insuranceBaseSalary) markTouched('insuranceBaseSalary');
+                            }}
+                            onBlur={() => markTouched('insuranceBaseSalary')}
+                            style={{
+                              borderColor:
+                                (touched.insuranceBaseSalary || hasSubmitted) && insuranceBaseSalaryError
+                                  ? '#EF4444'
+                                  : undefined,
+                            }}
+                          />
+                          <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 4 }}>
+                            Dự kiến trích đóng 10.5%:{' '}
+                            <strong style={{ color: '#0F172A' }}>
+                              {Math.round(
+                                (insuranceBaseSalary === '' ? Number(baseSalary) || 0 : Number(insuranceBaseSalary) || 0) *
+                                  0.105
+                              ).toLocaleString('vi-VN')}{' '}
+                              đ/tháng
+                            </strong>
+                          </div>
+                          {(touched.insuranceBaseSalary || hasSubmitted) && insuranceBaseSalaryError && (
+                            <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>•</span> {insuranceBaseSalaryError}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* OT Config */}

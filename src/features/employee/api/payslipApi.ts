@@ -57,6 +57,7 @@ export interface PayslipResponse {
   advanceDeduction: number;
   remainingDebt: number;
   socialInsurance: number;
+  insuranceBaseSalary?: number;
   bhxhAmount: number;
   bhytAmount: number;
   bhtnAmount: number;
@@ -221,6 +222,7 @@ export function mapBackendDetailToDetailedRecord(dto: PayslipResponse): PayslipD
     otRateSunday: dto.otSunday || '200%',
     otRatePercent: dto.otWeekday ? `${dto.otWeekday} (Thường) / ${dto.otSunday || '200%'} (CN)` : '150% (Thường) / 200% (CN)',
     contractBaseSalary: dto.baseRate,
+    insuranceBaseSalary: dto.insuranceBaseSalary,
     baseSalaryEarned: dto.baseSalaryEarned,
     overtimePay: dto.overtimePay,
     totalAllowance: dto.totalAllowance,

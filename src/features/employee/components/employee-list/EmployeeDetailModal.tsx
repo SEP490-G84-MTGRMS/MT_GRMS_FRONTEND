@@ -430,6 +430,27 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                       </div>
                     </div>
                   </div>
+                  {employee.salaryConfig?.salaryType === 'monthly' && (
+                    <div
+                      className="emp-grid-2"
+                      style={{ fontSize: 14, marginTop: 12, paddingTop: 12, borderTop: '1px dashed #E2E8F0' }}
+                    >
+                      <div>
+                        <span style={{ color: '#64748B' }}>Hợp đồng lao động (BHXH/BHYT/BHTN):</span>
+                        <div style={{ fontWeight: 600, marginTop: 4 }}>
+                          {employee.salaryConfig?.hasLaborContract ? 'Có tham gia (10.5%)' : 'Không tham gia'}
+                        </div>
+                      </div>
+                      {employee.salaryConfig?.hasLaborContract && (
+                        <div>
+                          <span style={{ color: '#64748B' }}>Mức lương đóng bảo hiểm:</span>
+                          <div style={{ fontWeight: 700, fontSize: 15, color: '#0F172A', marginTop: 4 }}>
+                            {formatVND(employee.salaryConfig?.insuranceBaseSalary ?? employee.salaryConfig?.baseSalary)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="emp-section-card">

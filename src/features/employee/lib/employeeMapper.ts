@@ -15,6 +15,8 @@ export interface EmployeeBackendSummaryDto {
   status: string;
   salaryType: string;
   baseRate: number;
+  hasLaborContract?: boolean;
+  insuranceBaseSalary?: number | null;
   otWeekday?: string;
   otSunday?: string;
   debtAmount?: number;
@@ -48,6 +50,8 @@ export interface EmployeeBackendDetailDto {
   role?: string;
   salaryType: string;
   baseRate: number;
+  hasLaborContract?: boolean;
+  insuranceBaseSalary?: number | null;
   allowances?: Array<{ id?: string; name: string; amount: number }>;
   debtAmount: number;
   status: string;
@@ -74,6 +78,8 @@ export interface CreateEmployeePayload {
   gender?: string;
   salaryType: string;
   baseRate: number;
+  hasLaborContract?: boolean;
+  insuranceBaseSalary?: number | null;
   allowances?: Array<{ id?: string; name: string; amount: number }>;
   bankAccountNumber?: string;
   bankName?: string;
@@ -114,6 +120,8 @@ export const mapBackendSummaryToEmployee = (dto: EmployeeBackendSummaryDto): Emp
   const salaryConfig: SalaryConfig = {
     salaryType,
     baseSalary: dto.baseRate || 0,
+    hasLaborContract: Boolean(dto.hasLaborContract),
+    insuranceBaseSalary: dto.insuranceBaseSalary ?? undefined,
     otWeekday: dto.otWeekday || '150%',
     otSunday: dto.otSunday || '200%',
     otDayOff: '200%',
@@ -168,6 +176,8 @@ export const mapBackendDetailToEmployee = (dto: EmployeeBackendDetailDto): Emplo
   const salaryConfig: SalaryConfig = {
     salaryType,
     baseSalary: dto.baseRate || 0,
+    hasLaborContract: Boolean(dto.hasLaborContract),
+    insuranceBaseSalary: dto.insuranceBaseSalary ?? undefined,
     otWeekday: dto.otWeekday || '150%',
     otSunday: dto.otSunday || '200%',
     otDayOff: '200%',
@@ -257,6 +267,12 @@ export const mapFormToCreatePayload = (
     gender: emp.gender || 'male',
     salaryType: salaryConfig?.salaryType || 'monthly',
     baseRate: salaryConfig?.baseSalary || 0,
+    hasLaborContract:
+      (salaryConfig?.salaryType || 'monthly') === 'monthly' && Boolean(salaryConfig?.hasLaborContract),
+    insuranceBaseSalary:
+      (salaryConfig?.salaryType || 'monthly') === 'monthly' && salaryConfig?.hasLaborContract
+        ? (salaryConfig.insuranceBaseSalary ?? salaryConfig.baseSalary ?? 0)
+        : null,
     allowances: activeAllowances,
     bankAccountNumber: emp.bankAccountNumber?.trim() || undefined,
     bankName: emp.bankName?.trim() || undefined,

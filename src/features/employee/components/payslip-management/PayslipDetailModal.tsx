@@ -469,7 +469,12 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                      <span style={{ color: '#475569' }}>BHXH (8%)</span>
+                      <span style={{ color: '#475569' }}>
+                        BHXH (8%)
+                        {effectivePayslip.insuranceBaseSalary && effectivePayslip.insuranceBaseSalary > 0
+                          ? ` trên ${formatVND(effectivePayslip.insuranceBaseSalary)}`
+                          : ''}
+                      </span>
                       <span style={{ color: bhxhAmount > 0 ? '#DC2626' : '#64748B' }}>
                         {bhxhAmount > 0 ? `-${formatVND(bhxhAmount)}` : '0 đ'}
                       </span>

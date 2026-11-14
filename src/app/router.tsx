@@ -734,7 +734,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'employees/schedule',
-        element: <WorkSchedulePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <WorkSchedulePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'employees/shifts',
@@ -845,7 +849,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'schedule',
-        element: <WorkSchedulePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <WorkSchedulePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'shifts',
@@ -885,11 +893,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/employee/schedule" replace />,
+        element: <Navigate to="/employee/attendance" replace />,
       },
       {
         path: 'schedule',
-        element: <WorkSchedulePage />,
+        element: <Navigate to="/employee/attendance" replace />,
       },
       {
         path: 'attendance',
