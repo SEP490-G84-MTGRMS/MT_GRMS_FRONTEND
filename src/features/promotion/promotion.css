@@ -6,11 +6,17 @@
 
 .promotion-page {
   width: 100%;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
   background-color: var(--bg-soft-blue, #F0FDFA);
-  padding: 8px 16px 40px 16px;
+  padding: 8px 16px 12px 16px;
   font-family: var(--font-sans, 'Be Vietnam Pro', sans-serif);
   box-sizing: border-box;
-  min-height: calc(100vh - 70px);
 }
 
 /* ── Top Header Bar ── */
@@ -20,9 +26,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--blue-border, #99F6E4);
+  flex-shrink: 0;
 }
 
 .promotion-topbar-title {
@@ -300,7 +307,12 @@
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   overflow: hidden;
-  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  margin-bottom: 0;
 }
 
 .promotion-card-header {
@@ -310,6 +322,7 @@
   align-items: center;
   justify-content: space-between;
   background: #ffffff;
+  flex-shrink: 0;
 }
 
 .promotion-card-title {
@@ -324,7 +337,10 @@
 
 .table-responsive {
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: auto;
+  overflow-y: auto;
 }
 
 .promotion-table {
@@ -1027,6 +1043,11 @@
   max-width: 1440px;
   margin: 0 auto;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .loyalty-header-action-bar {
@@ -1034,8 +1055,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .loyalty-nav-tabs {

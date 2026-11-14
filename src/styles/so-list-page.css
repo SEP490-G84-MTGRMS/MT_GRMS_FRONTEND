@@ -302,6 +302,7 @@
 
 .so-list-table-card--wrap .so-list-table tbody td.so-list-td--actions {
   white-space: nowrap !important;
+  overflow: hidden !important;
 }
 
 .so-list-table-card--wrap .so-list-code {
