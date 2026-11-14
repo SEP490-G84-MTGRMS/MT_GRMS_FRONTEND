@@ -349,7 +349,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     expect(negErr).toBeDefined();
   });
 
-  it('Scenario 8: SL < MOQ -> WARNING; vẫn Apply được nếu không ERROR', async () => {
+  it('Scenario 8: SL < MOQ -> ERROR; không Apply được', async () => {
     const wsData = [
       ['Header info'],
       [`Mã CN: ${mockBranch.id}`],
@@ -371,15 +371,12 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       isCellEditable,
     });
 
-    // Per user rules: MOQ is a WARNING, not an ERROR. Result is valid and can be applied!
-    expect(result.valid).toBe(true);
-    expect(result.summary.errorCount).toBe(0);
-    expect(result.summary.warningCount).toBe(1);
-    const moqWarn = result.warnings.find((w) => w.code === 'MOQ_NOT_MET');
-    expect(moqWarn).toBeDefined();
-    expect(moqWarn?.inputValue).toBe(5);
-    expect(result.summary.validCells).toBe(1);
-    expect(result.cellsToApply[0].quantity).toBe(5);
+    expect(result.valid).toBe(false);
+    expect(result.summary.errorCount).toBeGreaterThanOrEqual(1);
+    const moqErr = result.errors.find((e) => e.code === 'MOQ_NOT_MET');
+    expect(moqErr).toBeDefined();
+    expect(moqErr?.inputValue).toBe(5);
+    expect(result.cellsToApply.length).toBe(0);
   });
 
   it('Scenario 9: Bội số đặt hàng không khớp -> WARNING (ORDER_MULTIPLE_INVALID)', async () => {

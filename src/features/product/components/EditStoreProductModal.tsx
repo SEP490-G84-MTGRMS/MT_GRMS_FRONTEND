@@ -24,24 +24,27 @@ interface FieldErrors {
   minOrderQuantity?: string;
 }
 
-const rowStyle: CSSProperties = {
-  display: 'flex',
+/** 4 cột đều: Nhãn | Ô | Nhãn | Ô */
+const formGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  columnGap: 10,
+  rowGap: 12,
   alignItems: 'center',
-  gap: 12,
-  minHeight: 36,
 };
 
 const labelStyle: CSSProperties = {
-  width: 140,
-  flexShrink: 0,
-  fontSize: 13,
+  fontSize: 12.5,
   fontWeight: 600,
   color: '#475569',
   textAlign: 'left',
+  lineHeight: 1.3,
+  minWidth: 0,
 };
 
 const inputBase: CSSProperties = {
-  flex: 1,
+  width: '100%',
+  minWidth: 0,
   height: 36,
   padding: '0 10px',
   borderRadius: 6,
@@ -61,23 +64,35 @@ const readOnlyInput: CSSProperties = {
   cursor: 'default',
 };
 
-function FieldRow({
+const controlCellStyle: CSSProperties = {
+  minWidth: 0,
+  width: '100%',
+};
+
+/** Mỗi field chiếm 2 cột lưới (nhãn + ô). wide = ô kéo dài 3 cột. */
+function FieldPair({
   label,
   children,
   htmlFor,
+  wide = false,
 }: {
   label: string;
   children: ReactNode;
   htmlFor?: string;
+  wide?: boolean;
 }) {
   return (
-    <div style={rowStyle}>
+    <>
       <label htmlFor={htmlFor} style={labelStyle}>
         {label}
       </label>
-      {children}
-    </div>
+      <div style={{ ...controlCellStyle, gridColumn: wide ? 'span 3' : 'span 1' }}>{children}</div>
+    </>
   );
+}
+
+function GridDivider() {
+  return <div style={{ gridColumn: '1 / -1', height: 1, background: '#e2e8f0', margin: '2px 0' }} />;
 }
 
 export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
@@ -262,8 +277,8 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
           id="modalEditStoreProductDialog"
           className="modal-box"
           style={{
-            maxWidth: 620,
-            width: '95%',
+            maxWidth: 860,
+            width: '96%',
             maxHeight: '90vh',
             display: 'flex',
             flexDirection: 'column',
@@ -356,9 +371,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
               className="modal-body"
               style={{
                 padding: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 14,
                 overflowY: 'auto',
                 flex: 1,
               }}
@@ -371,6 +383,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     alignItems: 'center',
                     gap: 10,
                     padding: '10px 14px',
+                    marginBottom: 12,
                     backgroundColor: '#fef2f2',
                     border: '1px solid #fecaca',
                     borderRadius: 8,
@@ -383,220 +396,294 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 </div>
               )}
 
-              {/* Group A - Store Info */}
-              <FieldRow label="Mã chi nhánh" htmlFor="inputStoreCode">
-                <input
-                  id="inputStoreCode"
-                  type="text"
-                  readOnly
-                  value={product.storeCode || matchedStore?.code || ''}
-                  style={readOnlyInput}
-                />
-              </FieldRow>
+              <div style={formGridStyle}>
+                {/* Group A - Store Info */}
+                <FieldPair label="Mã chi nhánh" htmlFor="inputStoreCode">
+                  <input
+                    id="inputStoreCode"
+                    type="text"
+                    readOnly
+                    value={product.storeCode || matchedStore?.code || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Tên chi nhánh" htmlFor="inputStoreName">
-                <input
-                  id="inputStoreName"
-                  type="text"
-                  readOnly
-                  value={product.storeName || matchedStore?.name || ''}
-                  style={readOnlyInput}
-                />
-              </FieldRow>
+                <FieldPair label="Tên chi nhánh" htmlFor="inputStoreName">
+                  <input
+                    id="inputStoreName"
+                    type="text"
+                    readOnly
+                    value={product.storeName || matchedStore?.name || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Địa chỉ chi nhánh" htmlFor="inputStoreAddress">
-                <input
-                  id="inputStoreAddress"
-                  type="text"
-                  readOnly
-                  value={storeAddress || matchedStore?.address || ''}
-                  style={readOnlyInput}
-                />
-              </FieldRow>
+                <FieldPair label="Địa chỉ chi nhánh" htmlFor="inputStoreAddress" wide>
+                  <input
+                    id="inputStoreAddress"
+                    type="text"
+                    readOnly
+                    value={storeAddress || matchedStore?.address || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <div style={{ height: 1, background: '#e2e8f0', margin: '2px 0' }} />
+                <GridDivider />
 
-              {/* Group B - Product Info */}
-              <FieldRow label="SKU" htmlFor="inputProductSku">
-                <input
-                  id="inputProductSku"
-                  type="text"
-                  readOnly
-                  value={product.sku}
-                  style={{ ...readOnlyInput, fontFamily: 'monospace' }}
-                />
-              </FieldRow>
+                {/* Group B - Product Info */}
+                <FieldPair label="SKU" htmlFor="inputProductSku">
+                  <input
+                    id="inputProductSku"
+                    type="text"
+                    readOnly
+                    value={product.sku}
+                    style={{ ...readOnlyInput, fontFamily: 'monospace' }}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Sản phẩm" htmlFor="inputProductName">
-                <input id="inputProductName" type="text" readOnly value={product.name} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Sản phẩm" htmlFor="inputProductName">
+                  <input id="inputProductName" type="text" readOnly value={product.name} style={readOnlyInput} />
+                </FieldPair>
 
-              <FieldRow label="Mã vạch" htmlFor="inputProductBarcode">
-                <input id="inputProductBarcode" type="text" readOnly value={product.barcode} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Mã vạch" htmlFor="inputProductBarcode">
+                  <input
+                    id="inputProductBarcode"
+                    type="text"
+                    readOnly
+                    value={product.barcode}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Ngành hàng" htmlFor="inputProductCategory">
-                <input id="inputProductCategory" type="text" readOnly value={product.category} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Ngành hàng" htmlFor="inputProductCategory">
+                  <input
+                    id="inputProductCategory"
+                    type="text"
+                    readOnly
+                    value={product.category}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Đơn vị tính" htmlFor="inputProductUnit">
-                <input id="inputProductUnit" type="text" readOnly value={product.unit} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Đơn vị nhập" htmlFor="inputProductUnit">
+                  <input id="inputProductUnit" type="text" readOnly value={product.unit} style={readOnlyInput} />
+                </FieldPair>
 
-              <FieldRow label="Giá vốn" htmlFor="inputCostPrice">
-                <input id="inputCostPrice" type="text" readOnly value={`${fmt(product.costPrice)} đ`} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Giá vốn" htmlFor="inputCostPrice">
+                  <input
+                    id="inputCostPrice"
+                    type="text"
+                    readOnly
+                    value={`${fmt(product.costPrice)} đ`}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Tồn kho" htmlFor="inputCurrentStock">
-                <input id="inputCurrentStock" type="text" readOnly value={`${product.currentStock} ${product.unit}`} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Tồn kho" htmlFor="inputCurrentStock">
+                  <input
+                    id="inputCurrentStock"
+                    type="text"
+                    readOnly
+                    value={`${product.currentStock} ${product.unit}`}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <div style={{ height: 1, background: '#e2e8f0', margin: '2px 0' }} />
+                <FieldPair label="MOQ" htmlFor="inputEditMoq">
+                  <input
+                    id="inputEditMoq"
+                    type="number"
+                    readOnly
+                    value={Number(minOrderQuantityStr) || 1}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              {/* Group C - Supplier Info */}
-              <FieldRow label="Mã NCC" htmlFor="inputSupplierCode">
-                <input id="inputSupplierCode" type="text" readOnly value={product.primarySupplierCode || ''} style={readOnlyInput} />
-              </FieldRow>
+                <GridDivider />
 
-              <FieldRow label="Tên NCC" htmlFor="inputSupplierName">
-                <input id="inputSupplierName" type="text" readOnly value={product.primarySupplierName || ''} style={readOnlyInput} />
-              </FieldRow>
+                {/* Group C - Supplier Info */}
+                <FieldPair label="Mã NCC" htmlFor="inputSupplierCode">
+                  <input
+                    id="inputSupplierCode"
+                    type="text"
+                    readOnly
+                    value={product.primarySupplierCode || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <div style={{ height: 1, background: '#e2e8f0', margin: '2px 0' }} />
+                <FieldPair label="Tên NCC" htmlFor="inputSupplierName">
+                  <input
+                    id="inputSupplierName"
+                    type="text"
+                    readOnly
+                    value={product.primarySupplierName || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              {/* Group D - Editable fields */}
-              <FieldRow label="Giá bán lẻ niêm yết" htmlFor="inputRetailPrice">
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      id="inputRetailPrice"
-                      type="number"
-                      min={0}
-                      step={100}
-                      value={retailPriceStr}
-                      onChange={(e) => {
-                        setRetailPriceStr(e.target.value);
-                        if (fieldErrors.retailPrice) {
-                          setFieldErrors((prev) => ({ ...prev, retailPrice: undefined }));
-                        }
-                      }}
-                      style={{
-                        ...inputBase,
-                        borderColor: fieldErrors.retailPrice ? '#ef4444' : '#cbd5e1',
-                        textAlign: 'left',
-                      }}
-                    />
-                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, width: 16 }}>đ</span>
-                  </div>
-                  {product.costPrice != null && !isNaN(parsedPrice) && (
-                    <div style={{ fontSize: 12, marginTop: 2 }}>
-                      {parsedPrice >= product.costPrice ? (
-                        <span style={{ color: '#16a34a', fontWeight: 600 }}>
-                          Lãi gộp ước tính: +{fmt(parsedPrice - product.costPrice)} đ (
-                          {parsedPrice > 0 ? (((parsedPrice - product.costPrice) / parsedPrice) * 100).toFixed(1) : 0}%)
-                        </span>
-                      ) : (
-                        <span style={{ color: '#dc2626', fontWeight: 600 }}>
-                          Bán dưới giá vốn! Lỗ gộp: -{fmt(product.costPrice - parsedPrice)} đ
-                        </span>
-                      )}
+                <GridDivider />
+
+                {/* Group D - Editable fields */}
+                <FieldPair label="Giá bán lẻ niêm yết" htmlFor="inputRetailPrice">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <input
+                        id="inputRetailPrice"
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={retailPriceStr}
+                        onChange={(e) => {
+                          setRetailPriceStr(e.target.value);
+                          if (fieldErrors.retailPrice) {
+                            setFieldErrors((prev) => ({ ...prev, retailPrice: undefined }));
+                          }
+                        }}
+                        style={{
+                          ...inputBase,
+                          borderColor: fieldErrors.retailPrice ? '#ef4444' : '#cbd5e1',
+                        }}
+                      />
+                      <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>đ</span>
                     </div>
-                  )}
-                </div>
-              </FieldRow>
-
-              {fieldErrors.retailPrice && (
-                <div style={{ paddingLeft: 152, fontSize: 12, color: '#ef4444' }}>{fieldErrors.retailPrice}</div>
-              )}
-
-              {product.costPrice && parsedPrice > 0 && parsedPrice < product.costPrice && (
-                <div
-                  style={{
-                    marginLeft: 152,
-                    marginTop: 4,
-                    padding: '8px 12px',
-                    backgroundColor: '#FEF3C7',
-                    border: '1px solid #F59E0B',
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: 12,
-                    color: '#92400E',
-                  }}
-                >
-                  <AlertTriangle size={15} color="#D97706" style={{ flexShrink: 0 }} />
-                  <span>
-                    <strong>Cảnh báo giá bán:</strong> Giá bán tại chi nhánh đang thấp hơn giá vốn ({fmt(product.costPrice)} đ). Cần sự xác nhận của Quản lý chi nhánh.
-                  </span>
-                </div>
-              )}
-
-              <FieldRow label="Số lượng đặt hàng tối thiểu" htmlFor="inputEditMoq">
-                <input
-                  id="inputEditMoq"
-                  type="number"
-                  readOnly
-                  value={Number(minOrderQuantityStr) || 1}
-                  style={readOnlyInput}
-                />
-              </FieldRow>
-
-              {/* Unit prices if multi-unit */}
-              {unitPriceDrafts.length > 1 && (
-                <>
-                  <div style={{ height: 1, background: '#e2e8f0', margin: '4px 0' }} />
-                  {unitPriceDrafts.map((u, idx) => (
-                    <FieldRow key={`${u.unitName}-${idx}`} label={`Giá ${u.unitName}`} htmlFor={`unitPrice-${idx}`}>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          id={`unitPrice-${idx}`}
-                          type="number"
-                          min={0}
-                          step={100}
-                          value={u.price}
-                          onChange={(e) => handleUnitPriceChange(idx, e.target.value)}
-                          style={{
-                            ...inputBase,
-                            borderColor: fieldErrors.retailPrice && u.isBaseUnit ? '#ef4444' : '#cbd5e1',
-                            textAlign: 'left',
-                          }}
-                        />
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, width: 16 }}>đ</span>
+                    {product.costPrice != null && !isNaN(parsedPrice) && (
+                      <div style={{ fontSize: 11.5, lineHeight: 1.35 }}>
+                        {parsedPrice >= product.costPrice ? (
+                          <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                            Lãi gộp: +{fmt(parsedPrice - product.costPrice)} đ (
+                            {parsedPrice > 0
+                              ? (((parsedPrice - product.costPrice) / parsedPrice) * 100).toFixed(1)
+                              : 0}
+                            %)
+                          </span>
+                        ) : (
+                          <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                            Bán dưới giá vốn! Lỗ: -{fmt(product.costPrice - parsedPrice)} đ
+                          </span>
+                        )}
                       </div>
-                    </FieldRow>
-                  ))}
-                </>
-              )}
+                    )}
+                    {fieldErrors.retailPrice && (
+                      <div style={{ fontSize: 12, color: '#ef4444' }}>{fieldErrors.retailPrice}</div>
+                    )}
+                  </div>
+                </FieldPair>
 
-              <FieldRow label="Trạng thái">
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, height: 36 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#15803d' }}>
-                    <input
-                      type="radio"
-                      id="statusActive"
-                      name="storeProductStatus"
-                      value="Active"
-                      checked={status === 'Active'}
-                      onChange={() => setStatus('Active')}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>Đang kinh doanh</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#64748b' }}>
-                    <input
-                      type="radio"
-                      id="statusInactive"
-                      name="storeProductStatus"
-                      value="Inactive"
-                      checked={status === 'Inactive'}
-                      onChange={() => setStatus('Inactive')}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>Tạm ngừng bán</span>
-                  </label>
-                </div>
-              </FieldRow>
+                <FieldPair label="Trạng thái">
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      minHeight: 36,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: '#15803d',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        id="statusActive"
+                        name="storeProductStatus"
+                        value="Active"
+                        checked={status === 'Active'}
+                        onChange={() => setStatus('Active')}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>Đang KD</span>
+                    </label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: '#64748b',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        id="statusInactive"
+                        name="storeProductStatus"
+                        value="Inactive"
+                        checked={status === 'Inactive'}
+                        onChange={() => setStatus('Inactive')}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>Tạm ngừng</span>
+                    </label>
+                  </div>
+                </FieldPair>
+
+                {product.costPrice && parsedPrice > 0 && parsedPrice < product.costPrice && (
+                  <div
+                    style={{
+                      gridColumn: '1 / -1',
+                      padding: '8px 12px',
+                      backgroundColor: '#FEF3C7',
+                      border: '1px solid #F59E0B',
+                      borderRadius: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontSize: 12,
+                      color: '#92400E',
+                    }}
+                  >
+                    <AlertTriangle size={15} color="#D97706" style={{ flexShrink: 0 }} />
+                    <span>
+                      <strong>Cảnh báo giá bán:</strong> Giá bán tại chi nhánh đang thấp hơn giá vốn (
+                      {fmt(product.costPrice)} đ). Cần sự xác nhận của Quản lý chi nhánh.
+                    </span>
+                  </div>
+                )}
+
+                {unitPriceDrafts.length > 1 && (
+                  <>
+                    <GridDivider />
+                    {unitPriceDrafts.map((u, idx) => (
+                      <FieldPair
+                        key={`${u.unitName}-${idx}`}
+                        label={`Giá ${u.unitName}`}
+                        htmlFor={`unitPrice-${idx}`}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                          <input
+                            id={`unitPrice-${idx}`}
+                            type="number"
+                            min={0}
+                            step={100}
+                            value={u.price}
+                            onChange={(e) => handleUnitPriceChange(idx, e.target.value)}
+                            style={{
+                              ...inputBase,
+                              borderColor:
+                                fieldErrors.retailPrice && u.isBaseUnit ? '#ef4444' : '#cbd5e1',
+                            }}
+                          />
+                          <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>
+                            đ
+                          </span>
+                        </div>
+                      </FieldPair>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
 
             <div

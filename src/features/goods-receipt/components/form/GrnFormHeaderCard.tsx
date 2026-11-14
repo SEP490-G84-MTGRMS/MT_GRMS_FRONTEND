@@ -1,14 +1,4 @@
-import type { FC } from 'react';
-import {
-  FileSpreadsheet,
-  Building2,
-  Package,
-  Calendar,
-  User,
-  CreditCard,
-  Receipt,
-  FileCheck,
-} from 'lucide-react';
+import type { CSSProperties, FC, ReactNode } from 'react';
 import type {
   PaymentMethod,
   PaymentTerm,
@@ -44,6 +34,47 @@ interface GrnFormHeaderCardProps {
   onPaymentMethodChange: (val: PaymentMethod) => void;
 }
 
+const fieldCol: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+  minWidth: 0,
+};
+
+const labelStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  color: '#64748b',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
+
+const controlBase: CSSProperties = {
+  width: '100%',
+  height: 32,
+  padding: '0 8px',
+  borderRadius: 6,
+  border: '1px solid #cbd5e1',
+  fontSize: 12,
+  boxSizing: 'border-box',
+  outline: 'none',
+  minWidth: 0,
+};
+
+const FieldCol: FC<{ label: string; span?: number; children: ReactNode }> = ({
+  label,
+  span = 1,
+  children,
+}) => (
+  <div style={{ ...fieldCol, gridColumn: span > 1 ? `span ${span}` : undefined }}>
+    <span style={labelStyle} title={label}>
+      {label}
+    </span>
+    {children}
+  </div>
+);
+
 export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   grnNo,
   branchId,
@@ -70,87 +101,42 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   const resolveBranchLabel = (id: string) =>
     branches.find((b) => b.id === id)?.label || id || '—';
 
+  const readOnlyBox: CSSProperties = {
+    ...controlBase,
+    backgroundColor: '#f8fafc',
+    color: '#0f172a',
+    fontWeight: 600,
+    display: 'flex',
+    alignItems: 'center',
+    overflow: 'hidden',
+  };
+
   return (
-    <div
-      style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 10,
-        padding: '16px 20px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-      }}
-    >
-      {/* Card Header Title */}
+    <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid #e2e8f0' }}>
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingBottom: 12,
-          marginBottom: 16,
-          borderBottom: '1px solid #f1f5f9',
+          fontSize: 12,
+          fontWeight: 700,
+          color: '#0f172a',
+          marginBottom: 10,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FileSpreadsheet size={16} color="#0d9488" />
-          <h2
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: '#0f172a',
-              textTransform: 'uppercase',
-              letterSpacing: 0.3,
-              margin: 0,
-            }}
-          >
-            Thông tin chung phiếu nhập kho
-          </h2>
-        </div>
-        <div style={{ fontSize: 12, color: '#64748b' }}>
-          Hình thức: <span style={{ color: '#0d9488', fontWeight: 700 }}>Nhập từ đơn PO</span>
-        </div>
+        Thông tin phiếu nhập kho
+        <span style={{ fontWeight: 500, color: '#64748b' }}> · Nhập từ PO</span>
       </div>
 
-      {/* Grid Fields */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '14px 20px',
+          gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
+          gap: '10px 12px',
         }}
       >
-        {/* 1. Chi nhánh nhận */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <Building2 size={13} color="#64748b" />
-            <span>Chi nhánh nhận:</span>
-          </label>
+        {/* Hàng 1 — 8 cột */}
+        <FieldCol label="Chi nhánh nhận">
           {isEmployee || readOnly ? (
-            <div
-              style={{
-                height: 34,
-                padding: '0 10px',
-                backgroundColor: '#f1f5f9',
-                border: '1px solid #cbd5e1',
-                borderRadius: 6,
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: '#1e293b',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <span>
+            <div style={readOnlyBox}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {resolveBranchLabel(branchId || employeeBranchId)}
               </span>
             </div>
@@ -158,21 +144,9 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
             <select
               value={branchId}
               onChange={(e) => onBranchChange(e.target.value)}
-              style={{
-                width: '100%',
-                height: 34,
-                padding: '0 10px',
-                borderRadius: 6,
-                border: '1px solid #cbd5e1',
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: '#0f172a',
-                backgroundColor: '#ffffff',
-                outline: 'none',
-                cursor: 'pointer',
-              }}
+              style={{ ...controlBase, fontWeight: 600, backgroundColor: '#fff', cursor: 'pointer' }}
             >
-              <option value="">-- Chọn chi nhánh --</option>
+              <option value="">-- Chọn CN --</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.label}
@@ -180,294 +154,98 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               ))}
             </select>
           )}
-        </div>
+        </FieldCol>
 
-        {/* 2. Mã GRN */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <Receipt size={13} color="#64748b" />
-            <span>Mã phiếu GRN:</span>
-          </label>
+        <FieldCol label="Mã phiếu GRN">
           <input
             type="text"
             value={grnNo}
             readOnly
             style={{
-              width: '100%',
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 12.5,
+              ...controlBase,
               fontFamily: 'monospace',
               fontWeight: 700,
               color: '#0f766e',
               backgroundColor: '#f8fafc',
-              boxSizing: 'border-box',
-              outline: 'none',
             }}
           />
-        </div>
+        </FieldCol>
 
-        {/* 3. Đơn đặt hàng PO nguồn */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <Package size={13} color="#64748b" />
-            <span>Đơn mua hàng PO gốc:</span>
-          </label>
+        <FieldCol label="Đơn mua hàng PO">
           <div
             style={{
-              height: 34,
-              padding: '0 10px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              borderRadius: 6,
-              fontSize: 12.5,
+              ...readOnlyBox,
               fontFamily: 'monospace',
               fontWeight: 700,
               color: poReference ? '#0284c7' : '#94a3b8',
-              display: 'flex',
-              alignItems: 'center',
             }}
             title="PO gốc cố định theo đơn được chọn để nhập kho"
           >
-            {poReference || '—'}
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {poReference || '—'}
+            </span>
           </div>
-        </div>
+        </FieldCol>
 
-        {/* 4. Mã nhà cung cấp */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <Building2 size={13} color="#64748b" />
-            <span>Mã nhà cung cấp:</span>
-          </label>
-          <div
-            style={{
-              height: 34,
-              padding: '0 10px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              borderRadius: 6,
-              fontSize: 12.5,
-              fontWeight: 700,
-              fontFamily: 'monospace',
-              color: '#0f172a',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            <span>{supplierCode || '—'}</span>
+        <FieldCol label="Mã NCC">
+          <div style={{ ...readOnlyBox, fontFamily: 'monospace', fontWeight: 700 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {supplierCode || '—'}
+            </span>
           </div>
-        </div>
+        </FieldCol>
 
-        {/* 5. Tên nhà cung cấp */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <Building2 size={13} color="#64748b" />
-            <span>Tên nhà cung cấp:</span>
-          </label>
-          <div
-            style={{
-              height: 34,
-              padding: '0 10px',
-              backgroundColor: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              borderRadius: 6,
-              fontSize: 12.5,
-              fontWeight: 600,
-              color: '#0f172a',
-              display: 'flex',
-              alignItems: 'center',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-            title={supplierName || undefined}
-          >
+        <FieldCol label="Tên nhà cung cấp" span={2}>
+          <div style={readOnlyBox} title={supplierName || undefined}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {supplierName || '— Chưa chọn PO —'}
             </span>
           </div>
-        </div>
+        </FieldCol>
 
-        {/* 6. Ngày giờ nhận hàng */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <Calendar size={13} color="#64748b" />
-            <span>Ngày / giờ nhập kho:</span>
-          </label>
+        <FieldCol label="Ngày / giờ nhập">
           <input
             type="text"
             value={receiptTime}
             readOnly
-            style={{
-              width: '100%',
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 12.5,
-              color: '#334155',
-              backgroundColor: '#f8fafc',
-              boxSizing: 'border-box',
-              outline: 'none',
-            }}
+            style={{ ...controlBase, color: '#334155', backgroundColor: '#f8fafc' }}
           />
-        </div>
+        </FieldCol>
 
-        {/* 7. Số hóa đơn / Phiếu giao hàng */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <FileCheck size={13} color="#64748b" />
-            <span>Số hóa đơn / Phiếu NCC:</span>
-          </label>
+        <FieldCol label="Người lập phiếu">
+          <input
+            type="text"
+            value={createdBy}
+            readOnly
+            style={{ ...controlBase, color: '#334155', backgroundColor: '#f8fafc' }}
+          />
+        </FieldCol>
+
+        {/* Hàng 2 */}
+        <FieldCol label="Số HĐ / phiếu NCC" span={2}>
           <input
             type="text"
             value={invoiceNo}
             onChange={(e) => onInvoiceNoChange(e.target.value)}
             disabled={readOnly}
-            placeholder="VD: INV-998822 hoặc số phiếu giao"
+            placeholder="VD: INV-998822"
             style={{
-              width: '100%',
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 12.5,
+              ...controlBase,
               color: '#0f172a',
               backgroundColor: readOnly ? '#f8fafc' : '#ffffff',
-              boxSizing: 'border-box',
-              outline: 'none',
             }}
           />
-        </div>
+        </FieldCol>
 
-        {/* 8. Người lập phiếu */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <User size={13} color="#64748b" />
-            <span>Người lập phiếu:</span>
-          </label>
-          <input
-            type="text"
-            value={createdBy}
-            readOnly
-            style={{
-              width: '100%',
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 12.5,
-              color: '#334155',
-              backgroundColor: '#f8fafc',
-              boxSizing: 'border-box',
-              outline: 'none',
-            }}
-          />
-        </div>
-
-        {/* 9. Hạn thanh toán */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <CreditCard size={13} color="#64748b" />
-            <span>Hạn thanh toán:</span>
-          </label>
+        <FieldCol label="Hạn thanh toán" span={2}>
           <select
             value={paymentTerm}
             onChange={(e) => onPaymentTermChange(e.target.value as PaymentTerm)}
             disabled={readOnly}
             style={{
-              width: '100%',
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 12.5,
+              ...controlBase,
               fontWeight: 500,
-              color: '#0f172a',
               backgroundColor: readOnly ? '#f8fafc' : '#ffffff',
-              outline: 'none',
               cursor: readOnly ? 'default' : 'pointer',
             }}
           >
@@ -475,39 +253,17 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
             <option value="15">15 Ngày</option>
             <option value="0">Thanh toán ngay (0 Ngày)</option>
           </select>
-        </div>
+        </FieldCol>
 
-        {/* 10. Hình thức thanh toán */}
-        <div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#475569',
-              marginBottom: 5,
-            }}
-          >
-            <CreditCard size={13} color="#64748b" />
-            <span>Hình thức thanh toán:</span>
-          </label>
+        <FieldCol label="Hình thức TT" span={2}>
           <select
             value={paymentMethod}
             onChange={(e) => onPaymentMethodChange(e.target.value as PaymentMethod)}
             disabled={readOnly}
             style={{
-              width: '100%',
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 12.5,
+              ...controlBase,
               fontWeight: 500,
-              color: '#0f172a',
               backgroundColor: readOnly ? '#f8fafc' : '#ffffff',
-              outline: 'none',
               cursor: readOnly ? 'default' : 'pointer',
             }}
           >
@@ -515,7 +271,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
             <option value="Cash">Tiền mặt (Cash)</option>
             <option value="Bank">Chuyển khoản (Bank Transfer)</option>
           </select>
-        </div>
+        </FieldCol>
       </div>
     </div>
   );

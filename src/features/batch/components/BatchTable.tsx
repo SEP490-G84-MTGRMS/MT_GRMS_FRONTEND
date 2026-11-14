@@ -324,14 +324,14 @@ export const BatchTable: FC<BatchTableProps> = ({
               <SortTh field="expiryDate" label="Hạn dùng" align="center" />
               <SortTh field="daysLeft" label="Còn (ngày)" align="right" />
               <th
-                style={{ ...thBaseStyle, textAlign: 'right' }}
-                title="Số lượng theo đơn vị nhập (quy đổi từ tồn)"
+                style={{ ...thBaseStyle, textAlign: 'center' }}
+                title="Đơn vị nhập (purchase UoM)"
               >
                 ĐVT nhập
               </th>
               <SortTh
                 field="qtyCurrent"
-                label="ĐVT tồn"
+                label="Tồn"
                 align="right"
               />
               <SortTh field="costPrice" label="Giá vốn" align="right" />
@@ -471,6 +471,23 @@ export const BatchTable: FC<BatchTableProps> = ({
 
                       return (
                         <>
+                          {/* Chỉ tên đơn vị nhập */}
+                          <td
+                            style={{
+                              textAlign: 'center',
+                              fontWeight: 700,
+                              color: '#334155',
+                            }}
+                            title={
+                              sameUnit
+                                ? purchaseUnit
+                                : `1 ${purchaseUnit} = ${rateLabel} ${stockUnit}`
+                            }
+                          >
+                            {purchaseUnit}
+                          </td>
+
+                          {/* Tồn theo đơn vị nhập */}
                           <td
                             style={{
                               textAlign: 'right',
@@ -481,7 +498,7 @@ export const BatchTable: FC<BatchTableProps> = ({
                             title={
                               sameUnit
                                 ? undefined
-                                : `1 ${purchaseUnit} = ${rateLabel} ${stockUnit}`
+                                : `Tồn gốc: ${fmtQty(stockQty)} ${stockUnit}`
                             }
                           >
                             <div>
@@ -491,43 +508,11 @@ export const BatchTable: FC<BatchTableProps> = ({
                             {hasHold && (
                               <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
                                 KD: {fmtQty(availPurchase)} {purchaseUnit}
-                              </div>
-                            )}
-                          </td>
-
-                          <td
-                            style={{
-                              textAlign: 'right',
-                              fontFamily: 'monospace',
-                              fontWeight: 800,
-                              color: '#0f172a',
-                            }}
-                          >
-                            <div>
-                              {fmtQty(stockQty)}{' '}
-                              <span style={{ fontWeight: 600, color: '#64748b' }}>{stockUnit}</span>
-                            </div>
-                            {!sameUnit && (
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 600,
-                                  color: '#0f766e',
-                                  lineHeight: 1.25,
-                                  marginTop: 2,
-                                }}
-                              >
-                                1 {purchaseUnit} = {rateLabel} {stockUnit}
-                              </div>
-                            )}
-                            {hasHold && (
-                              <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
-                                KD: {fmtQty(Number(availStock) || 0)} {stockUnit}
                                 {(row.qtyQuarantined ?? 0) > 0
-                                  ? ` · CL:${fmtQty(row.qtyQuarantined ?? 0)}`
+                                  ? ` · CL:${fmtQty(getPurchaseQty(row.qtyQuarantined ?? 0, rate))}`
                                   : ''}
                                 {(row.qtyReserved ?? 0) > 0
-                                  ? ` · RTV:${fmtQty(row.qtyReserved ?? 0)}`
+                                  ? ` · RTV:${fmtQty(getPurchaseQty(row.qtyReserved ?? 0, rate))}`
                                   : ''}
                               </div>
                             )}

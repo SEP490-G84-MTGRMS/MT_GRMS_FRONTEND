@@ -64,6 +64,7 @@ export interface MatrixBackendResponse {
     inactiveReason?: string;
     cutoffTime: string;
     cutoffDayOffset?: number;
+    minOrderQuantity?: number;
     activeDeliveryDays: number[];
     blackoutDates: string[];
   }>;
@@ -267,6 +268,14 @@ export const purchaseOrderApi = {
             typeof sc.cutoffDayOffset === 'number' && sc.cutoffDayOffset >= 0
               ? sc.cutoffDayOffset
               : 1,
+          minOrderQuantity: Math.max(
+            0,
+            Number(
+              (sc as { minOrderQuantity?: number; MinOrderQuantity?: number }).minOrderQuantity ??
+                (sc as { MinOrderQuantity?: number }).MinOrderQuantity ??
+                0
+            ) || 0
+          ),
           activeDeliveryDays: sc.activeDeliveryDays || [1, 2, 3, 4, 5, 6],
           blackoutDates: sc.blackoutDates || [],
         }));

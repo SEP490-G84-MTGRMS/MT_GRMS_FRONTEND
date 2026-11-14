@@ -247,30 +247,20 @@ export const BatchRepackModal: FC<BatchRepackModalProps> = ({ batch, onClose, on
             <>
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                  gap: 10,
-                  marginBottom: 16,
+                  marginBottom: 12,
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  lineHeight: 1.55,
+                  color: '#0f172a',
+                  letterSpacing: 0.2,
                 }}
               >
-                {[
-                  ['Tổng tồn', `${fmtKg(summary?.quantityOnHand ?? batch.qtyCurrent)} kg`],
-                  ['Nguyên quả còn', `${fmtKg(rawMax)} kg`],
-                  ['Đã đóng khay', `${fmtKg(summary?.packagedQty ?? 0)} kg (${summary?.packageCount ?? 0} khay)`],
-                ].map(([label, val]) => (
-                  <div
-                    key={label}
-                    style={{
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 8,
-                      padding: '10px 12px',
-                    }}
-                  >
-                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>{label}</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{val}</div>
-                  </div>
-                ))}
+                <span style={{ color: '#475569' }}>Tổng tồn</span>={fmtKg(summary?.quantityOnHand ?? batch.qtyCurrent)} kg
+                <span style={{ color: '#94a3b8' }}> · </span>
+                <span style={{ color: '#475569' }}>Nguyên quả còn</span>={fmtKg(rawMax)} kg
+                <span style={{ color: '#94a3b8' }}> · </span>
+                <span style={{ color: '#475569' }}>Đã đóng khay</span>={fmtKg(summary?.packagedQty ?? 0)} kg/{summary?.packageCount ?? 0}
               </div>
 
               {summary && summary.packages.length > 0 && (

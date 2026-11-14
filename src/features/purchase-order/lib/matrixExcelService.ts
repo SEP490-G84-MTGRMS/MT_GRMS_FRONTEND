@@ -577,16 +577,28 @@ export async function validateMatrixExcelFile(
     isCellEditable,
   } = context;
 
+  const isGuidLike = (v?: string) =>
+    !!v &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.trim());
+
   const branchExpectStr = currentBranchName
-    ? `${currentBranchName} (${currentBranchCode || currentBranchId})`
-    : currentBranchCode || currentBranchId || '-';
+    ? currentBranchCode && !isGuidLike(currentBranchCode)
+      ? `${currentBranchName} (${currentBranchCode})`
+      : currentBranchName
+    : currentBranchCode && !isGuidLike(currentBranchCode)
+      ? currentBranchCode
+      : '-';
 
   const supplierExpectStr =
     currentSupplierId === 'ALL'
       ? 'Tất cả nhà cung cấp'
       : currentSupplierName
-      ? `${currentSupplierName} (${currentSupplierCode || currentSupplierId})`
-      : currentSupplierCode || currentSupplierId || '-';
+        ? currentSupplierCode && !isGuidLike(currentSupplierCode)
+          ? `${currentSupplierName} (${currentSupplierCode})`
+          : currentSupplierName
+        : currentSupplierCode && !isGuidLike(currentSupplierCode)
+          ? currentSupplierCode
+          : '-';
 
   const periodExpectStr =
     viewFrom && viewTo
@@ -1264,11 +1276,11 @@ export async function validateMatrixExcelFile(
       let cellNote = currentFinalQty > 0 ? `Cập nhật (${currentFinalQty} → ${numVal})` : 'Nạp mới';
       let hasWarning = false;
 
-      // Validate MOQ per Delivery Date (WARNING)
+      // Validate MOQ per Delivery Date (ERROR — không cho lưu/apply bản thảo)
       const moq = targetProduct.moq || 1;
-      if (numVal < moq) {
-        result.warnings.push({
-          type: 'WARNING',
+      if (numVal > 0 && numVal < moq) {
+        result.errors.push({
+          type: 'ERROR',
           row: rowNum,
           productCode: targetProduct.sku,
           productName: targetProduct.name,
@@ -1276,11 +1288,10 @@ export async function validateMatrixExcelFile(
           dateLabel: `${dayCol.dowName} ${dayCol.dateShort}`,
           inputValue: numVal,
           code: 'MOQ_NOT_MET',
-          message: `Số lượng đặt (${numVal}) nhỏ hơn số lượng đặt tối thiểu MOQ = ${moq} của sản phẩm trong ngày này.`,
+          message: `Số lượng đặt (${numVal}) nhỏ hơn MOQ = ${moq}. Không được lưu bản thảo.`,
         });
-        result.summary.warningCount++;
-        cellNote += ` • ⚠️ Dưới MOQ (${moq})`;
-        hasWarning = true;
+        result.summary.errorCount++;
+        return;
       }
 
       // Validate Order Multiple (WARNING)

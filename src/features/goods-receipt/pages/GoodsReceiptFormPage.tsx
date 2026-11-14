@@ -19,8 +19,7 @@ import { goodsReceiptApi, type BackendGoodsReceiptDto } from '../api/goodsReceip
 import { branchApi } from '../../purchase-order/api/branchApi';
 import { GrnFormHeaderCard, type GrnBranchOption } from '../components/form/GrnFormHeaderCard';
 import { GrnProductEntryTable } from '../components/form/GrnProductEntryTable';
-import { GrnCostSummaryCard } from '../components/form/GrnCostSummaryCard';
-import { GrnFormActionBar } from '../components/form/GrnFormActionBar';
+import { GrnFormFooter } from '../components/form/GrnFormFooter';
 import { GrnMismatchConfirmModal } from '../components/form/GrnMismatchConfirmModal';
 import { GrnPrintPreviewModal } from '../components/form/GrnPrintPreviewModal';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -151,8 +150,9 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   const [notes, setNotes] = useState('');
   const [poDeliveryDate, setPoDeliveryDate] = useState<string | null>(null);
   const [items, setItems] = useState<GrnItemDetail[]>([]);
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [vatPercent, setVatPercent] = useState(0);
+  // GRN không nhập CK/VAT lúc nhận — luôn 0; BE còn field nên vẫn gửi 0.
+  const discountAmount = 0;
+  const vatPercent = 0;
 
   const [isMismatchModalOpen, setIsMismatchModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -183,8 +183,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       setSupplierCode(dto.supplierCode);
       setInvoiceNo(dto.invoiceNo || '');
       setNotes(dto.note || '');
-      setDiscountAmount(dto.discountAmount || 0);
-      setVatPercent(dto.vatPercent || 0);
       if (dto.receivedAtUtc) {
         const d = new Date(dto.receivedAtUtc);
         const day = String(d.getDate()).padStart(2, '0');
@@ -446,6 +444,20 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             updated.batchCode = '';
             updated.manufactureDate = '';
             updated.expiryDate = '';
+          }
+        }
+        // HSD không được trước ngày SX — clear nếu lệch
+        if (field === 'manufactureDate') {
+          const mfg = String(value || '');
+          if (mfg && updated.expiryDate && updated.expiryDate < mfg) {
+            updated.expiryDate = '';
+          }
+        }
+        if (field === 'expiryDate') {
+          const exp = String(value || '');
+          const mfg = updated.manufactureDate || '';
+          if (exp && mfg && exp < mfg) {
+            return it;
           }
         }
         return updated;
@@ -712,32 +724,20 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   return (
     <div
       style={{
-        padding: '16px 24px 32px 24px',
+        padding: '16px 24px 24px',
         backgroundColor: '#f8fafc',
-        minHeight: 'calc(100vh - 60px)',
+        height: 'calc(100vh - 60px)',
+        maxHeight: 'calc(100vh - 60px)',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        gap: 14,
+        gap: 12,
+        overflow: 'hidden',
       }}
     >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      <div
-        style={{
-          padding: '10px 14px',
-          borderRadius: 8,
-          background: '#eff6ff',
-          border: '1px solid #bfdbfe',
-          fontSize: 12.5,
-          color: '#1e3a8a',
-          lineHeight: 1.5,
-        }}
-      >
-        <b>Quy tắc nhập (1 lần / PO):</b> Giá dòng = giá PO (không đổi lúc nhận). Hoàn tất phiếu → PO{' '}
-        <b>COMPLETED</b> kể cả giao thiếu; phần thiếu phải <b>đặt bù đơn mới</b>, không tạo GRN thứ 2 trên cùng PO.
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         <button
           type="button"
           onClick={() => navigate(listPath)}
@@ -782,60 +782,67 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             </span>
             {isSaving && <Loader2 size={16} className="animate-spin" color="#0d9488" />}
           </h1>
-          <p style={{ margin: '2px 0 0 0', fontSize: 12.5, color: '#64748b' }}>
-            Đối soát số lượng thực nhận, kiểm tra hạn sử dụng FEFO và tính chi phí nhập kho
-          </p>
         </div>
       </div>
 
-      <GrnFormHeaderCard
-        grnNo={grnNo}
-        branchId={branchId}
-        poReference={poReference}
-        availablePos={availablePos}
-        branches={branches}
-        supplierName={supplierName}
-        supplierCode={supplierCode}
-        receiptTime={receiptTime}
-        invoiceNo={invoiceNo}
-        createdBy={createdBy}
-        paymentTerm={paymentTerm}
-        paymentMethod={paymentMethod}
-        role={role}
-        employeeBranchId={employeeBranchId}
-        readOnly={isReadOnly || !isCreateMode}
-        onBranchChange={setBranchId}
-        onPoChange={handlePoChange}
-        onInvoiceNoChange={setInvoiceNo}
-        onPaymentTermChange={setPaymentTerm}
-        onPaymentMethodChange={setPaymentMethod}
-      />
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          backgroundColor: '#ffffff',
+          border: '1px solid #e2e8f0',
+          borderRadius: 10,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <GrnFormHeaderCard
+            grnNo={grnNo}
+            branchId={branchId}
+            poReference={poReference}
+            availablePos={availablePos}
+            branches={branches}
+            supplierName={supplierName}
+            supplierCode={supplierCode}
+            receiptTime={receiptTime}
+            invoiceNo={invoiceNo}
+            createdBy={createdBy}
+            paymentTerm={paymentTerm}
+            paymentMethod={paymentMethod}
+            role={role}
+            employeeBranchId={employeeBranchId}
+            readOnly={isReadOnly || !isCreateMode}
+            onBranchChange={setBranchId}
+            onPoChange={handlePoChange}
+            onInvoiceNoChange={setInvoiceNo}
+            onPaymentTermChange={setPaymentTerm}
+            onPaymentMethodChange={setPaymentMethod}
+          />
 
-      <GrnProductEntryTable
-        items={items}
-        readOnly={isReadOnly}
-        onItemChange={handleItemChange}
-        onRemoveRow={handleRemoveRow}
-        onSplitLot={handleSplitLot}
-      />
+          <GrnProductEntryTable
+            items={items}
+            readOnly={isReadOnly}
+            onItemChange={handleItemChange}
+            onRemoveRow={handleRemoveRow}
+            onSplitLot={handleSplitLot}
+          />
+        </div>
 
-      <GrnCostSummaryCard
-        notes={notes}
-        costs={costs}
-        readOnly={isReadOnly}
-        onNotesChange={setNotes}
-        onDiscountChange={setDiscountAmount}
-        onVatPercentChange={setVatPercent}
-      />
-
-      <GrnFormActionBar
-        readOnly={isReadOnly}
-        onCancel={() => navigate(listPath)}
-        onSaveDraft={handleSaveDraft}
-        onCompleteAndPrint={handleCompleteAndPrint}
-        onComplete={handleComplete}
-        hidePrint
-      />
+        <GrnFormFooter
+          notes={notes}
+          readOnly={isReadOnly}
+          isSaving={isSaving}
+          hidePrint
+          onNotesChange={setNotes}
+          onCancel={() => navigate(listPath)}
+          onSaveDraft={handleSaveDraft}
+          onCompleteAndPrint={handleCompleteAndPrint}
+          onComplete={handleComplete}
+        />
+      </div>
 
       <GrnMismatchConfirmModal
         isOpen={isMismatchModalOpen}

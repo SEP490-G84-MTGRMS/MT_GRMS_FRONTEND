@@ -16,6 +16,7 @@ export interface StoreProductItem {
   sku: string;
   barcode: string;
   category: string;
+  /** Đơn vị nhập (DeliveryUoM / IsPurchaseUnit / BaseUnit) — không phải ĐVT bán lẻ. */
   unit: string;
   imageUrl?: string;
   retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
