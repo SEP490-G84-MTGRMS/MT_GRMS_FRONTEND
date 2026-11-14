@@ -18,7 +18,6 @@ import {
   Building2,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
-import { employeeApi } from '../../employee/api/employeeApi';
 import type { ShiftCashMovementDto } from '../types/posShift.types';
 import { useAuthStore } from '../../../stores/useAuthStore';
 
@@ -26,17 +25,9 @@ export const StorePosCashControlPage: FC = () => {
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
 
-  // Chi nhánh đang chọn
+  // Chi nhánh đang chọn đồng bộ từ TopNav
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
-
-  useEffect(() => {
-    employeeApi.getBranches().then((res) => {
-      if (Array.isArray(res)) {
-        setBranches(res);
-      }
-    }).catch(() => {});
-  }, []);
+  const [selectedBranchName, setSelectedBranchName] = useState<string>('Toàn hệ thống');
 
   // Cấu hình hạn mức
   const [threshold, setThreshold] = useState<number>(200000);
@@ -59,8 +50,9 @@ export const StorePosCashControlPage: FC = () => {
     const handleGlobalBranchChange = (e: Event) => {
       const customEvent = e as CustomEvent;
       const branch = customEvent.detail;
-      if (branch?.id) {
-        setSelectedBranchId(branch.id);
+      if (branch) {
+        setSelectedBranchId(branch.id || 'ALL');
+        setSelectedBranchName(branch.name || 'Toàn hệ thống');
       }
     };
 
@@ -68,8 +60,9 @@ export const StorePosCashControlPage: FC = () => {
       const stored = localStorage.getItem('mtgrms_active_branch');
       if (stored) {
         const branch = JSON.parse(stored);
-        if (branch?.id) {
-          setSelectedBranchId(branch.id);
+        if (branch) {
+          setSelectedBranchId(branch.id || 'ALL');
+          setSelectedBranchName(branch.name || 'Toàn hệ thống');
         }
       }
     } catch {
@@ -199,7 +192,7 @@ export const StorePosCashControlPage: FC = () => {
   };
 
   return (
-    <div style={{ width: '100%', maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20, padding: '4px 0 24px' }}>
       {/* 1. Header Bar */}
       <div
         style={{
@@ -228,7 +221,7 @@ export const StorePosCashControlPage: FC = () => {
             </div>
             <div>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Hạn Mức & Duyệt Chi Két POS
+                Hạn Mức &amp; Duyệt Chi Két POS
               </h1>
               <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>
                 Kiểm soát rủi ro tiền mặt quầy thu ngân &bull; Phê duyệt phiếu chi vặt &bull; Xác nhận tiền rút két nộp quỹ
@@ -237,44 +230,25 @@ export const StorePosCashControlPage: FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {branches.length > 0 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                backgroundColor: '#ffffff',
-                padding: '4px 12px',
-                borderRadius: 8,
-                border: '1px solid #cbd5e1',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-              }}
-            >
-              <Building2 size={16} className="text-teal-700" />
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569' }}>Chi nhánh:</span>
-              <select
-                value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value)}
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: '#0f172a',
-                  backgroundColor: 'transparent',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="ALL">Toàn bộ chi nhánh</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: '#f0fdfa',
+              border: '1px solid #ccfbf1',
+              color: '#0f766e',
+              padding: '6px 12px',
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 600,
+            }}
+            title="Đang đồng bộ tự động theo chi nhánh được chọn trên thanh Topbar"
+          >
+            <Building2 size={15} />
+            <span>Chi nhánh: <b>{selectedBranchName}</b></span>
+          </div>
 
           <button
             type="button"
@@ -284,7 +258,7 @@ export const StorePosCashControlPage: FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              height: 38,
+              height: 36,
               padding: '0 14px',
               borderRadius: 8,
               border: '1px solid #cbd5e1',
@@ -488,7 +462,7 @@ export const StorePosCashControlPage: FC = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(380px, 440px) 1fr',
+          gridTemplateColumns: 'minmax(360px, 460px) 1fr',
           gap: 20,
           alignItems: 'start',
         }}

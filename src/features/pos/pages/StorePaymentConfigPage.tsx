@@ -34,6 +34,13 @@ interface SePayLinkedBankAccount {
   label: string;
 }
 
+interface PaymentAccountAssignment {
+  paymentAccountId: string;
+  bankCode: string;
+  bankAccountNumber: string;
+  branchIds: string[];
+}
+
 export const StorePaymentConfigPage: FC = () => {
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || '';
@@ -51,6 +58,7 @@ export const StorePaymentConfigPage: FC = () => {
   const [savedAccountKey, setSavedAccountKey] = useState('');
   const [branches, setBranches] = useState<BranchOption[]>([]);
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [paymentAccountAssignments, setPaymentAccountAssignments] = useState<PaymentAccountAssignment[]>([]);
 
   // Danh sách đa tài khoản ngân hàng liên kết trong SePay của Chủ cửa hàng
   const [linkedAccounts, setLinkedAccounts] = useState<SePayLinkedBankAccount[]>([]);
@@ -97,6 +105,7 @@ export const StorePaymentConfigPage: FC = () => {
         setIsRotatingKey(!data.hasApiKey);
         if (typeof data.isActive === 'boolean') setIsActive(data.isActive);
         const accounts = Array.isArray(data.paymentAccounts) ? data.paymentAccounts : [];
+        setPaymentAccountAssignments(accounts);
         const currentAccount = accounts.find(
           (account: any) => account.bankCode === data.bankCode && account.bankAccountNumber === data.bankAccountNumber
         ) || accounts[0];
@@ -136,52 +145,23 @@ export const StorePaymentConfigPage: FC = () => {
     }
   };
 
-  const handleSelectReceivingAccount = async (acc: SePayLinkedBankAccount) => {
+  const handleSelectReceivingAccount = (acc: SePayLinkedBankAccount) => {
     if (!isOwnerOrAdmin) return;
-    const isReplacing = !!bankAccountNumber &&
-      (bankCode !== acc.bankCode || bankAccountNumber.trim() !== acc.bankAccountNumber.trim());
-    if (isReplacing) {
-      const branchNames = branches
-        .filter((branch) => selectedBranchIds.includes(branch.id))
-        .map((branch) => branch.name)
-        .join(', ');
-      const confirmed = window.confirm(
-        `Thay tài khoản ${bankCode} - ${bankAccountNumber} bằng ${acc.bankCode} - ${acc.bankAccountNumber}` +
-        `${branchNames ? ` cho: ${branchNames}` : ''}?\n\nCác giao dịch cũ vẫn giữ tài khoản cũ.`
-      );
-      if (!confirmed) return;
-    }
+    const existingAccount = paymentAccountAssignments.find(
+      (account) => account.bankCode === acc.bankCode &&
+        account.bankAccountNumber.trim() === acc.bankAccountNumber.trim()
+    );
+
     setBankCode(acc.bankCode);
     setBankAccountNumber(acc.bankAccountNumber);
     setBankAccountName(acc.bankAccountName);
-    setPaymentAccountId(null);
-
-    const storageKey = `pos_payment_config_${currentTenantId}`;
-    const publicQrCache = {
-      tenantId: currentTenantId,
-      tenantPrefix,
-      bankCode: acc.bankCode,
-      bankName: acc.bankName,
-      bankAccountNumber: acc.bankAccountNumber.trim(),
-      bankAccountName: acc.bankAccountName.trim().toUpperCase(),
-      webhookUrl,
-      isActive,
-      paymentAccountId,
-      branchIds: selectedBranchIds,
-    };
-    try {
-      const res = await httpClient.post('/payments/config', publicQrCache);
-      if (res.data?.paymentAccountId) setPaymentAccountId(res.data.paymentAccountId);
-      setSavedAccountKey(`${acc.bankCode}|${acc.bankAccountNumber.trim()}`);
-      localStorage.setItem(storageKey, JSON.stringify(publicQrCache));
-      setSaveMessage(
-        `Đã chuyển tài khoản nhận tiền tại POS sang ${acc.bankCode} - ${acc.bankAccountNumber} (${acc.bankAccountName})!`
-      );
-    } catch (error: any) {
-      setSaveMessage(error?.response?.data?.message || 'Không thể lưu tài khoản nhận tiền lên máy chủ.');
-      return;
-    }
-    setTimeout(() => setSaveMessage(null), 4000);
+    setPaymentAccountId(existingAccount?.paymentAccountId || null);
+    setSelectedBranchIds(existingAccount?.branchIds || []);
+    setSaveMessage(
+      existingAccount
+        ? 'Đã mở cấu hình tài khoản. Hãy chọn các chi nhánh cần gán rồi bấm Lưu Cấu Hình.'
+        : 'Tài khoản này chưa gán chi nhánh. Hãy chọn chi nhánh cần gán rồi bấm Lưu Cấu Hình.'
+    );
   };
 
   const handleAddCurrentToLinkedList = () => {
@@ -287,6 +267,26 @@ export const StorePaymentConfigPage: FC = () => {
         if (res.data.paymentAccountId) setPaymentAccountId(res.data.paymentAccountId);
       }
       setSavedAccountKey(nextAccountKey);
+      setPaymentAccountAssignments((current) => {
+        const savedId = res.data?.paymentAccountId || paymentAccountId || '';
+        const updated = current.map((account) => ({
+          ...account,
+          branchIds: account.branchIds.filter((id) => !selectedBranchIds.includes(id)),
+        }));
+        const existingIndex = updated.findIndex(
+          (account) => account.paymentAccountId === savedId ||
+            (account.bankCode === bankCode && account.bankAccountNumber === bankAccountNumber.trim())
+        );
+        const savedAccount: PaymentAccountAssignment = {
+          paymentAccountId: savedId,
+          bankCode,
+          bankAccountNumber: bankAccountNumber.trim(),
+          branchIds: selectedBranchIds,
+        };
+        if (existingIndex < 0) return [...updated, savedAccount];
+        updated[existingIndex] = savedAccount;
+        return updated;
+      });
       localStorage.setItem(storageKey, JSON.stringify(publicQrCache));
       setSaveMessage(
         res.data?.message ||
@@ -472,19 +472,6 @@ export const StorePaymentConfigPage: FC = () => {
               <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>
                 Thông Tin Tài Khoản Nhận Tiền & Khóa Đối Soát
               </div>
-              <span
-                style={{
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  color: '#0f766e',
-                  backgroundColor: '#ccfbf1',
-                  padding: '3px 8px',
-                  borderRadius: 6,
-                }}
-                title="Tiền tố định tuyến đơn hàng riêng cho cửa hàng này"
-              >
-                Tiền tố QR: {tenantPrefix}_HDxxxx
-              </span>
             </div>
 
             <div style={{ padding: '12px 14px', backgroundColor: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8 }}>
