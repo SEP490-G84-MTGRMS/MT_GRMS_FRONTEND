@@ -34,6 +34,8 @@ interface BatchListItemDto {
   shelfLocation?: string | null;
   originalGrnNo?: string | null;
   originalGrnId?: string | null;
+  fefoDiscountPercent?: number;
+  isFefoDiscountActive?: boolean;
 }
 
 interface BatchPagedResultDto {
@@ -110,6 +112,7 @@ export const mapBatchDtoToItem = (dto: BatchListItemDto): BatchItem => ({
   shelfLocation: dto.shelfLocation || '—',
   originalGrnNo: dto.originalGrnNo || '',
   originalGrnId: dto.originalGrnId || undefined,
+  discountPercent: dto.isFefoDiscountActive ? Number(dto.fefoDiscountPercent) || 0 : 0,
   movements: [],
 });
 
@@ -172,5 +175,16 @@ export const batchApi = {
     const res = await httpClient.get<ApiResponse<BatchListItemDto>>(`/batches/${id}`);
     if (!res.data?.success || !res.data.data) return null;
     return mapBatchDtoToItem(res.data.data);
+  },
+
+  async applyFefoDiscount(id: string, discountPercent: number) {
+    const res = await httpClient.patch<ApiResponse<{ batchId: string; discountPercent: number; isActive: boolean }>>(
+      `/batches/${id}/fefo-discount`,
+      { discountPercent, isActive: discountPercent > 0 }
+    );
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không thể lưu giảm giá FEFO.');
+    }
+    return res.data.data;
   },
 };

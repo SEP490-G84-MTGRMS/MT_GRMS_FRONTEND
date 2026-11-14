@@ -5,6 +5,7 @@ import { posShiftApi } from '../../api/posShiftApi';
 import { MANUAL_CASH_MOVEMENT_CATEGORY } from '../../types/posShift.types';
 import type { ShiftDetailResponse, ShiftCashMovementDto } from '../../types/posShift.types';
 import { useAuthStore } from '../../../../stores/useAuthStore';
+import { MANUAL_CASH_MOVEMENT_OPTIONS } from '../../config/manualCashMovementConfig';
 
 interface Props {
   isOpen: boolean;
@@ -178,72 +179,34 @@ export const CashMovementModal: FC<Props> = ({
               <div className="modal-form-group">
                 <label className="modal-label" style={{ fontWeight: 600, fontSize: 13 }}>Loại nghiệp vụ (*):</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMovementType('OUT');
-                      setCategory(MANUAL_CASH_MOVEMENT_CATEGORY.EXPENSE);
-                      setReason('Chi vặt quầy thu ngân');
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      border: movementType === 'OUT' && category === MANUAL_CASH_MOVEMENT_CATEGORY.EXPENSE ? '2px solid #dc2626' : '1px solid #cbd5e1',
-                      backgroundColor: movementType === 'OUT' && category === MANUAL_CASH_MOVEMENT_CATEGORY.EXPENSE ? '#fef2f2' : '#ffffff',
-                      color: movementType === 'OUT' && category === MANUAL_CASH_MOVEMENT_CATEGORY.EXPENSE ? '#991b1b' : '#334155',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    [-] Chi vặt quầy (Mua đá, bill...)
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMovementType('OUT');
-                      setCategory(MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DRAW);
-                      setReason('Rút bớt tiền nộp Chủ cửa hàng');
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      border: movementType === 'OUT' && category === MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DRAW ? '2px solid #ea580c' : '1px solid #cbd5e1',
-                      backgroundColor: movementType === 'OUT' && category === MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DRAW ? '#fff7ed' : '#ffffff',
-                      color: movementType === 'OUT' && category === MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DRAW ? '#c2410c' : '#334155',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    [↓] Rút két nộp Chủ / Két sắt
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMovementType('IN');
-                      setCategory(MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DEPOSIT);
-                      setReason('Nạp thêm tiền lẻ vào két');
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      border: movementType === 'IN' && category === MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DEPOSIT ? '2px solid #059669' : '1px solid #cbd5e1',
-                      backgroundColor: movementType === 'IN' && category === MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DEPOSIT ? '#ecfdf5' : '#ffffff',
-                      color: movementType === 'IN' && category === MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DEPOSIT ? '#065f46' : '#334155',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      gridColumn: '1 / -1',
-                    }}
-                  >
-                    [+] Nạp thêm tiền lẻ vào két
-                  </button>
+                  {MANUAL_CASH_MOVEMENT_OPTIONS.map((option) => {
+                    const isActive = movementType === option.movementType && category === option.category;
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => {
+                          setMovementType(option.movementType);
+                          setCategory(option.category);
+                          setReason(option.defaultReason);
+                        }}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: 6,
+                          border: isActive ? `2px solid ${option.activeBorder}` : '1px solid #cbd5e1',
+                          backgroundColor: isActive ? option.activeBackground : '#ffffff',
+                          color: isActive ? option.activeColor : '#334155',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          gridColumn: option.fullWidth ? '1 / -1' : undefined,
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

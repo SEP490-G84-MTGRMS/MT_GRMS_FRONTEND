@@ -74,6 +74,10 @@ export interface ShiftDetailResponse {
   handoverStatus: HandoverStatus;
   status: ShiftState;
   notes?: string | null;
+  businessDate?: string | null;
+  discrepancyReason?: string | null;
+  openedScheduleId?: string | null;
+  closedScheduleId?: string | null;
   cashMovements: ShiftCashMovementDto[];
   closingStartedByUserId?: string | null;
   closingStartedAtUtc?: string | null;
@@ -175,6 +179,7 @@ export interface ConfirmCloseShiftRequest {
   receiverUserId?: string | null;
   notes?: string | null;
   earlyOrLateReason?: string | null;
+  discrepancyReason?: string | null;
 }
 
 export interface ForceCloseShiftRequest {
@@ -203,5 +208,71 @@ export interface CashierShiftEligibilityDto {
   isFullTime?: boolean;
   hasClosedShiftToday?: boolean;
   salaryType?: string | null;
+}
+
+export interface BusinessDayFundPreview {
+  fundId: string;
+  fundName: string;
+  fundType: string;
+  expectedCash: number;
+  requiresPhysicalCount: boolean;
+  isInTransit: boolean;
+}
+
+export interface BusinessDayFundCount {
+  fundId: string;
+  actualCashCounted: number;
+}
+
+export interface BusinessDayBlocker {
+  code: string;
+  entityType: string;
+  entityId: string;
+  displayName: string;
+  amount?: number | null;
+  status: string;
+  actionPath?: string | null;
+}
+
+export interface BusinessDayClosingPreview {
+  branchId: string;
+  businessDate: string;
+  periodStartUtc: string;
+  periodEndUtc: string;
+  totalCashSales: number;
+  totalBankSales: number;
+  totalCashIn: number;
+  totalCashOut: number;
+  totalRetainedFloat: number;
+  totalDroppedToSafe: number;
+  funds: BusinessDayFundPreview[];
+  blockers: BusinessDayBlocker[];
+  previewToken: string;
+}
+
+export interface BusinessDateResponse {
+  branchId: string;
+  businessDate: string;
+  businessDayStartTime: string;
+}
+
+export interface BusinessDayClosingVersion {
+  id: string;
+  branchId: string;
+  businessDate: string;
+  version: number;
+  status: string;
+  isActive: boolean;
+  supersedesClosingId?: string | null;
+  referenceCode: string;
+  totalCashSales: number;
+  totalBankSales: number;
+  totalCashIn: number;
+  totalCashOut: number;
+  totalDiscrepancy: number;
+  closedAtUtc?: string | null;
+  reopenedAtUtc?: string | null;
+  reopenedByUserId?: string | null;
+  reopenReason?: string | null;
 }
 

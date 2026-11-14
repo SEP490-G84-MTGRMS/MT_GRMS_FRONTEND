@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { FC } from 'react';
-import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, Sparkles, BarChart3, AlertTriangle, Clock } from 'lucide-react';
+import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, BarChart3, AlertTriangle, Clock } from 'lucide-react';
 import { posShiftApi } from '../../api/posShiftApi';
 import type { ShiftDetailResponse, ShiftCashMovementDto } from '../../types/posShift.types';
 
@@ -45,7 +45,8 @@ export const CloseShiftModal: FC<Props> = ({
   // Phân bổ tiền cuối ca
   const [retainedFloat, setRetainedFloat] = useState<number>(1500000);
   const [droppedToSafe, setDroppedToSafe] = useState<number>(0);
-  const [receiverUserId, setReceiverUserId] = useState<string>('Thu ngân ca sau');
+  const [receiverUserId, setReceiverUserId] = useState<string>('');
+  const [discrepancyReason, setDiscrepancyReason] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [earlyOrLateReason, setEarlyOrLateReason] = useState<string>('');
   const [plannedEndTime, setPlannedEndTime] = useState<string | null>(null);
@@ -326,11 +327,7 @@ export const CloseShiftModal: FC<Props> = ({
       setErrorMsg('Tiền để lại két và tiền nộp két phải là số nguyên không âm.');
       return;
     }
-    if (!receiverUserId.trim()) {
-      setErrorMsg('Vui lòng nhập người nhận ca tiếp theo.');
-      return;
-    }
-    if (receiverUserId.trim().length > 100 || notes.trim().length > 500 || earlyOrLateReason.trim().length > 500) {
+    if (receiverUserId.trim().length > 100 || notes.trim().length > 500 || earlyOrLateReason.trim().length > 500 || discrepancyReason.trim().length > 500) {
       setErrorMsg('Người nhận tối đa 100 ký tự; ghi chú và giải trình tối đa 500 ký tự.');
       return;
     }
@@ -340,7 +337,12 @@ export const CloseShiftModal: FC<Props> = ({
     }
 
     if (!isAllocationValid) {
-      setErrorMsg('Tổng tiền để lại két và nộp két sắt phải bằng chính xác tiền kiểm đếm thực tế (Invariant violation)!');
+      setErrorMsg('Tổng tiền để lại và tiền bàn giao phải bằng tiền thực tế trong két.');
+      return;
+    }
+
+    if (discrepancy !== 0 && !discrepancyReason.trim()) {
+      setErrorMsg('Vui lòng nhập lý do chênh lệch tiền trong két.');
       return;
     }
 
@@ -366,6 +368,7 @@ export const CloseShiftModal: FC<Props> = ({
         receiverUserId: receiverUserId.trim() || undefined,
         notes: notes.trim() || undefined,
         earlyOrLateReason: formattedEarlyLateReason,
+        discrepancyReason: discrepancyReason.trim() || undefined,
       });
 
       onShiftClosed(closed);
@@ -571,7 +574,7 @@ export const CloseShiftModal: FC<Props> = ({
                     <Banknote size={14} className="text-amber-600" />
                     <span>Tiền mặt đầu ca</span>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#b45309', marginTop: 4, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#b45309', marginTop: 4 }}>
                     {(currentShiftData.openingFloat || 0).toLocaleString('vi-VN')} đ
                   </div>
                   <div style={{ fontSize: 10.5, color: '#b45309', marginTop: 2 }}>Vốn lẻ nhận bàn giao đầu ca</div>
@@ -583,7 +586,7 @@ export const CloseShiftModal: FC<Props> = ({
                     <Banknote size={14} className="text-emerald-600" />
                     <span>Bán hàng tiền mặt</span>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#059669', marginTop: 4, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#059669', marginTop: 4 }}>
                     {cashSales.toLocaleString('vi-VN')} đ
                   </div>
                   <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>Cộng dồn vào két tiền mặt</div>
@@ -595,7 +598,7 @@ export const CloseShiftModal: FC<Props> = ({
                     <CreditCard size={14} className="text-blue-600" />
                     <span>Chuyển khoản / VietQR</span>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#2563eb', marginTop: 4, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#2563eb', marginTop: 4 }}>
                     {bankRevenue.toLocaleString('vi-VN')} đ
                   </div>
                   <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 2 }}>Đã vào tài khoản NH (ngoài két)</div>
@@ -607,7 +610,7 @@ export const CloseShiftModal: FC<Props> = ({
                     <TrendingUp size={14} className="text-emerald-700" />
                     <span>Tổng doanh thu ca</span>
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#15803d', marginTop: 4, fontFamily: 'monospace' }}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#15803d', marginTop: 4 }}>
                     {totalShiftRevenue.toLocaleString('vi-VN')} đ
                   </div>
                   <div style={{ fontSize: 10.5, color: '#166534', marginTop: 2 }}>Tiền mặt + Chuyển khoản</div>
@@ -619,7 +622,7 @@ export const CloseShiftModal: FC<Props> = ({
             <div style={{ border: '1px solid #cbd5e1', borderRadius: 10, padding: '12px 14px', backgroundColor: '#ffffff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <Banknote size={15} color="#0f766e" /> Kiểm đếm tiền mặt thực tế trong két (H)
+                  <Banknote size={15} color="#0f766e" /> Kiểm đếm tiền mặt thực tế trong két
                 </div>
 
                 {/* Tabs chuyển đổi giữa Nhập nhanh tổng tiền mặt và Đếm chi tiết 9 mệnh giá */}
@@ -678,7 +681,6 @@ export const CloseShiftModal: FC<Props> = ({
                           padding: '0 36px 0 12px',
                           fontSize: 16,
                           fontWeight: 700,
-                          fontFamily: 'monospace',
                           color: '#0f766e',
                           borderRadius: 6,
                           border: '2px solid #0f766e',
@@ -712,7 +714,6 @@ export const CloseShiftModal: FC<Props> = ({
                       }}
                       title="Gán bằng đúng tiền lý thuyết hệ thống"
                     >
-                      <Sparkles size={14} />
                       <span>Khớp lý thuyết</span>
                     </button>
                   </div>
@@ -778,7 +779,6 @@ export const CloseShiftModal: FC<Props> = ({
                                 padding: '2px 4px',
                                 textAlign: 'right',
                                 fontSize: 12,
-                                fontFamily: 'monospace',
                                 borderRadius: 4,
                                 border: '1px solid #cbd5e1',
                               }}
@@ -811,25 +811,25 @@ export const CloseShiftModal: FC<Props> = ({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', paddingBottom: 6, borderBottom: '1px dashed #e2e8f0', fontSize: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748b' }}>+ Tiền mặt đầu ca (Opening Float):</span>
-                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#b45309' }}>
+                  <span style={{ fontWeight: 600, color: '#b45309' }}>
                     {(currentShiftData.openingFloat || 0).toLocaleString('vi-VN')} đ
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748b' }}>+ Bán hàng thu tiền mặt:</span>
-                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#059669' }}>
+                  <span style={{ fontWeight: 600, color: '#059669' }}>
                     +{cashSales.toLocaleString('vi-VN')} đ
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748b' }}>+ Thu tiền mặt khác trong ca:</span>
-                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#0284c7' }}>
+                  <span style={{ fontWeight: 600, color: '#0284c7' }}>
                     +{(currentShiftData.totalCashIn || 0).toLocaleString('vi-VN')} đ
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748b' }}>- Chi tiền mặt / Rút két trong ca:</span>
-                  <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#dc2626' }}>
+                  <span style={{ fontWeight: 600, color: '#dc2626' }}>
                     -{(currentShiftData.totalCashOut || 0).toLocaleString('vi-VN')} đ
                   </span>
                 </div>
@@ -837,14 +837,14 @@ export const CloseShiftModal: FC<Props> = ({
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#334155', fontWeight: 600 }}>Tiền mặt lý thuyết hệ thống (G = Đầu ca + Bán hàng TM + Thu - Chi):</span>
-                <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#1e293b' }}>
+                <span style={{ fontWeight: 700, color: '#1e293b' }}>
                   {expectedCash.toLocaleString('vi-VN')} đ
                 </span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b' }}>Tiền mặt thực tế kiểm đếm (H):</span>
-                <span style={{ fontWeight: 800, fontFamily: 'monospace', color: '#0f766e', fontSize: 14 }}>
+                <span style={{ color: '#64748b' }}>Tiền thực tế trong két:</span>
+                <span style={{ fontWeight: 800, color: '#0f766e', fontSize: 14 }}>
                   {actualCashCounted.toLocaleString('vi-VN')} đ
                 </span>
               </div>
@@ -858,10 +858,9 @@ export const CloseShiftModal: FC<Props> = ({
                   fontWeight: 700,
                 }}
               >
-                <span>Chênh lệch kết ca (Δ = H - G):</span>
+                <span>Chênh lệch:</span>
                 <span
                   style={{
-                    fontFamily: 'monospace',
                     color: discrepancy === 0 ? '#10b981' : discrepancy > 0 ? '#0284c7' : '#ef4444',
                   }}
                 >
@@ -871,10 +870,24 @@ export const CloseShiftModal: FC<Props> = ({
               </div>
             </div>
 
+            {discrepancy !== 0 && (
+              <div className="modal-form-group">
+                <label className="modal-label" style={{ fontSize: 12 }}>Lý do chênh lệch (*):</label>
+                <textarea
+                  value={discrepancyReason}
+                  onChange={(e) => setDiscrepancyReason(e.target.value)}
+                  maxLength={500}
+                  className="modal-input"
+                  aria-required="true"
+                  placeholder="Mô tả nguyên nhân thừa hoặc thiếu tiền trong két"
+                />
+              </div>
+            )}
+
             {/* 4. PHÂN BỔ TIỀN MẶT & RÀNG BUỘC BẤT BIẾN */}
             <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, padding: '12px 14px', backgroundColor: '#ffffff' }}>
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: '#1e293b' }}>
-                Phân bổ tiền mặt sau chốt ca (Bắt buộc Retained + Dropped == H)
+                Bàn giao tiền sau khi chốt ca
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -913,17 +926,17 @@ export const CloseShiftModal: FC<Props> = ({
               )}
             </div>
 
-            {/* 5. NGƯỜI NHẬN BÀN GIAO & GHI CHÚ */}
+            {/* 5. THÔNG TIN BÀN GIAO & GHI CHÚ */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="modal-form-group">
-                <label className="modal-label" style={{ fontSize: 12 }}>Người nhận ca tiếp theo (*):</label>
+                <label className="modal-label" style={{ fontSize: 12 }}>Người nhận bàn giao (tùy chọn):</label>
                 <input
                   type="text"
                   value={receiverUserId}
                   onChange={(e) => setReceiverUserId(e.target.value)}
                   maxLength={100}
                   className="modal-input"
-                  required
+                  placeholder="Có thể để trống; ca sau sẽ tự xác nhận tiền đầu ca"
                 />
               </div>
 
@@ -1044,7 +1057,7 @@ export const CloseShiftModal: FC<Props> = ({
             >
               <CheckCircle size={16} className="text-teal-600 flex-shrink-0" />
               <span>
-                <b>Quy trình chốt ca:</b> Khi bấm gửi, ca làm việc sẽ chuyển sang trạng thái <b>Chờ Chủ xác nhận bàn giao tiền két</b> (Pending Handover). Số tiền nộp két an toàn <b>{droppedToSafe.toLocaleString('vi-VN')} đ</b> và tiền để lại két <b>{retainedFloat.toLocaleString('vi-VN')} đ</b> sẽ được Chủ đối soát và phê duyệt trên hệ thống.
+                <b>Quy trình chốt ca:</b> Khi xác nhận, hệ thống khóa số liệu ca và ghi nhận tiền để lại két <b>{retainedFloat.toLocaleString('vi-VN')} đ</b>. Phần bàn giao về két chủ/két sắt là <b>{droppedToSafe.toLocaleString('vi-VN')} đ</b> và không được tính là chi phí.
               </span>
             </div>
           </div>
@@ -1127,18 +1140,18 @@ export const CloseShiftModal: FC<Props> = ({
 
             <button
               type="submit"
-              disabled={!isShiftClosing || isLoading || hasPending || !isAllocationValid || (isEarlyOrLate && !earlyOrLateReason.trim())}
+              disabled={!isShiftClosing || isLoading || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim())}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
                 padding: '8px 22px',
                 borderRadius: 6,
-                backgroundColor: !isShiftClosing || hasPending || !isAllocationValid || (isEarlyOrLate && !earlyOrLateReason.trim()) ? '#94a3b8' : '#0f766e',
+                backgroundColor: !isShiftClosing || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) ? '#94a3b8' : '#0f766e',
                 color: '#ffffff',
                 border: 'none',
                 fontWeight: 600,
-                cursor: !isShiftClosing || hasPending || !isAllocationValid || (isEarlyOrLate && !earlyOrLateReason.trim()) || isLoading ? 'not-allowed' : 'pointer',
+                cursor: !isShiftClosing || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) || isLoading ? 'not-allowed' : 'pointer',
               }}
             >
               <CheckCircle size={16} />

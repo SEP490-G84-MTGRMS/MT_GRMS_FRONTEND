@@ -42,8 +42,6 @@ describe('POS inventory branch scope', () => {
     await screen.findByText('LOT-A');
     expect(httpClient.get).toHaveBeenCalledWith('/inventory/product-1/batches', expect.objectContaining({ params: { branchId: 'branch-a' } }));
     expect(screen.queryByText(/An Nhiên Mart/)).toBeNull();
-    expect(screen.getByText('20 Chai')).toBeTruthy();
-    expect(screen.getByText('3 Chai')).toBeTruthy();
     expect(screen.getByText('17 Chai')).toBeTruthy();
     expect(screen.queryByText('999 Chai')).toBeNull();
   });

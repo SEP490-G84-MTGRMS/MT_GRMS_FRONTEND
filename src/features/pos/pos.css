@@ -1503,9 +1503,9 @@
 }
 
 .pos-catalog-modal-body {
-  padding: 14px 22px;
+  padding: 14px 22px 0 22px;
   max-height: none;
-  overflow-y: auto;
+  overflow: hidden;
   flex: 1 1 0%;
   min-height: 0;
   display: flex;
@@ -1516,8 +1516,9 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
 }
 
 .pos-catalog-modal-dialog .pos-catalog-fieldset {
@@ -1526,8 +1527,28 @@
   background-color: transparent;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 100%;
+  flex: 1 1 0%;
+  min-height: 0;
+  height: 100%;
+}
+
+.pos-catalog-modal-dialog .pos-catalog-products-container {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  padding-bottom: 8px;
+}
+
+.pos-catalog-modal-dialog .pos-catalog-pagination-wrap {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding: 10px 0 12px 0;
+  background-color: #ffffff;
+  border-top: 1px solid #f1f5f9;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .pos-catalog-modal-dialog .pos-catalog-legend {
@@ -3105,7 +3126,7 @@
   }
 
   .pos-catalog-modal-body {
-    padding: 10px;
+    padding: 10px 10px 0 10px;
   }
 
   .pos-products-grid {

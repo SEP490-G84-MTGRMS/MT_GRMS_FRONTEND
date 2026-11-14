@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
 import { posOrderApi, type OwnerUnsettledSummaryResponse } from '../api/posOrderApi';
-import type { ShiftDetailResponse, ConfirmHandoverRequest } from '../types/posShift.types';
+import type { ShiftDetailResponse, ConfirmHandoverRequest, BusinessDayClosingPreview, BusinessDayClosingVersion } from '../types/posShift.types';
 import { employeeApi } from '../../employee/api/employeeApi';
 import { TablePagination } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -79,6 +79,11 @@ export const PosShiftPage: FC = () => {
     const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
     return vnNow.toISOString().slice(0, 10);
   });
+  const [businessDayPreview, setBusinessDayPreview] = useState<BusinessDayClosingPreview | null>(null);
+  const [isLoadingBusinessDayPreview, setIsLoadingBusinessDayPreview] = useState(false);
+  const [businessDayPreviewError, setBusinessDayPreviewError] = useState<string | null>(null);
+  const [businessDayFundCounts, setBusinessDayFundCounts] = useState<Record<string, string>>({});
+  const [businessDayHistory, setBusinessDayHistory] = useState<BusinessDayClosingVersion[]>([]);
 
   // Modal Buộc đóng ca (Force Close) cho Chủ cửa hàng khi nhân viên quên chốt ca
   const [forceCloseTargetShift, setForceCloseTargetShift] = useState<ShiftDetailResponse | null>(null);
@@ -88,6 +93,19 @@ export const PosShiftPage: FC = () => {
   const [isSubmittingForceClose, setIsSubmittingForceClose] = useState<boolean>(false);
 
   // Tải danh sách chi nhánh thực tế từ CSDL & Đồng bộ với TopNav
+  useEffect(() => {
+    if (!isOwnerEodModalOpen || eodBranchScope !== 'CURRENT' || !selectedBranchId || selectedBranchId === 'ALL') return;
+    let cancelled = false;
+    posShiftApi.getCurrentBusinessDate(selectedBranchId)
+      .then((result) => {
+        if (!cancelled) setEodBusinessDate(result.businessDate);
+      })
+      .catch(() => {
+        // Keep the selected date so historical closing remains available when current-date lookup fails.
+      });
+    return () => { cancelled = true; };
+  }, [isOwnerEodModalOpen, eodBranchScope, selectedBranchId]);
+
   useEffect(() => {
     let isMounted = true;
     employeeApi.getBranches().then((list) => {
@@ -180,7 +198,8 @@ export const PosShiftPage: FC = () => {
     fetchShiftHistory();
   }, [fetchShiftHistory]);
 
-  // Quy tắc Ngày nghiệp vụ (Business Date): Ca làm việc (kể cả ca xuyên đêm 22:00 -> 06:00) tính theo Ngày mở ca (giờ VN UTC+7)
+  // Backend là nguồn xác định BusinessDate theo cutoff riêng của chi nhánh.
+  // Chỉ fallback cho dữ liệu lịch sử cũ chưa có businessDate.
   const getBusinessDateStr = useCallback((isoString?: string | null): string => {
     if (!isoString) return '';
     const d = new Date(isoString);
@@ -188,6 +207,78 @@ export const PosShiftPage: FC = () => {
     const vnTime = new Date(d.getTime() + 7 * 3600 * 1000);
     return vnTime.toISOString().slice(0, 10);
   }, []);
+  const getShiftBusinessDate = useCallback(
+    (shiftItem: ShiftDetailResponse): string => shiftItem.businessDate || getBusinessDateStr(shiftItem.openedAtUtc),
+    [getBusinessDateStr]
+  );
+
+  useEffect(() => {
+    if (!isOwnerEodModalOpen || eodBranchScope !== 'CURRENT' || !selectedBranchId || selectedBranchId === 'ALL') {
+      setBusinessDayPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingBusinessDayPreview(true);
+    setBusinessDayPreviewError(null);
+    posShiftApi.previewBusinessDay(selectedBranchId, eodBusinessDate)
+      .then((preview) => {
+        if (!cancelled) {
+          setBusinessDayPreview(preview);
+          setBusinessDayFundCounts((current) => Object.fromEntries(
+            preview.funds
+              .filter((fund) => fund.requiresPhysicalCount)
+              .map((fund) => [fund.fundId, current[fund.fundId] ?? String(fund.expectedCash)])
+          ));
+        }
+      })
+      .catch((error: any) => {
+        if (!cancelled) {
+          setBusinessDayPreview(null);
+          setBusinessDayPreviewError(error.response?.data?.detail || error.response?.data?.message || 'Không tải được số liệu tạm tính của ngày kinh doanh.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingBusinessDayPreview(false);
+      });
+    return () => { cancelled = true; };
+  }, [isOwnerEodModalOpen, eodBranchScope, selectedBranchId, eodBusinessDate]);
+
+  useEffect(() => {
+    if (!isOwnerEodModalOpen || eodBranchScope !== 'CURRENT' || !selectedBranchId || selectedBranchId === 'ALL') {
+      setBusinessDayHistory([]);
+      return;
+    }
+    let cancelled = false;
+    posShiftApi.getBusinessDayHistory(selectedBranchId, eodBusinessDate)
+      .then((items) => { if (!cancelled) setBusinessDayHistory(items); })
+      .catch(() => { if (!cancelled) setBusinessDayHistory([]); });
+    return () => { cancelled = true; };
+  }, [isOwnerEodModalOpen, eodBranchScope, selectedBranchId, eodBusinessDate]);
+
+  const handleReopenBusinessDay = async (closing: BusinessDayClosingVersion) => {
+    const reason = window.prompt('Nhập lý do mở lại ngày nghiệp vụ (bắt buộc, tối đa 500 ký tự):', '');
+    if (reason == null) return;
+    const normalized = reason.trim();
+    if (!normalized || normalized.length > 500) {
+      alert('Lý do mở lại phải có từ 1 đến 500 ký tự.');
+      return;
+    }
+    setIsSettlingOwnerEod(true);
+    try {
+      await posShiftApi.reopenBusinessDay(closing.id, normalized);
+      const [history, preview] = await Promise.all([
+        posShiftApi.getBusinessDayHistory(selectedBranchId, eodBusinessDate),
+        posShiftApi.previewBusinessDay(selectedBranchId, eodBusinessDate),
+      ]);
+      setBusinessDayHistory(history);
+      setBusinessDayPreview(preview);
+      alert('Đã mở lại ngày nghiệp vụ. Snapshot cũ được giữ nguyên; sau khi điều chỉnh hãy chốt lại để tạo phiên bản mới.');
+    } catch (error: any) {
+      alert(error?.response?.data?.message || error?.message || 'Không thể mở lại ngày nghiệp vụ.');
+    } finally {
+      setIsSettlingOwnerEod(false);
+    }
+  };
 
   // Danh sách tất cả các ca của Nhân viên đã đóng nhưng đang chờ Chủ cửa hàng duyệt bàn giao (tiền đang lơ lửng chưa vào Két sắt)
   const pendingEmployeeShifts = useMemo(() => {
@@ -204,12 +295,12 @@ export const PosShiftPage: FC = () => {
     const todayVn = new Date(nowMs + 7 * 3600 * 1000).toISOString().slice(0, 10);
     return pendingEmployeeShifts.filter((s) => {
       const closedTime = s.closedAtUtc ? new Date(s.closedAtUtc).getTime() : 0;
-      const shiftBizDate = getBusinessDateStr(s.openedAtUtc);
+      const shiftBizDate = getShiftBusinessDate(s);
       const isOverTwoHours = closedTime > 0 && nowMs - closedTime > 2 * 3600 * 1000;
       const isFromPastDay = shiftBizDate !== '' && shiftBizDate < todayVn;
       return isOverTwoHours || isFromPastDay;
     });
-  }, [pendingEmployeeShifts, getBusinessDateStr]);
+  }, [pendingEmployeeShifts, getShiftBusinessDate]);
 
   const pendingEmployeeCashDrop = useMemo(
     () =>
@@ -224,18 +315,18 @@ export const PosShiftPage: FC = () => {
   const pendingDatesSummary = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of pendingEmployeeShifts) {
-      const d = getBusinessDateStr(s.openedAtUtc);
+      const d = getShiftBusinessDate(s);
       if (d) {
         map.set(d, (map.get(d) || 0) + 1);
       }
     }
     return Array.from(map.entries()).map(([date, count]) => ({ date, count }));
-  }, [pendingEmployeeShifts, getBusinessDateStr]);
+  }, [pendingEmployeeShifts, getShiftBusinessDate]);
 
-  // Các ca thuộc Ngày nghiệp vụ đang chọn trong Modal Cuối ngày (tính theo Ngày mở ca OpenedAtUtc)
+  // Các ca thuộc BusinessDate do backend trả về.
   const shiftsForBusinessDate = useMemo(
-    () => shifts.filter((s) => getBusinessDateStr(s.openedAtUtc) === eodBusinessDate),
-    [shifts, eodBusinessDate, getBusinessDateStr]
+    () => shifts.filter((s) => getShiftBusinessDate(s) === eodBusinessDate),
+    [shifts, eodBusinessDate, getShiftBusinessDate]
   );
 
   // Các ca mở trong Ngày nghiệp vụ đang chọn mà nhân viên quên chưa chốt (Ca của ngày hôm sau đang mở sẽ KHÔNG nằm trong danh sách này và KHÔNG chặn khóa sổ ngày cũ)
@@ -302,6 +393,13 @@ export const PosShiftPage: FC = () => {
   // Thao tác 1 (Độc lập 24/7): Kết toán đơn Chủ tự bán (ShiftId = null) tính đến thời điểm hiện tại (Không bị chặn bởi ca nhân viên đang mở)
   // Thao tác 2: Duyệt bàn giao & Khóa sổ các ca nhân viên đã đóng thuộc Ngày nghiệp vụ đang chọn
   const handleApproveBusinessDateShifts = async () => {
+    const blockersOtherThanPendingHandover = businessDayPreview?.blockers.filter(
+      (blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER'
+    ) ?? [];
+    if (blockersOtherThanPendingHandover.length) {
+      alert(`Chưa thể khóa sổ: còn ${blockersOtherThanPendingHandover.length} việc cần xử lý.`);
+      return;
+    }
     if (openShiftsForBusinessDate.length > 0) {
       alert(`Chưa thể khóa sổ ngày ${eodBusinessDate}: còn ${openShiftsForBusinessDate.length} ca đang mở.`);
       return;
@@ -312,6 +410,18 @@ export const PosShiftPage: FC = () => {
           `Ngày ${eodBusinessDate} hiện không có ca đã đóng nào chờ duyệt (còn ${openShiftsForBusinessDate.length} ca đang mở). Nếu nhân viên quên chốt ca, vui lòng bấm "Buộc đóng ca này"!`
         );
       }
+      if (!businessDayPreview) return;
+    }
+
+    const invalidFund = businessDayPreview?.funds
+      .filter((fund) => fund.requiresPhysicalCount)
+      .find((fund) => {
+        const raw = businessDayFundCounts[fund.fundId];
+        const value = Number(raw);
+        return raw == null || raw.trim() === '' || !Number.isInteger(value) || value < 0 || value > 999_999_999_999;
+      });
+    if (pendingShiftsForBusinessDate.length === 0 && invalidFund) {
+      alert(`Vui lòng nhập số tiền thực đếm hợp lệ cho quỹ ${invalidFund.fundName}.`);
       return;
     }
 
@@ -325,17 +435,52 @@ export const PosShiftPage: FC = () => {
         });
         approvedShiftsCount++;
       }
+
+      // Xác nhận bàn giao là một thay đổi dữ liệu nguồn, vì vậy preview/token cũ
+      // không còn hợp lệ. Tải lại để chủ cửa hàng kiểm tra trước khi khóa sổ.
+      if (approvedShiftsCount > 0) {
+        const refreshedPreview = await posShiftApi.previewBusinessDay(selectedBranchId, eodBusinessDate);
+        setBusinessDayPreview(refreshedPreview);
+        setBusinessDayFundCounts(Object.fromEntries(
+          refreshedPreview.funds
+            .filter((fund) => fund.requiresPhysicalCount)
+            .map((fund) => [fund.fundId, String(fund.expectedCash)])
+        ));
+        await fetchShiftHistory();
+        alert(`Đã xác nhận bàn giao ${approvedShiftsCount} ca. Vui lòng kiểm tra số liệu tạm tính rồi bấm Khóa sổ ngày.`);
+        return;
+      }
       const closing = await posShiftApi.closeBusinessDay({
         branchId: selectedBranchId,
         businessDate: eodBusinessDate,
-        actualCashCounted: businessDateMetrics.totalCashDrop + (ownerUnsettled?.cashRevenue || 0),
+        fundCounts: (businessDayPreview?.funds ?? [])
+          .filter((fund) => fund.requiresPhysicalCount)
+          .map((fund) => ({ fundId: fund.fundId, actualCashCounted: Number(businessDayFundCounts[fund.fundId]) })),
+        previewToken: businessDayPreview?.previewToken ?? '',
         note: ownerEodNote.trim() || undefined,
       });
       alert(
-        `Đã duyệt ${approvedShiftsCount} ca và khóa sổ ngày ${eodBusinessDate}. Phiếu thu/chi được tạo với mã ${closing.referenceCode}.`
+        `Đã duyệt ${approvedShiftsCount} ca và khóa sổ ngày ${eodBusinessDate}. Mã chốt ngày: ${closing.referenceCode}.`
       );
+      setBusinessDayHistory(await posShiftApi.getBusinessDayHistory(selectedBranchId, eodBusinessDate));
       await fetchShiftHistory();
     } catch (err: any) {
+      const errorCode = err?.response?.data?.errorCode || err?.response?.data?.code;
+      if (errorCode === 'STALE_PREVIEW' && selectedBranchId && selectedBranchId !== 'ALL') {
+        try {
+          const refreshedPreview = await posShiftApi.previewBusinessDay(selectedBranchId, eodBusinessDate);
+          setBusinessDayPreview(refreshedPreview);
+          setBusinessDayFundCounts((current) => Object.fromEntries(
+            refreshedPreview.funds
+              .filter((fund) => fund.requiresPhysicalCount)
+              .map((fund) => [fund.fundId, current[fund.fundId] ?? String(fund.expectedCash)])
+          ));
+          alert('Số liệu hệ thống đã thay đổi. Bản nháp kiểm đếm được giữ lại; vui lòng kiểm tra và xác nhận lại.');
+          return;
+        } catch {
+          // Fall through to the original server error when refresh also fails.
+        }
+      }
       alert(err?.response?.data?.message || err?.message || 'Lỗi khi duyệt khóa sổ ca trong ngày.');
     } finally {
       setIsSettlingOwnerEod(false);
@@ -1554,6 +1699,64 @@ export const PosShiftPage: FC = () => {
                 </div>
               </div>
 
+              {isLoadingBusinessDayPreview && (
+                <div role="status" style={{ padding: 12, borderRadius: 8, background: '#F8FAFC', color: '#475569' }}>
+                  Đang tải số liệu tạm tính từ hệ thống...
+                </div>
+              )}
+              {businessDayPreviewError && (
+                <div role="alert" style={{ padding: 12, borderRadius: 8, background: '#FEF2F2', color: '#B91C1C', border: '1px solid #FECACA' }}>
+                  {businessDayPreviewError}
+                </div>
+              )}
+              {businessDayPreview && (
+                <div style={{ backgroundColor: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 10, padding: 14, display: 'grid', gap: 10 }}>
+                  <div style={{ fontWeight: 800, color: '#0F766E' }}>Số liệu tạm tính từ hệ thống</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, fontSize: 12.5 }}>
+                    <span>Doanh thu tiền mặt: <b>{formatVND(businessDayPreview.totalCashSales)}</b></span>
+                    <span>Doanh thu QR/chuyển khoản: <b>{formatVND(businessDayPreview.totalBankSales)}</b></span>
+                    <span>Thu khác: <b>{formatVND(businessDayPreview.totalCashIn)}</b></span>
+                    <span>Chi vận hành: <b>{formatVND(businessDayPreview.totalCashOut)}</b></span>
+                  </div>
+                  <div style={{ borderTop: '1px dashed #5EEAD4', paddingTop: 8 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 5 }}>Đối soát theo quỹ</div>
+                    {businessDayPreview.funds.length === 0
+                      ? <span style={{ color: '#64748B' }}>Chưa có quỹ hoạt động tại chi nhánh.</span>
+                      : businessDayPreview.funds.map((fund) => (
+                        <div key={fund.fundId} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) auto minmax(150px, 190px)', alignItems: 'center', gap: 12, padding: '4px 0' }}>
+                          <span>{fund.fundName} ({fund.fundType})</span>
+                          <span>Dự kiến: <b>{formatVND(fund.expectedCash)}</b></span>
+                          {fund.requiresPhysicalCount ? (
+                            <label style={{ display: 'grid', gap: 3, fontSize: 11.5 }}>
+                              Thực đếm (VNĐ)
+                              <input
+                                aria-label={`Tiền thực đếm quỹ ${fund.fundName}`}
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={businessDayFundCounts[fund.fundId] ?? ''}
+                                onChange={(event) => setBusinessDayFundCounts((current) => ({ ...current, [fund.fundId]: event.target.value }))}
+                                style={{ padding: '7px 9px', border: '1px solid #94A3B8', borderRadius: 6 }}
+                              />
+                            </label>
+                          ) : <span style={{ color: '#64748B' }}>Không cần kiểm đếm</span>}
+                        </div>
+                      ))}
+                  </div>
+                  {businessDayPreview.blockers.length > 0 && (
+                    <div role="alert" style={{ background: '#FFF7ED', border: '1px solid #FDBA74', borderRadius: 8, padding: 10 }}>
+                      <div style={{ fontWeight: 800, color: '#9A3412', marginBottom: 6 }}>Việc cần xử lý trước khi khóa sổ</div>
+                      {businessDayPreview.blockers.map((blocker) => (
+                        <div key={`${blocker.code}-${blocker.entityId}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '3px 0' }}>
+                          <span>{blocker.displayName} — {blocker.status}{blocker.amount != null ? ` — ${formatVND(blocker.amount)}` : ''}</span>
+                          {blocker.actionPath && <button type="button" onClick={() => navigate(blocker.actionPath!)} style={{ border: 0, background: 'none', color: '#C2410C', fontWeight: 700, cursor: 'pointer' }}>Xem/Xử lý</button>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* MỤC 2: BÁO CÁO & KHÓA SỔ CÁC CA NHÂN VIÊN THUỘC NGÀY NGHIỆP VỤ ĐANG CHỌN */}
               <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1631,7 +1834,16 @@ export const PosShiftPage: FC = () => {
                     type="button"
                     disabled={
                       isSettlingOwnerEod ||
-                      pendingShiftsForBusinessDate.length === 0 ||
+                      isLoadingBusinessDayPreview ||
+                      Boolean(businessDayPreview?.blockers.some((blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER')) ||
+                      !businessDayPreview ||
+                      (pendingShiftsForBusinessDate.length === 0 && businessDayPreview.funds
+                        .filter((fund) => fund.requiresPhysicalCount)
+                        .some((fund) => {
+                          const raw = businessDayFundCounts[fund.fundId];
+                          const value = Number(raw);
+                          return raw == null || raw.trim() === '' || !Number.isInteger(value) || value < 0 || value > 999_999_999_999;
+                        })) ||
                       openShiftsForBusinessDate.length > 0
                     }
                     onClick={handleApproveBusinessDateShifts}
@@ -1640,14 +1852,14 @@ export const PosShiftPage: FC = () => {
                       borderRadius: 6,
                       border: 'none',
                       backgroundColor:
-                        pendingShiftsForBusinessDate.length === 0
+                        Boolean(businessDayPreview?.blockers.some((blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER')) || openShiftsForBusinessDate.length > 0
                           ? '#94A3B8'
                           : '#D97706',
                       color: '#FFFFFF',
                       fontSize: 12,
                       fontWeight: 700,
                       cursor:
-                        pendingShiftsForBusinessDate.length === 0
+                        Boolean(businessDayPreview?.blockers.some((blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER')) || openShiftsForBusinessDate.length > 0
                           ? 'not-allowed'
                           : 'pointer',
                       whiteSpace: 'nowrap',
@@ -1655,10 +1867,28 @@ export const PosShiftPage: FC = () => {
                   >
                     {isSettlingOwnerEod
                       ? 'Đang duyệt...'
-                      : `Duyệt & Khóa sổ (${pendingShiftsForBusinessDate.length} ca)`}
+                      : pendingShiftsForBusinessDate.length > 0
+                        ? `Xác nhận bàn giao (${pendingShiftsForBusinessDate.length} ca)`
+                        : 'Khóa sổ ngày'}
                   </button>
                 </div>
               </div>
+
+              {businessDayHistory.length > 0 && (
+                <div style={{ border: '1px solid #CBD5E1', borderRadius: 10, padding: 12, display: 'grid', gap: 8 }}>
+                  <strong style={{ color: '#334155' }}>Lịch sử chốt ngày nghiệp vụ</strong>
+                  {businessDayHistory.map((closing) => (
+                    <div key={closing.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '7px 0', borderTop: '1px solid #E2E8F0', fontSize: 12.5 }}>
+                      <span><b>Phiên bản {closing.version}</b> — {closing.referenceCode} — {closing.status}{closing.reopenReason ? ` — Lý do mở lại: ${closing.reopenReason}` : ''}</span>
+                      {closing.isActive && closing.status.toLowerCase() === 'closed' && (
+                        <button type="button" disabled={isSettlingOwnerEod} onClick={() => handleReopenBusinessDay(closing)} style={{ padding: '5px 9px', border: '1px solid #DC2626', borderRadius: 6, background: '#FFF', color: '#B91C1C', fontWeight: 700, cursor: 'pointer' }}>
+                          Mở lại để điều chỉnh
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div>
                 <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#334155', marginBottom: 4 }}>

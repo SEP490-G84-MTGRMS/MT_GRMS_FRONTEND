@@ -14,7 +14,6 @@ import { PosCatalogModal } from '../components/modals/PosCatalogModal';
 import { AddCustomerModal } from '../components/modals/AddCustomerModal';
 import { VietQrModal } from '../components/modals/VietQrModal';
 import { BelowCostWarningModal } from '../components/modals/BelowCostWarningModal';
-import { DebtLimitWarningModal } from '../components/modals/DebtLimitWarningModal';
 import { OrderDiscountModal } from '../components/modals/OrderDiscountModal';
 import { PosReceiptModal } from '../components/PosReceiptModal';
 import { PosInventoryLookupModal } from '../components/modals/PosInventoryLookupModal';
@@ -33,9 +32,11 @@ import { employeeApi } from '../../employee/api/employeeApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
 
-const getInitialTabs = (tenantId: string): OrderTab[] => {
+const getPosStorageScope = (tenantId: string, userId: string) => `${tenantId}_${userId || 'anonymous'}`;
+
+const getInitialTabs = (tenantId: string, userId: string): OrderTab[] => {
   try {
-    const key = `mtgrms_pos_tabs_${tenantId}`;
+    const key = `mtgrms_pos_tabs_${getPosStorageScope(tenantId, userId)}`;
     const saved = localStorage.getItem(key);
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -73,9 +74,9 @@ const getInitialTabs = (tenantId: string): OrderTab[] => {
   ];
 };
 
-const getInitialActiveTabId = (tenantId: string, initialTabs: OrderTab[]): number => {
+const getInitialActiveTabId = (tenantId: string, userId: string, initialTabs: OrderTab[]): number => {
   try {
-    const key = `mtgrms_pos_active_tab_${tenantId}`;
+    const key = `mtgrms_pos_active_tab_${getPosStorageScope(tenantId, userId)}`;
     const saved = localStorage.getItem(key);
     if (saved) {
       const parsed = parseInt(saved, 10);
@@ -96,6 +97,7 @@ const isValidGuid = (value?: string | null): boolean =>
 export const PosCheckoutPage: FC = () => {
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_mt_mart_01';
+  const currentUserId = user?.id || 'anonymous';
   const isDefaultDemoStore = currentTenantId === 'tenant_mt_mart_01';
   const isAnNhienStore = currentTenantId === 'tenant_an_nhien_02';
 
@@ -123,10 +125,10 @@ export const PosCheckoutPage: FC = () => {
   const [isOwnerShiftModeModalOpen, setIsOwnerShiftModeModalOpen] = useState(false);
 
   // Tab Đa đơn hàng (Multi-tab orders) được lưu trữ riêng biệt theo từng TenantId
-  const [tabs, setTabs] = useState<OrderTab[]>(() => getInitialTabs(currentTenantId));
+  const [tabs, setTabs] = useState<OrderTab[]>(() => getInitialTabs(currentTenantId, currentUserId));
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
-  const [activeTabId, setActiveTabId] = useState<number>(() => getInitialActiveTabId(currentTenantId, tabs));
+  const [activeTabId, setActiveTabId] = useState<number>(() => getInitialActiveTabId(currentTenantId, currentUserId, tabs));
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [isInventoryLookupOpen, setIsInventoryLookupOpen] = useState(false);
   const [dbBranches, setDbBranches] = useState<Array<{ id: string; name: string; address?: string; phone?: string }>>([]);
@@ -224,9 +226,32 @@ export const PosCheckoutPage: FC = () => {
   const handleSelectBranch = (branchId: string) => {
     const target = availableBranches.find((b: { id: string; name: string }) => b.id === branchId);
     if (target && target.id !== activeBranch.id) {
+      const itemCount = tabsRef.current.reduce((sum, tab) => sum + tab.cart.length, 0);
+      if (itemCount > 0 && !window.confirm(
+        `Đang có ${itemCount} sản phẩm trong các đơn của ${activeBranch.name}. Chuyển chi nhánh sẽ xóa các giỏ hàng này để tránh trừ nhầm kho. Bạn có muốn tiếp tục?`
+      )) return;
+
+      setTabs((current) => current.map((tab) => ({
+        ...tab,
+        cart: [],
+        customer: null,
+        orderDiscountPercent: 0,
+        couponCode: '',
+        couponDiscount: 0,
+        usePoints: false,
+        note: '',
+        paymentMethod: 'cash',
+        cashTendered: 0,
+      })));
+      setGiftItems([]);
+      setPendingPaymentOrder(null);
+      setAppliedPromotionId(undefined);
+      setAppliedPromotions([]);
+      setAutoPromoDiscount(0);
+      setVoucherDiscount(0);
       setSearchQuery('');
       setActiveBranch(target);
-      showToast(`Đã chuyển điểm bán sang: ${target.name}`, 'info');
+      showToast(`Đã chuyển điểm bán sang ${target.name}; chỉ giỏ nháp của tài khoản bạn tại chi nhánh cũ đã được xóa.`, 'info');
     }
   };
 
@@ -311,30 +336,30 @@ export const PosCheckoutPage: FC = () => {
 
   // Khi chuyển đổi tài khoản (TenantId thay đổi) -> reset và nạp dữ liệu riêng của Tenant đó
   useEffect(() => {
-    const freshTabs = getInitialTabs(currentTenantId);
+    const freshTabs = getInitialTabs(currentTenantId, currentUserId);
     setTabs(freshTabs);
-    setActiveTabId(getInitialActiveTabId(currentTenantId, freshTabs));
+    setActiveTabId(getInitialActiveTabId(currentTenantId, currentUserId, freshTabs));
     setProducts([]);
     setCustomers(getInitialCustomers());
     prevLoadedBranchIdRef.current = null;
-  }, [currentTenantId, isDefaultDemoStore]);
+  }, [currentTenantId, currentUserId, isDefaultDemoStore]);
 
   // Tự động đồng bộ giỏ hàng và các hóa đơn vào localStorage theo TenantId
   useEffect(() => {
     try {
-      localStorage.setItem(`mtgrms_pos_tabs_${currentTenantId}`, JSON.stringify(tabs));
+      localStorage.setItem(`mtgrms_pos_tabs_${getPosStorageScope(currentTenantId, currentUserId)}`, JSON.stringify(tabs));
     } catch (e) {
       console.warn('Failed to save POS tabs state:', e);
     }
-  }, [tabs, currentTenantId]);
+  }, [tabs, currentTenantId, currentUserId]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(`mtgrms_pos_active_tab_${currentTenantId}`, activeTabId.toString());
+      localStorage.setItem(`mtgrms_pos_active_tab_${getPosStorageScope(currentTenantId, currentUserId)}`, activeTabId.toString());
     } catch (e) {
       console.warn('Failed to save POS active tab state:', e);
     }
-  }, [activeTabId, currentTenantId]);
+  }, [activeTabId, currentTenantId, currentUserId]);
 
   // Chế độ bán hàng (fast vs normal) & Modal danh mục sản phẩm cảm ứng (F3)
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
@@ -345,7 +370,6 @@ export const PosCheckoutPage: FC = () => {
   const [isVietQrOpen, setIsVietQrOpen] = useState(false);
   const [pendingPaymentOrder, setPendingPaymentOrder] = useState<Awaited<ReturnType<typeof posOrderApi.createOrder>> | null>(null);
   const [belowCostWarningItem, setBelowCostWarningItem] = useState<CartItem | null>(null);
-  const [isDebtWarningOpen, setIsDebtWarningOpen] = useState(false);
   const [isOrderDiscountOpen, setIsOrderDiscountOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -407,13 +431,24 @@ export const PosCheckoutPage: FC = () => {
         const isBranchSwitch = Boolean(
           prevLoadedBranchIdRef.current && prevLoadedBranchIdRef.current !== activeBranch.id
         );
-        const removedCount = tabsRef.current.reduce(
-          (acc, tab) => acc + tab.cart.filter((c) => !byId.has(c.product.id)).length,
-          0
-        );
+        const removedCount = tabsRef.current.reduce((acc, tab) => acc + tab.cart.length, 0);
 
         setTabs((prevTabs) =>
           prevTabs.map((tab) => {
+            if (isBranchSwitch) {
+              return {
+                ...tab,
+                cart: [],
+                customer: null,
+                orderDiscountPercent: 0,
+                couponCode: '',
+                couponDiscount: 0,
+                usePoints: false,
+                note: '',
+                paymentMethod: 'cash',
+                cashTendered: 0,
+              };
+            }
             const nextCart: CartItem[] = [];
             for (const cartItem of tab.cart) {
               const fresh = byId.get(cartItem.product.id);
@@ -449,11 +484,18 @@ export const PosCheckoutPage: FC = () => {
           })
         );
 
-        setGiftItems((prev) => prev.filter((g) => byId.has(g.productId)));
+        setGiftItems((prev) => isBranchSwitch ? [] : prev.filter((g) => byId.has(g.productId)));
+        if (isBranchSwitch) {
+          setPendingPaymentOrder(null);
+          setAppliedPromotionId(undefined);
+          setAppliedPromotions([]);
+          setAutoPromoDiscount(0);
+          setVoucherDiscount(0);
+        }
 
         if (isBranchSwitch && removedCount > 0) {
           showToast(
-            `Đã gỡ ${removedCount} sản phẩm không kinh doanh tại ${activeBranch.name} khỏi giỏ hàng.`,
+            `Đã xóa ${removedCount} sản phẩm của chi nhánh cũ khỏi giỏ hàng.`,
             'info'
           );
         }
@@ -610,7 +652,7 @@ export const PosCheckoutPage: FC = () => {
   };
 
   // Cart operations
-  const handleAddToCart = (product: Product, batchCode?: string, expiryDate?: string) => {
+  const handleAddToCart = (product: Product, batchId?: string, batchCode?: string, expiryDate?: string, discountPercent = 0) => {
     if (!isStoreOwner && !currentShift) {
       alert('Quầy bán hàng hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc và kiểm đếm tiền đầu ca trước khi bán hàng!');
       setIsOpenShiftModalOpen(true);
@@ -636,8 +678,14 @@ export const PosCheckoutPage: FC = () => {
         : product;
       const newItem = {
         ...createInitialCartItem(prodToInsert, 1, 0),
+        batchId,
         batchCode: targetBatch,
         expiryDate: expiryDate || product.expiryDate,
+        fefoDiscountPercent: discountPercent,
+        discountType: 'percent' as const,
+        discountPerItem: discountPercent,
+        actualPrice: product.basePrice * (1 - discountPercent / 100),
+        totalAmount: product.basePrice * (1 - discountPercent / 100),
       };
       updateCurrentTab({ cart: [...currentTab.cart, newItem] });
     }
@@ -1045,6 +1093,7 @@ export const PosCheckoutPage: FC = () => {
         unitId: c.unitId,
         unitName: c.unit,
         isGift: false,
+        batchId: c.batchId || undefined,
       };
     });
 
@@ -1273,13 +1322,6 @@ export const PosCheckoutPage: FC = () => {
         } else {
           alert('Ca bán hàng đã đóng hoặc đang kiểm đếm: ' + errMsg);
         }
-      } else if (
-        errMsg.includes('CREDIT_LIMIT_EXCEEDED') ||
-        errMsg.includes('DEBT_OVERDUE_BLOCKED') ||
-        errMsg.includes('hạn mức tín dụng') ||
-        errMsg.includes('quá hạn')
-      ) {
-        setIsDebtWarningOpen(true);
       } else if (errMsg && errMsg.includes('tồn kho')) {
         alert(`Cảnh báo kho: ${errMsg}`);
       } else {
@@ -1640,27 +1682,21 @@ export const PosCheckoutPage: FC = () => {
         onApply={(percent) => updateCurrentTab({ orderDiscountPercent: percent })}
       />
 
-      <DebtLimitWarningModal
-        isOpen={isDebtWarningOpen}
-        customer={currentTab.customer}
-        orderAmount={finalAmount + Math.round(finalAmount * 0.01)}
-        onClose={() => setIsDebtWarningOpen(false)}
-        onApprove={(note) => {
-setIsDebtWarningOpen(false);
-          executeCompleteCheckout(note, true);
-        }}
-      />
-
             <PosInventoryLookupModal
         isOpen={isInventoryLookupOpen}
         onClose={() => setIsInventoryLookupOpen(false)}
         currentBranchId={activeBranch.id}
         currentBranchName={activeBranch.name}
         products={products}
-        onSelectBatchToCart={(prod, batchCode, expDate) => {
-          handleAddToCart(prod, batchCode, expDate);
+        onSelectBatchToCart={(prod, batchId, batchCode, expDate, discountPercent) => {
+          handleAddToCart(prod, batchId, batchCode, expDate, discountPercent);
           setIsInventoryLookupOpen(false);
-          showToast(`Đã thêm sản phẩm "${prod.name}" (tự động phân bổ FEFO) vào giỏ hàng`, 'success');
+          showToast(
+            batchCode
+              ? `Đã thêm "${prod.name}" từ lô ${batchCode}${discountPercent ? `, giảm ${discountPercent}%` : ''}`
+              : `Đã thêm "${prod.name}" theo FEFO tự động`,
+            'success'
+          );
         }}
       />
 

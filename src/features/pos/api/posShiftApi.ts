@@ -17,6 +17,9 @@ import type {
   ConfirmCloseShiftRequest,
   ForceCloseShiftRequest,
   CashierShiftEligibilityDto,
+  BusinessDayClosingPreview,
+  BusinessDateResponse,
+  BusinessDayClosingVersion,
 } from '../types/posShift.types';
 
 export const posShiftApi = {
@@ -228,7 +231,8 @@ export const posShiftApi = {
   async closeBusinessDay(request: {
     branchId: string;
     businessDate: string;
-    actualCashCounted: number;
+    fundCounts: Array<{ fundId: string; actualCashCounted: number }>;
+    previewToken: string;
     note?: string;
   }): Promise<{
     id: string;
@@ -239,6 +243,28 @@ export const posShiftApi = {
     referenceCode: string;
   }> {
     const res = await httpClient.post('/business-days/close', request, {
+      headers: { 'Idempotency-Key': generateUuidV7() },
+    });
+    return res.data?.data || res.data;
+  },
+
+  async getCurrentBusinessDate(branchId: string): Promise<BusinessDateResponse> {
+    const res = await httpClient.get('/business-days/current', { params: { branchId } });
+    return res.data?.data || res.data;
+  },
+
+  async previewBusinessDay(branchId: string, businessDate: string): Promise<BusinessDayClosingPreview> {
+    const res = await httpClient.get('/business-days/preview', { params: { branchId, businessDate } });
+    return res.data?.data || res.data;
+  },
+
+  async getBusinessDayHistory(branchId: string, businessDate: string): Promise<BusinessDayClosingVersion[]> {
+    const res = await httpClient.get(`/business-days/${branchId}/${businessDate}/history`);
+    return res.data?.data || res.data;
+  },
+
+  async reopenBusinessDay(id: string, reason: string): Promise<BusinessDayClosingVersion> {
+    const res = await httpClient.post(`/business-days/${id}/reopen`, { reason }, {
       headers: { 'Idempotency-Key': generateUuidV7() },
     });
     return res.data?.data || res.data;

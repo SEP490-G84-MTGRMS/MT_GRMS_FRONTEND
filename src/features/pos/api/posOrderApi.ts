@@ -12,6 +12,7 @@ export interface OrderItemCreateDto {
   unitName?: string;
   isGift?: boolean;
   promotionId?: string | null;
+  batchId?: string | null;
 }
 
 export interface OrderCreateRequest {

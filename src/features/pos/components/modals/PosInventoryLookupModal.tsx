@@ -10,7 +10,7 @@ interface Props {
   currentBranchId: string;
   currentBranchName: string;
   products: Product[];
-  onSelectBatchToCart?: (product: Product, batchCode: string, expiryDate?: string) => void;
+  onSelectBatchToCart?: (product: Product, batchId?: string, batchCode?: string, expiryDate?: string, discountPercent?: number) => void;
 }
 interface InventoryBatch {
   batchId: string;
@@ -22,6 +22,8 @@ interface InventoryBatch {
   reservedQty: number;
   availableQty: number;
   status: string;
+  fefoDiscountPercent?: number;
+  isFefoDiscountActive?: boolean;
 }
 
 const formatQuantity = (value: number) => new Intl.NumberFormat('vi-VN', {
@@ -101,16 +103,22 @@ export const PosInventoryLookupModal: FC<Props> = ({
               batches.length === 0 ? <p>Chưa có dữ liệu lô hàng tại chi nhánh này.</p> :
               <div style={{ overflowX: 'auto' }}>
                 <table className="pos-shift-table" style={{ minWidth: 800 }} aria-label={`Danh sách ${batches.length} lô của ${selectedProduct.name}`}>
-                  <thead><tr><th>Ưu tiên FEFO</th><th>Mã lô</th><th>Ngày sản xuất</th><th>Hạn sử dụng</th><th>Còn hạn</th><th>Tồn trong lô</th><th>Đang giữ</th><th>Khả dụng</th></tr></thead>
+                  <thead><tr><th>Ưu tiên FEFO</th><th>Mã lô</th><th>Ngày sản xuất</th><th>Hạn sử dụng</th><th>Còn hạn</th><th>Giảm FEFO</th><th>Khả dụng</th><th>Thao tác</th></tr></thead>
                   <tbody>{batches.map((batch, index) => <tr key={batch.batchId}>
                     <td>#{index + 1}</td>
                     <td><b>{batch.batchCode}</b></td>
                     <td>{formatDate(batch.mfgDate)}</td>
                     <td>{formatDate(batch.expiryDate)}</td>
-                    <td>{batch.daysLeft == null ? 'Không giới hạn' : batch.daysLeft <= 0 ? 'Đã hết hạn' : `${batch.daysLeft} ngày`}</td>
-                    <td>{formatQuantity(batch.quantityOnHand)} {selectedProduct.baseUnit}</td>
-                    <td>{formatQuantity(batch.reservedQty)} {selectedProduct.baseUnit}</td>
+                    <td>{batch.daysLeft == null ? 'Không giới hạn' : batch.daysLeft < 0 ? 'Đã hết hạn' : batch.daysLeft === 0 ? 'Hết hạn hôm nay' : `${batch.daysLeft} ngày`}</td>
+                    <td>{batch.isFefoDiscountActive ? `-${batch.fefoDiscountPercent || 0}%` : '—'}</td>
                     <td><b>{formatQuantity(batch.availableQty)} {selectedProduct.baseUnit}</b></td>
+                    <td><button type="button" className="pos-btn-secondary"
+                      disabled={batch.availableQty <= 0 || (batch.daysLeft != null && batch.daysLeft < 0)}
+                      onClick={() => {
+                        onSelectBatchToCart?.(selectedProduct, batch.batchId, batch.batchCode, batch.expiryDate || undefined,
+                          batch.isFefoDiscountActive ? batch.fefoDiscountPercent || 0 : 0);
+                        onClose();
+                      }}>Chọn lô</button></td>
                   </tr>)}</tbody>
                 </table>
               </div>}
@@ -120,7 +128,7 @@ export const PosInventoryLookupModal: FC<Props> = ({
           <button type="button" className="pos-btn-secondary" onClick={onClose}>Đóng</button>
           {selectedProduct && onSelectBatchToCart && <button type="button" className="pos-btn-primary"
             disabled={loading || Boolean(error) || !batches.some(batch => batch.availableQty > 0 && (batch.daysLeft == null || batch.daysLeft > 0))}
-            onClick={() => { onSelectBatchToCart(selectedProduct, ''); onClose(); }}>Thêm vào đơn · tự động FEFO</button>}
+            onClick={() => { onSelectBatchToCart(selectedProduct); onClose(); }}>Thêm vào đơn · tự động FEFO</button>}
         </div>
       </div>
     </div>

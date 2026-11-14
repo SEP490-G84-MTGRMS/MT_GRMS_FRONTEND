@@ -26,6 +26,7 @@ export class ProductDTO {
   quantityOnHand: number = 0;
   allocatedQty?: number;
   batchCode?: string;
+    batchId?: string;
   expiryDate?: string;
   shelfLocation?: string;
   unitPrices?: Array<{
@@ -59,6 +60,8 @@ export class CartItemDTO {
   totalAmount: number = 0;
   isBelowCostApproved?: boolean;
   batchCode?: string;
+  batchId?: string;
+  fefoDiscountPercent?: number;
   expiryDate?: string;
 
   constructor(init?: Partial<CartItemDTO>) {

@@ -218,8 +218,16 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     setIsDiscountModalOpen(true);
   };
 
-  const handleApplyDiscount = (_batchId: string, _discountPercent: number) => {
-    showToast('Chưa có API giảm giá FEFO — thay đổi chưa được lưu.', 'warning');
+  const handleApplyDiscount = async (batchId: string, discountPercent: number) => {
+    try {
+      await batchApi.applyFefoDiscount(batchId, discountPercent);
+      setIsDiscountModalOpen(false);
+      setDiscountBatch(null);
+      showToast(`Đã lưu giảm giá FEFO ${discountPercent}% cho lô hàng.`, 'success');
+      await loadBatches();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể lưu giảm giá FEFO.', 'error');
+    }
   };
 
   const handleWriteOff = (batch: BatchItem) => {

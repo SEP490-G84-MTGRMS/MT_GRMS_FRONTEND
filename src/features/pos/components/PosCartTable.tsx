@@ -54,6 +54,9 @@ export const PosCartTable: FC<Props> = ({
           <tbody>
             {cart.length > 0 ? (
               cart.map((item, index) => {
+                const discountPerUnit = Math.max(0, item.unitPrice - item.actualPrice);
+                const lineDiscount = discountPerUnit * item.quantity;
+                const hasFefoDiscount = Boolean(item.batchId && (item.fefoDiscountPercent || 0) > 0);
 
                 return (
                   <tr key={item.id} className="pos-cart-row">
@@ -79,6 +82,17 @@ export const PosCartTable: FC<Props> = ({
                       <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span>&#10003; Tồn kho: {item.product.quantityOnHand}</span>
                       </div>
+                      {item.batchCode && (
+                        <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 11 }}>
+                          <span style={{ color: '#475569' }}>Lô: <b>{item.batchCode}</b></span>
+                          {item.expiryDate && <span style={{ color: '#64748b' }}>HSD: {new Date(item.expiryDate).toLocaleDateString('vi-VN')}</span>}
+                          {hasFefoDiscount && (
+                            <span style={{ padding: '2px 7px', borderRadius: 999, color: '#b45309', background: '#fef3c7', fontWeight: 700 }}>
+                              Giảm FEFO {item.fefoDiscountPercent}%
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       {item.product.unitPrices && item.product.unitPrices.length > 1 ? (
@@ -121,15 +135,21 @@ export const PosCartTable: FC<Props> = ({
                       />
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 600 }}>{item.unitPrice.toLocaleString('vi-VN')}</div>
-                      {item.discountPerItem > 0 && (
-                        <div style={{ fontSize: 11, color: '#dc2626' }}>
-                          - {item.discountPerItem.toLocaleString('vi-VN')}
+                      {discountPerUnit > 0 ? <>
+                        <div style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'line-through' }}>
+                          {item.unitPrice.toLocaleString('vi-VN')} đ
                         </div>
+                        <div style={{ fontWeight: 700, color: '#dc2626' }}>{item.actualPrice.toLocaleString('vi-VN')} đ</div>
+                        <div style={{ fontSize: 10.5, color: '#b45309' }}>
+                          {hasFefoDiscount ? `-${item.fefoDiscountPercent}%` : `Giảm ${discountPerUnit.toLocaleString('vi-VN')} đ`}
+                        </div>
+                      </> : (
+                        <div style={{ fontWeight: 600 }}>{item.unitPrice.toLocaleString('vi-VN')} đ</div>
                       )}
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                      {item.totalAmount.toLocaleString('vi-VN')}
+                      <div>{item.totalAmount.toLocaleString('vi-VN')} đ</div>
+                      {lineDiscount > 0 && <div style={{ fontSize: 10.5, color: '#16a34a', fontWeight: 600 }}>Tiết kiệm {lineDiscount.toLocaleString('vi-VN')} đ</div>}
                     </td>
 
                   </tr>

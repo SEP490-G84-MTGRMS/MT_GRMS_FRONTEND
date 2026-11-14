@@ -11,6 +11,8 @@ export interface InventoryBatchDto {
   reservedQty: number;
   availableQty: number;
   status: string; // Expired, Critical, Warning, NoExpiry, Normal
+  fefoDiscountPercent?: number;
+  isFefoDiscountActive?: boolean;
 }
 
 // DTO khớp với backend InventoryStockItemDto

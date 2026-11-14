@@ -83,7 +83,7 @@ export const customerApi = {
       address: input.address?.trim() || null,
       debtLimit: Number(input.debtLimit) || 0,
       membershipTier: input.membershipTier || 'Standard',
-      allowDebt: (Number(input.debtLimit) || 0) > 0,
+      allowDebt: Boolean(input.allowDebt),
     });
 
     if (!res.data.success || !res.data.data) {
@@ -104,7 +104,7 @@ export const customerApi = {
       debtLimit: input.debtLimit !== undefined ? Number(input.debtLimit) : undefined,
       membershipTier: input.membershipTier,
       status: input.status,
-      allowDebt: input.debtLimit !== undefined ? Number(input.debtLimit) > 0 : undefined,
+      allowDebt: input.allowDebt,
     });
 
     if (!res.data.success || !res.data.data) {
