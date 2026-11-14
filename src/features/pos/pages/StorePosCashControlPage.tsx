@@ -15,8 +15,10 @@ import {
   Sliders,
   AlertTriangle,
   Info,
+  Building2,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
+import { employeeApi } from '../../employee/api/employeeApi';
 import type { ShiftCashMovementDto } from '../types/posShift.types';
 import { useAuthStore } from '../../../stores/useAuthStore';
 
@@ -26,6 +28,15 @@ export const StorePosCashControlPage: FC = () => {
 
   // Chi nhánh đang chọn
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    employeeApi.getBranches().then((res) => {
+      if (Array.isArray(res)) {
+        setBranches(res);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Cấu hình hạn mức
   const [threshold, setThreshold] = useState<number>(200000);
@@ -226,7 +237,45 @@ export const StorePosCashControlPage: FC = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {branches.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                backgroundColor: '#ffffff',
+                padding: '4px 12px',
+                borderRadius: 8,
+                border: '1px solid #cbd5e1',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              }}
+            >
+              <Building2 size={16} className="text-teal-700" />
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569' }}>Chi nhánh:</span>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                style={{
+                  border: 'none',
+                  outline: 'none',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: '#0f172a',
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="ALL">Toàn bộ chi nhánh</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={loadData}

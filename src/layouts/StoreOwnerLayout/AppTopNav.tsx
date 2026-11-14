@@ -243,8 +243,8 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
           { label: "Sổ quỹ", to: "/store-owner/cashbook" },
           {
-            label: "Ca & két (duyệt chi, rút két)",
-            to: "/store-owner/cash-control",
+            label: "Hạn mức & duyệt chi két POS",
+            to: "/store-owner/pos-cash-control",
           },
           {
             label: "Lịch sử giao ca bán hàng",
@@ -977,7 +977,7 @@ export const AppTopNav: FC = () => {
           ...g,
           badge: pendingCashApprovalCount > 0 ? pendingCashApprovalCount : undefined,
           children: g.children?.map((c) => {
-            if (c.to === "/store-owner/cash-control") {
+            if (c.to === "/store-owner/pos-cash-control" || c.to === "/store-owner/cash-control") {
               return {
                 ...c,
                 badge:
@@ -1777,7 +1777,7 @@ export const AppTopNav: FC = () => {
 
                       {/* Mục 2: Hạn Mức & Duyệt Chi Két POS */}
                       <Link
-                        to="/store-owner/cash-control"
+                        to="/store-owner/pos-cash-control"
                         onClick={() => setSettingsMenuOpen(false)}
                         style={{
                           display: "flex",
