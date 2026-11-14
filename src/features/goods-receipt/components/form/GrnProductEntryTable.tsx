@@ -287,7 +287,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
             {items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={readOnly ? 14 : 15}
+                  colSpan={readOnly ? 15 : 16}
                   style={{
                     padding: '36px 16px',
                     textAlign: 'center',
@@ -603,7 +603,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     {!readOnly && (
                       <td style={{ padding: '6px 4px', textAlign: 'center' }}>
                         <div style={{ display: 'inline-flex', gap: 2 }}>
-                          {onSplitLot && (
+                          {onSplitLot && manageBatch && (
                             <button
                               type="button"
                               onClick={() => onSplitLot(row.id)}
@@ -646,7 +646,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
             )}
           </tbody>
 
-          {/* Footer Totals */}
+          {/* Footer Totals — khớp 15 cột (+1 Thao tác khi edit) */}
           {items.length > 0 && (
             <tfoot>
               <tr
@@ -658,34 +658,48 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                   color: '#0f172a',
                 }}
               >
+                {/* STT + SKU + Tên + ĐVT */}
                 <td colSpan={4} style={{ padding: '10px 10px', textAlign: 'right' }}>
                   TỔNG CỘNG KIỂM ĐẾM:
                 </td>
+                {/* SL ĐẶT */}
                 <td style={{ padding: '10px 8px', textAlign: 'right', color: '#475569' }}>
                   {totalOrderedQty}
                 </td>
+                {/* THỰC NHẬN */}
                 <td style={{ padding: '10px 8px', textAlign: 'right', color: '#0d9488' }}>
                   {totalReceivedQty}
                 </td>
-                <td style={{ padding: '10px 8px', textAlign: 'right', color: totalShortageQty > 0 ? '#dc2626' : '#94a3b8' }}>
-                  {totalShortageQty}
-                </td>
-                <td colSpan={5}></td>
-                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#475569' }}>
-                  Tiền hàng:
-                </td>
+                {/* THIẾU */}
                 <td
                   style={{
-                    padding: '10px 10px',
+                    padding: '10px 8px',
+                    textAlign: 'right',
+                    color: totalShortageQty > 0 ? '#dc2626' : '#94a3b8',
+                  }}
+                >
+                  {totalShortageQty}
+                </td>
+                {/* Lý do + Lệch PO + QL Batch + Mã lô + Ngày SX + Hạn SD */}
+                <td colSpan={6} />
+                {/* ĐƠN GIÁ — nhãn tiền hàng */}
+                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#64748b', fontWeight: 600 }}>
+                  Tiền hàng
+                </td>
+                {/* THÀNH TIỀN */}
+                <td
+                  style={{
+                    padding: '10px 12px',
                     textAlign: 'right',
                     fontFamily: 'monospace',
                     fontSize: 13,
                     color: '#0d9488',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {formatCurrency(totalGoodsAmount)}
                 </td>
-                {!readOnly && <td></td>}
+                {!readOnly && <td />}
               </tr>
             </tfoot>
           )}

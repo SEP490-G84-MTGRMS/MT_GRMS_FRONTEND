@@ -294,7 +294,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>SP trên Matrix</span>
+                  <span>SP cửa hàng</span>
                   <ArrowUpDown
                     size={12}
                     color={sortField === 'matrixProductCount' ? '#0f766e' : '#94a3b8'}
@@ -466,7 +466,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                     {b.managerName || '—'}
                   </td>
 
-                  {/* 4. SP đang nhập trên Order Matrix */}
+                  {/* 4. SP đã gán bán tại cửa hàng (BranchProducts) — khớp /stores/products */}
                   <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span
@@ -485,7 +485,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                           border:
                             (b.matrixProductCount ?? 0) > 0 ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
                         }}
-                        title="Số sản phẩm đang có số lượng trên Order Matrix"
+                        title="Số sản phẩm đã gán bán tại chi nhánh (giống màn Sản phẩm cửa hàng)"
                       >
                         {b.matrixProductCount ?? 0}
                       </span>

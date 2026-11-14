@@ -115,6 +115,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [showPriceHistory, setShowPriceHistory] = useState<boolean>(false);
   const [hasBatches, setHasBatches] = useState<boolean>(false);
+  const [allowRepack, setAllowRepack] = useState<boolean>(false);
   const [eligibleForVatReduction, setEligibleForVatReduction] = useState<boolean>(false);
 
   // Trạng thái lưu (loading)
@@ -163,6 +164,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setSellingPrice(productToEdit.sellingPrice || 0);
         setIsFavorite(Boolean(productToEdit.isFavorite));
         setHasBatches(Boolean(productToEdit.hasBatches));
+        setAllowRepack(Boolean(productToEdit.allowRepack));
         setEligibleForVatReduction(Boolean((productToEdit as any).eligibleForVatReduction));
         setIsSubmitting(false);
 
@@ -229,6 +231,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
         setIsFavorite(false);
         setHasBatches(false);
+        setAllowRepack(false);
         setIsSubmitting(false);
 
         setBaseUnit('');
@@ -329,6 +332,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       : '';
 
   const trimmedBaseUnit = baseUnit.trim();
+  /** Đơn vị nhập = ProductUnit có isPurchaseUnit; không lấy từ baseUnit nếu đã chọn UOM khác. */
+  const purchaseUnitFromFlag = uomConversions.find((u) => Boolean(u.isPurchaseUnit));
+  const effectivePurchaseUnitName = (
+    purchaseUnitFromFlag?.unitName?.trim() ||
+    (isBaseUnitPurchaseUnit ? trimmedBaseUnit : '') ||
+    ''
+  ).trim();
+  const isPurchaseUnitKg = effectivePurchaseUnitName.toLowerCase() === 'kg';
   const baseUnitError =
     (touched.baseUnit || uomConversions.length > 0) && !trimmedBaseUnit
       ? 'Vui lòng nhập tên đơn vị cơ bản (Bắt buộc).'
@@ -403,16 +414,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const handleSelectBaseUnitAsPurchaseUnit = () => {
     setIsBaseUnitPurchaseUnit(true);
     setUomConversions((prev) => prev.map((u) => ({ ...u, isPurchaseUnit: false })));
+    if (baseUnit.trim().toLowerCase() !== 'kg') {
+      setAllowRepack(false);
+    }
   };
 
   const handleSelectUomAsPurchaseUnit = (id: string) => {
     setIsBaseUnitPurchaseUnit(false);
+    const selected = uomConversions.find((u) => u.id === id);
     setUomConversions((prev) =>
       prev.map((u) => ({
         ...u,
         isPurchaseUnit: u.id === id,
       }))
     );
+    if ((selected?.unitName || '').trim().toLowerCase() !== 'kg') {
+      setAllowRepack(false);
+    }
   };
 
   const handleUpdateUom = (id: string, field: keyof UomConversion, value: any) => {
@@ -645,7 +663,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         sellingPrice,
         costPrice: userRole === 'StoreOwner' ? costPrice : productToEdit?.costPrice ?? 0,
         isFavorite,
-        hasBatches,
+        hasBatches: hasBatches || (isPurchaseUnitKg && allowRepack),
+        allowRepack: isPurchaseUnitKg && allowRepack,
         eligibleForVatReduction,
         description: description.trim() || undefined,
         internalNote: internalNote.trim() || undefined,
@@ -674,6 +693,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setInternalNote('');
         setIsFavorite(false);
         setHasBatches(false);
+        setAllowRepack(false);
         setWarningMsg('');
         setValidationPopupMsg('');
         setTouched({});
@@ -1663,7 +1683,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   id="product-has-batches-checkbox"
                   type="checkbox"
                   style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0F766E', margin: 0 }}
-                  checked={hasBatches}
+                  checked={hasBatches || allowRepack}
                   onChange={(e) => setHasBatches(e.target.checked)}
                 />
                 <label
@@ -1673,6 +1693,29 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   Quản lý theo lô & hạn sử dụng (FEFO)
                 </label>
               </div>
+
+              {isPurchaseUnitKg && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    id="product-allow-repack-checkbox"
+                    type="checkbox"
+                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#0F766E', margin: 0 }}
+                    checked={allowRepack}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setAllowRepack(next);
+                      if (next) setHasBatches(true);
+                    }}
+                  />
+                  <label
+                    htmlFor="product-allow-repack-checkbox"
+                    style={{ cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, userSelect: 'none', margin: 0 }}
+                    title={`Đơn vị nhập: ${effectivePurchaseUnitName || '—'}`}
+                  >
+                    Cho chia khay / chế biến
+                  </label>
+                </div>
+              )}
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input

@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { AppTopNav } from './AppTopNav';
 import { useAuthStore } from '../../stores/useAuthStore';
+import { ProtectedRoute } from '../../components/auth/ProtectedRoute';
 
 export const StoreOwnerLayout: FC = () => {
   const { user, isAuthenticated } = useAuthStore();
@@ -46,7 +47,9 @@ export const StoreOwnerLayout: FC = () => {
           minHeight: 0,
         }}
       >
-        <Outlet />
+        <ProtectedRoute>
+          <Outlet />
+        </ProtectedRoute>
       </main>
     </div>
   );

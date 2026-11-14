@@ -128,6 +128,24 @@ httpClient.interceptors.response.use(
       }
     }
 
+    const responseData = error.response?.data as
+      | { code?: string; errorCode?: string; detail?: string; message?: string }
+      | undefined;
+    const problemCode = String(responseData?.code || responseData?.errorCode || '').toUpperCase();
+    if (error.response?.status === 403 && problemCode === 'SUBSCRIPTION_REQUIRED') {
+      window.dispatchEvent(
+        new CustomEvent('subscription-required', {
+          detail: {
+            code: problemCode,
+            message:
+              responseData?.detail ||
+              responseData?.message ||
+              'Gói dịch vụ đã hết hạn. Vui lòng thanh toán hoặc gia hạn gói để tiếp tục sử dụng.',
+          },
+        })
+      );
+    }
+
     return Promise.reject(error);
   }
 );

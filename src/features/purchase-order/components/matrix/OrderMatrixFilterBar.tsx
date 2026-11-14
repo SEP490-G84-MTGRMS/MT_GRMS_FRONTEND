@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FC, KeyboardEvent } from 'react';
-import type { SupplierOption, BranchOption } from '../../types/po.types';
-import { Search, RotateCcw, X, ChevronsUpDown } from 'lucide-react';
+import type { SupplierOption, BranchOption, OrderMatrixProduct } from '../../types/po.types';
+import { RotateCcw, X, ChevronsUpDown } from 'lucide-react';
+import { MatrixTokenFilter } from './MatrixTokenFilter';
 
 interface OrderMatrixFilterBarProps {
   branches?: BranchOption[];
@@ -11,8 +12,18 @@ interface OrderMatrixFilterBarProps {
   fixedBranchLabel?: string;
 
   suppliers: SupplierOption[];
-  selectedSupplierId: string;
-  onSelectSupplier: (supplierId: string) => void;
+  /** Token mã NCC đã chọn (multi). */
+  supplierCodes: string[];
+  onSupplierCodesChange: (codes: string[]) => void;
+  /** Token tên NCC đã chọn (multi). */
+  supplierNames: string[];
+  onSupplierNamesChange: (names: string[]) => void;
+
+  products: OrderMatrixProduct[];
+  productSkus: string[];
+  onProductSkusChange: (skus: string[]) => void;
+  productNames: string[];
+  onProductNamesChange: (names: string[]) => void;
 
   dateFrom: string;
   dateTo: string;
@@ -21,9 +32,6 @@ interface OrderMatrixFilterBarProps {
   onApplyRange: () => void;
   durationDays?: number;
   onSelectDuration?: (days: number) => void;
-
-  keyword: string;
-  onKeywordChange: (kw: string) => void;
 
   moqOnly: boolean;
   onMoqOnlyChange: (checked: boolean) => void;
@@ -48,6 +56,7 @@ interface OrderMatrixFilterBarProps {
   onCopyPrevWeek: () => void;
   onAutoSuggest?: () => void;
   onExcelDownload: () => void;
+  onExcelTemplateDownload?: () => void;
   onExcelUpload: (file: File) => void;
 }
 
@@ -97,7 +106,12 @@ interface SearchableSelectProps {
   selectedLabel?: string;
   allowClearToId?: string;
   clearLabel?: string;
+  /** Chiều rộng cố định (px). */
+  width?: number;
+  /** @deprecated dùng width */
   minWidth?: number;
+  /** Chỉ lọc theo primary (vd: ô mã chỉ theo mã, ô tên chỉ theo tên). */
+  matchPrimaryOnly?: boolean;
   onSelect: (id: string) => boolean | void;
 }
 
@@ -109,9 +123,12 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
   selectedLabel,
   allowClearToId,
   clearLabel,
-  minWidth = 240,
+  width,
+  minWidth = 160,
+  matchPrimaryOnly = false,
   onSelect,
 }) => {
+  const boxWidth = width ?? minWidth;
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -123,16 +140,16 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return options.slice(0, 12);
-    return options
-      .filter(
-        (o) =>
-          o.primary.toLowerCase().includes(q) ||
-          (o.secondary && o.secondary.toLowerCase().includes(q)) ||
-          o.id.toLowerCase().includes(q)
-      )
-      .slice(0, 12);
-  }, [options, query]);
+    if (!q) return options;
+    return options.filter((o) => {
+      if (o.primary.toLowerCase().includes(q)) return true;
+      if (matchPrimaryOnly) return false;
+      return (
+        (o.secondary && o.secondary.toLowerCase().includes(q)) ||
+        o.id.toLowerCase().includes(q)
+      );
+    });
+  }, [options, query, matchPrimaryOnly]);
 
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
@@ -149,11 +166,24 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
     setFocusedIndex(0);
   }, [query, open]);
 
+  useEffect(() => {
+    if (open) {
+      // Cho phép gõ tìm ngay khi mở — không bị chip chiếm chỗ
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [open]);
+
   const pick = (id: string) => {
     const ok = onSelect(id);
     if (ok === false) return;
     setQuery('');
     setOpen(false);
+  };
+
+  const enterSearchMode = () => {
+    setQuery('');
+    setOpen(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -184,42 +214,40 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
   };
 
   const hasSelection = Boolean(chipText) && selectedId !== (allowClearToId ?? '');
+  // Khi mở/đang gõ: full input để tìm & đổi CN linh hoạt (Store Owner)
+  const searchMode = open || Boolean(query);
 
   return (
     <div ref={rootRef} className="po-filter-field" style={{ position: 'relative', flexShrink: 0 }}>
       <label className="po-filter-label">{label}</label>
-      <div style={{ position: 'relative', width: minWidth }}>
+      <div style={{ position: 'relative', width: boxWidth, flexShrink: 0 }}>
         <div
-          onClick={() => {
-            inputRef.current?.focus();
-            setOpen(true);
-          }}
+          onClick={enterSearchMode}
           style={{
             display: 'flex',
             alignItems: 'center',
             flexWrap: 'nowrap',
             gap: 4,
-            width: '100%',
+            width: boxWidth,
             height: CTRL_H,
-            overflow: 'hidden',
             padding: '0 28px 0 6px',
             borderRadius: 6,
             border: open || hasSelection ? '1px solid #0d9488' : '1px solid #cbd5e1',
-            backgroundColor: hasSelection ? '#f0fdfa' : '#ffffff',
+            backgroundColor: hasSelection && !searchMode ? '#f0fdfa' : '#ffffff',
             boxShadow: open ? '0 0 0 3px rgba(13, 148, 136, 0.12)' : 'none',
             boxSizing: 'border-box',
             cursor: 'text',
-            minWidth: 0,
+            overflow: 'hidden',
           }}
         >
-          {hasSelection && !query && (
+          {hasSelection && !searchMode && (
             <span
+              title={chipText}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                flex: '1 1 auto',
-                minWidth: 0,
                 gap: 4,
+                flexShrink: 0,
                 height: 22,
                 padding: '0 4px 0 8px',
                 borderRadius: 4,
@@ -228,63 +256,64 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
                 fontSize: 12,
                 fontWeight: 700,
                 border: '1px solid #99f6e4',
-                maxWidth: '100%',
+                whiteSpace: 'nowrap',
               }}
             >
-              <span
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  minWidth: 0,
-                  flex: 1,
-                }}
-                title={chipText}
-              >
-                {chipText}
-              </span>
-              {allowClearToId !== undefined && selectedId !== allowClearToId && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+              Đã chọn
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (allowClearToId !== undefined && selectedId !== allowClearToId) {
                     pick(allowClearToId);
-                  }}
-                  title={clearLabel || 'Xóa lựa chọn'}
-                  style={{
-                    width: 16,
-                    height: 16,
-                    flexShrink: 0,
-                    border: 'none',
-                    background: 'transparent',
-                    color: '#0f766e',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0,
-                  }}
-                >
-                  <X size={11} />
-                </button>
-              )}
+                    return;
+                  }
+                  enterSearchMode();
+                }}
+                title={
+                  allowClearToId !== undefined
+                    ? clearLabel || 'Xóa lựa chọn'
+                    : 'Tìm / đổi chi nhánh'
+                }
+                style={{
+                  width: 16,
+                  height: 16,
+                  flexShrink: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#0f766e',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
+              >
+                <X size={11} />
+              </button>
             </span>
           )}
           <input
             ref={inputRef}
             type="text"
             value={query}
-            placeholder={hasSelection && !query ? 'Đổi...' : placeholder}
+            placeholder={
+              searchMode
+                ? placeholder
+                : hasSelection
+                  ? 'Đổi'
+                  : placeholder
+            }
             onChange={(e) => {
               setQuery(e.target.value);
               setOpen(true);
             }}
-            onFocus={() => setOpen(true)}
+            onFocus={enterSearchMode}
             onKeyDown={handleKeyDown}
             style={{
-              flex: hasSelection && !query ? '0 0 56px' : '1 1 auto',
-              minWidth: 0,
-              width: hasSelection && !query ? 56 : '100%',
+              flex: searchMode || !hasSelection ? '1 1 auto' : '0 0 40px',
+              minWidth: searchMode || !hasSelection ? 48 : 40,
+              width: 0,
               height: 24,
               border: 'none',
               outline: 'none',
@@ -305,19 +334,66 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
               position: 'absolute',
               top: '100%',
               left: 0,
-              minWidth: '100%',
-              width: Math.max(minWidth, 260),
+              width: Math.max(boxWidth, 320),
               marginTop: 4,
               backgroundColor: '#ffffff',
               border: '1px solid #cbd5e1',
               borderRadius: 8,
               boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
               zIndex: 90,
-              maxHeight: 260,
+              maxHeight: 300,
               overflowY: 'auto',
               padding: '4px 0',
             }}
           >
+            {hasSelection && (
+              <div
+                style={{
+                  borderBottom: '1px solid #e2e8f0',
+                  padding: '8px 12px',
+                  backgroundColor: '#f0fdfa',
+                  marginBottom: 4,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#64748b',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.3,
+                    marginBottom: 4,
+                  }}
+                >
+                  Đang chọn
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    whiteSpace: 'normal',
+                    wordBreak: 'break-word',
+                    lineHeight: 1.35,
+                  }}
+                >
+                  {chipText}
+                </div>
+                {selected?.secondary && selected.secondary !== chipText && (
+                  <div
+                    style={{
+                      fontSize: 11.5,
+                      color: '#64748b',
+                      marginTop: 2,
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {selected.secondary}
+                  </div>
+                )}
+              </div>
+            )}
             {filtered.length === 0 ? (
               <div style={{ padding: '10px 12px', fontSize: 12.5, color: '#64748b' }}>
                 Không tìm thấy kết quả
@@ -334,6 +410,7 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => pick(item.id)}
                     style={{
+                      display: 'block',
                       width: '100%',
                       textAlign: 'left',
                       border: 'none',
@@ -342,11 +419,29 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
                       backgroundColor: active || isSelected ? '#f0fdfa' : 'transparent',
                     }}
                   >
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#0f172a',
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.35,
+                      }}
+                    >
                       {highlightMatch(item.primary, query)}
                     </div>
                     {item.secondary && (
-                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: '#64748b',
+                          marginTop: 2,
+                          whiteSpace: 'normal',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.35,
+                        }}
+                      >
                         {highlightMatch(item.secondary, query)}
                       </div>
                     )}
@@ -368,8 +463,15 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
   hideBranchSelect = false,
   fixedBranchLabel,
   suppliers,
-  selectedSupplierId,
-  onSelectSupplier,
+  supplierCodes,
+  onSupplierCodesChange,
+  supplierNames,
+  onSupplierNamesChange,
+  products,
+  productSkus,
+  onProductSkusChange,
+  productNames,
+  onProductNamesChange,
   dateFrom,
   dateTo,
   onDateFromChange,
@@ -377,8 +479,6 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
   onApplyRange,
   durationDays = 14,
   onSelectDuration,
-  keyword,
-  onKeywordChange,
   moqOnly,
   onMoqOnlyChange,
   orderedOnly,
@@ -396,16 +496,22 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
   onCopyPrevWeek,
   onAutoSuggest,
   onExcelDownload,
+  onExcelTemplateDownload,
   onExcelUpload,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [draftKeyword, setDraftKeyword] = useState(keyword);
 
-  useEffect(() => {
-    setDraftKeyword(keyword);
-  }, [keyword]);
+  const branchCodeOptions: SearchOption[] = useMemo(
+    () =>
+      branches.map((b) => ({
+        id: b.id,
+        primary: b.code,
+        secondary: b.name,
+      })),
+    [branches]
+  );
 
-  const branchOptions: SearchOption[] = useMemo(
+  const branchNameOptions: SearchOption[] = useMemo(
     () =>
       branches.map((b) => ({
         id: b.id,
@@ -415,20 +521,57 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
     [branches]
   );
 
-  const supplierOptions: SearchOption[] = useMemo(
-    () => [
-      { id: 'ALL', primary: 'Tất cả nhà cung cấp', secondary: 'ALL' },
-      ...suppliers.map((s) => ({
+  const supplierCodeOptions = useMemo(
+    () =>
+      suppliers.map((s) => ({
         id: s.id,
-        primary: s.name,
-        secondary: s.code,
+        value: s.code,
+        primary: s.code,
+        secondary: s.name,
       })),
-    ],
     [suppliers]
   );
 
+  const supplierNameOptions = useMemo(
+    () =>
+      suppliers.map((s) => ({
+        id: s.id,
+        value: s.name,
+        primary: s.name,
+        secondary: s.code,
+      })),
+    [suppliers]
+  );
+
+  const productSkuOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { id: string; value: string; primary: string; secondary?: string }[] = [];
+    for (const p of products) {
+      const sku = (p.sku || '').trim();
+      if (!sku) continue;
+      const key = sku.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push({ id: p.id, value: sku, primary: sku, secondary: p.name });
+    }
+    return list;
+  }, [products]);
+
+  const productNameOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { id: string; value: string; primary: string; secondary?: string }[] = [];
+    for (const p of products) {
+      const name = (p.name || '').trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push({ id: `${p.id}-${name}`, value: name, primary: name, secondary: p.sku });
+    }
+    return list;
+  }, [products]);
+
   const selectedBranch = branches.find((b) => b.id === selectedBranchId);
-  const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId);
 
   const handleBranchChange = (newId: string) => {
     if (newId === selectedBranchId) return true;
@@ -440,39 +583,42 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
     return true;
   };
 
-  const handleSupplierChange = (newId: string) => {
-    if (newId === selectedSupplierId) return true;
-    onSelectSupplier(newId);
-    return true;
-  };
-
   const handleApply = () => {
-    onKeywordChange(draftKeyword.trim());
     onApplyRange();
   };
 
   const handleReset = () => {
-    setDraftKeyword('');
     onResetFilters();
   };
 
   return (
     <div className="po-filter-box">
-      {/* ── ROW 1: Chi nhánh / NCC / khung ngày / Áp dụng ── */}
+      {/* ── DÒNG 1: Phạm vi CN / NCC / khung ngày / khoảng ngày ── */}
       <div className="po-filter-row">
         <div className="po-filter-row-left">
           {!hideBranchSelect && (
-            <SearchableSelect
-              label="Chi nhánh:"
-              placeholder="Nhập mã / tên CN..."
-              options={branchOptions}
-              selectedId={selectedBranchId}
-              selectedLabel={
-                selectedBranch ? `${selectedBranch.code} — ${selectedBranch.name}` : undefined
-              }
-              minWidth={190}
-              onSelect={handleBranchChange}
-            />
+            <>
+              <SearchableSelect
+                label="Mã CN:"
+                placeholder="Mã CN..."
+                options={branchCodeOptions}
+                selectedId={selectedBranchId}
+                selectedLabel={selectedBranch?.code}
+                width={120}
+                matchPrimaryOnly
+                onSelect={handleBranchChange}
+              />
+              <SearchableSelect
+                label="Tên CN:"
+                placeholder="Tên CN..."
+                options={branchNameOptions}
+                selectedId={selectedBranchId}
+                selectedLabel={selectedBranch?.name}
+                width={200}
+                matchPrimaryOnly
+                onSelect={handleBranchChange}
+              />
+            </>
           )}
 
           {hideBranchSelect && (
@@ -482,6 +628,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
+                width: 200,
                 padding: '0 12px',
                 height: CTRL_H,
                 background: '#f1f5f9',
@@ -489,50 +636,42 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                 borderRadius: 6,
                 fontSize: 12,
                 color: '#334155',
-                whiteSpace: 'nowrap',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
               }}
               title={`Chi nhánh phân công: ${fixedBranchLabel || 'Chi nhánh làm việc'}`}
             >
-              <span style={{ color: '#64748b', fontWeight: 500 }}>Chi nhánh:</span>
-              <span style={{ color: '#0f172a', fontWeight: 700 }}>{fixedBranchLabel || 'MT-Mart Chi Nhánh'}</span>
-              <span
-                style={{
-                  fontSize: 10,
-                  padding: '1px 6px',
-                  background: '#e2e8f0',
-                  borderRadius: 4,
-                  color: '#475569',
-                  fontWeight: 600,
-                }}
-              >
-                Cố định
+              <span style={{ color: '#64748b', fontWeight: 500, flexShrink: 0 }}>CN:</span>
+              <span style={{ color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                Đã chọn
               </span>
             </div>
           )}
 
-          <SearchableSelect
-            label="Nhà cung cấp:"
-            placeholder="Nhập mã / tên NCC..."
-            options={supplierOptions}
-            selectedId={selectedSupplierId || 'ALL'}
-            selectedLabel={
-              selectedSupplierId === 'ALL' || !selectedSupplierId
-                ? 'Tất cả nhà cung cấp'
-                : selectedSupplier
-                  ? `${selectedSupplier.code} — ${selectedSupplier.name}`
-                  : undefined
-            }
-            allowClearToId="ALL"
-            clearLabel="Về tất cả NCC"
-            minWidth={220}
-            onSelect={handleSupplierChange}
+          <MatrixTokenFilter
+            label="Mã NCC:"
+            placeholder="Mã NCC..."
+            width={140}
+            tokens={supplierCodes}
+            options={supplierCodeOptions}
+            onChange={onSupplierCodesChange}
+            matchPrimaryOnly
+          />
+          <MatrixTokenFilter
+            label="Tên NCC:"
+            placeholder="Tên NCC..."
+            width={180}
+            tokens={supplierNames}
+            options={supplierNameOptions}
+            onChange={onSupplierNamesChange}
+            matchPrimaryOnly
           />
 
           <div className="po-bar-divider" />
 
           {onSelectDuration && (
             <div className="po-filter-field">
-              <label className="po-filter-label">Khung ngày:</label>
+              <label className="po-filter-label">Khung:</label>
               <div style={{ display: 'inline-flex', gap: 3 }}>
                 {[7, 14, 21, 31].map((d) => {
                   const active = durationDays === d;
@@ -560,15 +699,15 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               </div>
             </div>
           )}
-        </div>
 
-        <div className="po-filter-row-right">
+          <div className="po-bar-divider" />
+
           <div className="po-filter-field">
             <label className="po-filter-label">Từ:</label>
             <input
               type="date"
               className="po-ctrl-date"
-              style={{ width: 122, height: CTRL_H, fontSize: 12 }}
+              style={{ width: 118, height: CTRL_H, fontSize: 12 }}
               value={dateFrom}
               onChange={(e) => onDateFromChange(e.target.value)}
             />
@@ -576,7 +715,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             <input
               type="date"
               className="po-ctrl-date"
-              style={{ width: 122, height: CTRL_H, fontSize: 12 }}
+              style={{ width: 118, height: CTRL_H, fontSize: 12 }}
               value={dateTo}
               onChange={(e) => onDateToChange(e.target.value)}
             />
@@ -585,7 +724,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               className="po-ctrl-btn-apply"
               onClick={handleApply}
               title="Áp dụng khoảng ngày và tìm kiếm sản phẩm"
-              style={{ padding: '0 12px', height: CTRL_H, fontSize: 12, fontWeight: 600 }}
+              style={{ padding: '0 10px', height: CTRL_H, fontSize: 12, fontWeight: 600 }}
             >
               Áp dụng
             </button>
@@ -596,7 +735,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               title="Đặt lại các bộ lọc"
               style={{
                 height: CTRL_H,
-                padding: '0 10px',
+                padding: '0 8px',
                 fontSize: 12,
                 fontWeight: 600,
                 color: '#64748b',
@@ -612,57 +751,27 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
         </div>
       </div>
 
-      {/* ── ROW 2: Sản phẩm / ngành hàng / checkbox / thao tác ── */}
+      {/* ── DÒNG 2: Sản phẩm / checkbox / thao tác Excel ── */}
       <div className="po-filter-row">
         <div className="po-filter-row-left">
-          <div className="po-filter-field">
-            <label className="po-filter-label">Sản phẩm:</label>
-            <div
-              className="po-ctrl-search"
-              style={{
-                width: 260,
-                height: CTRL_H,
-                border: draftKeyword.trim() || keyword ? '1px solid #0d9488' : undefined,
-                backgroundColor: draftKeyword.trim() || keyword ? '#f0fdfa' : undefined,
-              }}
-            >
-              <Search size={13} className="po-ctrl-search-icon" />
-              <input
-                type="text"
-                className="po-ctrl-search-input"
-                placeholder="Tên SP / SKU..."
-                style={{ fontSize: 12 }}
-                value={draftKeyword}
-                onChange={(e) => setDraftKeyword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleApply();
-                  }
-                }}
-              />
-              {(draftKeyword || keyword) && (
-                <button
-                  type="button"
-                  title="Xóa từ khóa"
-                  onClick={() => {
-                    setDraftKeyword('');
-                    onKeywordChange('');
-                  }}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    color: '#94a3b8',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    padding: '0 6px 0 0',
-                  }}
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-          </div>
+          <MatrixTokenFilter
+            label="Mã SP:"
+            placeholder="SKU..."
+            width={140}
+            tokens={productSkus}
+            options={productSkuOptions}
+            onChange={onProductSkusChange}
+            matchPrimaryOnly
+          />
+          <MatrixTokenFilter
+            label="Tên SP:"
+            placeholder="Tên SP..."
+            width={200}
+            tokens={productNames}
+            options={productNameOptions}
+            onChange={onProductNamesChange}
+            matchPrimaryOnly
+          />
 
           <div className="po-bar-divider" />
 
@@ -779,17 +888,29 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             type="button"
             className="po-icon-btn"
             onClick={onExcelDownload}
-            title="Xuất bảng ma trận Excel"
+            title="Xuất bảng ma trận Excel theo bộ lọc hiện tại"
             style={{ padding: '0 8px', height: CTRL_H, fontSize: 11, fontWeight: 600 }}
           >
             <span>Xuất Excel</span>
           </button>
 
+          {onExcelTemplateDownload && (
+            <button
+              type="button"
+              className="po-icon-btn"
+              onClick={onExcelTemplateDownload}
+              title="Tải mẫu Excel (ô editable trống) theo bộ lọc hiện tại"
+              style={{ padding: '0 8px', height: CTRL_H, fontSize: 11, fontWeight: 600 }}
+            >
+              <span>Tải mẫu</span>
+            </button>
+          )}
+
           <button
             type="button"
             className="po-icon-btn"
             onClick={() => fileInputRef.current?.click()}
-            title="Nạp dữ liệu từ file Excel"
+            title="Nạp dữ liệu từ file Excel (kiểm tra trên máy chủ)"
             style={{ padding: '0 8px', height: CTRL_H, fontSize: 11, fontWeight: 600 }}
           >
             <span>Nạp Excel</span>

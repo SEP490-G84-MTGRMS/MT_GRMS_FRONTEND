@@ -353,9 +353,17 @@ export const SupplierOrderDispatchHubPage: FC = () => {
             <Grid3x3 size={14} />
             <span>Ma trận đặt hàng</span>
           </Link>
-          <Link to="/store-owner/purchase-orders" className="po-btn po-btn-secondary">
+          <Link to="/store-owner/purchase-orders/list" className="po-btn po-btn-secondary">
             <ListOrdered size={14} />
             <span>Danh sách PO</span>
+          </Link>
+          <Link
+            to="/store-owner/goods-receipts"
+            className="po-btn po-btn-secondary"
+            title="Sau khi chốt PO → nhận hàng / nhập kho"
+          >
+            <Truck size={14} />
+            <span>Nhập kho</span>
           </Link>
         </div>
       </div>

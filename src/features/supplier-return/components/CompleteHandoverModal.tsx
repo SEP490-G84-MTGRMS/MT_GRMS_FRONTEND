@@ -176,7 +176,9 @@ export const CompleteHandoverModal: FC<Props> = ({
           >
             <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 2 }} />
             <div>
-              <strong>Lưu ý quan trọng (Phương án B):</strong> Khi bấm xác nhận bàn giao, hệ thống sẽ chính thức trừ số lượng tồn kho vật lý tại chi nhánh và ghi nhận giao dịch xuất trả <code>SUPPLIER_RETURN</code>.
+              <strong>Quy tắc trừ tồn (RULE-02):</strong> Tạo phiếu / NCC xác nhận / Owner duyệt{' '}
+              <b>chưa trừ</b> tồn bán. Chỉ khi <b>bàn giao thực tế</b> hệ thống mới trừ{' '}
+              <code>QuantityOnHand</code> và giải phóng hàng cách ly (nếu có). Hàng thiếu kiểm kê không tạo phiếu trả.
             </div>
           </div>
 

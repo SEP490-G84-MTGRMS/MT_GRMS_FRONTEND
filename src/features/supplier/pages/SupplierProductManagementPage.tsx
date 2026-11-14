@@ -15,9 +15,14 @@ import { SupplierProductTable } from '../components/products/SupplierProductTabl
 import { AssignProductModal } from '../components/products/AssignProductModal';
 import { EditSupplierProductModal } from '../components/products/EditSupplierProductModal';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { supplierProductApi, type BatchAssignProductInput } from '../api/supplierProductApi';
+import {
+  supplierProductApi,
+  type BatchAssignProductInput,
+  type SupplierProductExcelImportResult,
+} from '../api/supplierProductApi';
 import { supplierApi } from '../api/supplierApi';
-import { Building2, Download, Plus, Layers, Store, Loader2 } from 'lucide-react';
+import { Building2, Plus, Layers, Store, Loader2 } from 'lucide-react';
+import { SupplierProductImportResultModal } from '../components/products/SupplierProductImportResultModal';
 import '../../purchase-order/purchase-order.css';
 import '../supplier.css';
 
@@ -60,6 +65,9 @@ export const SupplierProductManagementPage: FC = () => {
   // Modals state
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<SupplierProductItem | null>(null);
+  const [importResult, setImportResult] = useState<SupplierProductExcelImportResult | null>(null);
+  const [isImportResultOpen, setIsImportResultOpen] = useState(false);
+  const [excelBusy, setExcelBusy] = useState(false);
 
   // Toast notification state
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -253,6 +261,61 @@ export const SupplierProductManagementPage: FC = () => {
     }
   };
 
+  const handleExportExcel = async (supplierId: string) => {
+    if (!supplierId || supplierId === 'ALL') {
+      showToast('Vui lòng chọn một nhà cung cấp cụ thể để xuất Excel.', 'error');
+      return;
+    }
+    setExcelBusy(true);
+    try {
+      await supplierProductApi.exportPriceMoqExcel(supplierId);
+      showToast('Đã tải file Excel giá nhập sỉ & MOQ.', 'success');
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể xuất Excel. Kiểm tra NCC có SP Active đã gán.';
+      showToast(msg, 'error');
+    } finally {
+      setExcelBusy(false);
+    }
+  };
+
+  const handleImportExcel = async (supplierId: string, file: File) => {
+    if (!supplierId || supplierId === 'ALL') {
+      showToast('Vui lòng chọn một nhà cung cấp cụ thể để nhập Excel.', 'error');
+      return;
+    }
+    setExcelBusy(true);
+    try {
+      const result = await supplierProductApi.importPriceMoqExcel(supplierId, file);
+      setImportResult(result);
+      setIsImportResultOpen(true);
+      if (result.summary.successCount > 0) {
+        await fetchProducts();
+      }
+      if (result.summary.failedCount === 0) {
+        showToast(
+          `Import thành công ${result.summary.successCount}/${result.summary.totalRows} dòng.`,
+          'success'
+        );
+      } else {
+        showToast(
+          `Import xong: ${result.summary.successCount} OK, ${result.summary.failedCount} lỗi.`,
+          'info'
+        );
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Import Excel thất bại.';
+      showToast(msg, 'error');
+    } finally {
+      setExcelBusy(false);
+    }
+  };
+
   const assignedProductIds = useMemo(
     () => products.map((p) => p.productId),
     [products]
@@ -311,14 +374,6 @@ export const SupplierProductManagementPage: FC = () => {
           </Link>
           <button
             type="button"
-            className="po-btn po-btn-secondary"
-            onClick={() => showToast('Đang kết xuất danh mục mặt hàng NCC ra tệp Excel (.xlsx)...', 'info')}
-          >
-            <Download size={14} />
-            <span>Xuất Excel</span>
-          </button>
-          <button
-            type="button"
             id="btnOpenAssignProductModal"
             className="po-btn po-btn-primary"
             onClick={() => setIsAssignModalOpen(true)}
@@ -341,6 +396,9 @@ export const SupplierProductManagementPage: FC = () => {
           filteredCount={products.length}
           onSearch={handleApplySearch}
           onReset={handleResetFilters}
+          onExportExcel={handleExportExcel}
+          onImportExcel={handleImportExcel}
+          excelBusy={excelBusy}
         />
       </div>
 
@@ -380,6 +438,15 @@ export const SupplierProductManagementPage: FC = () => {
           suppliers.find((s) => s.id === editingItem?.supplierId)?.name || currentSupplier?.name || ''
         }
         onSave={handleSaveEdit}
+      />
+
+      <SupplierProductImportResultModal
+        isOpen={isImportResultOpen}
+        result={importResult}
+        onClose={() => {
+          setIsImportResultOpen(false);
+          setImportResult(null);
+        }}
       />
     </div>
   );

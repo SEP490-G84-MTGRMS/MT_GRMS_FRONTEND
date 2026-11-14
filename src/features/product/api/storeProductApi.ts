@@ -80,6 +80,8 @@ export const storeProductApi = {
         primarySupplierCode: x.primarySupplierCode || x.supplierCode || '',
         primarySupplierName: x.primarySupplierName || x.supplierName || '',
         isPrimarySupplier: Boolean(x.isPrimarySupplier),
+        hasActiveSupplierSource: x.hasActiveSupplierSource !== false,
+        lostSupplierSource: Boolean(x.lostSupplierSource),
         status: x.status,
         shelfLocation: x.shelfLocation,
         assignedDate: x.assignedDate ? x.assignedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),

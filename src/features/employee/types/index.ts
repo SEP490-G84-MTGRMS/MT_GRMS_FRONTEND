@@ -173,12 +173,17 @@ export interface ScheduleAssignment {
   shiftName: string;
   shiftTime: string;
   shiftColor: string;
+  durationHours?: number;
   dayOfWeek: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN';
   dateStr: string;
   workDate?: string;
   branchId?: string;
   branchName: string;
   status?: string;
+  approvalType?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  checkInMethod?: string | null;
   isLeave?: boolean;
   isPaidLeave?: boolean;
 }
@@ -207,12 +212,15 @@ export interface AttendanceRecord {
   workHours?: number;
   gpsLocation?: string;
   deviceInfo?: string;
+  checkInMethod?: string;
+  approvalType?: string;
   approvalStatus?: string;
   note?: string;
 }
 
 export interface PayslipDetailedRecord {
   id: string; // PL004173
+  payslipCode?: string;
   employeeId: string;
   employeeCode: string; // NV001
   employeeName: string; // Dung Phạm
@@ -229,7 +237,12 @@ export interface PayslipDetailedRecord {
   totalShifts?: number; // 25
   totalLateMinutes?: number;
   totalEarlyLeaveMinutes?: number;
+  paidLeaveDays?: number;
+  unpaidLeaveDays?: number;
   otHours: number; // 8.5
+  otRateWeekday?: string; // 150%
+  otRateSunday?: string; // 200%
+  otRatePercent?: string; // 150% (Thường) / 200% (CN)
   contractBaseSalary: number; // 8,000,000 (tương thích ngược với baseRate)
 
   // Thu nhập (Earnings)

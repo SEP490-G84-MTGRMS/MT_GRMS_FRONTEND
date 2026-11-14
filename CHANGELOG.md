@@ -4,6 +4,14 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-13
+
+### Changed
+- **Đổi tên và nhận diện thương hiệu sang THViet (QUẢN LÝ TẠP HÓA VIỆT)**: Tích hợp bộ logo chính thức `public/logo/` vào thanh điều hướng TopNav (`thviet_logo_white.png`), Navbar & Footer trang chủ (`thviet_logo_horizontal.png` với kích thước phóng to rõ nét), Favicon ứng dụng (`logo2png.png`), dọn dẹp ký tự thừa và cập nhật toàn bộ tiêu đề trang, bản quyền, thông điệp hỗ trợ sang thương hiệu THViet [FE-BRAND] [worklog: docs/worklogs/2026-11-13_FE-BRAND_AI_rebrand-ui-to-thviet.md].
+
+### Fixed
+- **Bổ sung hoạt họa xoay cho icon loading `animate-spin` (`tailwind-compat.css`)**: Định nghĩa `@keyframes spin` và class `.animate-spin` giúp các icon spinner `<Loader2>` trên nút gửi mã Email OTP và các nút tác vụ quay mượt mà, loại bỏ cảm giác đơ/treo giao diện [FE-AUTH] [worklog: docs/worklogs/2026-11-13_FE-AUTH_AI_add-animate-spin-loading-keyframes.md].
+
 ## [Unreleased] - 2026-11-10
 
 ### Fixed

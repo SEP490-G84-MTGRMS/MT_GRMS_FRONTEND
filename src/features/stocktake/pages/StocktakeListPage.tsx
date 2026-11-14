@@ -213,6 +213,7 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
               type="button"
               className="po-btn po-btn-secondary"
               onClick={() => navigate('/store-owner/supplier-returns')}
+              title="Theo dõi phiếu trả/đổi hàng đã tạo từ kiểm kê"
             >
               <RotateCcw size={14} />
               <span>Phiếu trả hàng NCC</span>

@@ -9,6 +9,7 @@ import type {
   RecordSupplierResponsePayload,
   CompleteHandoverPayload,
   CancelSupplierReturnPayload,
+  ExchangePurchaseOrderSummary,
 } from '../types/supplierReturn.types';
 import {
   MOCK_SUPPLIER_RETURNS,
@@ -136,14 +137,27 @@ export const supplierReturnApi = {
     return MOCK_GRN_RETURNABLE_LINES[grnId] || [];
   },
 
-  async create(payload: CreateSupplierReturnPayload): Promise<SupplierReturnDetail> {
+  async create(
+    payload: CreateSupplierReturnPayload,
+    opts?: { allowMock?: boolean }
+  ): Promise<SupplierReturnDetail> {
+    const allowMock = opts?.allowMock !== false;
     try {
-      const res = await httpClient.post('/supplier-returns', payload);
+      const res = await httpClient.post('/supplier-returns', {
+        ...payload,
+        autoSubmit: payload.autoSubmit ?? payload.submitImmediately ?? false,
+      });
       if (res.data?.data) {
         return res.data.data;
       }
-    } catch {
-      // Fallback
+      throw new Error(res.data?.message || 'Không tạo được phiếu trả hàng.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      if (e.response || !allowMock) {
+        throw new Error(
+          e.response?.data?.message || e.message || 'Không tạo được phiếu trả hàng.'
+        );
+      }
     }
 
     const grn = MOCK_ELIGIBLE_GRNS.find((g) => g.id === payload.goodsReceiptId);
@@ -162,7 +176,7 @@ export const supplierReturnApi = {
       branchId: payload.branchId || grn?.branchId || '',
       branchCode: payload.branchId || grn?.branchId || '',
       branchName: grn?.branchName || 'Chi nhánh',
-      status: payload.submitImmediately ? 'PENDING_SUPPLIER' : 'DRAFT',
+      status: payload.autoSubmit || payload.submitImmediately ? 'PENDING_SUPPLIER' : 'DRAFT',
       reason: payload.reason,
       reasonNotes: payload.reasonNotes,
       attachmentUrl: payload.attachmentUrl,
@@ -296,5 +310,26 @@ export const supplierReturnApi = {
     ret.status = 'CANCELLED';
     ret.cancellationReason = payload.reason;
     return ret;
+  },
+
+  async createExchangePurchaseOrders(id: string): Promise<ExchangePurchaseOrderSummary[]> {
+    const res = await httpClient.post(`/supplier-returns/${id}/exchange-purchase-orders`);
+    const data = res.data?.data;
+    if (!data) throw new Error(res.data?.message || 'Không tạo được PO đổi hàng.');
+    return Array.isArray(data) ? data : [data];
+  },
+
+  async getRelatedPurchaseOrders(id: string): Promise<ExchangePurchaseOrderSummary[]> {
+    const res = await httpClient.get(`/supplier-returns/${id}/purchase-orders`);
+    return res.data?.data || [];
+  },
+
+  async recordCostSharePayment(
+    id: string,
+    payload: { amount: number; note?: string }
+  ): Promise<SupplierReturnDetail> {
+    const res = await httpClient.post(`/supplier-returns/${id}/cost-share-payments`, payload);
+    if (!res.data?.data) throw new Error(res.data?.message || 'Không ghi nhận được thanh toán.');
+    return res.data.data;
   },
 };

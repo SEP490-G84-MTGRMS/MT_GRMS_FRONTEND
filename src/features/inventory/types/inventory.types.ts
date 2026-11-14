@@ -11,6 +11,8 @@ export type InventoryCategory =
 
 export interface InventoryItem {
   id: string;
+  /** Product GUID từ API — dùng load lô */
+  productId?: string;
   sku: string;
   productName: string;
   category: InventoryCategory;
@@ -28,6 +30,10 @@ export interface InventoryItem {
   totalValue: number;
   status: InventoryStockStatus;
   batchCount: number;
+  /** RULE-01: cách ly (không bán) */
+  quarantined?: number;
+  /** RULE-01: giữ chỗ */
+  reserved?: number;
 }
 
 export interface InventoryFilterState {

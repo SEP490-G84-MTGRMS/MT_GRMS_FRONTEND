@@ -43,10 +43,11 @@ const parseCurrency = (str: string): number => {
 };
 
 const defaultTerms = (
-  masterPrice = 0,
+  _masterPrice = 0,
   masterMoq = 1
 ): { price: string; moq: string; shortage: string } => ({
-  price: String(Math.max(0, Math.round(masterPrice || 0))),
+  // Để trống = chưa thỏa thuận → BE lưu NULL, hiệu lực = Master CostPrice
+  price: '',
   moq: String(Math.max(1, Math.round(masterMoq || 1))),
   shortage: '0',
 });
@@ -1180,6 +1181,12 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                                     value={terms.price}
                                     onChange={(e) => updateRowPrice(p.id, e.target.value)}
                                     disabled={isSubmitting}
+                                    placeholder={
+                                      p.defaultWholesalePrice > 0
+                                        ? `Master ${formatCurrency(p.defaultWholesalePrice)}`
+                                        : 'Trống = Master'
+                                    }
+                                    title="Để trống = chưa thỏa thuận (dùng giá Master khi đặt hàng)"
                                     style={{
                                       width: '100%',
                                       height: 30,
