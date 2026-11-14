@@ -294,11 +294,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <StoreOwnerDashboardPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><StoreOwnerDashboardPage /></ProtectedRoute>,
       },
       {
         path: 'dashboard',
-        element: <StoreOwnerDashboardPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><StoreOwnerDashboardPage /></ProtectedRoute>,
       },
       {
         path: 'products',
