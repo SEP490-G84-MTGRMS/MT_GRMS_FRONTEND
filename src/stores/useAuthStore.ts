@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import axios from 'axios';
 import type { UserProfile } from '../features/auth/authTypes';
 import { authService } from '../features/auth/authService';
 
@@ -26,7 +27,7 @@ const getStoredUser = (): UserProfile | null => {
 
 const initialUser = getStoredUser();
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: initialUser,
   token: null,
   isAuthenticated: Boolean(initialUser),
@@ -62,8 +63,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ isLoading: true });
       const user = await authService.getMe();
       set({ user, isAuthenticated: true, isLoading: false });
+      window.dispatchEvent(new CustomEvent('session-refreshed'));
       return user;
-    } catch {
+    } catch (error) {
+      if (!axios.isAxiosError(error) || error.response?.status !== 401) {
+        set({ isLoading: false });
+        return get().user;
+      }
       localStorage.removeItem('auth_user');
       localStorage.removeItem('tenant_id');
       localStorage.removeItem('access_token');
@@ -82,3 +88,5 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 }));
+
+window.addEventListener('session-expired', () => useAuthStore.getState().setAuth(null));

@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from 'axios';
 import { mapProblemDetailsToVietnamese } from './problemDetailsMapper';
+import { attachSessionRefresh } from './sessionRefresh';
 
 export interface EnhancedAxiosError extends AxiosError {
   vietnameseMessage?: string;
@@ -44,6 +45,8 @@ financeHttpClient.interceptors.request.use((config) => {
 
   return config;
 });
+
+attachSessionRefresh(financeHttpClient);
 
 financeHttpClient.interceptors.response.use(
   (response) => response,
