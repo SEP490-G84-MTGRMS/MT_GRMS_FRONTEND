@@ -913,18 +913,18 @@ export const PosShiftPage: FC = () => {
           </div>
 
           <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-            <table className="so-list-table" style={{ minWidth: 1240, width: '100%', tableLayout: 'fixed' }}>
+            <table className="so-list-table" style={{ minWidth: 1230, width: '100%', tableLayout: 'fixed' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
                 <tr>
-                  <th style={{ width: 130, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1' }}>Mã ca</th>
-                  <th style={{ width: 180, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1' }}>Thời gian mở - đóng</th>
-                  <th style={{ width: 170, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1' }}>Thu ngân</th>
-                  <th style={{ width: 120, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Tiền đầu ca</th>
-                  <th style={{ width: 130, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Tiền lý thuyết</th>
-                  <th style={{ width: 130, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Thực đếm</th>
-                  <th style={{ width: 130, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'right' }}>Chênh lệch</th>
-                  <th style={{ width: 140, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Xác nhận kết ca</th>
-                  <th style={{ width: 130, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 12px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', textAlign: 'center' }}>Thao tác</th>
+                  <th style={{ width: 120, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Mã ca</th>
+                  <th style={{ width: 145, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thời gian mở - đóng</th>
+                  <th style={{ width: 200, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thu ngân</th>
+                  <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền đầu ca</th>
+                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền lý thuyết</th>
+                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Thực đếm</th>
+                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Chênh lệch</th>
+                  <th style={{ width: 135, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Xác nhận kết ca</th>
+                  <th style={{ width: 175, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -973,10 +973,10 @@ export const PosShiftPage: FC = () => {
                           e.currentTarget.style.backgroundColor = '#ffffff';
                         }}
                       >
-                        <td className="so-list-td">
+                        <td className="so-list-td" style={{ overflow: 'hidden' }}>
                           <span className="so-list-code font-mono font-bold">{s.shiftCode}</span>
                         </td>
-                        <td className="so-list-td" style={{ color: '#334155', fontSize: 12 }}>
+                        <td className="so-list-td" style={{ color: '#334155', fontSize: 12, overflow: 'hidden', whiteSpace: 'nowrap' }}>
                           <div><b>Mở:</b> {formatDate(s.openedAtUtc)}</div>
                           <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981', fontWeight: 600 }}>Đang mở</span>}</div>
                           {earlyLateText && (
@@ -993,17 +993,17 @@ export const PosShiftPage: FC = () => {
                                 backgroundColor: isEarlyClose ? '#FEF3C7' : isLateClose ? '#FEE2E2' : '#E0F2FE',
                                 color: isEarlyClose ? '#B45309' : isLateClose ? '#B91C1C' : '#0369A1',
                                 border: isEarlyClose ? '1px solid #FCD34D' : isLateClose ? '1px solid #FCA5A5' : '1px solid #BAE6FD',
-                                maxWidth: 240,
+                                maxWidth: 135,
                               }}
                               title={`Giải trình giờ chốt ca: ${earlyLateText}`}
                             >
-                              <span>{isEarlyClose ? '⚠️ Chốt sớm' : isLateClose ? '⏰ Chốt muộn' : '⏱ Giải trình giờ'}</span>
+                              <span>{isEarlyClose ? '⚠️ Chốt sớm' : isLateClose ? '⏰ Chốt muộn' : '⏱ Giải trình'}</span>
                             </div>
                           )}
                         </td>
-                        <td className="so-list-td" style={{ color: '#1E293B' }}>
+                        <td className="so-list-td" style={{ color: '#1E293B', overflow: 'hidden' }}>
                           {uniqueParticipants.length > 0 ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxWidth: 240 }} title={cashierDisplay}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }} title={cashierDisplay}>
                               {uniqueParticipants.map((p, pIdx) => (
                                 <span
                                   key={p.id || pIdx}
@@ -1018,7 +1018,11 @@ export const PosShiftPage: FC = () => {
                                     fontSize: 12,
                                     fontWeight: 600,
                                     whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    maxWidth: '100%',
                                   }}
+                                  title={p.fullName || p.userName}
                                 >
                                   {p.fullName || p.userName}
                                 </span>
@@ -1028,16 +1032,16 @@ export const PosShiftPage: FC = () => {
                             <span style={{ color: '#64748B', fontStyle: 'italic' }}>Thu ngân quầy</span>
                           )}
                         </td>
-                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569' }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569', overflow: 'hidden' }}>
                           {formatVND(s.openingFloat)}
                         </td>
-                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600 }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600, overflow: 'hidden' }}>
                           {formatVND(s.expectedCash)}
                         </td>
-                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A' }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A', overflow: 'hidden' }}>
                           {s.actualCashCounted !== null && s.actualCashCounted !== undefined ? formatVND(s.actualCashCounted) : '---'}
                         </td>
-                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>
+                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, overflow: 'hidden' }}>
                           {diff === 0 ? (
                             <span style={{ color: '#059669' }}>Khớp (0 đ)</span>
                           ) : diff > 0 ? (
@@ -1046,11 +1050,11 @@ export const PosShiftPage: FC = () => {
                             <span style={{ color: '#DC2626' }}>{formatVND(diff)}</span>
                           )}
                         </td>
-                        <td className="so-list-td" style={{ textAlign: 'center' }}>
+                        <td className="so-list-td" style={{ textAlign: 'center', overflow: 'hidden' }}>
                           {getHandoverBadge(s.handoverStatus)}
                         </td>
-                        <td className="so-list-td so-list-td--actions" style={{ textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                        <td className="so-list-td so-list-td--actions" style={{ textAlign: 'center', overflow: 'hidden' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center', width: '100%' }}>
                             <button
                               type="button"
                               className="so-list-action-btn"
@@ -1070,7 +1074,7 @@ export const PosShiftPage: FC = () => {
                                   alignItems: 'center',
                                   gap: 4,
                                   height: 28,
-                                  padding: '0 10px',
+                                  padding: '0 8px',
                                   borderRadius: 6,
                                   border: '1px solid #DC2626',
                                   backgroundColor: '#FEF2F2',
@@ -1100,7 +1104,7 @@ export const PosShiftPage: FC = () => {
                                   alignItems: 'center',
                                   gap: 4,
                                   height: 28,
-                                  padding: '0 10px',
+                                  padding: '0 8px',
                                   borderRadius: 6,
                                   border: '1px solid #059669',
                                   backgroundColor: '#ECFDF5',
@@ -1113,7 +1117,7 @@ export const PosShiftPage: FC = () => {
                                 title="Chủ cửa hàng duyệt bàn giao & cộng tiền nộp két vào Sổ quỹ"
                               >
                                 <UserCheck size={13} />
-                                <span>Duyệt bàn giao</span>
+                                <span>Duyệt</span>
                               </button>
                             )}
                           </div>
