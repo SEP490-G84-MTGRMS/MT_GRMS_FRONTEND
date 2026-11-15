@@ -16,6 +16,7 @@ import '../transfer.css';
 export const ReceiveTransferPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   const [transfer, setTransfer] = useState<TransferOrder | null>(null);
   const [items, setItems] = useState<TransferItem[]>([]);
@@ -99,7 +100,7 @@ export const ReceiveTransferPage: React.FC = () => {
     try {
       await transferService.receive(id, items, receiveNote.trim());
       showToast(`Đã nhận hàng cho phiếu ${transfer.transferCode}.`);
-      setTimeout(() => navigate(`/store-owner/transfers/${transfer.id}`), 500);
+      setTimeout(() => navigate(`${transferBasePath}/${transfer.id}`), 500);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Không thể xác nhận nhận hàng.', 'warning');
     } finally { setIsSaving(false); }
@@ -128,7 +129,7 @@ export const ReceiveTransferPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, maxWidth: 600 }}>
           <button
             type="button"
-            onClick={() => navigate('/store-owner/transfers')}
+            onClick={() => navigate(transferBasePath)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',

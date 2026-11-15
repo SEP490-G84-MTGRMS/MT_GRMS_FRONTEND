@@ -41,6 +41,7 @@ export const TransferListPage: React.FC = () => {
   // User role & current branch context (BR-SEC-02 simulation)
   const user = useAuthStore((state) => state.user);
   const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
+  const transferBasePath = isStoreOwner ? '/store-owner/transfers' : '/employee/transfers';
 
   // Filters
   const [searchInput, setSearchInput] = useState<string>(() => querySearch);
@@ -48,16 +49,16 @@ export const TransferListPage: React.FC = () => {
   const [fromBranchId, setFromBranchId] = useState<string>(() => queryFromBranch);
   const [toBranchId, setToBranchId] = useState<string>(() => queryToBranch);
   const [selectedStatuses, setSelectedStatuses] = useState<TransferStatus[]>(() => {
-    if (queryStatus === 'Draft' || queryStatus === 'Cancelled') {
+    if (queryStatus === 'Draft' || queryStatus === 'Pending' || queryStatus === 'Cancelled') {
       return [queryStatus];
     }
-    if (queryStatus === 'InTransit' || queryStatus === 'In-Transit') {
-      return ['In-Transit'];
+    if (queryStatus === 'InTransit') {
+      return ['InTransit'];
     }
-    if (queryStatus === 'Received' || queryStatus === 'Completed') {
-      return ['Received'];
+    if (queryStatus === 'Completed') {
+      return ['Completed'];
     }
-    return ['Draft', 'In-Transit', 'Received', 'Cancelled'];
+    return ['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled'];
   });
   const [statusDropdown, setStatusDropdown] = useState<string>(() => queryStatus);
   const [timeRange, setTimeRange] = useState<'all' | 'this_month' | 'custom'>('this_month');
@@ -114,9 +115,7 @@ export const TransferListPage: React.FC = () => {
       setIsLoading(false);
       return;
     }
-    const activeStatuses = selectedStatuses.map((status) =>
-      status === 'In-Transit' ? 'InTransit' : status
-    );
+    const activeStatuses = selectedStatuses;
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
     const date =
@@ -197,11 +196,7 @@ export const TransferListPage: React.FC = () => {
   const handleStatusDropdownChange = (value: string) => {
     setStatusDropdown(value);
     if (value === 'ALL') {
-      setSelectedStatuses(['Draft', 'In-Transit', 'Received', 'Cancelled']);
-    } else if (value === 'Completed' || value === 'Received') {
-      setSelectedStatuses(['Received']);
-    } else if (value === 'InTransit' || value === 'In-Transit') {
-      setSelectedStatuses(['In-Transit']);
+      setSelectedStatuses(['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled']);
     } else {
       setSelectedStatuses([value as TransferStatus]);
     }
@@ -213,7 +208,7 @@ export const TransferListPage: React.FC = () => {
     setFromBranchId('');
     setToBranchId('');
     setStatusDropdown('ALL');
-    setSelectedStatuses(['Draft', 'In-Transit', 'Received', 'Cancelled']);
+    setSelectedStatuses(['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled']);
     setTimeRange('this_month');
     setCustomDate('');
     setRecvStatus('all');
@@ -254,7 +249,7 @@ export const TransferListPage: React.FC = () => {
       // Recv status
       if (recvStatus === 'match') {
         const isAllMatch = t.items.every((it) => it.receivedQty === it.sentQty);
-        if (!isAllMatch || t.status !== 'Received') return false;
+        if (!isAllMatch || t.status !== 'Completed') return false;
       } else if (recvStatus === 'mismatch') {
         const hasMismatch = t.items.some((it) => (it.receivedQty ?? it.sentQty) < it.sentQty);
         if (!hasMismatch) return false;
@@ -359,7 +354,11 @@ export const TransferListPage: React.FC = () => {
             Phiếu tạm
           </span>
         );
-      case 'In-Transit':
+      case 'Pending':
+        return (
+          <span className="transfer-status transfer-status--pending">Chờ xử lý</span>
+        );
+      case 'InTransit':
         return (
           <span
             style={{
@@ -379,7 +378,7 @@ export const TransferListPage: React.FC = () => {
             Đang chuyển
           </span>
         );
-      case 'Received':
+      case 'Completed':
         return (
           <span
             style={{
@@ -396,7 +395,7 @@ export const TransferListPage: React.FC = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            Đã nhận
+            Hoàn tất
           </span>
         );
       case 'Cancelled':
@@ -500,7 +499,7 @@ export const TransferListPage: React.FC = () => {
           <button
             type="button"
             className="po-btn po-btn-primary"
-            onClick={() => navigate('/store-owner/transfers/create')}
+            onClick={() => navigate(isStoreOwner ? `${transferBasePath}/create` : `${transferBasePath}/request`)}
             title="Tạo phiếu chuyển kho mới"
           >
             <Plus size={15} />
@@ -605,8 +604,9 @@ export const TransferListPage: React.FC = () => {
             >
               <option value="ALL">Tất cả trạng thái</option>
               <option value="Draft">Phiếu tạm (Draft)</option>
-              <option value="In-Transit">Đang chuyển (InTransit)</option>
-              <option value="Received">Đã nhận (Completed)</option>
+              <option value="Pending">Chờ xử lý (Pending)</option>
+              <option value="InTransit">Đang chuyển (InTransit)</option>
+              <option value="Completed">Hoàn tất (Completed)</option>
               <option value="Cancelled">Đã hủy (Cancelled)</option>
             </select>
           </div>
@@ -771,7 +771,7 @@ export const TransferListPage: React.FC = () => {
             <tbody>
               {filteredTransfers.map((t) => {
                 const isChecked = selectedIds.includes(t.id);
-                const isReceiving = t.status === 'In-Transit';
+                const isReceiving = t.status === 'InTransit';
 
                 return (
                   <tr
@@ -850,7 +850,7 @@ export const TransferListPage: React.FC = () => {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/store-owner/transfers/${t.id}/receive`);
+                            navigate(`${transferBasePath}/${t.id}/receive`);
                           }}
                         >
                           <CheckCircle size={12} />

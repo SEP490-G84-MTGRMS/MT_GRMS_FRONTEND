@@ -12,6 +12,7 @@ import {
   FileText,
   FilePlus,
   ClipboardCheck,
+  Truck,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { ApprovalRequestsModal } from '../../features/employee/components/approval-requests/ApprovalRequestsModal';
@@ -157,6 +158,8 @@ export const AppTopNav: FC = () => {
   const isStocktakeActive =
     location.pathname.startsWith('/employee/stocktakes') ||
     location.pathname.startsWith('/employee/batches');
+
+  const isTransferActive = location.pathname.startsWith('/employee/transfers');
 
   return (
     <>
@@ -385,6 +388,20 @@ export const AppTopNav: FC = () => {
             >
               <ClipboardCheck size={17} color="currentColor" />
               <span>Kiểm kê hàng hóa</span>
+            </NavLink>
+
+            <NavLink
+              to="/employee/transfers"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, padding: '0 16px', height: '100%',
+                textDecoration: 'none', fontSize: 13.5, fontWeight: isTransferActive ? 700 : 500,
+                color: '#ffffff', backgroundColor: isTransferActive ? 'rgba(0, 0, 0, 0.2)' : 'transparent',
+                borderBottom: isTransferActive ? '3px solid #FCD34D' : '3px solid transparent',
+                whiteSpace: 'nowrap', boxSizing: 'border-box',
+              }}
+            >
+              <Truck size={17} color="currentColor" />
+              <span>Luân chuyển kho</span>
             </NavLink>
 
             {/* 4. Làm đơn (Xin nghỉ, Đổi ca, Sự cố FaceID, Làm thêm OT) */}

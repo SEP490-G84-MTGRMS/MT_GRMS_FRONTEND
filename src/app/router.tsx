@@ -68,6 +68,7 @@ import {
   CreateTransferPage,
   ReceiveTransferPage,
   TransferDetailPage,
+  CreateUrgentTransferRequestPage,
 } from '../features/transfer';
 
 // 7. Employee Management Feature
@@ -874,6 +875,22 @@ export const router = createBrowserRouter([
       {
         path: 'stocktakes/:id/edit',
         element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/request',
+        element: <CreateUrgentTransferRequestPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
       },
     ],
   },

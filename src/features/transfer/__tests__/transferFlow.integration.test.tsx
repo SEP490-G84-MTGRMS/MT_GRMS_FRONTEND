@@ -56,7 +56,7 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
       createdBy: 'Nguyễn Quản Lý',
       transferDate: '14/11/2026 08:30:00',
       expectedDeliveryDate: '15/11/2026',
-      status: 'In-Transit',
+      status: 'InTransit',
       totalAmount: 540000,
       note: 'Chuyển hàng định kỳ',
       items: [
@@ -187,7 +187,7 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
 
     it('TC-INT-01c: Parses deep link query parameters on mount', async () => {
       render(
-        <MemoryRouter initialEntries={['/store-owner/transfers?search=TRF-20261114-001&status=In-Transit']}>
+        <MemoryRouter initialEntries={['/store-owner/transfers?search=TRF-20261114-001&status=InTransit']}>
           <TransferListPage />
         </MemoryRouter>
       );
@@ -275,7 +275,7 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
     it('TC-INT-04: Loads In-Transit transfer details and submits receive confirmation', async () => {
       vi.mocked(transferService.receive).mockResolvedValue({
         ...mockTransfers[0],
-        status: 'Received',
+        status: 'Completed',
       });
 
       render(

@@ -18,6 +18,7 @@ import {
 import type { TransferOrder, TransferItem, TransferStatus } from '../types';
 import { CancelTransferModal } from './CancelTransferModal';
 import { transferService } from '../services/transferService';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface TransferDetailModalProps {
   isOpen: boolean;
@@ -33,6 +34,10 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
   onUpdateTransfer,
 }) => {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const normalizedRole = user?.role?.toUpperCase() ?? '';
+  const isOwner = normalizedRole === 'STORE_OWNER' || normalizedRole === 'ADMIN' || normalizedRole === 'SYSTEMADMIN';
+  const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
   const [currentTransfer, setCurrentTransfer] = useState<TransferOrder | null>(initialTransfer);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
@@ -72,9 +77,33 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
     }
   };
 
+  const applyAction = async (action: 'submit' | 'dispatch') => {
+    try {
+      const updated = action === 'submit'
+        ? await transferService.submit(currentTransfer.id)
+        : await transferService.dispatch(currentTransfer.id);
+      setCurrentTransfer(updated);
+      onUpdateTransfer?.(updated);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Không thể cập nhật phiếu chuyển.');
+    }
+  };
+
+  const handleReturnToSource = async () => {
+    const reason = window.prompt('Xác nhận hàng đã thực tế quay về kho nguồn. Nhập lý do hoàn trả:');
+    if (!reason?.trim()) return;
+    try {
+      const updated = await transferService.returnToSource(currentTransfer.id, reason.trim());
+      setCurrentTransfer(updated);
+      onUpdateTransfer?.(updated);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Không thể xác nhận hoàn trả.');
+    }
+  };
+
   const handleDuplicate = () => {
     onClose();
-    navigate('/store-owner/transfers/create');
+    navigate(window.location.pathname.startsWith('/employee') ? `${transferBasePath}/request` : `${transferBasePath}/create`);
   };
 
   const handleExport = async () => {
@@ -104,7 +133,11 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
     window.print();
   };
 
-  const isTransit = currentTransfer.status === 'In-Transit';
+  const isTransit = currentTransfer.status === 'InTransit';
+  const isSourceBranch = user?.branchId === currentTransfer.fromBranchId;
+  const isDestinationBranch = user?.branchId === currentTransfer.toBranchId;
+  const canOperateSource = isOwner || isSourceBranch;
+  const canOperateDestination = isOwner || isDestinationBranch;
 
   // Filter items
   const filteredItems = currentTransfer.items.filter((it) => {
@@ -127,16 +160,22 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
             <Clock size={13} /> Phiếu tạm
           </span>
         );
-      case 'In-Transit':
+      case 'Pending':
+        return (
+          <span className="transfer-status-text pending">
+            <Clock size={13} /> Chờ xử lý
+          </span>
+        );
+      case 'InTransit':
         return (
           <span className="transfer-status-text transit">
             <Truck size={13} /> Đang chuyển
           </span>
         );
-      case 'Received':
+      case 'Completed':
         return (
           <span className="transfer-status-text received">
-            <CheckCircle size={13} /> Đã nhận
+            <CheckCircle size={13} /> Hoàn tất
           </span>
         );
       case 'Cancelled':
@@ -265,13 +304,25 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
                   {currentTransfer.transferCode}
                 </h2>
                 <span style={{ color: '#0F766E', fontWeight: 600, fontSize: 13 }}>
-                  [{currentTransfer.status === 'In-Transit' ? 'Đang chuyển' : currentTransfer.status === 'Received' ? 'Đã nhận' : currentTransfer.status === 'Draft' ? 'Phiếu tạm' : 'Đã hủy'}]
+                  [{currentTransfer.status === 'InTransit' ? 'Đang chuyển' : currentTransfer.status === 'Completed' ? 'Hoàn tất' : currentTransfer.status === 'Pending' ? 'Chờ xử lý' : currentTransfer.status === 'Draft' ? 'Phiếu tạm' : 'Đã hủy'}]
                 </span>
               </div>
               <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
                 Người tạo: <b>{currentTransfer.createdBy}</b>
               </div>
             </div>
+
+            {currentTransfer.history && currentTransfer.history.length > 0 && (
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+                <h3 style={{ margin: '0 0 10px', fontSize: 14 }}>Lịch sử xử lý</h3>
+                {currentTransfer.history.map((entry) => (
+                  <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '145px 1fr', gap: 10, padding: '7px 0', fontSize: 12.5 }}>
+                    <span style={{ color: '#64748b' }}>{new Date(entry.createdAt).toLocaleString('vi-VN')}</span>
+                    <span><b>{entry.action}</b> · {entry.fromStatus ?? 'Khởi tạo'} → {entry.toStatus}{entry.reason ? ` · ${entry.reason}` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Hộp Chuyển từ & Chuyển đến */}
             <div
@@ -454,7 +505,7 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
           >
             {/* Trái */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {currentTransfer.status !== 'Cancelled' && (
+              {(currentTransfer.status === 'Draft' || currentTransfer.status === 'Pending') && (
                 <button
                   type="button"
                   className="btn-secondary-white"
@@ -484,17 +535,34 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
 
             {/* Phải */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {isTransit ? (
-                <button
-                  type="button"
-                  className="btn-primary-teal"
-                  onClick={() => {
-                    onClose();
-                    navigate(`/store-owner/transfers/${currentTransfer.id}/receive`);
-                  }}
-                >
-                  <CheckCircle size={15} /> Nhận hàng
+              {currentTransfer.status === 'Draft' && isOwner ? (
+                <button type="button" className="btn-primary-teal" onClick={() => void applyAction('submit')}>
+                  <ExternalLink size={15} /> Gửi phiếu
                 </button>
+              ) : currentTransfer.status === 'Pending' && canOperateSource ? (
+                <button type="button" className="btn-primary-teal" onClick={() => void applyAction('dispatch')}>
+                  <Truck size={15} /> Xác nhận xuất
+                </button>
+              ) : isTransit ? (
+                <>
+                  {canOperateSource && (
+                    <button type="button" className="btn-secondary-white" onClick={() => void handleReturnToSource()}>
+                      <Truck size={15} /> Hàng đã về kho nguồn
+                    </button>
+                  )}
+                  {canOperateDestination && (
+                    <button
+                      type="button"
+                      className="btn-primary-teal"
+                      onClick={() => {
+                        onClose();
+                        navigate(`${transferBasePath}/${currentTransfer.id}/receive`);
+                      }}
+                    >
+                      <CheckCircle size={15} /> Nhận hàng
+                    </button>
+                  )}
+                </>
               ) : (
                 <button
                   type="button"

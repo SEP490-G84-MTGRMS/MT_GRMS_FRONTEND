@@ -3,6 +3,13 @@ import type { TransferOrder, TransferItem } from '../types';
 
 type ApiEnvelope<T> = { data?: T; Data?: T };
 type ApiPage<T> = { items?: T[]; Items?: T[] };
+export type TransferDemandItem = { productId: string; quantity: number; unit: string };
+export type TransferAllocationPreview = {
+  toBranchId: string;
+  isFullyAllocated: boolean;
+  totals: Array<{ productId: string; productCode: string; productName: string; requestedQuantity: number; allocatedQuantity: number; shortageQuantity: number; unit: string }>;
+  sources: Array<{ fromBranchId: string; fromBranchName: string; items: Array<{ productId: string; productCode: string; productName: string; requestedQuantity: number; allocatedQuantity: number; shortageQuantity: number; unit: string }> }>;
+};
 export type ApiTransfer = {
   id: string;
   transferCode: string;
@@ -16,6 +23,11 @@ export type ApiTransfer = {
   receivedAt?: string;
   expectedDeliveryDate?: string;
   status: string;
+  completionResult?: string;
+  origin?: string;
+  priority?: string;
+  submittedAt?: string;
+  hasDiscrepancy?: boolean;
   totalAmount: number;
   note?: string;
   discrepancyNote?: string;
@@ -35,6 +47,7 @@ export type ApiTransfer = {
     amount: number;
     discrepancyReason?: string;
   }>;
+  history?: Array<{ id: string; fromStatus?: string; toStatus: string; action: string; actorUserId: string; actorBranchId?: string; actorRole: string; reason?: string; createdAt: string }>;
 };
 
 const unwrap = <T,>(response: ApiEnvelope<T>): T => (response?.data ?? response?.Data ?? response) as T;
@@ -90,7 +103,12 @@ export const mapTransfer = (dto: ApiTransfer): TransferOrder => ({
   transferDate: new Date(dto.createdAt).toLocaleString('vi-VN'),
   receiveDate: dto.receivedAt ? new Date(dto.receivedAt).toLocaleString('vi-VN') : undefined,
   expectedDeliveryDate: dto.expectedDeliveryDate,
-  status: dto.status === 'InTransit' ? 'In-Transit' : (dto.status as TransferOrder['status']),
+  status: dto.status as TransferOrder['status'],
+  completionResult: dto.completionResult as TransferOrder['completionResult'],
+  origin: (dto.origin ?? 'OwnerAllocation') as TransferOrder['origin'],
+  priority: (dto.priority ?? 'Normal') as TransferOrder['priority'],
+  submittedAt: dto.submittedAt,
+  hasDiscrepancy: dto.hasDiscrepancy ?? false,
   totalAmount: dto.totalAmount,
   note: dto.note,
   discrepancyNote: dto.discrepancyNote,
@@ -111,6 +129,7 @@ export const mapTransfer = (dto: ApiTransfer): TransferOrder => ({
     expiryDate: line.expiryDate,
     note: line.discrepancyReason,
   })),
+  history: dto.history ?? [],
 });
 
 export const transferService = {
@@ -192,12 +211,6 @@ export const transferService = {
 
   async list(params: Record<string, unknown> = {}) {
     const queryParams = { ...params };
-    if (queryParams.status === 'In-Transit') {
-      queryParams.status = 'InTransit';
-    }
-    if (Array.isArray(queryParams.statuses)) {
-      queryParams.statuses = queryParams.statuses.map((status) => status === 'In-Transit' ? 'InTransit' : status);
-    }
     if (typeof queryParams.fromDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(queryParams.fromDate)) {
       queryParams.fromDate = `${queryParams.fromDate}T00:00:00`;
     }
@@ -225,9 +238,12 @@ export const transferService = {
     return this.get(id);
   },
 
-  async create(input: { fromBranchId: string; toBranchId: string; dispatchNow: boolean; note?: string; items: TransferItem[] }) {
+  async create(input: { fromBranchId: string; toBranchId: string; note?: string; origin?: 'OwnerAllocation' | 'StaffUrgentRequest'; priority?: 'Normal' | 'Urgent'; relatedOrderId?: string; items: TransferItem[] }) {
     const response = await httpClient.post<ApiEnvelope<ApiTransfer>>('/transfers', {
       ...input,
+      dispatchNow: false,
+      origin: input.origin ?? 'OwnerAllocation',
+      priority: input.priority ?? 'Normal',
       items: input.items.map((item) => ({
         productId: item.productId,
         quantity: item.sentQty,
@@ -237,6 +253,11 @@ export const transferService = {
         unitPrice: item.unitPrice,
       })),
     });
+    return mapTransfer(unwrap(response.data));
+  },
+
+  async submit(id: string) {
+    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(`/transfers/${id}/submit`);
     return mapTransfer(unwrap(response.data));
   },
 
@@ -261,5 +282,20 @@ export const transferService = {
   async cancel(id: string, reason: string) {
     const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(`/transfers/${id}/cancel`, { reason });
     return mapTransfer(unwrap(response.data));
+  },
+
+  async returnToSource(id: string, reason: string) {
+    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(`/transfers/${id}/return`, { reason });
+    return mapTransfer(unwrap(response.data));
+  },
+
+  async previewUrgentAllocation(input: { toBranchId: string; requiredAt?: string; relatedOrderId?: string; note?: string; items: TransferDemandItem[] }) {
+    const response = await httpClient.post<ApiEnvelope<TransferAllocationPreview>>('/transfer-requests/allocation-preview', input);
+    return unwrap(response.data);
+  },
+
+  async createUrgentRequest(input: { toBranchId: string; requiredAt?: string; relatedOrderId?: string; note?: string; items: TransferDemandItem[] }) {
+    const response = await httpClient.post<ApiEnvelope<{ id: string; requestCode: string; transfers: ApiTransfer[] }>>('/transfer-requests', input);
+    return unwrap(response.data);
   },
 };
