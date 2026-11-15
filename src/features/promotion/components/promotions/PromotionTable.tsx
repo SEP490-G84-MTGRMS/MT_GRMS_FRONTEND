@@ -246,14 +246,14 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                     (item.totalDiscountGiven / item.budgetLimit) >= 1
                                       ? '#fef2f2'
                                       : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
-                                      ? '#fffbeb'
-                                      : '#f0fdf4',
+                                        ? '#fffbeb'
+                                        : '#f0fdf4',
                                   color:
                                     (item.totalDiscountGiven / item.budgetLimit) >= 1
                                       ? '#b91c1c'
                                       : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
-                                      ? '#b45309'
-                                      : '#15803d',
+                                        ? '#b45309'
+                                        : '#15803d',
                                 }}
                               >
                                 {Math.min(100, Math.round((item.totalDiscountGiven / item.budgetLimit) * 100))}%
@@ -293,8 +293,8 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                       (item.totalDiscountGiven / item.budgetLimit) >= 1
                                         ? '#ef4444'
                                         : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
-                                        ? '#f59e0b'
-                                        : '#10b981',
+                                          ? '#f59e0b'
+                                          : '#10b981',
                                     borderRadius: 3,
                                     transition: 'width 0.3s ease',
                                   }}
@@ -441,8 +441,8 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                           {item.type === 'BUY_X_GET_Y'
                                             ? `Mua đủ ${tier.requiredQty || 1} ${tier.buyUnit ? `${tier.buyUnit} ` : ''}${tier.buyProductName || 'sản phẩm bất kỳ'} tặng ngay ${tier.giftQty || 1} ${tier.giftUnit || ''} ${tier.giftProductName || 'quà tặng'} (0 đ)`
                                             : tier.discountType === 'PERCENT'
-                                            ? `Giảm ${tier.discountValue}% trên tổng tiền hàng${tier.maxDiscount ? ` (tối đa ${tier.maxDiscount.toLocaleString('vi-VN')} đ)` : ''}`
-                                            : `Trừ trực tiếp ${tier.discountValue.toLocaleString('vi-VN')} đ vào hóa đơn`}
+                                              ? `Giảm ${tier.discountValue}% trên tổng tiền hàng${tier.maxDiscount ? ` (tối đa ${tier.maxDiscount.toLocaleString('vi-VN')} đ)` : ''}`
+                                              : `Trừ trực tiếp ${tier.discountValue.toLocaleString('vi-VN')} đ vào hóa đơn`}
                                           {item.type !== 'BUY_X_GET_Y' && tier.giftProductName && ` kèm quà tặng ${tier.giftProductName}`}
                                         </td>
                                       </tr>
