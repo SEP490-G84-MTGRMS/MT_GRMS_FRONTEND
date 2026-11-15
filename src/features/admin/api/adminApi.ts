@@ -123,6 +123,18 @@ export interface UpdateTenantPayload {
   city?: string | null;
 }
 
+export interface CreateTenantPayload {
+  name: string;
+  subdomain: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  password: string;
+  address?: string;
+  city?: string;
+  taxCode?: string;
+}
+
 export interface LockTenantPayload {
   lockType: 'SOFT' | 'HARD';
   reason: string;
@@ -175,6 +187,11 @@ export const planApi = {
 };
 
 export const tenantApi = {
+  create: async (payload: CreateTenantPayload): Promise<ApiResponse<{ id: string }>> => {
+    const res = await httpClient.post<ApiResponse<{ id: string }>>('/admin/tenants', payload);
+    return res.data;
+  },
+
   getTenants: async (params?: {
     keyword?: string;
     status?: string;

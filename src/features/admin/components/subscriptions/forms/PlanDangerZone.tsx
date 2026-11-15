@@ -5,11 +5,13 @@ import { DeletePlanModal } from "../DeletePlanModal";
 interface PlanDangerZoneProps {
   plan: SubscriptionPlan;
   onDeleted: () => void;
+  onSwitchToInactive: () => void;
 }
 
 export const PlanDangerZone: React.FC<PlanDangerZoneProps> = ({
   plan,
   onDeleted,
+  onSwitchToInactive,
 }) => {
   const [showModal, setShowModal] = useState(false);
   const isProtected = plan.activeTenantCount > 0;
@@ -88,7 +90,7 @@ export const PlanDangerZone: React.FC<PlanDangerZoneProps> = ({
           whiteSpace: "nowrap",
         }}
       >
-        {isProtected ? "🔒 Không Thể Xóa" : "🗑️ Xóa Gói"}
+        {isProtected ? "Không thể xóa" : "Xóa gói"}
       </button>
 
       {showModal && (
@@ -102,7 +104,7 @@ export const PlanDangerZone: React.FC<PlanDangerZoneProps> = ({
           }}
           onSwitchToInactive={(_planId) => {
             setShowModal(false);
-            onDeleted();
+            onSwitchToInactive();
           }}
         />
       )}

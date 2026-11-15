@@ -733,6 +733,52 @@
 .admin-dashboard-page .admin-kpi-card:hover { border-color: #0f766e; }
 .admin-dashboard-page .admin-btn-secondary:hover { border-color: #0f766e; color: #0f766e; }
 
+/* Tenant list — compact management table. */
+.admin-tenant-list-card { border-color: #dbe4ec; border-radius: 10px; box-shadow: none; }
+.admin-tenant-list-summary { flex: 0 0 auto; padding: 10px 16px; border-bottom: 1px solid #e7edf2; color: #475569; font-size: 12px; }
+.admin-tenant-list-summary strong { color: #12263f; }
+.admin-tenant-table { min-width: 980px !important; table-layout: fixed; }
+.admin-tenant-table thead tr { background: #f5f7f9; }
+.admin-tenant-table .so-list-th { position: sticky; top: 0; z-index: 2; padding: 10px 10px !important; background: #f5f7f9 !important; color: #20334d !important; font-size: 11px !important; white-space: nowrap; }
+.admin-tenant-table .so-list-td { height: 52px; padding: 7px 10px !important; border-bottom-color: #e8edf2 !important; }
+.admin-tenant-table .so-list-row:hover { background: #f8fbfc; }
+.admin-tenant-col-store { width: 24%; }
+.admin-tenant-col-owner { width: 24%; }
+.admin-tenant-col-plan { width: 10%; }
+.admin-tenant-table tbody td:nth-child(3) > span { max-width: 100%; white-space: normal !important; overflow-wrap: anywhere; }
+.admin-tenant-col-scale { width: 13%; }
+.admin-tenant-col-expiry { width: 10%; }
+.admin-tenant-col-status { width: 10%; }
+.admin-tenant-col-actions { width: 9%; text-align: right !important; }
+.admin-tenant-store-cell { display: flex; align-items: center; min-width: 0; gap: 9px; }
+.admin-tenant-store-icon { display: grid; flex: 0 0 29px; width: 29px; height: 29px; place-items: center; border: 1px solid #bfeee8; border-radius: 6px; background: #effbf9; color: #0f8a80; }
+.admin-tenant-cell-copy { min-width: 0; }
+.admin-tenant-cell-copy strong,
+.admin-tenant-cell-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-tenant-cell-copy strong { color: #14253e; font-size: 12px; font-weight: 700; }
+.admin-tenant-cell-copy span { margin-top: 2px; color: #718096; font-size: 10.5px; }
+.admin-tenant-cell-copy span.is-locked { color: #c2413b; }
+.admin-tenant-scale { display: flex; flex-direction: column; gap: 3px; color: #52657b; font-family: var(--font-mono); font-size: 10.5px; white-space: nowrap; }
+.admin-tenant-scale b { color: #14253e; }
+.admin-tenant-expiry { color: #334155; font-family: var(--font-mono); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.admin-tenant-expiry.is-urgent { color: #c2413b; }
+.admin-tenant-table .so-list-td--actions { overflow: visible !important; white-space: normal !important; }
+.admin-tenant-actions { display: flex; justify-content: flex-end; flex-wrap: nowrap; gap: 5px; }
+.admin-tenant-icon-btn { display: inline-grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; padding: 0; border: 1px solid #d6e0e8; border-radius: 6px; background: #fff; color: #52657b; cursor: pointer; }
+.admin-tenant-icon-btn:hover { border-color: #0f766e; background: #f0fdfa; color: #0f766e; }
+.admin-tenant-icon-btn-primary { color: #0f766e; }
+.admin-tenant-icon-btn-danger { border-color: #f3d4d4; color: #c2413b; }
+.admin-tenant-icon-btn-danger:hover { border-color: #e5a8a8; background: #fff7f7; color: #a93030; }
+.admin-tenant-empty { padding: 42px 20px !important; color: #718096 !important; text-align: center; }
+
+@media (max-width: 1200px) {
+  .admin-tenant-table { min-width: 900px !important; }
+  .admin-tenant-col-owner { width: 21%; }
+  .admin-tenant-col-store { width: 22%; }
+  .admin-tenant-col-scale { width: 15%; }
+  .admin-tenant-col-actions { width: 11%; }
+}
+
 @media (max-width: 1200px) {
   .admin-dashboard-page .admin-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -19,6 +19,7 @@ export interface Tenant {
   ownerEmail: string;
   ownerPhone: string;
   plan: PlanType;
+  planName?: string;
   branchCount: number;
   maxBranches: number | 'unlimited';
   staffCount: number;

@@ -69,6 +69,7 @@ export function mapBackendTenantToFrontend(dto: BackendTenantSummaryDto): Tenant
     ownerEmail: dto.ownerEmail || '',
     ownerPhone: dto.ownerPhone || '',
     plan,
+    planName: dto.plan || undefined,
     branchCount: dto.branchCount ?? 0,
     maxBranches: dto.maxBranches === -1 ? 'unlimited' : (dto.maxBranches ?? 1),
     staffCount: dto.staffCount ?? 0,

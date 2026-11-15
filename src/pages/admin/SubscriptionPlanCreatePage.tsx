@@ -1,3 +1,4 @@
+import './adminPlans.css';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PlanStatus, PlanQuotaConfig, PlanFeatureConfig } from '../../features/admin/types/plan.types';
@@ -126,7 +127,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
   };
 
   return (
-    <div
+    <div className="admin-plans admin-plans-form"
       style={{
         width: '100%',
         minHeight: '100vh',
@@ -163,7 +164,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
       )}
 
       {/* Header compact */}
-      <div style={{ marginBottom: '16px' }}>
+      <div className="plans-page-heading" style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button
@@ -254,7 +255,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
       </div>
 
       {/* Main Grid: Left Form Controls (60%) vs Right Live Preview Card (40%) */}
-      <form onSubmit={handleSubmit}>
+      <form className="plans-editor" onSubmit={handleSubmit}>
         <div
           style={{
             display: 'grid',

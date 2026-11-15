@@ -470,18 +470,16 @@ export const AdminDashboardPage: FC = () => {
         </section>
       </div>
 
-      {/* ── BẢNG CHI TIẾT CAN THIỆP KHẨN CẤP ĐẦY ĐỦ (KHI CÓ DỮ LIỆU) ── */}
-      {urgentAlerts.length > 0 && (
-        <div className="admin-dash-table-wrap">
-          <UrgentAlertTable
-            tenants={urgentAlerts}
-            onViewAll={() => navigate("/admin/tenants")}
-            onDetail={handleOpenDetailBySubdomain}
-            onExtendGrace={handleOpenGraceBySubdomain}
-            onLock={handleOpenLockBySubdomain}
-          />
-        </div>
-      )}
+      {/* Bảng luôn hiện để dashboard giữ bố cục ổn định cả khi không có cảnh báo. */}
+      <div className="admin-dash-table-wrap">
+        <UrgentAlertTable
+          tenants={urgentAlerts}
+          onViewAll={() => navigate("/admin/tenants")}
+          onDetail={handleOpenDetailBySubdomain}
+          onExtendGrace={handleOpenGraceBySubdomain}
+          onLock={handleOpenLockBySubdomain}
+        />
+      </div>
 
       {/* Modals */}
       <TenantDetailModal

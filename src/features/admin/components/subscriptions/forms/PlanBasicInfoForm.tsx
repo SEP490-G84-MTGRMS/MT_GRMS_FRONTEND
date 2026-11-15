@@ -32,7 +32,7 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
   onChange,
 }) => {
   return (
-    <div
+    <div className="plans-panel"
       style={{
         background: '#ffffff',
         border: '1px solid var(--border-light, #e2e8f0)',

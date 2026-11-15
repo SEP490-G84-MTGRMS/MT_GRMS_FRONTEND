@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FC, CSSProperties } from 'react';
 import type { Tenant } from '../../types/admin.types';
 import { TablePagination } from '../../../../components/common';
+import { Building2, CalendarPlus, Eye, LockKeyhole, UnlockKeyhole } from 'lucide-react';
 
 interface TenantDataTableProps {
   tenants: Tenant[];
@@ -18,7 +19,6 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
   onUnlock,
   onExtendGrace,
 }) => {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -27,21 +27,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
     currentPage * pageSize
   );
 
-  const toggleSelectAll = () => {
-    if (selectedIds.length === tenants.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(tenants.map((t) => t.id));
-    }
-  };
-
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const getPlanBadge = (plan: Tenant['plan']) => {
+  const getPlanBadge = (plan: Tenant['plan'], planName?: string) => {
     switch (plan) {
       case 'enterprise':
         return (
@@ -58,7 +44,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            Doanh Nghiệp
+            {planName || 'Doanh Nghiệp'}
           </span>
         );
       case 'advanced':
@@ -76,7 +62,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            Nâng Cao
+            {planName || 'Nâng Cao'}
           </span>
         );
       case 'basic':
@@ -95,7 +81,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
               whiteSpace: 'nowrap',
             }}
           >
-            Cơ Bản
+            {planName || 'Cơ Bản'}
           </span>
         );
     }
@@ -150,7 +136,7 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
               border: '1px solid #fde68a',
             }}
           >
-            Ân hạn ({tenant.graceDaysRemaining ? 7 - tenant.graceDaysRemaining : 3}/7d)
+            Ân hạn
           </span>
         );
       case 'locked':
@@ -183,34 +169,27 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card admin-tenant-list-card">
+      <div className="admin-tenant-list-summary">
+        Đang hiển thị <strong>{displayedTenants.length} / {tenants.length}</strong> khách hàng thuê
+      </div>
       <div className="so-list-table-body supplier-table-scroll-container">
-        <table className="so-list-table" style={{ minWidth: 960 }}>
+        <table className="so-list-table admin-tenant-table">
           <thead>
-            <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #cbd5e1' }}>
-              <th className="so-list-th" style={{ width: 44, textAlign: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
-                <input
-                  type="checkbox"
-                  checked={tenants.length > 0 && selectedIds.length === tenants.length}
-                  onChange={toggleSelectAll}
-                  style={{ accentColor: '#0F766E', cursor: 'pointer', margin: 0 }}
-                />
-              </th>
-              <th className="so-list-th" style={{ width: 155, position: 'sticky', top: 0, zIndex: 10 }}>Mã Subdomain</th>
-              <th className="so-list-th" style={{ position: 'sticky', top: 0, zIndex: 10 }}>Tên Chuỗi / Cửa Hàng</th>
-              <th className="so-list-th" style={{ position: 'sticky', top: 0, zIndex: 10 }}>Chủ Sở Hữu & Liên Hệ</th>
-              <th className="so-list-th" style={{ width: 110, textAlign: 'center', position: 'sticky', top: 0, zIndex: 10 }}>Gói Cước</th>
-              <th className="so-list-th" style={{ width: 85, textAlign: 'right', position: 'sticky', top: 0, zIndex: 10 }}>Chi Nhánh</th>
-              <th className="so-list-th" style={{ width: 85, textAlign: 'right', position: 'sticky', top: 0, zIndex: 10 }}>Nhân Sự</th>
-              <th className="so-list-th" style={{ width: 115, textAlign: 'center', position: 'sticky', top: 0, zIndex: 10 }}>Hạn Hợp Đồng</th>
-              <th className="so-list-th" style={{ width: 135, textAlign: 'center', position: 'sticky', top: 0, zIndex: 10 }}>Trạng Thái</th>
-              <th className="so-list-th" style={{ width: 165, textAlign: 'center', position: 'sticky', top: 0, zIndex: 10 }}>Thao Tác</th>
+            <tr>
+              <th className="so-list-th admin-tenant-col-store">Cửa hàng</th>
+              <th className="so-list-th admin-tenant-col-owner">Chủ sở hữu & liên hệ</th>
+              <th className="so-list-th admin-tenant-col-plan">Gói dịch vụ</th>
+              <th className="so-list-th admin-tenant-col-scale">Quy mô</th>
+              <th className="so-list-th admin-tenant-col-expiry">Hạn hợp đồng</th>
+              <th className="so-list-th admin-tenant-col-status">Trạng thái</th>
+              <th className="so-list-th admin-tenant-col-actions">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {tenants.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                <td colSpan={7} className="admin-tenant-empty">
                   Không tìm thấy khách hàng thuê nào phù hợp với điều kiện tìm kiếm
                 </td>
               </tr>
@@ -222,107 +201,86 @@ export const TenantDataTable: FC<TenantDataTableProps> = ({
                   onClick={() => onDetail(t)}
                   style={{ cursor: 'pointer' }}
                 >
-                  <td className="so-list-td" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(t.id)}
-                      onChange={() => toggleSelectOne(t.id)}
-                      style={{ accentColor: '#0F766E', cursor: 'pointer', margin: 0 }}
-                    />
-                  </td>
-                  <td className="so-list-td" title={t.subdomain}>
-                    <span
-                      className="admin-subdomain-tag"
-                      style={
-                        t.status === 'locked'
-                          ? { color: '#dc2626' }
-                          : {}
-                      }
-                    >
-                      {t.subdomain}
-                    </span>
-                  </td>
-                  <td className="so-list-td" title={t.name}>
-                    <div style={{ fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {t.name}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      MST: {t.taxCode || '—'} {t.city ? `• ${t.city}` : ''}
+                  <td className="so-list-td" title={`${t.name} · ${t.subdomain}`}>
+                    <div className="admin-tenant-store-cell">
+                      <span className="admin-tenant-store-icon"><Building2 size={15} /></span>
+                      <div className="admin-tenant-cell-copy">
+                        <strong>{t.name}</strong>
+                        <span className={t.status === 'locked' ? 'is-locked' : ''}>{t.subdomain}</span>
+                      </div>
                     </div>
                   </td>
                   <td className="so-list-td" title={`${t.ownerName} - ${t.ownerEmail} - ${t.ownerPhone}`}>
-                    <div style={{ fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {t.ownerName}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {t.ownerEmail} &bull; {t.ownerPhone}
+                    <div className="admin-tenant-cell-copy">
+                      <strong>{t.ownerName}</strong>
+                      <span>{t.ownerEmail} · {t.ownerPhone}</span>
                     </div>
                   </td>
-                  <td className="so-list-td" style={{ textAlign: 'center' }}>{getPlanBadge(t.plan)}</td>
-                  <td className="so-list-td" style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                    <b>{t.branchCount}</b> / {t.maxBranches === 'unlimited' ? '∞' : t.maxBranches}
+                  <td className="so-list-td" title={t.planName}>{getPlanBadge(t.plan, t.planName)}</td>
+                  <td className="so-list-td">
+                    <div className="admin-tenant-scale">
+                      <span><b>{t.branchCount}</b>/{t.maxBranches === 'unlimited' ? '∞' : t.maxBranches} chi nhánh</span>
+                      <span><b>{t.staffCount}</b>/{t.maxStaff === 'unlimited' ? '∞' : t.maxStaff} nhân sự</span>
+                    </div>
                   </td>
-                  <td className="so-list-td" style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-                    <b>{t.staffCount}</b> / {t.maxStaff === 'unlimited' ? '∞' : t.maxStaff}
-                  </td>
-                  <td className="so-list-td" style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
-                    <span
-                      style={{
-                        color:
-                          t.status === 'grace'
-                            ? 'var(--red-accent)'
-                            : t.status === 'expiring'
-                            ? 'var(--orange-accent)'
-                            : '#334155',
-                        fontWeight: t.status === 'grace' || t.status === 'expiring' ? 700 : 500,
-                      }}
-                    >
+                  <td className="so-list-td">
+                    <span className={`admin-tenant-expiry ${t.status === 'grace' || t.status === 'expiring' ? 'is-urgent' : ''}`}>
                       {t.expiryDate || '—'}
                     </span>
                   </td>
-                  <td className="so-list-td so-list-td--status" style={{ textAlign: 'center' }}>{getStatusBadge(t)}</td>
-                  <td className="so-list-td so-list-td--actions" style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                    <div style={{ display: 'inline-flex', gap: 6 }}>
+                  <td className="so-list-td so-list-td--status">{getStatusBadge(t)}</td>
+                  <td className="so-list-td so-list-td--actions" onClick={(e) => e.stopPropagation()}>
+                    <div className="admin-tenant-actions">
                       {t.status === 'locked' ? (
                         <button
                           type="button"
-                          className="admin-table-btn"
+                          className="admin-tenant-icon-btn"
                           onClick={() => onUnlock(t)}
+                          title="Mở khóa cửa hàng"
+                          aria-label={`Mở khóa ${t.name}`}
                         >
-                          Mở khóa
+                          <UnlockKeyhole size={15} />
                         </button>
                       ) : t.status === 'grace' ? (
                         <>
                           <button
                             type="button"
-                            className="admin-table-btn"
+                            className="admin-tenant-icon-btn"
                             onClick={() => onExtendGrace(t)}
+                            title="Thêm ngày ân hạn"
+                            aria-label={`Thêm ngày ân hạn cho ${t.name}`}
                           >
-                            Thêm ngày
+                            <CalendarPlus size={15} />
                           </button>
                           <button
                             type="button"
-                            className="admin-table-btn"
+                            className="admin-tenant-icon-btn admin-tenant-icon-btn-danger"
                             onClick={() => onLock(t)}
+                            title="Khóa mềm cửa hàng"
+                            aria-label={`Khóa mềm ${t.name}`}
                           >
-                            Khóa mềm
+                            <LockKeyhole size={15} />
                           </button>
                         </>
                       ) : (
                         <button
                           type="button"
-                          className="admin-table-btn"
+                          className="admin-tenant-icon-btn admin-tenant-icon-btn-danger"
                           onClick={() => onLock(t)}
+                          title="Khóa cửa hàng"
+                          aria-label={`Khóa ${t.name}`}
                         >
-                          Khóa
+                          <LockKeyhole size={15} />
                         </button>
                       )}
                       <button
                         type="button"
-                        className="admin-table-btn admin-table-btn-primary"
+                        className="admin-tenant-icon-btn admin-tenant-icon-btn-primary"
                         onClick={() => onDetail(t)}
+                        title="Xem chi tiết"
+                        aria-label={`Xem chi tiết ${t.name}`}
                       >
-                        Chi tiết
+                        <Eye size={15} />
                       </button>
                     </div>
                   </td>

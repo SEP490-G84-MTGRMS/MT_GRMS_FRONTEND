@@ -18,6 +18,7 @@ import {
   mapBackendTenantToFrontend,
 } from '../../features/admin/api';
 import { Loader2 } from 'lucide-react';
+import { CreateTenantModal } from '../../features/admin/components/tenants/CreateTenantModal';
 
 export const TenantManagementPage: FC = () => {
   const navigate = useNavigate();
@@ -220,7 +221,7 @@ export const TenantManagementPage: FC = () => {
             onClick={() => setIsCreateOpen(true)}
           >
             <PlusIcon size={14} />
-            <span>Cấp phát Tenant mới</span>
+            <span>Tạo cửa hàng mới</span>
           </button>
         </div>
       </div>
@@ -285,130 +286,14 @@ export const TenantManagementPage: FC = () => {
         onSubmit={handleApplyLockSubmit}
       />
 
-      {/* Modal Cấp phát Tenant mới */}
       {isCreateOpen && (
-        <div className="admin-modal-backdrop" onClick={() => setIsCreateOpen(false)} role="dialog" aria-modal="true">
-          <div className="admin-modal-box" style={{ maxWidth: 680 }} onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-header">
-              <div className="admin-modal-title">Cấp phát Khách hàng thuê mới (Create Tenant)</div>
-              <button type="button" className="admin-modal-close-btn" onClick={() => setIsCreateOpen(false)}>
-                &times;
-              </button>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                setIsCreateOpen(false);
-                showToast('Đã cấp phát Tenant mới thành công! Hệ thống đã gửi email cấp mật khẩu tạm.', 'success');
-              }}
-            >
-              <div className="admin-modal-body">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700 }}>
-                      Tên Doanh nghiệp / Chuỗi <span style={{ color: 'var(--red-accent)' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="admin-input"
-                      placeholder="VD: Siêu thị Hapro Mart"
-                      required
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700 }}>
-                      Subdomain định danh <span style={{ color: 'var(--red-accent)' }}>*</span>
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        className="admin-input"
-                        placeholder="hapro"
-                        style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
-                        required
-                      />
-                      <span
-                        style={{
-                          backgroundColor: '#f1f5f9',
-                          border: '1px solid #cbd5e1',
-                          borderLeft: 'none',
-                          padding: '8px 12px',
-                          fontSize: 13,
-                          color: '#64748b',
-                          borderTopRightRadius: 6,
-                          borderBottomRightRadius: 6,
-                        }}
-                      >
-                        .mtgrms.vn
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700 }}>
-                      Họ tên Chủ chuỗi (Store Owner) <span style={{ color: 'var(--red-accent)' }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      className="admin-input"
-                      placeholder="VD: Trần Văn Bình"
-                      required
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700 }}>
-                      Email quản trị <span style={{ color: 'var(--red-accent)' }}>*</span>
-                    </label>
-                    <input
-                      type="email"
-                      className="admin-input"
-                      placeholder="binh.tran@hapro.vn"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700 }}>
-                      Số điện thoại hotline <span style={{ color: 'var(--red-accent)' }}>*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      className="admin-input"
-                      placeholder="0912 345 678"
-                      required
-                    />
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 700 }}>
-                      Gói dịch vụ ban đầu <span style={{ color: 'var(--red-accent)' }}>*</span>
-                    </label>
-                    <select className="admin-input" defaultValue="STARTER">
-                      <option value="STARTER">Gói Starter (1 CN, 3 NV)</option>
-                      <option value="GROWTH">Gói Growth (5 CN, 15 NV)</option>
-                      <option value="ENTERPRISE">Gói Enterprise (20 CN, 50 NV)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div className="admin-modal-footer">
-                <button
-                  type="button"
-                  className="admin-btn admin-btn-secondary"
-                  onClick={() => setIsCreateOpen(false)}
-                >
-                  Hủy bỏ
-                </button>
-                <button type="submit" className="admin-btn admin-btn-primary">
-                  Xác nhận cấp phát
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CreateTenantModal
+          onClose={() => setIsCreateOpen(false)}
+          onCreated={(id) => {
+            setIsCreateOpen(false);
+            navigate(`/admin/tenants/${id}`);
+          }}
+        />
       )}
     </div>
   );
