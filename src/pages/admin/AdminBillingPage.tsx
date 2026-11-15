@@ -17,14 +17,14 @@ import type {
   BillingFilterParams,
 } from '../../features/admin/types/billing.types';
 import { billingApi } from '../../features/admin/api/billingApi';
-import { mockBillingKpiSummary } from '../../features/admin/data/mockBillingData';
 import { FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 import './adminPlans.css';
 import './adminBilling.css';
 
 export const AdminBillingPage: FC = () => {
   const [transactions, setTransactions] = useState<BillingTransaction[]>([]);
-  const [kpis, setKpis] = useState<BillingKpiSummary>(mockBillingKpiSummary);
+  const [kpis, setKpis] = useState<BillingKpiSummary>({ totalRevenue: 0, revenueThisMonth: 0, totalTransactions: 0, successRate: 0, pendingCount: 0, pendingAmount: 0 });
+  const [isDemo, setIsDemo] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -67,6 +67,7 @@ export const AdminBillingPage: FC = () => {
 
       if (txRes.success) {
         setTransactions(txRes.data);
+        setIsDemo(txRes.source === 'demo' || kpiRes.source === 'demo');
       }
       if (kpiRes.success) {
         setKpis(kpiRes.data);
@@ -83,11 +84,14 @@ export const AdminBillingPage: FC = () => {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
   // Handle Refresh
   const handleRefresh = () => {
     setIsRefreshing(true);
     fetchData();
-    showToast('Đã làm mới dữ liệu giao dịch mới nhất.', 'success');
   };
 
   // Handle Filter Update
@@ -126,9 +130,11 @@ export const AdminBillingPage: FC = () => {
         fetchData();
       } else {
         showToast(res.message, 'warning');
+        throw new Error(res.message);
       }
     } catch {
       showToast('Lỗi khi thực hiện đối soát giao dịch.', 'warning');
+      throw new Error('Không thể đối soát giao dịch.');
     }
   };
 
@@ -186,6 +192,7 @@ export const AdminBillingPage: FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
       showToast('Đã xuất báo cáo giao dịch thành công (.csv)!', 'success');
     } catch {
@@ -202,20 +209,8 @@ export const AdminBillingPage: FC = () => {
       <div className="plans-hero">
         <div>
           <p className="plans-eyebrow">QUẢN TRỊ TÀI CHÍNH NỀN TẢNG</p>
-          <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h1>
             <span>Giao dịch & Hóa đơn SaaS</span>
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 800,
-                color: '#0F766E',
-                background: '#EAF6F4',
-                padding: '3px 10px',
-                borderRadius: 9999,
-              }}
-            >
-              Billing & Invoices
-            </span>
           </h1>
           <p>
             Theo dõi dòng tiền thuê bao gói, nạp quỹ ví VietQR Napas247, mở rộng chi nhánh và đối soát thanh toán
@@ -227,10 +222,11 @@ export const AdminBillingPage: FC = () => {
             type="button"
             className="admin-btn admin-btn-secondary"
             onClick={handleExportExcel}
+            disabled={isLoading || !transactions.length}
             style={{ display: 'flex', alignItems: 'center', gap: 7 }}
           >
-            <FileSpreadsheet size={15} style={{ color: '#16A34A' }} />
-            <span>Xuất báo cáo Excel</span>
+            <FileSpreadsheet size={15} />
+            <span>Xuất CSV</span>
           </button>
 
           {statusCounts.pending > 0 && (
@@ -238,7 +234,7 @@ export const AdminBillingPage: FC = () => {
               type="button"
               className="admin-btn admin-btn-primary"
               onClick={() => handleFilterChange({ status: 'PENDING' })}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#D97706', borderColor: '#D97706' }}
+              disabled={isLoading}
             >
               <CheckCircle2 size={15} />
               <span>Cần đối soát ({statusCounts.pending})</span>
@@ -246,6 +242,8 @@ export const AdminBillingPage: FC = () => {
           )}
         </div>
       </div>
+
+      {isDemo && <div className="billing-demo-notice" role="status">Đang hiển thị dữ liệu mẫu do API giao dịch chưa phản hồi. Các thao tác đối soát mẫu chỉ có hiệu lực trong phiên này.</div>}
 
       {/* KPI Metric Summary Cards */}
       <BillingKpiBanner kpis={kpis} />
@@ -255,9 +253,7 @@ export const AdminBillingPage: FC = () => {
         filters={filters}
         onFilterChange={handleFilterChange}
         onRefresh={handleRefresh}
-        onExportExcel={handleExportExcel}
         isRefreshing={isRefreshing}
-        statusCounts={statusCounts}
       />
 
       {/* Data Table */}
@@ -280,6 +276,7 @@ export const AdminBillingPage: FC = () => {
       />
 
       <ReconcileModal
+        key={selectedReconcileTx?.id || 'none'}
         transaction={selectedReconcileTx}
         isOpen={isReconcileOpen}
         onClose={() => {

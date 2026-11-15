@@ -15,24 +15,25 @@ export type AuditActionType =
 export type AuditTargetType = 'TENANT' | 'PLAN' | 'SUBSCRIPTION' | 'SYSTEM' | 'CRONJOB' | 'USER';
 
 export interface AuditLogItem {
+  tenantId?: string | null;
   id: string;
   timestamp: string;
   actorName: string;
   actorEmail: string;
   actorRole: string;
-  actionType: AuditActionType;
+  actionType: string;
   actionTitle: string;
-  targetType: AuditTargetType;
+  targetType: string;
   targetId: string;
   targetName: string;
-  riskLevel: AuditRiskLevel;
+  riskLevel?: AuditRiskLevel;
   ipAddress: string;
   userAgent: string;
   location: string;
   reason: string;
   details?: {
-    oldValue?: Record<string, unknown> | null;
-    newValue?: Record<string, unknown> | null;
+    oldValue?: unknown;
+    newValue?: unknown;
     changesSummary?: string;
   };
 }
@@ -57,8 +58,10 @@ export interface CronJobItem {
 }
 
 export interface AuditFilterParams {
+  page?: number;
+  pageSize?: number;
   keyword?: string;
-  actionType?: AuditActionType;
+  actionType?: string;
   riskLevel?: 'ALL' | AuditRiskLevel;
   dateRange?: 'today' | '7d' | '30d' | 'all';
 }

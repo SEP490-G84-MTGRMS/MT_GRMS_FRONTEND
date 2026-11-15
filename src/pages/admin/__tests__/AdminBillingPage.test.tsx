@@ -70,7 +70,7 @@ describe('AdminBillingPage', () => {
     fireEvent.click(invoiceButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByText('HÓA ĐƠN ĐIỆN TỬ SAAS')).toBeTruthy();
+      expect(screen.getByText('HÓA ĐƠN DỊCH VỤ SAAS')).toBeTruthy();
       expect(screen.getByText(/THÔNG TIN ĐƠN VỊ THUÊ DỊCH VỤ/i)).toBeTruthy();
       expect(screen.getByText('In hóa đơn')).toBeTruthy();
     });

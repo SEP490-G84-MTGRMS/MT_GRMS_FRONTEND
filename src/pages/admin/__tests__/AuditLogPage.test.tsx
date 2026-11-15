@@ -1,89 +1,55 @@
 /** @vitest-environment jsdom */
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
-import { MemoryRouter } from 'react-router-dom';
+import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { AuditLogPage } from '../AuditLogPage';
+import { auditApi } from '../../../features/admin/api/auditApi';
 
-// Mock useAuthStore
-vi.mock('../../../stores/useAuthStore', () => ({
-  useAuthStore: () => ({
-    user: { id: 'admin1', fullName: 'Lê Văn Quản', role: 'ADMIN', isAdmin: true },
-    isAuthenticated: true,
-  }),
+vi.mock('../../../features/admin/api/auditApi', () => ({
+  auditApi: { getAuditLogs: vi.fn() },
 }));
 
-describe('AuditLogPage - FE-22 & FE-26 Platform Governance', () => {
-  it('renders hero title, KPI cards, and default Audit Logs tab', async () => {
-    render(
-      <MemoryRouter>
-        <AuditLogPage />
-      </MemoryRouter>
-    );
+const result = {
+  items: [{
+    id: 'log-1', timestamp: '2026-11-15T02:30:00Z', actorName: 'Quản trị viên',
+    actorRole: 'ADMIN', actorEmail: '', actionType: 'TENANT_CREATED',
+    actionTitle: 'TENANT_CREATED', targetType: 'Tenant', targetName: 'Tenant',
+    targetId: 'tenant-1', tenantId: 'tenant-1', ipAddress: '127.0.0.1',
+    userAgent: '', location: '', reason: '', riskLevel: 'INFO' as const,
+  }],
+  total: 21, page: 1, pageSize: 20, actionTypes: ['TENANT_CREATED'],
+};
 
-    // Hero title
-    expect(screen.getByText('Nhật ký Vận hành & Giám sát Tác vụ')).toBeInTheDocument();
-    expect(screen.getByText(/Đối soát kiểm toán hành vi quản trị/)).toBeInTheDocument();
+describe('AuditLogPage', () => {
+  beforeEach(() => { vi.mocked(auditApi.getAuditLogs).mockReset().mockResolvedValue(result); });
+  afterEach(cleanup);
 
-    // KPI Cards
-    expect(screen.getByText('Tổng hành vi ghi nhận')).toBeInTheDocument();
-    expect(screen.getByText('Tác vụ ngầm định kỳ')).toBeInTheDocument();
-
-    // Tab buttons
-    expect(screen.getByText('Nhật ký kiểm toán (Audit Logs)')).toBeInTheDocument();
-    expect(screen.getByText('Giám sát Cronjob & Tác vụ ngầm (Cronjobs Health)')).toBeInTheDocument();
-
-    // Audit logs table header after loading
-    await waitFor(() => {
-      expect(screen.getByText('HÀNH VI & ĐỐI TƯỢNG TÁC ĐỘNG')).toBeInTheDocument();
-    });
+  it('renders records and total returned by the API', async () => {
+    render(<AuditLogPage />);
+    expect(screen.getByRole('heading', { name: 'Nhật ký kiểm toán' })).toBeInTheDocument();
+    expect(await screen.findByText('Quản trị viên')).toBeInTheDocument();
+    expect(screen.getAllByText('21')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Xuất CSV trang này' })).toBeEnabled();
   });
 
-  it('switches to Cronjobs tab and displays all 4 background jobs', async () => {
-    render(
-      <MemoryRouter>
-        <AuditLogPage />
-      </MemoryRouter>
-    );
-
-    // Switch to Cronjobs tab
-    const cronTabBtn = screen.getByText('Giám sát Cronjob & Tác vụ ngầm (Cronjobs Health)');
-    fireEvent.click(cronTabBtn);
-
-    // 4 Cron jobs should be rendered
-    await waitFor(() => {
-      expect(screen.getByText('CRON-TENANT-EXPIRY')).toBeInTheDocument();
-      expect(screen.getByText('CRON-CUSTOMER-DEBT')).toBeInTheDocument();
-      expect(screen.getByText('CRON-FEFO-BATCH')).toBeInTheDocument();
-      expect(screen.getByText('CRON-DB-BACKUP')).toBeInTheDocument();
-    });
-
-    // Cron schedule badges
-    expect(screen.getByText('0 0 * * *')).toBeInTheDocument();
-    expect(screen.getByText('0 6 * * *')).toBeInTheDocument();
-    expect(screen.getByText('0 1 * * *')).toBeInTheDocument();
-    expect(screen.getByText('0 2 * * *')).toBeInTheDocument();
+  it('passes the selected action and date filters to the API', async () => {
+    render(<AuditLogPage />);
+    await screen.findByText('Quản trị viên');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Loại hành động' }), { target: { value: 'TENANT_CREATED' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Thời gian' }), { target: { value: 'today' } });
+    await waitFor(() => expect(auditApi.getAuditLogs).toHaveBeenLastCalledWith(
+      expect.objectContaining({ actionType: 'TENANT_CREATED', dateRange: 'today', page: 1 }),
+      expect.any(AbortSignal),
+    ));
   });
 
-  it('opens log modal when clicking on an audit log row', async () => {
-    render(
-      <MemoryRouter>
-        <AuditLogPage />
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Khóa chuỗi gian hàng (Soft-Lock)')).toBeInTheDocument();
-    });
-
-    // Click on the first row
-    fireEvent.click(screen.getByText('Khóa chuỗi gian hàng (Soft-Lock)'));
-
-    // Modal with diff should be displayed
-    await waitFor(() => {
-      expect(screen.getByText('So sánh dữ liệu biến động (Audit State Diff)')).toBeInTheDocument();
-      expect(screen.getByText('Dữ liệu trước thay đổi (Old Value)')).toBeInTheDocument();
-      expect(screen.getByText('Dữ liệu sau thay đổi (New Value)')).toBeInTheDocument();
-    });
+  it('shows a retry action and disables export when the API fails', async () => {
+    vi.mocked(auditApi.getAuditLogs).mockRejectedValue(new Error('Unavailable'));
+    render(<AuditLogPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Không tải được nhật ký');
+    expect(screen.getByRole('button', { name: 'Xuất CSV trang này' })).toBeDisabled();
+    vi.mocked(auditApi.getAuditLogs).mockResolvedValue(result);
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(await screen.findByText('Quản trị viên')).toBeInTheDocument();
   });
 });

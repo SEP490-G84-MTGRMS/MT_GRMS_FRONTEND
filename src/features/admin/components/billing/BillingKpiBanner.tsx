@@ -1,81 +1,22 @@
-import type { FC } from 'react';
+import { Wallet, TrendingUp, CheckCircle2, Clock } from 'lucide-react';
 import type { BillingKpiSummary } from '../../types/billing.types';
-import { DollarSign, TrendingUp, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 
-interface BillingKpiBannerProps {
-  kpis: BillingKpiSummary;
-}
-
-export const BillingKpiBanner: FC<BillingKpiBannerProps> = ({ kpis }) => {
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('vi-VN').format(val) + ' đ';
-  };
-
+export const BillingKpiBanner = ({ kpis }: { kpis: BillingKpiSummary }) => {
+  const currency = (value: number) => value.toLocaleString('vi-VN') + ' đ';
+  const metrics = [
+    { id: 'total-revenue', label: 'Tổng giá trị giao dịch', value: currency(kpis.totalRevenue), note: 'Giao dịch thành công, đã trừ hoàn tiền', icon: Wallet },
+    { id: 'month-revenue', label: 'Giá trị giao dịch tháng này', value: currency(kpis.revenueThisMonth), note: 'Theo tháng hiện tại', icon: TrendingUp },
+    { id: 'success-rate', label: 'Tỷ lệ giao dịch thành công', value: kpis.successRate + '%', note: kpis.totalTransactions + ' giao dịch ghi nhận', icon: CheckCircle2 },
+    { id: 'pending-reconcile', label: 'Chờ đối soát', value: kpis.pendingCount + ' giao dịch', note: currency(kpis.pendingAmount) + ' đang chờ', icon: Clock },
+  ];
   return (
-    <div className="plans-kpis" style={{ marginBottom: 18 }}>
-      {/* 1. Tổng doanh thu tích lũy */}
-      <div className="plans-kpi" data-testid="kpi-total-revenue">
-        <span>TỔNG DOANH THU SAAS</span>
-        <strong>{formatCurrency(kpis.totalRevenue)}</strong>
-        <small style={{ color: '#0F766E', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-          <TrendingUp size={13} /> Lũy kế toàn bộ gói & tiện ích
-        </small>
-        <span className="plans-kpi-icon" style={{ background: '#EAF6F4', color: '#0F766E' }}>
-          <DollarSign size={20} />
-        </span>
-      </div>
-
-      {/* 2. Doanh thu tháng này */}
-      <div className="plans-kpi" data-testid="kpi-month-revenue">
-        <span>DOANH THU THÁNG NÀY</span>
-        <strong style={{ color: '#0F766E' }}>{formatCurrency(kpis.revenueThisMonth)}</strong>
-        <small style={{ color: '#64748B' }}>
-          Doanh số tháng 11/2026
-        </small>
-        <span className="plans-kpi-icon" style={{ background: '#EFF6FF', color: '#2563EB' }}>
-          <TrendingUp size={20} />
-        </span>
-      </div>
-
-      {/* 3. Tỷ lệ khớp tiền thành công */}
-      <div className="plans-kpi" data-testid="kpi-success-rate">
-        <span>TỶ LỆ KHỚP TIỀN TỰ ĐỘNG</span>
-        <strong>{kpis.successRate}%</strong>
-        <small style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: 4 }}>
-          <CheckCircle2 size={13} /> {kpis.totalTransactions} giao dịch được ghi nhận
-        </small>
-        <span className="plans-kpi-icon" style={{ background: '#ECFDF5', color: '#10B981' }}>
-          <CheckCircle2 size={20} />
-        </span>
-      </div>
-
-      {/* 4. Cần đối soát thủ công */}
-      <div className="plans-kpi" data-testid="kpi-pending-reconcile">
-        <span>CẦN ĐỐI SOÁT / CHỜ DUYỆT</span>
-        <strong style={{ color: kpis.pendingCount > 0 ? '#D97706' : '#64748B' }}>
-          {kpis.pendingCount} giao dịch
-        </strong>
-        <small style={{ color: kpis.pendingCount > 0 ? '#D97706' : '#64748B', display: 'flex', alignItems: 'center', gap: 4 }}>
-          {kpis.pendingCount > 0 ? (
-            <>
-              <AlertCircle size={13} /> {formatCurrency(kpis.pendingAmount)} đang chờ
-            </>
-          ) : (
-            <>
-              <Clock size={13} /> Đã khớp hết giao dịch
-            </>
-          )}
-        </small>
-        <span
-          className="plans-kpi-icon"
-          style={{
-            background: kpis.pendingCount > 0 ? '#FEF3C7' : '#F1F5F9',
-            color: kpis.pendingCount > 0 ? '#D97706' : '#64748B',
-          }}
-        >
-          <Clock size={20} />
-        </span>
-      </div>
+    <div className="plans-kpis billing-kpis">
+      {metrics.map(({ id, label, value, note, icon: Icon }) => (
+        <article className="plans-kpi" key={id} data-testid={'kpi-' + id}>
+          <span>{label}</span><strong>{value}</strong><small>{note}</small>
+          <span className="plans-kpi-icon"><Icon size={19} /></span>
+        </article>
+      ))}
     </div>
   );
 };

@@ -1,292 +1,127 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type { FC } from 'react';
-import {
-  AuditKpiCards,
-  AuditTabNavigation,
-  AuditLogToolbar,
-  AuditLogTable,
-  AuditLogDetailModal,
-  CronJobTable,
-  CronJobRunModal,
-  AdminToast,
-  type ToastState,
-  type AuditTabType,
-} from '../../features/admin/components';
-import type {
-  AuditLogItem,
-  CronJobItem,
-  AuditActionType,
-  AuditRiskLevel,
-} from '../../features/admin/types/audit.types';
-import { auditApi } from '../../features/admin/api/auditApi';
-import { Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Download, RefreshCw, Search } from 'lucide-react';
+import { AuditLogTable, AuditLogDetailModal } from '../../features/admin/components';
+import { auditApi, type AuditLogPageData } from '../../features/admin/api/auditApi';
+import type { AuditLogItem, AuditFilterParams } from '../../features/admin/types/audit.types';
+import { TablePagination } from '../../components/common';
 import './adminPlans.css';
 import './auditLog.css';
 
-export const AuditLogPage: FC = () => {
-  const [activeTab, setActiveTab] = useState<AuditTabType>('logs');
-  const [logs, setLogs] = useState<AuditLogItem[]>([]);
-  const [cronJobs, setCronJobs] = useState<CronJobItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+const emptyPage: AuditLogPageData = { items: [], total: 0, page: 1, pageSize: 20, actionTypes: [] };
 
-  // Filters for Audit Logs
+export const AuditLogPage = () => {
   const [keyword, setKeyword] = useState('');
-  const [actionType, setActionType] = useState<AuditActionType>('ALL');
-  const [riskLevel, setRiskLevel] = useState<'ALL' | AuditRiskLevel>('ALL');
-  const [dateRange, setDateRange] = useState<'all' | 'today' | '7d' | '30d'>('all');
-
-  // Modals & Trigger state
+  const [search, setSearch] = useState('');
+  const [actionType, setActionType] = useState('ALL');
+  const [dateRange, setDateRange] = useState<AuditFilterParams['dateRange']>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [data, setData] = useState(emptyPage);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
   const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
-  const [selectedCronJob, setSelectedCronJob] = useState<CronJobItem | null>(null);
-  const [triggeringJobId, setTriggeringJobId] = useState<string | null>(null);
-
-  // Toast
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = (message: string, type: ToastState['type'] = 'success') => {
-    if (toastTimerRef.current) {
-      clearTimeout(toastTimerRef.current);
-    }
-    setToast({ id: Date.now().toString(), message, type });
-    toastTimerRef.current = setTimeout(() => {
-      setToast(null);
-    }, 3200);
-  };
-
-  // Fetch Audit Logs
-  const loadLogs = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const res = await auditApi.getAuditLogs({
-        keyword,
-        actionType,
-        riskLevel,
-        dateRange,
-      });
-      if (res.success) {
-        setLogs(res.data);
-      }
-    } catch {
-      showToast('Không thể tải nhật ký kiểm toán từ máy chủ', 'warning');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [keyword, actionType, riskLevel, dateRange]);
-
-  // Fetch Cron Jobs
-  const loadCronJobs = useCallback(async () => {
-    try {
-      const res = await auditApi.getCronJobs();
-      if (res.success) {
-        setCronJobs(res.data);
-      }
-    } catch {
-      showToast('Không thể tải danh sách tác vụ ngầm', 'warning');
-    }
-  }, []);
 
   useEffect(() => {
-    loadLogs();
-  }, [loadLogs]);
+    const timer = setTimeout(() => { setSearch(keyword.trim()); setPage(1); }, 350);
+    return () => clearTimeout(timer);
+  }, [keyword]);
 
   useEffect(() => {
-    loadCronJobs();
-  }, [loadCronJobs]);
+    const controller = new AbortController();
+    setIsLoading(true);
+    setError('');
+    auditApi.getAuditLogs({ keyword: search, actionType, dateRange, page, pageSize }, controller.signal)
+      .then(result => { if (!controller.signal.aborted) setData(result); })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setData(emptyPage);
+          setError('Không tải được nhật ký kiểm toán. Vui lòng thử lại.');
+        }
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsLoading(false); });
+    return () => controller.abort();
+  }, [search, actionType, dateRange, page, pageSize, refresh]);
 
-  // Handler: Trigger Cronjob immediately
-  const handleTriggerNow = async (job: CronJobItem) => {
-    try {
-      setTriggeringJobId(job.id);
-      showToast(`Đang khởi chạy tác vụ ngầm "${job.name}"...`, 'info');
-
-      // Giả lập thời gian kích hoạt thực tế 1.2s
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-
-      const res = await auditApi.triggerCronJob(job.id);
-      if (res.success) {
-        setCronJobs((prev) => prev.map((j) => (j.id === job.id ? res.updatedJob : j)));
-        showToast(res.message, 'success');
-        // Tải lại logs vì vừa có hành vi kích hoạt mới
-        loadLogs();
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Kích hoạt tác vụ thất bại';
-      showToast(msg, 'warning');
-    } finally {
-      setTriggeringJobId(null);
-    }
-  };
-
-  // Handler: Export CSV with UTF-8 BOM
-  const handleExport = () => {
-    if (logs.length === 0) {
-      showToast('Không có dữ liệu để xuất.', 'warning');
-      return;
-    }
-
-    const headers = [
-      'Mã log',
-      'Thời gian',
-      'Người thực hiện',
-      'Email',
-      'Vai trò',
-      'Loại hành động',
-      'Tiêu đề hành động',
-      'Đối tượng tác động',
-      'Mã đối tượng',
-      'Mức độ rủi ro',
-      'Địa chỉ IP',
-      'Vị trí',
-      'Lý do',
-      'Tóm tắt biến động',
-    ];
-
-    const rows = logs.map((l) => [
-      `"${l.id}"`,
-      `"${new Date(l.timestamp).toLocaleString('vi-VN')}"`,
-      `"${l.actorName.replace(/"/g, '""')}"`,
-      `"${l.actorEmail}"`,
-      `"${l.actorRole}"`,
-      `"${l.actionType}"`,
-      `"${l.actionTitle.replace(/"/g, '""')}"`,
-      `"${l.targetName.replace(/"/g, '""')}"`,
-      `"${l.targetId}"`,
-      `"${l.riskLevel}"`,
-      `"${l.ipAddress}"`,
-      `"${l.location}"`,
-      `"${(l.reason || '').replace(/"/g, '""')}"`,
-      `"${(l.details?.changesSummary || '').replace(/"/g, '""')}"`,
+  const exportPage = () => {
+    // Quote all values and prevent user-controlled values from becoming spreadsheet formulas.
+    const cell = (value: string) => {
+      const safe = /^[=+@\-\t\r\n]/.test(value) ? "'" + value : value;
+      return '"' + safe.replace(/"/g, '""') + '"';
+    };
+    const rows = data.items.map(log => [
+      log.id, new Date(log.timestamp).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
+      log.actorName, log.actorRole, log.actionType, log.targetType, log.targetId, log.tenantId || '', log.ipAddress,
     ]);
-
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    const content = [['Mã nhật ký', 'Thời gian Việt Nam', 'Người thực hiện', 'Vai trò', 'Hành động',
+      'Đối tượng', 'Mã đối tượng', 'Mã cửa hàng', 'IP'], ...rows].map(row => row.map(cell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\uFEFF', content], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `MT_GRMS_Audit_Logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
+    link.download = 'THViet_Audit_Logs.csv';
     link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    showToast(`Đã xuất thành công ${logs.length} bản ghi nhật ký kiểm toán (.csv).`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   return (
     <div className="admin-plans admin-audit-logs">
-      {/* Toast Notification */}
-      <AdminToast toast={toast} onClose={() => setToast(null)} />
-
-      {/* Hero Header */}
-      <div className="plans-hero" style={{ marginBottom: 18 }}>
+      <header className="plans-hero">
         <div>
-          <p className="plans-eyebrow">GIÁM SÁT HỆ THỐNG & AN TOÀN VẬN HÀNH</p>
-          <h1>Nhật ký Vận hành & Giám sát Tác vụ</h1>
-          <p>
-            Đối soát kiểm toán hành vi quản trị (FE-22) và kiểm soát 4 tác vụ ngầm tự động (FE-26)
-          </p>
+          <p className="plans-eyebrow">GIÁM SÁT NỀN TẢNG</p>
+          <h1>Nhật ký kiểm toán</h1>
+          <p>Tra cứu lịch sử thao tác, người thực hiện và dữ liệu thay đổi trên hệ thống.</p>
         </div>
-
         <div className="plans-toolbar-actions">
-          {activeTab === 'logs' ? (
-            <button
-              type="button"
-              className="admin-btn admin-btn-secondary"
-              onClick={handleExport}
-            >
-              <span>Xuất báo cáo kiểm toán</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="admin-btn admin-btn-primary"
-              onClick={() => {
-                const fefo = cronJobs.find((j) => j.id === 'cron-fefo-batch');
-                if (fefo) handleTriggerNow(fefo);
-              }}
-              disabled={Boolean(triggeringJobId)}
-            >
-              <span>Chạy nhanh quét FEFO</span>
-            </button>
-          )}
+          <button className="admin-btn admin-btn-secondary" onClick={() => setRefresh(value => value + 1)} disabled={isLoading}>
+            <RefreshCw size={16} /> Làm mới
+          </button>
+          <button className="admin-btn admin-btn-primary" onClick={exportPage} disabled={isLoading || !!error || !data.items.length}>
+            <Download size={16} /> Xuất CSV trang này
+          </button>
         </div>
+      </header>
+      <div className="plans-toolbar audit-toolbar">
+        <label className="plans-search">
+          <Search size={17} />
+          <input aria-label="Tìm nhật ký" value={keyword} maxLength={200}
+            onChange={event => setKeyword(event.target.value)}
+            placeholder="Tìm người thực hiện, hành động, mã đối tượng, IP..." />
+        </label>
+        <select aria-label="Loại hành động" value={actionType}
+          onChange={event => { setActionType(event.target.value); setPage(1); }}>
+          <option value="ALL">Tất cả hành động</option>
+          {Array.from(new Set([...data.actionTypes, ...(actionType === 'ALL' ? [] : [actionType])])).map(action => (
+            <option key={action} value={action}>{action}</option>
+          ))}
+        </select>
+        <select aria-label="Thời gian" value={dateRange}
+          onChange={event => { setDateRange(event.target.value as AuditFilterParams['dateRange']); setPage(1); }}>
+          <option value="all">Toàn bộ thời gian</option>
+          <option value="today">Hôm nay</option>
+          <option value="7d">7 ngày gần nhất</option>
+          <option value="30d">30 ngày gần nhất</option>
+        </select>
       </div>
-
-      {/* KPI Cards */}
-      <AuditKpiCards logs={logs} cronJobs={cronJobs} />
-
-      {/* Tab Navigation */}
-      <AuditTabNavigation
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        logsCount={logs.length}
-        cronJobsCount={cronJobs.length}
-      />
-
-      {/* Tab 1: Audit Logs */}
-      {activeTab === 'logs' && (
-        <>
-          <AuditLogToolbar
-            keyword={keyword}
-            onKeywordChange={setKeyword}
-            actionType={actionType}
-            onActionTypeChange={setActionType}
-            riskLevel={riskLevel}
-            onRiskLevelChange={setRiskLevel}
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
-            totalFiltered={logs.length}
-            totalAll={logs.length}
-            onExport={handleExport}
-          />
-
-          {isLoading ? (
-            <div
-              style={{
-                background: '#ffffff',
-                padding: '48px',
-                borderRadius: '18px',
-                textAlign: 'center',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '12px',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border-color, #e2eaf0)',
-              }}
-            >
-              <Loader2 className="animate-spin" size={32} color="var(--blue-primary, #0066ff)" />
-              <span style={{ fontSize: '14px', fontWeight: 500 }}>Đang nạp nhật ký kiểm toán...</span>
-            </div>
-          ) : (
-            <AuditLogTable logs={logs} onSelectLog={setSelectedLog} />
+      <div className="audit-meta"><span>Thời gian hiển thị theo Việt Nam (UTC+7)</span><span>Nhật ký chỉ đọc</span></div>
+      {error ? (
+        <div className="audit-state" role="alert">
+          <p>{error}</p>
+          <button className="admin-btn admin-btn-secondary" onClick={() => setRefresh(value => value + 1)}>Thử lại</button>
+        </div>
+      ) : (
+        <section className="plans-table-card" aria-busy={isLoading}>
+          <div className="plans-table-summary">
+            {isLoading ? 'Đang tải nhật ký...' : <><strong>{data.total.toLocaleString('vi-VN')}</strong> bản ghi phù hợp</>}
+          </div>
+          {isLoading ? <div className="audit-state" role="status">Đang tải nhật ký kiểm toán...</div> : (
+            <AuditLogTable logs={data.items} onSelectLog={setSelectedLog} />
           )}
-        </>
+          {!isLoading && <TablePagination currentPage={data.page} pageSize={pageSize} totalItems={data.total}
+            itemLabel="bản ghi" onPageChange={setPage}
+            onPageSizeChange={size => { setPageSize(size); setPage(1); }} />}
+        </section>
       )}
-
-      {/* Tab 2: Cron Jobs Monitoring */}
-      {activeTab === 'cronjobs' && (
-        <CronJobTable
-          cronJobs={cronJobs}
-          triggeringJobId={triggeringJobId}
-          onTriggerNow={handleTriggerNow}
-          onViewLogs={setSelectedCronJob}
-        />
-      )}
-
-      {/* Detail Modals */}
-      <AuditLogDetailModal
-        log={selectedLog}
-        isOpen={Boolean(selectedLog)}
-        onClose={() => setSelectedLog(null)}
-      />
-
-      <CronJobRunModal
-        job={selectedCronJob}
-        isOpen={Boolean(selectedCronJob)}
-        onClose={() => setSelectedCronJob(null)}
-      />
+      <AuditLogDetailModal log={selectedLog} isOpen={!!selectedLog} onClose={() => setSelectedLog(null)} />
     </div>
   );
 };

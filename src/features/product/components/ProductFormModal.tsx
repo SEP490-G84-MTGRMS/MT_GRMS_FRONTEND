@@ -20,6 +20,8 @@ import type { ProductItem, Category, UomConversion } from '../types';
 import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 import { productApi } from '../api/productApi';
 import { PriceHistoryModal } from './PriceHistoryModal';
+import { masterCatalogApi } from '../../admin/api/masterCatalogApi';
+import type { MasterProductSuggestion } from '../../admin/types/masterCatalog.types';
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -47,6 +49,82 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [barcode, setBarcode] = useState('');
   const [productName, setProductName] = useState('');
   const [categoryId, setCategoryId] = useState('');
+
+  // Master Catalog auto-lookup state
+  const [masterSuggestion, setMasterSuggestion] = useState<MasterProductSuggestion | null>(null);
+  const [isLookingUpMaster, setIsLookingUpMaster] = useState(false);
+
+  useEffect(() => {
+    if (productToEdit || !isOpen) {
+      setMasterSuggestion(null);
+      return;
+    }
+
+    const trimmed = barcode.trim();
+    if (trimmed.length < 8) {
+      setMasterSuggestion(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsLookingUpMaster(true);
+      try {
+        const suggestion = await masterCatalogApi.lookupByBarcode(trimmed);
+        setMasterSuggestion(suggestion);
+      } catch {
+        setMasterSuggestion(null);
+      } finally {
+        setIsLookingUpMaster(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [barcode, productToEdit, isOpen]);
+
+  const handleApplyMasterSuggestion = () => {
+    if (!masterSuggestion) return;
+
+    if (!productName.trim()) {
+      setProductName(masterSuggestion.name);
+    }
+    if (masterSuggestion.baseUnit) {
+      setBaseUnit(masterSuggestion.baseUnit);
+    }
+    if (masterSuggestion.imageUrl && images.length === 0) {
+      setImages([masterSuggestion.imageUrl]);
+    }
+    if (masterSuggestion.suggestedRetailPrice && (!sellingPrice || sellingPrice === 0)) {
+      setSellingPrice(masterSuggestion.suggestedRetailPrice);
+    }
+
+    if (categories && categories.length > 0 && masterSuggestion.categoryName) {
+      const match = categories.find(
+        (c) =>
+          c.name.toLowerCase().includes(masterSuggestion.categoryName.toLowerCase()) ||
+          masterSuggestion.categoryName.toLowerCase().includes(c.name.toLowerCase())
+      );
+      if (match) {
+        setCategoryId(match.id);
+      }
+    }
+
+    if (masterSuggestion.units && masterSuggestion.units.length > 0) {
+      const newUoms: UomConversion[] = masterSuggestion.units.map((u, i) => ({
+        id: `master-uom-${Date.now()}-${i}`,
+        unitName: u.unitName,
+        conversionRate: u.conversionRate,
+        barcode: u.barcode || '',
+        price: masterSuggestion.suggestedRetailPrice
+          ? Math.round(masterSuggestion.suggestedRetailPrice * u.conversionRate)
+          : (sellingPrice || 0) * u.conversionRate,
+        productCode: '',
+        isPurchaseUnit: Boolean(u.isPurchaseUnit),
+      }));
+      setUomConversions(newUoms);
+    }
+
+    setMasterSuggestion(null);
+  };
 
   // Category Searchable Dropdown state (phong cách tương tự EmployeeFormModal)
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -837,9 +915,16 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   {/* (2) Mã vạch */}
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                        Mã vạch
-                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                          Mã vạch
+                        </label>
+                        {isLookingUpMaster && (
+                          <span style={{ fontSize: 11, color: '#0066FF', fontStyle: 'italic' }}>
+                            (Đang tra mẫu...)
+                          </span>
+                        )}
+                      </div>
                       <span style={{ fontSize: 11, color: barcode.length > 50 ? '#DC2626' : '#94A3B8' }}>
                         {barcode.length}/50
                       </span>
@@ -860,6 +945,53 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                         <AlertCircle size={13} style={{ flexShrink: 0 }} />
                         <span>{barcodeError}</span>
+                      </div>
+                    )}
+                    {masterSuggestion && (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: '8px 12px',
+                          background: '#F0F6FF',
+                          border: '1px solid #BFDBFE',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                          {masterSuggestion.imageUrl ? (
+                            <img
+                              src={masterSuggestion.imageUrl}
+                              alt=""
+                              style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
+                            />
+                          ) : (
+                            <Tag size={16} color="#0066FF" style={{ flexShrink: 0 }} />
+                          )}
+                          <div style={{ fontSize: 12, color: '#1E40AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            Thư viện mẫu: <strong>{masterSuggestion.name}</strong>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleApplyMasterSuggestion}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '9999px',
+                            background: '#0066FF',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Tự động điền
+                        </button>
                       </div>
                     )}
                   </div>

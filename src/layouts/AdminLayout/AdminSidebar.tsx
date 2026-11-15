@@ -9,6 +9,8 @@ import {
   ChevronUp,
   ShieldCheck,
   Activity,
+  Sliders,
+  Package,
 } from "lucide-react";
 import {
   DashboardIcon,
@@ -170,6 +172,17 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({
         </NavLink>
 
         <NavLink
+          to="/admin/master-catalog"
+          title="Cấu hình dữ liệu khởi tạo cửa hàng mới"
+          className={({ isActive }) =>
+            `admin-nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <Package size={19} />
+          <span className="admin-nav-label">Dữ liệu khởi tạo</span>
+        </NavLink>
+
+        <NavLink
           to="/admin/subscriptions"
           title="Gói dịch vụ & Biểu phí SaaS"
           className={({ isActive }) =>
@@ -200,6 +213,17 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({
         >
           <Activity size={19} />
           <span className="admin-nav-label">Nhật ký & Tác vụ</span>
+        </NavLink>
+
+        <NavLink
+          to="/admin/settings"
+          title="Cấu hình Nền tảng Toàn cục"
+          className={({ isActive }) =>
+            `admin-nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <Sliders size={19} />
+          <span className="admin-nav-label">Cấu hình Nền tảng</span>
         </NavLink>
 
         <div className="admin-nav-section-title" style={{ marginTop: 14 }}>

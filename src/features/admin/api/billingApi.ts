@@ -17,7 +17,7 @@ export const billingApi = {
    */
   async getTransactions(
     filter?: BillingFilterParams
-  ): Promise<{ success: boolean; data: BillingTransaction[]; total: number }> {
+  ): Promise<{ success: boolean; data: BillingTransaction[]; total: number; source: 'api' | 'demo' }> {
     try {
       const params = new URLSearchParams();
       if (filter?.keyword) params.append('keyword', filter.keyword);
@@ -35,6 +35,7 @@ export const billingApi = {
           : (res.data.data as { items: BillingTransaction[] }).items;
         return {
           success: true,
+          source: 'api',
           data: items,
           total: Array.isArray(res.data.data) ? items.length : (res.data.data as { total: number }).total,
         };
@@ -83,6 +84,7 @@ export const billingApi = {
 
     return {
       success: true,
+      source: 'demo',
       data: result,
       total: result.length,
     };
@@ -91,13 +93,13 @@ export const billingApi = {
   /**
    * Lấy số liệu KPI doanh thu và đối soát
    */
-  async getBillingKpis(): Promise<{ success: boolean; data: BillingKpiSummary }> {
+  async getBillingKpis(): Promise<{ success: boolean; data: BillingKpiSummary; source: 'api' | 'demo' }> {
     try {
       const res = await httpClient.get<{ success: boolean; data: BillingKpiSummary }>(
         '/api/admin/billing/kpi'
       );
       if (res.data && res.data.success) {
-        return res.data;
+        return { ...res.data, source: 'api' };
       }
     } catch {
       // Fallback
@@ -117,6 +119,7 @@ export const billingApi = {
 
     return {
       success: true,
+      source: 'demo',
       data: {
         totalRevenue: totalRev,
         revenueThisMonth: thisMonthRev,
