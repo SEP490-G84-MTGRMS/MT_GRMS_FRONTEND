@@ -12,12 +12,14 @@ import {
   Scale,
   Download,
   SlidersHorizontal,
+  KeyRound,
 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { useTaxSnapshots } from '../hooks/useTaxSnapshots';
 import { TaxKPICards } from '../components/TaxKPICards';
 import { TaxSnapshotsHistoryView } from '../components/TaxSnapshotsHistoryView';
 import { CreateTaxSnapshotModal } from '../components/CreateTaxSnapshotModal';
+import { SecurityPinModal } from '../components/SecurityPinModal';
 import { TaxRateConfigModal } from '../components/TaxRateConfigModal';
 import { TaxSnapshotDetailDrawer } from '../components/TaxSnapshotDetailDrawer';
 import { TaxExportModal } from '../components/TaxExportModal';
@@ -61,10 +63,25 @@ export const TaxSnapshotPage: FC = () => {
 
   // Modals & Drawers
   const [isRateConfigOpen, setIsRateConfigOpen] = useState<boolean>(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
+  const [pinModalInitialTab, setPinModalInitialTab] = useState<'change' | 'reset'>('change');
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState<HouseholdTaxSnapshotDto | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
+
+  // Snapshot hiện tại đã được chốt hay chưa (chỉ lấy bản đang Active/Finalized, loại bỏ bản đã bị Superseded)
+  const existingFinalizedSnapshot = snapshots.find(
+    (s) =>
+      s.year === filterParams.year &&
+      s.periodType === filterParams.periodType &&
+      s.periodNumber === filterParams.periodNumber &&
+      s.status !== 'superseded' &&
+      s.status !== 'Superseded' &&
+      (s.status as any) !== 2 &&
+      (s.status as any) !== '2' &&
+      (s.status === 'finalized' || s.status === 'Finalized' || (s.status as any) === 1 || (s.status as any) === '1' || Boolean(s.auditSignatureHash))
+  );
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -115,6 +132,8 @@ export const TaxSnapshotPage: FC = () => {
       periodNumber: req.periodNumber,
       calculationMethod: req.calculationMethod,
       applyVatReduction2026: req.applyVatReduction2026,
+      allowSupersedeExisting: req.allowSupersedeExisting,
+      rectificationReason: req.rectificationReason,
       pinProvided: Boolean(req.pin),
     });
 
@@ -342,6 +361,22 @@ export const TaxSnapshotPage: FC = () => {
                 </button>
               )}
 
+              {/* Security PIN Management Button (Ẩn đối với Employee) */}
+              {!isEmployee && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPinModalInitialTab('change');
+                    setIsPinModalOpen(true);
+                  }}
+                  className="btn-secondary-pill"
+                  title="Quản lý, đổi hoặc khôi phục mã PIN bảo mật chốt kỳ thuế"
+                >
+                  <KeyRound size={15} />
+                  <span>Mã PIN bảo mật</span>
+                </button>
+              )}
+
               {/* Refresh Button */}
               <button
                 type="button"
@@ -542,9 +577,28 @@ export const TaxSnapshotPage: FC = () => {
           customVatRate={filterParams.customVatRate}
           customPitRate={filterParams.customPitRate}
           vatReductionPercentage={filterParams.vatReductionPercentage}
+          existingFinalizedSnapshot={existingFinalizedSnapshot}
+          onOpenPinModal={(tab) => {
+            setPinModalInitialTab(tab || 'change');
+            setIsPinModalOpen(true);
+          }}
           onSubmit={handleCreateSnapshot}
         />
       )}
+
+      {/* Security PIN Modal */}
+      <SecurityPinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        initialTab={pinModalInitialTab}
+        onSuccess={(msg) => {
+          setToast({
+            id: `toast-${Date.now()}`,
+            type: 'success',
+            message: msg,
+          });
+        }}
+      />
 
       {/* Tax Rate Config Modal */}
       <TaxRateConfigModal

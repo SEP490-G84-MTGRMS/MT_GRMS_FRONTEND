@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  approveServiceExpense,
   cancelServiceExpense,
   createServiceExpense,
   getExpenseSummary,
@@ -62,6 +63,27 @@ export const useCreateExpense = () => {
 
   return useMutation({
     mutationFn: (data: CreateExpenseRequest) => createServiceExpense(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: expenseKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: expenseKeys.summaries() });
+    },
+  });
+};
+
+/**
+ * Hook mutation to approve an expense voucher
+ */
+export const useApproveExpense = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      expenseId,
+      note,
+    }: {
+      expenseId: string;
+      note?: string;
+    }) => approveServiceExpense(expenseId, note),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: expenseKeys.lists() });
       queryClient.invalidateQueries({ queryKey: expenseKeys.summaries() });

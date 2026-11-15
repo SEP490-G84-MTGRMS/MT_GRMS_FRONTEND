@@ -578,6 +578,7 @@ function useFinanceOverviewController() {
     isError: zoneA.cashAccountsQuery.isError || zoneA.cashSummaryQuery.isError,
     isPnlPending: pnlReportQuery.isPlaceholderData && pnlReportQuery.isFetching,
     cashAccounts: zoneA.cashAccountsQuery.data || [],
+    cashSummary: zoneA.cashSummaryQuery.data,
     cashMetrics,
     cashInTransit,
     unconfirmedDropsCount,
@@ -625,6 +626,7 @@ export const FinanceOverviewPage: React.FC = () => {
               isLoading={ctrl.isLoading}
               metrics={ctrl.cashMetrics}
               accounts={ctrl.cashAccounts}
+              cashSummary={ctrl.cashSummary}
               onNavigateCashbook={() => navigate('/store-owner/cashbook')}
               onNavigateCashControl={() => navigate('/store-owner/cash-control?tab=pending')}
             />

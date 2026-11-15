@@ -1118,22 +1118,35 @@ export const InvoiceManagementPage: FC = () => {
               </div>
 
               <div className="pos-shift-table-responsive">
-                <table className="pos-shift-table">
+                <table className="pos-shift-table" style={{ width: '100%', minWidth: 1400, tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '3%' }} />
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '9.5%' }} />
+                    <col style={{ width: '8.5%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '6%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '8.5%' }} />
+                    <col style={{ width: '17.5%' }} />
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ width: 36, textAlign: 'center' }}>
+                      <th style={{ textAlign: 'center' }}>
                         <input type="checkbox" />
                       </th>
-                      <th style={{ width: 175 }}>Mã hóa đơn</th>
-                      <th style={{ width: 130 }}>Thời gian lập</th>
-                      <th style={{ minWidth: 140 }}>Khách hàng</th>
-                      <th style={{ minWidth: 130 }}>Người tạo</th>
-                      <th style={{ textAlign: 'right', width: 105 }}>Tổng tiền hàng</th>
-                      <th style={{ textAlign: 'right', width: 80 }}>Giảm giá</th>
-                      <th style={{ textAlign: 'right', width: 105 }}>Khách đã trả</th>
-                      <th style={{ textAlign: 'center', width: 125 }}>Phương thức TT</th>
-                      <th style={{ textAlign: 'center', width: 135 }}>Trạng thái</th>
-                      <th style={{ textAlign: 'center', width: 210 }}>Thao tác</th>
+                      <th>Mã hóa đơn</th>
+                      <th>Thời gian lập</th>
+                      <th>Khách hàng</th>
+                      <th>Người tạo</th>
+                      <th style={{ textAlign: 'right' }}>Tổng tiền hàng</th>
+                      <th style={{ textAlign: 'right' }}>Giảm giá</th>
+                      <th style={{ textAlign: 'right' }}>Khách đã trả</th>
+                      <th style={{ textAlign: 'center' }}>Phương thức TT</th>
+                      <th style={{ textAlign: 'center' }}>Trạng thái</th>
+                      <th style={{ textAlign: 'center' }}>Thao tác</th>
                     </tr>
                   </thead>
                   {paginatedInvoices.map((inv) => {
@@ -1744,19 +1757,31 @@ export const InvoiceManagementPage: FC = () => {
               </div>
 
               <div className="pos-shift-table-responsive">
-                <table className="pos-shift-table">
+                <table className="pos-shift-table" style={{ width: '100%', minWidth: 1380, tableLayout: 'fixed' }}>
+                  <colgroup>
+                    <col style={{ width: '13%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '7%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '9%' }} />
+                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '19%' }} />
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ width: 170 }}>Mã đơn đặt trước</th>
-                      <th style={{ minWidth: 140 }}>Khách hàng</th>
-                      <th style={{ minWidth: 150 }}>Người tạo</th>
-                      <th style={{ width: 140 }}>Thời gian hẹn nhận hàng</th>
-                      <th style={{ width: 110, textAlign: 'right' }}>Tổng tiền đơn</th>
-                      <th style={{ width: 90, textAlign: 'right' }}>Tiền cọc</th>
-                      <th style={{ width: 110, textAlign: 'right' }}>Còn phải thu</th>
-                      <th style={{ width: 120 }}>Phân bổ giữ kho</th>
-                      <th style={{ width: 130, textAlign: 'center' }}>Trạng thái</th>
-                      <th style={{ width: 180, textAlign: 'center' }}>Thao tác quầy</th>
+                      <th>Mã đơn đặt trước</th>
+                      <th>Khách hàng</th>
+                      <th>Người tạo</th>
+                      <th>Thời gian hẹn nhận hàng</th>
+                      <th style={{ textAlign: 'right' }}>Tổng tiền đơn</th>
+                      <th style={{ textAlign: 'right' }}>Tiền cọc</th>
+                      <th style={{ textAlign: 'right' }}>Còn phải thu</th>
+                      <th>Phân bổ giữ kho</th>
+                      <th style={{ textAlign: 'center' }}>Trạng thái</th>
+                      <th style={{ textAlign: 'center' }}>Thao tác quầy</th>
                     </tr>
                   </thead>
                   <tbody>

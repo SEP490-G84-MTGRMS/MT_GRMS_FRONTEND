@@ -364,6 +364,8 @@
   text-align: left;
   border-bottom: 1px solid #cbd5e1;
   white-space: nowrap;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .emp-table th.align-right,
@@ -386,6 +388,10 @@
   color: #1e293b;
   font-size: 12.5px;
   vertical-align: middle;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .emp-avatar-cell {

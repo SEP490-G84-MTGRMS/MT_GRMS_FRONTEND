@@ -8,6 +8,9 @@ import {
   Check,
   Copy,
   Loader2,
+  Eye,
+  EyeOff,
+  RefreshCw,
 } from 'lucide-react';
 import {
   TaxCalculationMethod,
@@ -27,6 +30,8 @@ interface CreateTaxSnapshotModalProps {
   customVatRate?: number | null;
   customPitRate?: number | null;
   vatReductionPercentage?: number | null;
+  existingFinalizedSnapshot?: HouseholdTaxSnapshotDto | null;
+  onOpenPinModal?: (tab?: 'change' | 'reset') => void;
   onSubmit: (request: CreateTaxSnapshotRequest) => Promise<HouseholdTaxSnapshotDto | void>;
 }
 
@@ -39,11 +44,16 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
   customVatRate,
   customPitRate,
   vatReductionPercentage,
+  existingFinalizedSnapshot,
+  onOpenPinModal,
   onSubmit,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [pin, setPin] = useState<string>('');
+  const [showPin, setShowPin] = useState<boolean>(false);
   const [notes, setNotes] = useState<string>('');
+  const [allowSupersede, setAllowSupersede] = useState<boolean>(false);
+  const [rectificationReason, setRectificationReason] = useState<string>('');
   const [isConfirmed, setIsConfirmed] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -55,7 +65,10 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
     if (isOpen) {
       setStep(1);
       setPin('');
+      setShowPin(false);
       setNotes('');
+      setAllowSupersede(false);
+      setRectificationReason('');
       setIsConfirmed(true);
       setIsSubmitting(false);
       setPinError(null);
@@ -74,23 +87,26 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
       ? `Quý ${summary.periodNumber}/${summary.year}`
       : `Cả năm ${summary.year}`;
 
-  const handlePinInput = (digit: string) => {
-    setPin((prev) => (prev.length < 4 ? prev + digit : prev));
-    setPinError(null);
-    setSubmitError(null);
-  };
-
-  const handlePinBackspace = () => {
-    setPin((prev) => prev.slice(0, -1));
-    setPinError(null);
-    setSubmitError(null);
-  };
+  const isExistingLocked = Boolean(existingFinalizedSnapshot || summary.isFinalized);
 
   const handleExecuteSeal = async () => {
-    if (pin.length !== 4) {
-      setPinError('Vui lòng nhập đầy đủ 4 số mã PIN.');
+    if (!/^\d{4,6}$/.test(pin)) {
+      setPinError('Vui lòng nhập từ 4 đến 6 chữ số mã PIN.');
       setStep(2);
       return;
+    }
+
+    if (isExistingLocked) {
+      if (!allowSupersede) {
+        setSubmitError('Kỳ thuế này đã có bản chốt trước đó. Vui lòng xác nhận cho phép thay thế (Supersede) ở Bước 1.');
+        setStep(1);
+        return;
+      }
+      if (!rectificationReason.trim()) {
+        setSubmitError('Vui lòng nhập lý do điều chỉnh thay thế bản chốt cũ ở Bước 1.');
+        setStep(1);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -114,6 +130,8 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
           : undefined,
         pin,
         notes: notes.trim() || undefined,
+        allowSupersedeExisting: allowSupersede,
+        rectificationReason: rectificationReason.trim() || undefined,
       });
 
       if (result) {
@@ -138,6 +156,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
           finalizedAtUtc: new Date().toISOString(),
           annualAccumulatedRevenue: summary.annualAccumulatedRevenue,
           auditSignatureHash: 'SEALED-HMAC-SHA256-SERVER-VALIDATED',
+          revisionNumber: existingFinalizedSnapshot?.revisionNumber ? existingFinalizedSnapshot.revisionNumber + 1 : 1,
         });
       }
     } catch (err: any) {
@@ -145,6 +164,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
       setSubmitError(msg);
       if (msg.toLowerCase().includes('pin')) {
         setPinError(msg);
+        setStep(2);
       }
     } finally {
       setIsSubmitting(false);
@@ -198,8 +218,8 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
           </button>
         </div>
 
-        {/* Step Progress Bar matching Prototype */}
-        <div style={{ padding: '16px 24px 0 24px' }}>
+        {/* Step Progress Bar */}
+        <div style={{ padding: '14px 20px 0 20px', flexShrink: 0 }}>
           <div className="step-bar">
             <div className={`step-item ${step === 1 ? 'active' : step > 1 ? 'completed' : ''}`}>
               <div className="step-circle">{step > 1 ? '✓' : '1'}</div>
@@ -223,6 +243,82 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
               ──────────────────────────────────────────────────────────────── */}
           {step === 1 && (
             <div>
+              {/* Cảnh báo nếu kỳ này đã được chốt trước đó (Supersede) */}
+              {isExistingLocked && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    borderRadius: 10,
+                    background: '#FFFBEB',
+                    border: '1px solid #FDE68A',
+                    marginBottom: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <RefreshCw size={20} className="text-orange flex-shrink-0" style={{ marginTop: 2 }} />
+                    <div style={{ flex: 1 }}>
+                      <strong style={{ fontSize: '0.86rem', color: '#92400E', display: 'block', marginBottom: 4 }}>
+                        Kỳ tính thuế này đã có bản chốt sổ trước đó!
+                      </strong>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '0.8rem', color: '#B45309', lineHeight: 1.45 }}>
+                        Bản chốt trước: <strong>{existingFinalizedSnapshot?.id || summary.snapshotId}</strong>
+                        {existingFinalizedSnapshot?.revisionNumber && (
+                          <span> (Lần {existingFinalizedSnapshot.revisionNumber})</span>
+                        )}.
+                        Theo quy định kế toán, việc chốt lại sẽ chuyển bản chốt cũ sang trạng thái{' '}
+                        <strong>Đã bị thay thế (Superseded)</strong> và tạo một bản chốt mới tăng Revision.
+                      </p>
+
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          fontSize: '0.82rem',
+                          color: '#78350F',
+                          marginBottom: 8,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={allowSupersede}
+                          onChange={(e) => setAllowSupersede(e.target.checked)}
+                          style={{ width: 16, height: 16, accentColor: '#D97706', cursor: 'pointer' }}
+                        />
+                        <span>Tôi xác nhận chốt lại và thay thế bản chốt cũ của kỳ này</span>
+                      </label>
+
+                      {allowSupersede && (
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#92400E', marginBottom: 4 }}>
+                            Lý do thay thế / Số hiệu quyết định thanh kiểm tra thuế (Bắt buộc):
+                          </label>
+                          <textarea
+                            value={rectificationReason}
+                            onChange={(e) => setRectificationReason(e.target.value)}
+                            placeholder="Ví dụ: Điều chỉnh doanh thu kê khai bổ sung theo Quyết định số 15/QĐ-CCT ngày 12/11/2026..."
+                            rows={2}
+                            style={{
+                              width: '100%',
+                              padding: '8px 10px',
+                              borderRadius: 6,
+                              border: '1px solid #FCD34D',
+                              fontSize: '0.82rem',
+                              boxSizing: 'border-box',
+                              outline: 'none',
+                              fontFamily: 'inherit',
+                              background: '#FFFFFF',
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="tax-threshold-alert alert-teal" style={{ marginBottom: 16 }}>
                 <FileCheck size={18} className="flex-shrink-0 text-teal" style={{ marginTop: 2 }} />
                 <div>
@@ -230,7 +326,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                     ✓ Đã đối soát đủ 7 sổ kế toán TT152 (S1a → S3a)
                   </strong>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: '#0F766E', lineHeight: 1.45 }}>
-                    Số liệu doanh thu, thuế GTGT và thuế TNCN đã được đối chiếu khớp với Sổ quỹ và hóa đơn bán hàng.
+                    Số liệu doanh thu, thuế GTGT và thuế TNCN đã được đối chiếu khớp với Sổ quỹ và hóa đơn bán lẻ.
                   </p>
                 </div>
               </div>
@@ -239,8 +335,8 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: 12,
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                  gap: 10,
                   marginBottom: 16,
                 }}
               >
@@ -324,8 +420,13 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                 </button>
                 <button
                   type="button"
+                  disabled={isExistingLocked && (!allowSupersede || !rectificationReason.trim())}
                   onClick={() => setStep(2)}
                   className="btn-primary-pill"
+                  style={{
+                    opacity: isExistingLocked && (!allowSupersede || !rectificationReason.trim()) ? 0.6 : 1,
+                    cursor: isExistingLocked && (!allowSupersede || !rectificationReason.trim()) ? 'not-allowed' : 'pointer',
+                  }}
                 >
                   Tiếp tục: Nhập PIN bảo mật →
                 </button>
@@ -334,7 +435,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
           )}
 
           {/* ────────────────────────────────────────────────────────────────
-              BƯỚC 2: NHẬP MÃ PIN BẢO MẬT CỦA CHỦ CỬA HÀNG
+              BƯỚC 2: NHẬP MÃ PIN BẢO MẬT (SỬ DỤNG BÀN PHÍM MÁY TÍNH TRỰC TIẾP)
               ──────────────────────────────────────────────────────────────── */}
           {step === 2 && (
             <div>
@@ -345,41 +446,113 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                     Bảo mật khóa dữ liệu bất biến (Read-only)
                   </strong>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: '#991B1B', lineHeight: 1.45 }}>
-                    Sau khi niêm phong, toàn bộ số liệu 7 sổ kế toán và tờ khai thuế của <strong>{periodLabel}</strong> sẽ bị khóa vĩnh viễn với chữ ký số HMAC server-side. Nhập mã PIN 4 số của Chủ cửa hàng để tiếp tục.
+                    Sau khi niêm phong, toàn bộ số liệu 7 sổ kế toán và tờ khai thuế của <strong>{periodLabel}</strong> sẽ bị khóa vĩnh viễn với chữ ký số HMAC server-side. Nhập mã PIN bảo mật (4-6 số) của Chủ cửa hàng để tiếp tục.
                   </p>
                 </div>
               </div>
 
-              {/* PIN Dots */}
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
-                  Nhập mã PIN xác thực (4 số):
+              {/* Native Keyboard PIN Input */}
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>
+                  Nhập mã PIN xác thực (4 – 6 số):
                 </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    gap: 16,
-                    margin: '12px 0 16px',
-                  }}
-                >
-                  {[0, 1, 2, 3].map((index) => {
-                    const hasDigit = pin.length > index;
-                    return (
-                      <div
-                        key={index}
+
+                <div style={{ position: 'relative', maxWidth: 280, margin: '0 auto 10px auto' }}>
+                  <input
+                    type={showPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    autoFocus
+                    maxLength={6}
+                    value={pin}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setPin(val);
+                      setPinError(null);
+                      setSubmitError(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && pin.length >= 4 && isConfirmed) {
+                        e.preventDefault();
+                        setStep(3);
+                      }
+                    }}
+                    placeholder="Nhập 4-6 số PIN"
+                    style={{
+                      width: '100%',
+                      padding: '12px 44px 12px 16px',
+                      fontSize: '1.35rem',
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      borderRadius: 10,
+                      border: pinError ? '2px solid #EF4444' : '2px solid #0F766E',
+                      background: '#F8FAFC',
+                      letterSpacing: showPin ? '4px' : '8px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      boxShadow: '0 2px 8px rgba(15, 118, 110, 0.1)',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    style={{
+                      position: 'absolute',
+                      right: 12,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#64748B',
+                      cursor: 'pointer',
+                      padding: 4,
+                    }}
+                    title={showPin ? 'Ẩn mã PIN' : 'Hiện mã PIN'}
+                  >
+                    {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+
+                <div style={{ fontSize: '0.76rem', color: '#64748B', marginBottom: 12 }}>
+                  Nhập số trực tiếp bằng bàn phím máy tính • Nhấn Enter để tiếp tục
+                </div>
+
+                {/* Quick actions for PIN management */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 16, fontSize: '0.78rem', marginBottom: 14 }}>
+                  {onOpenPinModal && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onOpenPinModal('reset')}
                         style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: '50%',
-                          border: '2px solid #0F766E',
-                          background: hasDigit ? '#0F766E' : '#ffffff',
-                          transition: 'all 0.15s ease',
-                          boxShadow: hasDigit ? '0 0 8px rgba(15, 118, 110, 0.4)' : 'none',
+                          background: 'none',
+                          border: 'none',
+                          color: '#0F766E',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: 0,
                         }}
-                      />
-                    );
-                  })}
+                      >
+                        Quên mã PIN? (Khôi phục bằng mật khẩu)
+                      </button>
+                      <span style={{ color: '#CBD5E1' }}>|</span>
+                      <button
+                        type="button"
+                        onClick={() => onOpenPinModal('change')}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#475569',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                          padding: 0,
+                        }}
+                      >
+                        Đổi mã PIN
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {pinError && (
@@ -389,7 +562,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                       fontSize: '0.82rem',
                       fontWeight: 700,
                       background: '#FEF2F2',
-                      padding: '6px 12px',
+                      padding: '6px 14px',
                       borderRadius: 8,
                       marginBottom: 12,
                       border: '1px solid #FCA5A5',
@@ -399,71 +572,6 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                     {pinError}
                   </div>
                 )}
-              </div>
-
-              {/* Numeric Keypad */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: 8,
-                  maxWidth: 220,
-                  margin: '0 auto 16px auto',
-                }}
-              >
-                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-                  <button
-                    key={digit}
-                    type="button"
-                    onClick={() => handlePinInput(digit)}
-                    style={{
-                      padding: '10px 0',
-                      fontSize: '1.2rem',
-                      fontWeight: 800,
-                      color: '#0F172A',
-                      background: '#F8FAFC',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      transition: 'all 0.12s ease',
-                    }}
-                  >
-                    {digit}
-                  </button>
-                ))}
-                <div />
-                <button
-                  type="button"
-                  onClick={() => handlePinInput('0')}
-                  style={{
-                    padding: '10px 0',
-                    fontSize: '1.2rem',
-                    fontWeight: 800,
-                    color: '#0F172A',
-                    background: '#F8FAFC',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                  }}
-                >
-                  0
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePinBackspace}
-                  style={{
-                    padding: '10px 0',
-                    fontSize: '0.82rem',
-                    fontWeight: 700,
-                    color: '#64748B',
-                    background: '#F1F5F9',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Xóa
-                </button>
               </div>
 
               {/* Confirmation Statement */}
@@ -501,12 +609,12 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  disabled={pin.length !== 4 || !isConfirmed}
+                  disabled={pin.length < 4 || !isConfirmed}
                   onClick={() => setStep(3)}
                   className="btn-primary-pill"
                   style={{
-                    opacity: pin.length !== 4 || !isConfirmed ? 0.6 : 1,
-                    cursor: pin.length !== 4 || !isConfirmed ? 'not-allowed' : 'pointer',
+                    opacity: pin.length < 4 || !isConfirmed ? 0.6 : 1,
+                    cursor: pin.length < 4 || !isConfirmed ? 'not-allowed' : 'pointer',
                   }}
                 >
                   Tiếp tục: Ký niêm phong HMAC →
@@ -549,6 +657,14 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                       <span style={{ color: '#64748B' }}>Kỳ kê khai:</span>
                       <strong style={{ color: '#0F172A' }}>{periodLabel}</strong>
                     </div>
+                    {isExistingLocked && allowSupersede && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ color: '#D97706' }}>Hình thức:</span>
+                        <strong className="text-orange">
+                          Chốt lại & Thay thế bản cũ (Lần {existingFinalizedSnapshot?.revisionNumber ? existingFinalizedSnapshot.revisionNumber + 1 : 2})
+                        </strong>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ color: '#64748B' }}>Doanh thu tính thuế:</span>
                       <strong style={{ color: '#0F172A' }}>{formatMoney(summary.taxableRevenueInPeriod)}</strong>
@@ -559,7 +675,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #E2E8F0', paddingTop: 6 }}>
                       <span style={{ color: '#64748B' }}>Xác thực mã PIN:</span>
-                      <span style={{ color: '#059669', fontWeight: 700 }}>✓ Đã nhập (4/4 số)</span>
+                      <span style={{ color: '#059669', fontWeight: 700 }}>✓ Đã nhập ({pin.length} số)</span>
                     </div>
                   </div>
 
@@ -643,6 +759,12 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
                       <span style={{ color: '#64748B' }}>Mã tham chiếu (Snapshot ID):</span>
                       <strong className="font-mono text-teal">{sealedSnapshot.id}</strong>
                     </div>
+                    {sealedSnapshot.revisionNumber && sealedSnapshot.revisionNumber > 1 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ color: '#64748B' }}>Lần chốt (Revision):</span>
+                        <strong className="text-orange">Lần {sealedSnapshot.revisionNumber} (Thay thế bản cũ)</strong>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                       <span style={{ color: '#64748B' }}>Thời điểm niêm phong:</span>
                       <strong>{new Date(sealedSnapshot.finalizedAtUtc).toLocaleString('vi-VN')}</strong>

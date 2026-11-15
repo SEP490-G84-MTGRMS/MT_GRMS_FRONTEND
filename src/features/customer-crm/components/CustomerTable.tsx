@@ -1,9 +1,9 @@
-import type { FC } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { useState, useRef, useEffect, type FC } from 'react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import type { CustomerDto } from '../types/customer.types';
 import { formatMoney } from '../../finance/utils/formatters';
-import { sanitizeCustomerText, normalizeDebtLimit } from '../utils/customerValidation';
+import { sanitizeCustomerText } from '../utils/customerValidation';
 
 export interface CustomerTableProps {
   customers: CustomerDto[];
@@ -26,169 +26,214 @@ export const CustomerTable: FC<CustomerTableProps> = ({
   onCollect,
   onViewLedger,
   currentPage = 1,
-  pageSize = 10,
+  pageSize = 15,
   onPageChange,
   onPageSizeChange,
 }) => {
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
+
   const displayedCustomers = onPageChange
     ? customers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
     : customers;
 
-  if (isLoading) {
-    return (
-      <div className="card" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <p style={{ margin: 0, fontWeight: 600 }}>Đang tải danh sách khách hàng...</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+    updateScrollState();
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateScrollState);
+      observer.observe(bodyRef.current);
+    }
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      observer?.disconnect();
+    };
+  }, [displayedCustomers, pageSize]);
 
-  if (customers.length === 0) {
-    return (
-      <div className="card" style={{ padding: '56px 24px', textAlign: 'center' }}>
-        <div
-          style={{
-            width: '56px',
-            height: '56px',
-            borderRadius: '50%',
-            background: 'var(--teal-light, #f0fdfa)',
-            color: 'var(--teal-primary, #0f766e)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px',
-          }}
-        >
-          <AlertCircle className="w-8 h-8" />
-        </div>
-        <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main, #0f172a)', margin: '0 0 8px' }}>
-          Không tìm thấy khách hàng nào
-        </h4>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #475569)', maxWidth: '460px', margin: '0 auto' }}>
-          Không có kết quả nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại.
-        </p>
-      </div>
-    );
-  }
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '34%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '18%' }} />
+      <col style={{ width: '14%' }} />
+      <col style={{ width: '22%' }} />
+    </colgroup>
+  );
 
   return (
-    <div className="card">
-      <div className="table-wrap">
-        <table className="data-table">
+    <div className="so-list-table-card">
+      {/* ── Fixed Table Header ── */}
+      <div
+        ref={headerRef}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
+      >
+        <table className="so-list-table" style={{ minWidth: 880, tableLayout: 'fixed' }}>
+          {tableColGroup}
           <thead>
             <tr>
-              <th>Khách hàng</th>
-              <th>Mã số thuế</th>
-              <th>Khách nợ / Hạn mức tín dụng</th>
-              <th className="text-right">Điểm tích lũy</th>
-              <th className="text-right">Thao tác</th>
+              <th className="so-list-th">Khách hàng</th>
+              <th className="so-list-th">Mã số thuế</th>
+              <th className="so-list-th" style={{ textAlign: 'right' }}>Công nợ hiện tại</th>
+              <th className="so-list-th" style={{ textAlign: 'right' }}>Điểm tích lũy</th>
+              <th className="so-list-th" style={{ textAlign: 'right', paddingRight: '16px' }}>Thao tác</th>
             </tr>
           </thead>
-          <tbody id="crm-cust-tbody">
-            {displayedCustomers.map((c) => {
-              const debt = Math.max(0, Number(c.currentDebtAR) || 0);
-              const limit = normalizeDebtLimit(c.debtLimit);
-              const pct = limit > 0 ? Math.min(100, Math.round((debt / limit) * 100)) : 0;
-              const isOverLimit = limit > 0 && debt > limit;
-              const hasDebt = debt > 0;
-              const fillCls = isOverLimit ? 'red' : pct >= 80 ? 'amber' : 'green';
-              const code = c.customerCode || c.id.slice(0, 8).toUpperCase();
-              const safeFullName = sanitizeCustomerText(c.fullName, 'Khách hàng');
-              const safeCompanyName = sanitizeCustomerText(c.companyName);
-
-              return (
-                <tr
-                  key={c.id}
-                  onClick={() => onSelect(c)}
-                  className="row-clickable"
-                >
-                  {/* Cột 1: Khách hàng */}
-                  <td>
-                    <div className="fw-700">
-                      {safeFullName}
-                      {isOverLimit && (
-                        <span className="badge badge-red" style={{ marginLeft: 6 }}>
-                          Vượt hạn mức
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-faint" style={{ fontSize: '11.5px', marginTop: 2 }}>
-                      <span className="font-mono">{code}</span> • {c.phoneNumber || ''} • {c.membershipTier || 'Thành viên'}
-                      {safeCompanyName ? ` (${safeCompanyName})` : ''}
-                    </div>
-                  </td>
-
-                  {/* Cột 2: Mã số thuế */}
-                  <td className="font-mono">{c.taxCode || '—'}</td>
-
-                  {/* Cột 3: Khách nợ / Hạn mức tín dụng */}
-                  <td style={{ minWidth: '210px' }}>
-                    <div className="flex-between" style={{ fontSize: '12px', marginBottom: '4px' }}>
-                      <span className={`num fw-700 ${isOverLimit ? 'text-red' : hasDebt ? 'text-amber' : ''}`}>
-                        {formatMoney(debt)}
-                      </span>
-                      <span className="num text-faint">/ {formatMoney(limit)}</span>
-                    </div>
-                    <div className="progress-bar">
-                      <div
-                        className={`progress-fill ${fillCls}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </td>
-
-                  {/* Cột 4: Điểm tích lũy */}
-                  <td className="text-right num fw-600">
-                    {(c.loyaltyPoints || 0).toLocaleString('vi-VN')} điểm
-                  </td>
-
-                  {/* Cột 5: Thao tác */}
-                  <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex-gap" style={{ justifyContent: 'flex-end', gap: '6px' }}>
-                      {hasDebt && (
-                        <button
-                          type="button"
-                          className="btn btn-warning btn-sm btn-collect-debt"
-                          data-action="collect-debt"
-                          onClick={() => onCollect(c)}
-                          title="Lập phiếu thu nợ & tạo mã VietQR SePay"
-                        >
-                          Thu nợ
-                        </button>
-                      )}
-                      {onViewLedger && (
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => onViewLedger(c)}
-                          title="Xem sổ chi tiết biến động công nợ"
-                        >
-                          Sổ nợ
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        onClick={() => onEdit(c)}
-                        title="Chỉnh sửa thông tin khách hàng"
-                      >
-                        Sửa
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
         </table>
       </div>
 
-      {/* Phân trang */}
+      {/* ── Scrollable Table Body ── */}
+      <div
+        ref={bodyRef}
+        className="so-list-table-body"
+        onScroll={handleBodyScroll}
+      >
+        {isLoading ? (
+          <div style={{ padding: '60px 24px', textAlign: 'center', color: '#64748b' }}>
+            <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 10px', color: '#0f766e' }} />
+            <p style={{ margin: 0, fontWeight: 600, fontSize: '13px' }}>Đang tải danh sách khách hàng &amp; công nợ...</p>
+          </div>
+        ) : customers.length === 0 ? (
+          <div style={{ padding: '56px 24px', textAlign: 'center' }}>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                background: '#f0fdfa',
+                color: '#0f766e',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+              }}
+            >
+              <AlertCircle size={24} />
+            </div>
+            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>
+              Không tìm thấy khách hàng nào
+            </h4>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', maxWidth: '420px', margin: '0 auto' }}>
+              Không có kết quả nào khớp với điều kiện tìm kiếm hoặc bộ lọc hiện tại.
+            </p>
+          </div>
+        ) : (
+          <table className="so-list-table" style={{ minWidth: 880, tableLayout: 'fixed' }}>
+            {tableColGroup}
+            <tbody id="crm-cust-tbody">
+              {displayedCustomers.map((c) => {
+                const debt = Math.max(0, Number(c.currentDebtAR) || 0);
+                const hasDebt = debt > 0;
+                const code = c.customerCode || c.id.slice(0, 8).toUpperCase();
+                const safeFullName = sanitizeCustomerText(c.fullName, 'Khách hàng');
+                const safeCompanyName = sanitizeCustomerText(c.companyName);
+
+                return (
+                  <tr
+                    key={c.id}
+                    onClick={() => onSelect(c)}
+                    className="so-list-row row-clickable"
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {/* Cột 1: Khách hàng */}
+                    <td className="so-list-td">
+                      <div style={{ fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                        <span>{safeFullName}</span>
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: 2 }}>
+                        <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{code}</span>
+                        {c.phoneNumber ? ` • ${c.phoneNumber}` : ''}
+                        {safeCompanyName ? ` (${safeCompanyName})` : ''}
+                      </div>
+                    </td>
+
+                    {/* Cột 2: Mã số thuế */}
+                    <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', color: '#334155' }}>
+                      {c.taxCode || '—'}
+                    </td>
+
+                    {/* Cột 3: Công nợ hiện tại */}
+                    <td className="so-list-td" style={{ textAlign: 'right' }}>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          color: hasDebt ? '#b45309' : '#0f766e',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontSize: '13px',
+                        }}
+                      >
+                        {formatMoney(debt)}
+                      </span>
+                    </td>
+
+                    {/* Cột 4: Điểm tích lũy */}
+                    <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 600, color: '#334155' }}>
+                      {(c.loyaltyPoints || 0).toLocaleString('vi-VN')} điểm
+                    </td>
+
+                    {/* Cột 5: Thao tác */}
+                    <td className="so-list-td" style={{ textAlign: 'right', paddingRight: '14px' }} onClick={(e) => e.stopPropagation()}>
+                      <div className="so-list-actions">
+                        {hasDebt && (
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--warning"
+                            data-action="collect-debt"
+                            onClick={() => onCollect(c)}
+                            title="Lập phiếu thu nợ & tạo mã VietQR SePay"
+                          >
+                            Thu nợ
+                          </button>
+                        )}
+                        {onViewLedger && (
+                          <button
+                            type="button"
+                            className="so-list-action-btn"
+                            onClick={() => onViewLedger(c)}
+                            title="Xem sổ chi tiết biến động công nợ"
+                          >
+                            Sổ nợ
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="so-list-action-btn"
+                          onClick={() => onEdit(c)}
+                          title="Chỉnh sửa thông tin khách hàng"
+                        >
+                          Sửa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* ── Pinned Pagination Footer ── */}
       {onPageChange && (
         <TablePagination
           currentPage={currentPage}
           pageSize={pageSize}
           totalItems={customers.length}
           itemLabel="khách hàng"
+          pageSizeOptions={[15, 25, 50]}
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
         />
@@ -196,3 +241,6 @@ export const CustomerTable: FC<CustomerTableProps> = ({
     </div>
   );
 };
+
+export default CustomerTable;
+

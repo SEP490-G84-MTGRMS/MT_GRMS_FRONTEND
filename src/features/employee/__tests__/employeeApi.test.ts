@@ -294,9 +294,9 @@ describe('employeeApi', () => {
       data: { success: true },
     });
 
-    const success = await employeeApi.deleteEmployee('emp-1');
+    const result = await employeeApi.deleteEmployee('emp-1');
     expect(httpClient.delete).toHaveBeenCalledWith('/employees/emp-1');
-    expect(success).toBe(true);
+    expect(result.success).toBe(true);
   });
 
   it('scheduleApi.getRawSchedules: gọi GET /schedules và trả về đầy đủ ScheduleResponse[]', async () => {

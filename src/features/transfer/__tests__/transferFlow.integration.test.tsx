@@ -152,6 +152,56 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
       expect(screen.getAllByText('Phiếu tạm').length).toBeGreaterThan(0);
     });
 
+    it('TC-INT-01b: Filters transfers by note keyword and resets filters correctly', async () => {
+      render(
+        <MemoryRouter>
+          <TransferListPage />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('TRF-20261114-001')).toBeInTheDocument();
+        expect(screen.getByText('TRF-20261114-002')).toBeInTheDocument();
+      });
+
+      // Search by note "mì gói"
+      const searchInput = screen.getByPlaceholderText('Mã phiếu, ghi chú...');
+      fireEvent.change(searchInput, { target: { value: 'mì gói' } });
+      const searchBtn = screen.getByText('Tìm kiếm');
+      fireEvent.click(searchBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByText('TRF-20261114-001')).not.toBeInTheDocument();
+        expect(screen.getByText('TRF-20261114-002')).toBeInTheDocument();
+      });
+
+      // Click Reset
+      const resetBtn = screen.getByText('Đặt lại');
+      fireEvent.click(resetBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText('TRF-20261114-001')).toBeInTheDocument();
+        expect(screen.getByText('TRF-20261114-002')).toBeInTheDocument();
+      });
+    });
+
+    it('TC-INT-01c: Parses deep link query parameters on mount', async () => {
+      render(
+        <MemoryRouter initialEntries={['/store-owner/transfers?search=TRF-20261114-001&status=In-Transit']}>
+          <TransferListPage />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(transferService.list).toHaveBeenCalledWith(
+          expect.objectContaining({
+            search: 'TRF-20261114-001',
+            statuses: ['InTransit'],
+          })
+        );
+      });
+    });
+
     it('TC-INT-02: Clicking on transfer row opens TransferDetailModal with correct details', async () => {
       render(
         <MemoryRouter>

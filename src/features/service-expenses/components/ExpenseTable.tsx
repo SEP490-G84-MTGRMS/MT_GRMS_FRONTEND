@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { FC } from 'react';
 import {
   EyeIcon,
   CloseIcon,
   AuditIcon,
+  CheckCircleIcon,
 } from '../../admin/components';
 import { TablePagination } from '../../../components/common';
 import {
@@ -12,7 +13,7 @@ import {
 } from '../types/expense.types';
 import { ExpenseStatusBadge } from './ExpenseStatusBadge';
 import { formatMoney } from '../../finance/utils/formatters';
-import { MoreHorizontal, ExternalLink } from 'lucide-react';
+import { MoreHorizontal, ExternalLink, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export interface ExpenseTableProps {
@@ -26,6 +27,7 @@ export interface ExpenseTableProps {
   onPageSizeChange?: (newPageSize: number) => void;
   onViewBill: (url: string, title: string) => void;
   onPay: (item: ServiceExpenseDto) => void;
+  onApprove?: (item: ServiceExpenseDto) => void;
   onCancel: (item: ServiceExpenseDto) => void;
 }
 
@@ -40,330 +42,448 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   onPageSizeChange,
   onViewBill,
   onPay,
+  onApprove,
   onCancel,
 }) => {
   const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  if (isLoading) {
-    return (
-      <div className="expense-table-container" style={{ padding: '24px' }}>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div
-            key={i}
-            className="skeleton-line"
-            style={{ height: '36px', marginBottom: '12px' }}
-          />
-        ))}
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.expense-row-menu')) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [openMenuId]);
 
-  if (data.length === 0) {
-    return (
-      <div
-        className="expense-table-container"
-        style={{ padding: '64px 24px', textAlign: 'center' }}
-      >
-        <div
-          style={{
-            width: '56px',
-            height: '56px',
-            background: 'var(--brand-50, #F0FDFA)',
-            borderRadius: '50%',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '16px',
-            color: 'var(--brand-700, #115E59)',
-          }}
-        >
-          <AuditIcon size={28} color="#115E59" />
-        </div>
-        <h4
-          style={{
-            fontSize: '1rem',
-            fontWeight: 700,
-            color: 'var(--text-main, #111827)',
-            margin: '0 0 8px',
-          }}
-        >
-          Không có khoản phải trả nào
-        </h4>
-        <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
-          Bấm "+ Ghi nhận chi phí" để thêm hóa đơn chi phí vận hành mới.
-        </p>
-      </div>
-    );
-  }
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+    updateScrollState();
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateScrollState);
+      observer.observe(bodyRef.current);
+    }
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      observer?.disconnect();
+    };
+  }, [data, pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: 130 }} />
+      <col style={{ width: 230 }} />
+      <col style={{ width: 140 }} />
+      <col style={{ width: 240 }} />
+      <col style={{ width: 120 }} />
+      <col style={{ width: 140 }} />
+      <col style={{ width: 130 }} />
+      <col style={{ width: 180 }} />
+    </colgroup>
+  );
 
   return (
-    <div className="expense-table-container">
-      <div style={{ overflowX: 'auto' }}>
-        <table className="expense-table">
+    <div className="so-list-table-card">
+      {/* ── Fixed Table Header ── */}
+      <div
+        ref={headerRef}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
+      >
+        <table className="so-list-table" style={{ minWidth: 1310, tableLayout: 'fixed' }}>
+          {tableColGroup}
           <thead>
             <tr>
-              <th>Mã phiếu chi</th>
-              <th>Danh mục chi phí</th>
-              <th>Chi nhánh</th>
-              <th>Nhà cung cấp / Diễn giải</th>
-              <th>Hạn thanh toán</th>
-              <th style={{ textAlign: 'right' }}>Số tiền (VNĐ)</th>
-              <th style={{ textAlign: 'left' }}>Trạng thái</th>
-              <th style={{ textAlign: 'right' }}>Thao tác</th>
+              <th className="so-list-th">Mã phiếu chi</th>
+              <th className="so-list-th">Danh mục chi phí</th>
+              <th className="so-list-th">Chi nhánh</th>
+              <th className="so-list-th">Nhà cung cấp / Diễn giải</th>
+              <th className="so-list-th">Hạn thanh toán</th>
+              <th className="so-list-th" style={{ textAlign: 'right' }}>Số tiền (VNĐ)</th>
+              <th className="so-list-th" style={{ textAlign: 'left' }}>Trạng thái</th>
+              <th className="so-list-th" style={{ textAlign: 'right', paddingRight: '16px' }}>Thao tác</th>
             </tr>
           </thead>
-          <tbody>
-            {data.map((item) => (
-              <tr key={item.expenseId}>
-                <td className="expense-table-id">
-                  <span className="mono-badge">{item.voucherCode || item.expenseId}</span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span className="expense-table-category">
-                      {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
-                    </span>
-                    {item.isFlaggedAsSuspiciousSplit && (
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          color: '#B91C1C',
-                          background: '#FEF2F2',
-                          border: '1px solid #FECACA',
-                          borderRadius: '9999px',
-                          padding: '1px 7px',
-                        }}
-                        title={item.suspiciousReason || 'Cảnh báo xé nhỏ hạn mức chi (Anti-Splitting)'}
-                      >
-                        ⚠️ Nghi vấn
-                      </span>
-                    )}
-                    {item.isRecurring && (
-                      <span
-                        className="badge-recurring"
-                        title={'Chi phí lặp lại định kỳ hàng tháng (ngày ' + (item.recurringDayOfMonth || 1) + ')'}
-                      >
-                        Định kỳ
-                      </span>
-                    )}
-                    {item.isTaxDeductible === false ? (
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          color: '#B45309',
-                          background: '#FEF3C7',
-                          border: '1px solid #FDE68A',
-                          borderRadius: '9999px',
-                          padding: '1px 7px',
-                        }}
-                        title="Khoản chi nằm trong danh sách loại trừ thuế (Blacklist)"
-                      >
-                        Loại trừ thuế
-                      </span>
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: '0.68rem',
-                          fontWeight: 600,
-                          color: '#0F766E',
-                          background: '#F0FDFA',
-                          border: '1px solid #CCFBF1',
-                          borderRadius: '9999px',
-                          padding: '1px 7px',
-                        }}
-                        title="Chi phí hợp lệ phục vụ sản xuất kinh doanh"
-                      >
-                        Hợp lệ thuế
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td style={{ color: '#475569' }}>
-                  {item.branchName || item.branchId}
-                </td>
-                <td>
-                  <div className="expense-table-vendor" style={{ fontWeight: 600 }}>{item.vendorName}</div>
-                  {item.note && (
-                    <div
-                      style={{
-                        fontSize: '0.74rem',
-                        color: '#94a3b8',
-                        maxWidth: '220px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                      title={item.note}
-                    >
-                      {item.note}
-                    </div>
-                  )}
-                </td>
-                <td style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                  {item.dueDate}
-                </td>
-                <td className="expense-table-amount" style={{ fontWeight: 800, textAlign: 'right' }}>
-                  {formatMoney(item.amount)}
-                </td>
-                <td style={{ textAlign: 'left' }}>
-                  <ExpenseStatusBadge status={item.status} dueDate={item.dueDate} />
-                </td>
-                <td style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', position: 'relative' }}>
-                    {item.attachedBillUrl && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onViewBill(
-                            item.attachedBillUrl!,
-                            `Chứng từ ${item.expenseId}`
-                          )
-                        }
-                        title="Xem hóa đơn đính kèm"
-                        className="admin-table-btn"
-                      >
-                        <EyeIcon size={12} color="currentColor" />
-                        <span>Hóa đơn</span>
-                      </button>
-                    )}
-
-                    {item.status === 'Pending' && canManageExpenses && (
-                      <button
-                        type="button"
-                        onClick={() => onPay(item)}
-                        title="Chi tiền thanh toán khoản này"
-                        style={{
-                          background: 'var(--brand-700, #115E59)',
-                          color: '#ffffff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          padding: '6px 14px',
-                          fontSize: '0.82rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                        }}
-                      >
-                        <span>Chi tiền</span>
-                      </button>
-                    )}
-
-                    
-                    {item.status === 'Paid' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const targetSearch = item.voucherCode || item.invoiceNumber || item.expenseId;
-                          navigate('/store-owner/cashbook?search=' + encodeURIComponent(targetSearch));
-                        }}
-                        title="Xem phiếu chi dòng tiền trong Sổ quỹ Cashbook"
-                        style={{
-                          background: '#F0FDFA',
-                          border: '1px solid #CCFBF1',
-                          color: '#0F766E',
-                          borderRadius: '8px',
-                          padding: '6px 12px',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                        }}
-                      >
-                        <ExternalLink size={12} />
-                        <span>Sổ quỹ</span>
-                      </button>
-                    )}
-
-                    {/* Poka-yoke: Danger action (Cancel) hidden in ⋯ menu, Owner/Manager only */}
-                    {item.status === 'Pending' && canManageExpenses && (
-                      <div style={{ position: 'relative' }}>
-                        <button
-                          type="button"
-                          onClick={() => setOpenMenuId(openMenuId === item.expenseId ? null : item.expenseId)}
-                          style={{
-                            background: '#F1F5F9',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            padding: '6px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: '#64748B',
-                          }}
-                          title="Tùy chọn khác"
-                        >
-                          <MoreHorizontal size={14} />
-                        </button>
-
-                        {openMenuId === item.expenseId && (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              right: 0,
-                              top: '100%',
-                              marginTop: 4,
-                              background: '#ffffff',
-                              border: '1px solid #E2E8F0',
-                              borderRadius: '8px',
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                              zIndex: 20,
-                              minWidth: '140px',
-                              padding: '4px',
-                            }}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMenuId(null);
-                                onCancel(item);
-                              }}
-                              style={{
-                                width: '100%',
-                                textAlign: 'left',
-                                padding: '8px 12px',
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--danger-700, #B91C1C)',
-                                fontSize: '0.82rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 6,
-                                borderRadius: '4px',
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = '#FEF2F2')}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                            >
-                              <CloseIcon size={12} color="#B91C1C" />
-                              <span>Hủy khoản chi</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* ── Scrollable Table Body ── */}
+      <div
+        ref={bodyRef}
+        className="so-list-table-body"
+        onScroll={handleBodyScroll}
+      >
+        {isLoading ? (
+          <div style={{ padding: '60px 24px', textAlign: 'center', color: '#64748b' }}>
+            <Loader2 size={24} className="animate-spin" style={{ margin: '0 auto 10px', color: '#0f766e' }} />
+            <p style={{ margin: 0, fontWeight: 600, fontSize: '13px' }}>Đang tải danh sách chi phí vận hành...</p>
+          </div>
+        ) : data.length === 0 ? (
+          <div style={{ padding: '64px 24px', textAlign: 'center' }}>
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                background: '#f0fdfa',
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '12px',
+                color: '#0f766e',
+              }}
+            >
+              <AuditIcon size={24} color="#0f766e" />
+            </div>
+            <h4
+              style={{
+                fontSize: '1rem',
+                fontWeight: 700,
+                color: '#0f172a',
+                margin: '0 0 6px',
+              }}
+            >
+              Không có khoản phải trả nào
+            </h4>
+            <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
+              Bấm "+ Lập phiếu chi phí" để thêm hóa đơn chi phí vận hành mới.
+            </p>
+          </div>
+        ) : (
+          <table className="so-list-table" style={{ minWidth: 1310, tableLayout: 'fixed' }}>
+            {tableColGroup}
+            <tbody>
+              {data.map((item) => (
+                <tr key={item.expenseId} className="so-list-row">
+                  {/* Mã phiếu */}
+                  <td className="so-list-td">
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono, monospace)',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        backgroundColor: '#f1f5f9',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        color: '#0f172a',
+                      }}
+                    >
+                      {item.voucherCode || item.expenseId}
+                    </span>
+                  </td>
+
+                  {/* Danh mục chi phí */}
+                  <td className="so-list-td">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, color: '#0f172a', fontSize: '12.5px' }}>
+                        {EXPENSE_CATEGORY_LABELS[item.category] || item.category}
+                      </span>
+                      {item.isFlaggedAsSuspiciousSplit && (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: '#b91c1c',
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            borderRadius: '9999px',
+                            padding: '1px 6px',
+                          }}
+                          title={item.suspiciousReason || 'Cảnh báo xé nhỏ hạn mức chi (Anti-Splitting)'}
+                        >
+                          ⚠️ Nghi vấn
+                        </span>
+                      )}
+                      {item.isRecurring && (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            color: '#2563eb',
+                            background: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: '9999px',
+                            padding: '1px 6px',
+                          }}
+                          title={'Chi phí lặp lại định kỳ hàng tháng (ngày ' + (item.recurringDayOfMonth || 1) + ')'}
+                        >
+                          Định kỳ
+                        </span>
+                      )}
+                      {item.isTaxDeductible === false ? (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            color: '#b45309',
+                            background: '#fef3c7',
+                            border: '1px solid #fde68a',
+                            borderRadius: '9999px',
+                            padding: '1px 6px',
+                          }}
+                          title="Khoản chi nằm trong danh sách loại trừ thuế (Blacklist)"
+                        >
+                          Loại trừ thuế
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            color: '#0f766e',
+                            background: '#f0fdfa',
+                            border: '1px solid #ccfbf1',
+                            borderRadius: '9999px',
+                            padding: '1px 6px',
+                          }}
+                          title="Chi phí hợp lệ phục vụ sản xuất kinh doanh"
+                        >
+                          Hợp lệ thuế
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Chi nhánh */}
+                  <td className="so-list-td" style={{ color: '#475569' }}>
+                    {item.branchName || item.branchId}
+                  </td>
+
+                  {/* NCC / Diễn giải */}
+                  <td className="so-list-td">
+                    <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.vendorName}</div>
+                    {item.note && (
+                      <div
+                        style={{
+                          fontSize: '0.74rem',
+                          color: '#94a3b8',
+                          maxWidth: '220px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        title={item.note}
+                      >
+                        {item.note}
+                      </div>
+                    )}
+                  </td>
+
+                  {/* Hạn thanh toán */}
+                  <td className="so-list-td" style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                    {item.dueDate || '—'}
+                  </td>
+
+                  {/* Số tiền */}
+                  <td className="so-list-td" style={{ fontWeight: 800, textAlign: 'right', color: '#0f172a' }}>
+                    {formatMoney(item.amount)}
+                  </td>
+
+                  {/* Trạng thái */}
+                  <td className="so-list-td" style={{ textAlign: 'left' }}>
+                    <ExpenseStatusBadge status={item.status} dueDate={item.dueDate} approvalStatus={item.approvalStatus} />
+                  </td>
+
+                  {/* Thao tác */}
+                  <td className="so-list-td" style={{ textAlign: 'right', paddingRight: '14px' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', position: 'relative' }}>
+                      {item.attachedBillUrl && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onViewBill(
+                              item.attachedBillUrl!,
+                              `Chứng từ ${item.expenseId}`
+                            )
+                          }
+                          title="Xem hóa đơn đính kèm"
+                          className="po-btn po-btn-secondary"
+                          style={{ height: 28, padding: '0 8px', fontSize: 11.5 }}
+                        >
+                          <EyeIcon size={12} color="currentColor" />
+                          <span>Hóa đơn</span>
+                        </button>
+                      )}
+
+                      {item.status === 'Pending' && canManageExpenses && (
+                        <button
+                          type="button"
+                          onClick={() => onPay(item)}
+                          title="Chi tiền thanh toán khoản này"
+                          className="po-btn po-btn-primary"
+                          style={{
+                            height: 28,
+                            padding: '0 10px',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            backgroundColor: '#0f766e',
+                          }}
+                        >
+                          <span>Chi tiền</span>
+                        </button>
+                      )}
+
+                      {item.status === 'Paid' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const targetSearch = item.voucherCode || item.invoiceNumber || item.expenseId;
+                            navigate('/store-owner/cashbook?search=' + encodeURIComponent(targetSearch));
+                          }}
+                          title="Xem phiếu chi dòng tiền trong Sổ quỹ Cashbook"
+                          className="po-btn po-btn-secondary"
+                          style={{
+                            height: 28,
+                            padding: '0 8px',
+                            fontSize: 11.5,
+                            backgroundColor: '#f0fdfa',
+                            borderColor: '#ccfbf1',
+                            color: '#0f766e',
+                            fontWeight: 600,
+                          }}
+                        >
+                          <ExternalLink size={12} />
+                          <span>Sổ quỹ</span>
+                        </button>
+                      )}
+
+                      {/* Danger action (Cancel) hidden in ⋯ menu */}
+                      {item.status === 'Pending' && canManageExpenses && (
+                        <div className="expense-row-menu" style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenMenuId(openMenuId === item.expenseId ? null : item.expenseId)}
+                            style={{
+                              background: '#f1f5f9',
+                              border: '1px solid #cbd5e1',
+                              borderRadius: '6px',
+                              padding: '5px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              color: '#64748b',
+                            }}
+                            title="Tùy chọn khác"
+                          >
+                            <MoreHorizontal size={14} />
+                          </button>
+
+                          {openMenuId === item.expenseId && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                right: 0,
+                                top: '100%',
+                                marginTop: 4,
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                zIndex: 30,
+                                minWidth: '150px',
+                                padding: '4px',
+                              }}
+                            >
+                              {item.approvalStatus !== 'Approved' && onApprove && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    onApprove(item);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    padding: '8px 12px',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#0f766e',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    borderRadius: '4px',
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f0fdfa')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                  <CheckCircleIcon size={12} color="#0f766e" />
+                                  <span>Phê duyệt</span>
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  onCancel(item);
+                                }}
+                                style={{
+                                  width: '100%',
+                                  textAlign: 'left',
+                                  padding: '8px 12px',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#b91c1c',
+                                  fontSize: '0.82rem',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  borderRadius: '4px',
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = '#fef2f2')}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                              >
+                                <CloseIcon size={12} color="#b91c1c" />
+                                <span>Hủy khoản chi</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* ── Pinned Pagination Footer ── */}
       {totalItems > 0 && (
         <TablePagination
           currentPage={page}
           pageSize={pageSize}
           totalItems={totalItems}
+          itemLabel="khoản chi"
+          pageSizeOptions={[10, 20, 50]}
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
         />
@@ -371,3 +491,6 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
     </div>
   );
 };
+
+export default ExpenseTable;
+

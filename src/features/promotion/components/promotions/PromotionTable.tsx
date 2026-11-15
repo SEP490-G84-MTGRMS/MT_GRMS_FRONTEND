@@ -84,18 +84,29 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   return (
     <div className="promotion-card">
       <div className="table-responsive">
-        <table className="promotion-table">
+        <table className="promotion-table" style={{ width: '100%', minWidth: 1200, tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '3%' }} />
+            <col style={{ width: '13%' }} />
+            <col style={{ width: '22%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '12%' }} />
+            <col style={{ width: '11%' }} />
+            <col style={{ width: '8%' }} />
+            <col style={{ width: '6%' }} />
+          </colgroup>
           <thead>
             <tr>
-              <th style={{ width: 44 }}></th>
-              <th style={{ width: 120 }}>Mã CTKM</th>
-              <th style={{ minWidth: 200 }}>Tên chương trình</th>
-              <th style={{ width: 140 }}>Hình thức</th>
-              <th style={{ width: 185 }}>Thời gian hiệu lực</th>
-              <th style={{ width: 165 }}>Chi nhánh áp dụng</th>
-              <th style={{ minWidth: 155, width: 165 }}>Lượt & Ngân sách</th>
-              <th style={{ width: 140 }}>Trạng thái</th>
-              <th style={{ width: 90, textAlign: 'right' }}>Thao tác</th>
+              <th></th>
+              <th>Mã CTKM</th>
+              <th>Tên chương trình</th>
+              <th>Hình thức</th>
+              <th>Thời gian hiệu lực</th>
+              <th>Chi nhánh áp dụng</th>
+              <th>Lượt & Ngân sách</th>
+              <th>Trạng thái</th>
+              <th style={{ textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>

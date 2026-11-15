@@ -29,10 +29,11 @@ export const TablePagination: FC<TablePaginationProps> = ({
   isLoading = false,
   className = '',
 }) => {
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeTotalItems = totalItems ?? 0;
+  const totalPages = Math.max(1, Math.ceil(safeTotalItems / pageSize));
   const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-  const fromItem = totalItems === 0 ? 0 : Math.min((safeCurrentPage - 1) * pageSize + 1, totalItems);
-  const toItem = Math.min(safeCurrentPage * pageSize, totalItems);
+  const fromItem = safeTotalItems === 0 ? 0 : Math.min((safeCurrentPage - 1) * pageSize + 1, safeTotalItems);
+  const toItem = Math.min(safeCurrentPage * pageSize, safeTotalItems);
   const paginationRange = generatePaginationRange(safeCurrentPage, totalPages);
 
   // Automatically reset to last valid page if out of bounds due to external filter changes
@@ -52,7 +53,7 @@ export const TablePagination: FC<TablePaginationProps> = ({
     if (onPageSizeChange && !isLoading) {
       onPageSizeChange(newPageSize);
       // Ensure we do not land on an out-of-range page
-      const newTotalPages = Math.max(1, Math.ceil(totalItems / newPageSize));
+      const newTotalPages = Math.max(1, Math.ceil(safeTotalItems / newPageSize));
       if (currentPage > newTotalPages) {
         onPageChange(1);
       }
@@ -65,7 +66,7 @@ export const TablePagination: FC<TablePaginationProps> = ({
       <div className="table-pagination-left">
         <div className="table-pagination-info">
           Hiển thị <strong>{fromItem} - {toItem}</strong> trên tổng số{' '}
-          <strong>{totalItems.toLocaleString('vi-VN')}</strong> {itemLabel}
+          <strong>{safeTotalItems.toLocaleString('vi-VN')}</strong> {itemLabel}
         </div>
 
         {/* Page Size Selector */}

@@ -220,6 +220,46 @@ const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
     createdBy: 'Quản lý Q7',
     createdAt: '2026-10-11T21:00:00Z',
   },
+  {
+    id: 'TX-006',
+    transactionCode: 'PT-20261114-001',
+    accountId: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
+    accountName: 'Két tiền mặt quầy Q1',
+    branchId: 'BR-01',
+    transactionType: 'RECEIPT',
+    category: 'Doanh thu bán lẻ POS',
+    amount: 2450000,
+    balanceAfter: 12500000,
+    counterpartyType: 'CUSTOMER',
+    counterpartyName: 'Khách mua tại quầy #1102',
+    description: 'Thanh toán tiền mặt đơn hàng POS #1102',
+    referenceDocType: 'POS_ORDER',
+    referenceDocId: 'ORD-1102',
+    sourceModuleName: 'POS_RETAIL',
+    isAutomated: true,
+    createdBy: 'Thu ngân Ca sáng',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'TX-007',
+    transactionCode: 'PC-20261114-002',
+    accountId: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
+    accountName: 'Két tiền mặt quầy Q1',
+    branchId: 'BR-01',
+    transactionType: 'PAYMENT',
+    category: 'Chi phí vận hành',
+    amount: 150000,
+    balanceAfter: 12350000,
+    counterpartyType: 'SUPPLIER',
+    counterpartyName: 'Văn phòng phẩm An Phát',
+    description: 'Mua giấy in hóa đơn nhiệt cho quầy thu ngân',
+    referenceDocType: 'SERVICE_EXPENSE',
+    referenceDocId: 'EXP-1105',
+    sourceModuleName: 'SERVICE_OPEX',
+    isAutomated: false,
+    createdBy: 'Cửa hàng trưởng',
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+  },
 ];
 
 const STORAGE_KEYS = {
@@ -527,6 +567,31 @@ export const cashbookService = {
       );
     }
 
+    if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
+      const cq = params.counterpartyQuery.trim().toLowerCase();
+      filtered = filtered.filter((tx) => tx.counterpartyName?.toLowerCase().includes(cq));
+    }
+
+    if (params.status && params.status !== 'ALL') {
+      if (params.status === 'VOIDED') {
+        filtered = filtered.filter((tx) => tx.isVoided);
+      } else if (params.status === 'COMPENSATING') {
+        filtered = filtered.filter((tx) => tx.isCompensating);
+      } else if (params.status === 'ACTIVE') {
+        filtered = filtered.filter((tx) => !tx.isVoided && !tx.isCompensating);
+      }
+    }
+
+    if (params.startDate) {
+      const startStr = params.startDate.slice(0, 10);
+      filtered = filtered.filter((tx) => tx.createdAt.slice(0, 10) >= startStr);
+    }
+
+    if (params.endDate) {
+      const endStr = params.endDate.slice(0, 10);
+      filtered = filtered.filter((tx) => tx.createdAt.slice(0, 10) <= endStr);
+    }
+
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const totalItems = filtered.length;
@@ -554,9 +619,14 @@ export const cashbookService = {
       if (params.branchId && params.branchId !== 'ALL') queryParams.branchId = params.branchId;
       if (params.startDate) queryParams.fromDate = params.startDate;
       if (params.endDate) queryParams.toDate = params.endDate;
+      if (params.transactionType && params.transactionType !== 'ALL') {
+        queryParams.entryType = params.transactionType;
+      }
       if (params.sourceType) queryParams.sourceType = params.sourceType;
       if (params.searchQuery && params.searchQuery.trim()) {
         queryParams.keyword = params.searchQuery.trim();
+      } else if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
+        queryParams.keyword = params.counterpartyQuery.trim();
       }
 
       const res = await financeHttpClient.get<{ data: BackendCashbookEntryResponse[] }>('/cashbook/entries', {
@@ -603,6 +673,23 @@ export const cashbookService = {
             (tx.sourceId && tx.sourceId.toLowerCase().includes(q)) ||
             (tx.id && tx.id.toLowerCase().includes(q))
         );
+      }
+
+      if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
+        const cq = params.counterpartyQuery.trim().toLowerCase();
+        mappedItems = mappedItems.filter((tx) =>
+          tx.counterpartyName?.toLowerCase().includes(cq)
+        );
+      }
+
+      if (params.status && params.status !== 'ALL') {
+        if (params.status === 'VOIDED') {
+          mappedItems = mappedItems.filter((tx) => tx.isVoided);
+        } else if (params.status === 'COMPENSATING') {
+          mappedItems = mappedItems.filter((tx) => tx.isCompensating);
+        } else if (params.status === 'ACTIVE') {
+          mappedItems = mappedItems.filter((tx) => !tx.isVoided && !tx.isCompensating);
+        }
       }
 
       return {
@@ -845,7 +932,7 @@ export const cashbookService = {
       branchId: targetAccount.branchId,
       transactionType: compType,
       category: `Gạch bỏ [${origTx.transactionCode}]`,
-      amount: origTx.amount,
+      amount: compType === 'RECEIPT' ? Math.abs(origTx.amount) : -Math.abs(origTx.amount),
       balanceAfter: targetAccount.currentBalance,
       counterpartyType: origTx.counterpartyType,
       counterpartyName: origTx.counterpartyName,

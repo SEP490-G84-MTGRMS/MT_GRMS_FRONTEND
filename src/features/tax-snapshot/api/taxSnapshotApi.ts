@@ -1,4 +1,5 @@
 import { financeHttpClient, type EnhancedAxiosError } from '../../../api/financeHttpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type {
   HouseholdTaxFilterDto,
   HouseholdTaxSummaryDto,
@@ -6,6 +7,8 @@ import type {
   CreateTaxSnapshotRequest,
   HouseholdTaxSnapshotDto,
   AccountingBookType,
+  ChangeSecurityPinRequest,
+  ResetSecurityPinRequest,
 } from '../types/taxSnapshot';
 import { generateMockSummary, mockBookEntries, mockSnapshotsList } from './mockTaxData';
 
@@ -229,13 +232,20 @@ export const taxSnapshotApi = {
       confirmEstimatedCogsResponsible: Boolean(req.confirmEstimatedCogsResponsible),
       estimatedCogsConfirmationStatement: req.estimatedCogsConfirmationStatement || null,
       notes: req.notes || null,
+      allowSupersedeExisting: Boolean(req.allowSupersedeExisting),
+      rectificationReason: req.rectificationReason || null,
     };
 
     try {
-      // 1. Luôn ưu tiên gọi Backend thật
+      // 1. Luôn ưu tiên gọi Backend thật (Kèm Idempotency-Key chống trùng lặp giao dịch)
       const res = await financeHttpClient.post<{ data: HouseholdTaxSnapshotDto; success: boolean; message?: string }>(
         '/tax/household/snapshots',
-        backendPayload
+        backendPayload,
+        {
+          headers: {
+            'Idempotency-Key': generateUuidV7(),
+          },
+        }
       );
 
       if (res.data?.data) {
@@ -279,9 +289,9 @@ export const taxSnapshotApi = {
         periodNumber: req.periodNumber,
         calculationMethod: req.calculationMethod,
         applyVatReduction2026: Boolean(req.applyVatReduction2026),
-      vatReductionPercentage: req.vatReductionPercentage ?? null,
-      customVatRate: req.customVatRate ?? null,
-      customPitRate: req.customPitRate ?? null,
+        vatReductionPercentage: req.vatReductionPercentage ?? null,
+        customVatRate: req.customVatRate ?? null,
+        customPitRate: req.customPitRate ?? null,
         totalTaxAmount: 0,
         status: failedPinAttempts >= MAX_PIN_ATTEMPTS ? 'LOCKED' : 'FAILED_PIN',
         notes: `Mã PIN không chính xác. Số lần còn lại: ${Math.max(0, attemptsLeft)}`,
@@ -300,6 +310,33 @@ export const taxSnapshotApi = {
     // PIN hợp lệ trong Test Runner
     failedPinAttempts = 0;
     lockedUntilTimestamp = 0;
+
+    const existingIndex = localSnapshots.findIndex(
+      (s) =>
+        s.year === req.year &&
+        s.periodType === req.periodType &&
+        s.periodNumber === req.periodNumber &&
+        (s.status === 1 || s.status === 'Finalized' || s.status === 'finalized') &&
+        s.revisionNumber !== undefined
+    );
+
+    let revisionNumber = 0;
+    let supersededSnapshotId: string | null = null;
+
+    if (existingIndex !== -1) {
+      if (!req.allowSupersedeExisting) {
+        throw new Error(
+          `Kỳ tính thuế ${req.periodType === 2 ? 'Quarter' : 'Month'} ${req.periodNumber}/${req.year} đã được chốt và khóa sổ.`
+        );
+      }
+      if (!req.rectificationReason?.trim()) {
+        throw new Error('Bắt buộc phải nhập lý do thay thế / số biên bản điều chỉnh khi chốt lại kỳ tính thuế đã khóa.');
+      }
+      const existing = localSnapshots[existingIndex];
+      existing.status = 'Superseded';
+      revisionNumber = (existing.revisionNumber ?? 0) + 1;
+      supersededSnapshotId = existing.id;
+    }
 
     const summary = generateMockSummary({
       year: req.year,
@@ -330,6 +367,10 @@ export const taxSnapshotApi = {
       pitRate: summary.pitRate,
       pitAmount: summary.pitAmount,
       totalTaxAmount: summary.totalTaxAmount,
+      status: 'Finalized',
+      revisionNumber,
+      supersededSnapshotId,
+      rectificationReason: req.rectificationReason || null,
       finalizedBy: 'Chủ tiệm (StoreOwner)',
       finalizedAtUtc: new Date().toISOString(),
       notes: req.notes || `Chốt kỳ tự động - Phương pháp ${req.calculationMethod === 2 ? 'Kê khai' : 'Tỷ lệ %'}`,
@@ -380,6 +421,43 @@ export const taxSnapshotApi = {
       responseType: 'blob',
     });
     return res.data;
+  },
+
+  /**
+   * Đổi mã PIN bảo mật (yêu cầu mã PIN hiện tại hoặc mật khẩu tài khoản)
+   */
+  async changeSecurityPin(req: ChangeSecurityPinRequest): Promise<void> {
+    try {
+      await financeHttpClient.post('/tax/household/pin/change', {
+        currentPin: req.currentPin || null,
+        password: req.password || null,
+        newPin: req.newPin,
+        confirmNewPin: req.confirmNewPin,
+      });
+    } catch (err: unknown) {
+      if (isMockEnabled()) {
+        return;
+      }
+      throw new Error(extractErrorMessage(err, 'Không thể đổi mã PIN bảo mật.'));
+    }
+  },
+
+  /**
+   * Khôi phục / Thiết lập lại mã PIN bảo mật bằng mật khẩu tài khoản
+   */
+  async resetSecurityPin(req: ResetSecurityPinRequest): Promise<void> {
+    try {
+      await financeHttpClient.post('/tax/household/pin/reset', {
+        password: req.password,
+        newPin: req.newPin,
+        confirmNewPin: req.confirmNewPin,
+      });
+    } catch (err: unknown) {
+      if (isMockEnabled()) {
+        return;
+      }
+      throw new Error(extractErrorMessage(err, 'Không thể đặt lại mã PIN bảo mật.'));
+    }
   },
 
   /**

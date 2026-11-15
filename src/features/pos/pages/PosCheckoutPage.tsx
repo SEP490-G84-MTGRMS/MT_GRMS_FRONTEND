@@ -15,7 +15,6 @@ import { PosCatalogModal } from '../components/modals/PosCatalogModal';
 import { AddCustomerModal } from '../components/modals/AddCustomerModal';
 import { VietQrModal } from '../components/modals/VietQrModal';
 import { BelowCostWarningModal } from '../components/modals/BelowCostWarningModal';
-import { DebtLimitWarningModal } from '../components/modals/DebtLimitWarningModal';
 import { OrderDiscountModal } from '../components/modals/OrderDiscountModal';
 import { PosReceiptModal } from '../components/PosReceiptModal';
 import { PosInventoryLookupModal } from '../components/modals/PosInventoryLookupModal';
@@ -345,7 +344,6 @@ export const PosCheckoutPage: FC = () => {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isVietQrOpen, setIsVietQrOpen] = useState(false);
   const [belowCostWarningItem, setBelowCostWarningItem] = useState<CartItem | null>(null);
-  const [isDebtWarningOpen, setIsDebtWarningOpen] = useState(false);
   const [isOrderDiscountOpen, setIsOrderDiscountOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -1130,13 +1128,6 @@ export const PosCheckoutPage: FC = () => {
         } else {
           alert('Ca bán hàng đã đóng hoặc đang kiểm đếm: ' + errMsg);
         }
-      } else if (
-        errMsg.includes('CREDIT_LIMIT_EXCEEDED') ||
-        errMsg.includes('DEBT_OVERDUE_BLOCKED') ||
-        errMsg.includes('hạn mức tín dụng') ||
-        errMsg.includes('quá hạn')
-      ) {
-        setIsDebtWarningOpen(true);
       } else if (errMsg && errMsg.includes('tồn kho')) {
         alert(`Cảnh báo kho: ${errMsg}`);
       } else {
@@ -1177,6 +1168,10 @@ export const PosCheckoutPage: FC = () => {
     }
 
     if (currentTab.paymentMethod === 'debt') {
+      if (!isStoreOwner) {
+        alert('Chỉ chủ cửa hàng mới được phép thực hiện bán nợ!');
+        return;
+      }
       if (!currentTab.customer) {
         alert('Vui lòng tìm và chọn khách hàng định danh trước khi thực hiện bán nợ!');
         return;
@@ -1468,18 +1463,7 @@ export const PosCheckoutPage: FC = () => {
         onApply={(percent) => updateCurrentTab({ orderDiscountPercent: percent })}
       />
 
-      <DebtLimitWarningModal
-        isOpen={isDebtWarningOpen}
-        customer={currentTab.customer}
-        orderAmount={finalAmount + Math.round(finalAmount * 0.01)}
-        onClose={() => setIsDebtWarningOpen(false)}
-        onApprove={(note) => {
-setIsDebtWarningOpen(false);
-          executeCompleteCheckout(note, true);
-        }}
-      />
-
-            <PosInventoryLookupModal
+      <PosInventoryLookupModal
         isOpen={isInventoryLookupOpen}
         onClose={() => setIsInventoryLookupOpen(false)}
         currentBranchName={activeBranch.name}

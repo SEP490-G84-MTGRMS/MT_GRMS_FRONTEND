@@ -603,6 +603,11 @@
   body * {
     visibility: hidden;
   }
+  .no-print,
+  .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+  }
   .printable-a4-sheet,
   .printable-a4-sheet * {
     visibility: visible;

@@ -102,6 +102,8 @@ export interface CashbookFilterParams {
   startDate?: string;
   endDate?: string;
   searchQuery?: string;
+  counterpartyQuery?: string;
+  status?: 'ALL' | 'ACTIVE' | 'VOIDED' | 'COMPENSATING';
 }
 
 export interface CreateReceiptDTO {

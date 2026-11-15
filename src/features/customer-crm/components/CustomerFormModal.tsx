@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
-import { X, User, Phone, Mail, MapPin, DollarSign, Award, Building } from 'lucide-react';
+import { X, User, Phone, Mail, MapPin, Building } from 'lucide-react';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
 import {
   sanitizeCustomerText,
   validateSafeCustomerText,
   validateVietnamesePhone,
-  validateDebtLimit,
-  normalizeDebtLimit,
 } from '../utils/customerValidation';
 
 interface CustomerFormModalProps {
@@ -19,8 +17,8 @@ interface CustomerFormModalProps {
     email?: string;
     address?: string;
     taxCode?: string;
-    debtLimit: number;
-    membershipTier: MembershipTier;
+    debtLimit?: number;
+    membershipTier?: MembershipTier;
   }) => Promise<void>;
   initialData?: CustomerDto | null;
   isSubmitting: boolean;
@@ -38,8 +36,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [taxCode, setTaxCode] = useState('');
-  const [debtLimit, setDebtLimit] = useState<number>(5000000);
-  const [membershipTier, setMembershipTier] = useState<MembershipTier>('Standard');
   const [errorMsg, setErrorMsg] = useState('');
 
   const isEdit = Boolean(initialData);
@@ -51,16 +47,12 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       setEmail(initialData.email || '');
       setAddress(sanitizeCustomerText(initialData.address));
       setTaxCode(initialData.taxCode || '');
-      setDebtLimit(normalizeDebtLimit(initialData.debtLimit));
-      setMembershipTier(initialData.membershipTier || 'Standard');
     } else {
       setFullName('');
       setPhoneNumber('');
       setEmail('');
       setAddress('');
       setTaxCode('');
-      setDebtLimit(5000000);
-      setMembershipTier('Standard');
     }
     setErrorMsg('');
   }, [initialData, isOpen]);
@@ -95,11 +87,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       return;
     }
 
-    if (!validateDebtLimit(Number(debtLimit))) {
-      setErrorMsg('Hạn mức nợ không thể là số âm.');
-      return;
-    }
-
     try {
       await onSubmit({
         fullName: sanitizeCustomerText(fullName),
@@ -107,8 +94,8 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
         email: email.trim() || undefined,
         address: sanitizeCustomerText(address) || undefined,
         taxCode: taxCode.trim() || undefined,
-        debtLimit: normalizeDebtLimit(debtLimit),
-        membershipTier,
+        debtLimit: initialData?.debtLimit ?? 0,
+        membershipTier: initialData?.membershipTier ?? 'Standard',
       });
     } catch (err: any) {
       setErrorMsg(err.message || 'Có lỗi xảy ra khi lưu khách hàng.');
@@ -200,52 +187,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
                   Số điện thoại là mã định danh, không thể thay đổi.
                 </p>
               )}
-            </div>
-
-            {/* Hạn mức nợ (DebtLimit) & Hạng thẻ */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">
-                  Hạn mức nợ (VNĐ) <span style={{ color: '#DC2626' }}>*</span>
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <DollarSign className="w-4 h-4 customer-search-icon" />
-                  <input
-                    type="number"
-                    min="0"
-                    step="100000"
-                    required
-                    value={debtLimit}
-                    onChange={(e) => setDebtLimit(Number(e.target.value))}
-                    placeholder="5000000"
-                    className="form-input"
-                    style={{ paddingLeft: '40px', fontFamily: 'var(--font-mono, monospace)' }}
-                  />
-                </div>
-                <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: '#94A3B8' }}>
-                  Trần nợ tối đa cho phép
-                </p>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  Hạng thành viên
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Award className="w-4 h-4 customer-search-icon" />
-                  <select
-                    value={membershipTier}
-                    onChange={(e) => setMembershipTier(e.target.value as MembershipTier)}
-                    className="form-select"
-                    style={{ paddingLeft: '40px' }}
-                  >
-                    <option value="Standard">Standard (Chuẩn)</option>
-                    <option value="Silver">Silver (Bạc)</option>
-                    <option value="Gold">Gold (Vàng)</option>
-                    <option value="VIP">VIP</option>
-                  </select>
-                </div>
-              </div>
             </div>
 
             {/* Email & MST */}

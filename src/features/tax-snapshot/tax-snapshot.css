@@ -765,6 +765,8 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
+  overflow-y: auto;
+  box-sizing: border-box;
   animation: taxFadeIn 0.2s ease-out;
 }
 
@@ -772,13 +774,17 @@
   background: #ffffff;
   border-radius: 16px;
   width: 100%;
-  max-width: 520px;
+  max-width: 580px;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
   border: 1px solid #E2E8F0;
   overflow: hidden;
   animation: taxModalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
+  margin: auto;
 }
 
 .tax-modal-header {
@@ -787,13 +793,36 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .tax-modal-body {
-  padding: 22px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+}
+
+.tax-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tax-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tax-modal-body::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+
+.tax-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 .tax-modal-footer {
@@ -804,6 +833,48 @@
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .tax-modal-backdrop {
+    padding: 8px;
+    align-items: center;
+  }
+
+  .tax-modal-card {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 12px;
+  }
+
+  .tax-modal-header {
+    padding: 12px 16px;
+  }
+
+  .tax-modal-body {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+
+  .tax-modal-footer {
+    padding: 12px 16px;
+  }
+
+  .step-bar {
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .step-item {
+    font-size: 0.72rem;
+  }
+
+  .step-circle {
+    width: 20px;
+    height: 20px;
+    font-size: 0.72rem;
+  }
 }
 
 .tax-form-group {
