@@ -119,24 +119,18 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Danh mục hàng hóa",
             to: "/store-owner/products",
-            badge: "",
           },
           {
             label: "Nhóm hàng",
             to: "/store-owner/categories",
-            badge: "",
           },
           {
             label: "Sản phẩm theo NCC",
             to: "/store-owner/suppliers/products",
-            badge: "",
-            badgeType: "blue",
           },
           {
             label: "Sản phẩm theo Cửa hàng",
             to: "/store-owner/stores/products",
-            badge: "Mới",
-            badgeType: "blue",
           },
         ],
       },
@@ -146,26 +140,18 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Tồn kho cửa hàng",
             to: "/store-owner/inventory",
-            badge: "FE-04",
-            badgeType: "blue",
           },
           {
             label: "Chi tiết lô & Hạn sử dụng",
             to: "/store-owner/batches",
-            badge: "FEFO",
-            badgeType: "blue",
           },
           {
             label: "Kiểm kê hàng hóa",
             to: "/store-owner/stocktakes",
-            badge: "KK",
-            badgeType: "blue",
           },
           {
             label: "Chuyển hàng liên kho",
             to: "/store-owner/transfers",
-            badge: "",
-            badgeType: "blue",
           },
         ],
       },
@@ -196,8 +182,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Hóa đơn đầu vào",
             to: "/store-owner/suppliers?view=invoices",
-            badge: "Mới",
-            badgeType: "red",
           },
         ],
       },
@@ -322,8 +306,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Chương trình khuyến mãi",
             to: "/store-owner/promotions",
-            badge: "Mới",
-            badgeType: "red",
           },
         ],
       },
@@ -333,8 +315,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Danh sách Voucher & Coupon",
             to: "/store-owner/vouchers",
-            badge: "Hot",
-            badgeType: "blue",
           },
         ],
       },
@@ -344,8 +324,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Thiết lập tích điểm",
             to: "/store-owner/loyalty-config",
-            badge: "Xu",
-            badgeType: "blue",
           },
         ],
       },
@@ -1702,18 +1680,6 @@ export const AppTopNav: FC = () => {
                               }}
                             >
                               Cấu hình VietQR & SePay
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                backgroundColor: "#10b981",
-                                color: "#ffffff",
-                                padding: "1px 6px",
-                                borderRadius: 10,
-                              }}
-                            >
-                              Mới
                             </span>
                           </div>
                           <div

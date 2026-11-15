@@ -7,3 +7,4 @@ export * from './components/BatchDetailDrawer';
 export * from './components/BatchDiscountModal';
 export * from './components/BatchExpiryAlertModal';
 export * from './pages/BatchListPage';
+export * from './pages/BatchPackageManagePage';

@@ -34,7 +34,7 @@ import {
 } from '../features/goods-receipt';
 
 // 2c. Batch & Expiry Feature (FE-02 / UI-02-01)
-import { BatchListPage } from '../features/batch';
+import { BatchListPage, BatchPackageManagePage } from '../features/batch';
 
 // 2d. Store inventory list (FE-04)
 import { InventoryListPage } from '../features/inventory';
@@ -483,6 +483,10 @@ export const router = createBrowserRouter([
       {
         path: 'batches',
         element: <BatchListPage defaultRole="store_owner" />,
+      },
+      {
+        path: 'batches/:batchId/packages',
+        element: <BatchPackageManagePage defaultRole="store_owner" />,
       },
       {
         path: 'expiry',
@@ -1341,6 +1345,10 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <BatchListPage defaultRole="employee" />,
+      },
+      {
+        path: ':batchId/packages',
+        element: <BatchPackageManagePage defaultRole="employee" />,
       },
     ],
   },
