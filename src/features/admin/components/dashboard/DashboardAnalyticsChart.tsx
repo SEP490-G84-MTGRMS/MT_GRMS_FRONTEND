@@ -142,10 +142,15 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
         },
         ticks: {
           color: '#94A3B8',
-          stepSize: 15,
+          maxTicksLimit: 6,
           font: { family: 'JetBrains Mono', size: 10.5, weight: 500 },
           padding: 10,
-          callback: (value) => `${value}M đ`,
+          callback: (value) => {
+            const num = Number(value);
+            if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(num % 1_000_000 === 0 ? 0 : 1)}M đ`;
+            if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K đ`;
+            return `${num} đ`;
+          },
         },
         border: { display: false },
       },
@@ -337,10 +342,15 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
         },
         ticks: {
           color: '#94A3B8',
-          stepSize: 30,
+          maxTicksLimit: 6,
           font: { family: 'JetBrains Mono', size: 11, weight: 500 },
           padding: 12,
-          callback: (value) => `${value}M đ`,
+          callback: (value) => {
+            const num = Number(value);
+            if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(num % 1_000_000 === 0 ? 0 : 1)}M đ`;
+            if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K đ`;
+            return `${num} đ`;
+          },
         },
         border: { display: false },
       },
@@ -423,10 +433,14 @@ export const DashboardAnalyticsChart: FC<DashboardAnalyticsChartProps> = ({ data
         },
         ticks: {
           color: '#94A3B8',
-          stepSize: 30,
+          maxTicksLimit: 6,
           font: { family: 'JetBrains Mono', size: 11, weight: 500 },
           padding: 12,
-          callback: (value) => `${value}K đơn`,
+          callback: (value) => {
+            const num = Number(value);
+            if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K đơn`;
+            return `${num} đơn`;
+          },
         },
         border: { display: false },
       },

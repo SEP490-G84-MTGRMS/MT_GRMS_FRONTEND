@@ -4,6 +4,15 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-15
+
+### Changed
+- **Tái thiết kế toàn diện màn hình Master Dashboard Quản trị nền tảng (`AdminDashboardPage.tsx`, `adminDashboard.css`, `DashboardAnalyticsChart.tsx`)**:
+  - Chuẩn hóa giao diện tinh gọn, tối ưu và thẩm mỹ theo đúng phong cách Dashboard Chủ cửa hàng (`StoreOwnerDashboardPage`).
+  - Sửa lỗi trục Y hiển thị số tiền `8460000M đ` bị đè lấp mờ nét trong biểu đồ doanh thu; chuẩn hóa định dạng số tiền VND gọn gàng (`846K đ`, `10.1M đ`).
+  - Tổ chức bố cục lưới chuẩn Dashboard 3 tầng: 4 thẻ KPI nền tảng với icon chuyên biệt; Lưới trọng tâm (Primary Grid) kết hợp biểu đồ doanh thu MRR và Thẻ cơ cấu gói cước SaaS; Lưới vận hành (Operations Grid) 3 cột đồng đều (Sự việc cần can thiệp, Mạng lưới điểm bán, Giám sát hệ thống tự động).
+  - Giữ nguyên 100% các modal nghiệp vụ (Chi tiết tenant, Gia hạn ân hạn, Khóa mềm/khóa cứng) [FE-ADMIN-DASH] [worklog: docs/worklogs/2026-11-15_FE-ADMIN-DASH_AI_redesign-admin-dashboard-like-store-owner.md].
+
 ## [Unreleased] - 2026-11-13
 
 ### Changed
