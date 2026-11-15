@@ -41,9 +41,8 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
         </div>
 
         <div className="finance-overview-actions">
-          {/* Accounting Mode Switch */}
-          <label className="finance-accounting-toggle-pill" title="Bật/tắt đối chiếu Kế toán dồn tích vs Thực thu chi">
-            <span className="finance-accounting-toggle-text">Chế độ Kế toán</span>
+          <label className="finance-accounting-toggle-pill" title="Bật hoặc tắt phần trình bày chi tiết kế toán">
+            <span className="finance-accounting-toggle-text">Chi tiết kế toán</span>
             <button
               type="button"
               role="switch"

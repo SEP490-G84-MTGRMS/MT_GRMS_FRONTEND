@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   KeyRound,
@@ -12,6 +12,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { taxSnapshotApi } from '../api/taxSnapshotApi';
+import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
 
 interface SecurityPinModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const SecurityPinModal: React.FC<SecurityPinModalProps> = ({
   initialTab = 'change',
   onSuccess,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<'change' | 'reset'>(initialTab);
 
   // Form states for Tab Change PIN
@@ -50,6 +52,7 @@ export const SecurityPinModal: React.FC<SecurityPinModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  useDialogFocusTrap(isOpen, dialogRef, onClose);
 
   useEffect(() => {
     if (isOpen) {
@@ -171,8 +174,8 @@ export const SecurityPinModal: React.FC<SecurityPinModalProps> = ({
   };
 
   return (
-    <div className="tax-modal-backdrop">
-      <div className="tax-modal-card" style={{ maxWidth: 520 }}>
+    <div className="tax-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !isLoading) onClose(); }}>
+      <div ref={dialogRef} className="tax-modal-card" role="dialog" aria-modal="true" aria-label="Quản lý mã PIN bảo mật" style={{ maxWidth: 520 }}>
         {/* Header */}
         <div className="tax-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

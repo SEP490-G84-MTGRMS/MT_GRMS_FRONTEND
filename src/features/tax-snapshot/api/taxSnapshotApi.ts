@@ -9,6 +9,7 @@ import type {
   AccountingBookType,
   ChangeSecurityPinRequest,
   ResetSecurityPinRequest,
+  HouseholdTaxDeclarationPreviewDto,
 } from '../types/taxSnapshot';
 import { generateMockSummary, mockBookEntries, mockSnapshotsList } from './mockTaxData';
 
@@ -148,6 +149,35 @@ export const taxSnapshotApi = {
       calculationMethod: calcMethod,
       applyVatReduction2026: applyReduction,
     });
+  },
+
+  async getDeclarationPreview(filter: HouseholdTaxFilterDto): Promise<HouseholdTaxDeclarationPreviewDto> {
+    const res = await financeHttpClient.get<{ data: HouseholdTaxDeclarationPreviewDto }>(
+      '/tax/household/declarations/01-cnkd/preview',
+      {
+        params: {
+          year: filter.year,
+          periodType: filter.periodType,
+          periodNumber: filter.periodNumber,
+          branchId: filter.branchId,
+          calculationMethod: filter.calculationMethod,
+          tier2Method: filter.tier2Method,
+          applyVatReduction: filter.applyVatReduction2026,
+          vatReductionPercentage: filter.vatReductionPercentage,
+          customVatRate: filter.customVatRate,
+          customPitRate: filter.customPitRate,
+        },
+      }
+    );
+    return res.data.data;
+  },
+
+  async exportDeclarationXml(snapshotId: string): Promise<Blob> {
+    const res = await financeHttpClient.get(
+      `/tax/household/snapshots/${snapshotId}/declaration-xml`,
+      { responseType: 'blob' }
+    );
+    return res.data;
   },
 
   /**

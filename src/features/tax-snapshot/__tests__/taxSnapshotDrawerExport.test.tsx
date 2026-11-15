@@ -45,7 +45,7 @@ describe('TaxSnapshotDetailDrawer - BF-03 & BF-04', () => {
     // Expect the professional explanatory message
     expect(
       screen.getAllByText(
-        /Dữ liệu bảng kê chi tiết từng hóa đơn được lưu trữ an toàn trong tệp sao lưu điện tử của kỳ chốt thuế\. Bạn có thể bấm nút 'Xuất tờ khai Form 01' ở dưới để trích xuất đầy đủ file XML\/Excel theo chuẩn Thông tư 152\./i
+        /File XML Mẫu 01\/CNKD chỉ do máy chủ tạo từ bản chốt hợp lệ; cần đối chiếu XSD của cổng thuế trước khi nộp\./i
       ).length
     ).toBeGreaterThan(0);
   });

@@ -118,10 +118,10 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
       <div className="pnl-waterfall-header-row">
         <div>
           <h4 className="pnl-waterfall-title">
-            Dòng chảy Lợi nhuận (P&L Waterfall) - 6 bước trực quan
+            Bậc thang Lợi nhuận P&amp;L ({accountingBasis === 'CASH' ? 'Thực thu thực chi' : 'Kế toán dồn tích'})
           </h4>
           <p className="pnl-waterfall-subtitle">
-            Cơ sở: {accountingBasis === 'CASH' ? 'Thực thu thực chi' : 'Sổ kế toán dồn tích'} ({periodLabel})
+            Dòng chảy Lợi nhuận (P&amp;L Waterfall) · Cơ sở: {accountingBasis === 'CASH' ? 'Thực thu thực chi' : 'Sổ kế toán dồn tích'} · {periodLabel}
           </p>
         </div>
         <div className="pnl-waterfall-legend">

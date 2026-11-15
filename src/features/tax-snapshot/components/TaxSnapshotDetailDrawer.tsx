@@ -318,7 +318,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
               >
                 <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: 2, color: '#0D9488' }} />
                 <div>
-                  Dữ liệu bảng kê chi tiết từng hóa đơn được lưu trữ an toàn trong tệp sao lưu điện tử của kỳ chốt thuế. Bạn có thể bấm nút &apos;Xuất tờ khai Form 01&apos; ở dưới để trích xuất đầy đủ file XML/Excel theo chuẩn Thông tư 152.
+                  Dữ liệu bảng kê chi tiết từng hóa đơn được lưu trong hồ sơ điện tử của kỳ chốt thuế. File XML Mẫu 01/CNKD chỉ do máy chủ tạo từ bản chốt hợp lệ; cần đối chiếu XSD của cổng thuế trước khi nộp.
                 </div>
               </div>
 
@@ -366,7 +366,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                                 Đã chốt số liệu gồm {snapshot.ordersCount ?? 0} hóa đơn trong kỳ
                               </p>
                               <p style={{ margin: '6px 0 0', fontSize: '0.8rem', color: '#475569', maxWidth: 520, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
-                                Dữ liệu bảng kê chi tiết từng hóa đơn được lưu trữ an toàn trong tệp sao lưu điện tử của kỳ chốt thuế. Bạn có thể bấm nút &apos;Xuất tờ khai Form 01&apos; ở dưới để trích xuất đầy đủ file XML/Excel theo chuẩn Thông tư 152.
+                                Dữ liệu bảng kê chi tiết từng hóa đơn được lưu trong hồ sơ điện tử của kỳ chốt thuế. File XML Mẫu 01/CNKD chỉ do máy chủ tạo từ bản chốt hợp lệ; cần đối chiếu XSD của cổng thuế trước khi nộp.
                               </p>
                             </td>
                           </tr>

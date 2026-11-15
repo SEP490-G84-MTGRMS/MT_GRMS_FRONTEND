@@ -119,6 +119,8 @@ export interface HouseholdTaxSummaryDto {
   periodNumber: number;
   branchId?: string;
   branchName: string;
+  filingDeadlineLocal?: string;
+  filingDeadlineNote?: string;
 
   annualAccumulatedRevenue: number;
   priorPeriodsAccumulatedRevenue: number;
@@ -201,6 +203,61 @@ export interface HouseholdTaxSummaryDto {
   snapshotId?: string;
   finalizedAtUtc?: string;
   finalizedBy?: string;
+}
+
+export interface HouseholdTaxpayerProfileDto {
+  taxpayerName: string;
+  taxCode: string;
+  businessLocation: string;
+  phoneNumber: string;
+  taxAuthorityName: string;
+}
+
+export interface TaxDeclarationLineDto {
+  sequence: number;
+  businessSector: string;
+  taxCode: string;
+  totalRevenue: number;
+  vatNonTaxableRevenue: number;
+  vatTaxableRevenue: number;
+  vatZeroRateRevenue: number;
+  vatRate: number;
+  vatAmount: number;
+  pitTaxableRevenue: number;
+  pitRevenueDeduction: number;
+  pitRate: number;
+  pitAmount: number;
+}
+
+export interface HouseholdTaxDeclarationPreviewDto {
+  formCode: string;
+  formTitle: string;
+  legalBasis: string;
+  isFinalized: boolean;
+  snapshotId?: string;
+  revisionNumber: number;
+  generatedAtUtc: string;
+  year: number;
+  periodType: TaxPeriodType;
+  periodNumber: number;
+  periodLabel: string;
+  filingDeadlineLocal: string;
+  isFirstDeclaration: boolean;
+  isSupplementaryDeclaration: boolean;
+  taxpayer: HouseholdTaxpayerProfileDto;
+  lines: TaxDeclarationLineDto[];
+  totalVatAmount: number;
+  totalPitAmount: number;
+  totalTaxAmount: number;
+  requiresBusinessActivityAppendix: boolean;
+  appendixCode: string;
+  appendixRevenue: number;
+  appendixCogs: number;
+  appendixOpex: number;
+  appendixTaxableIncome: number;
+  isProfileComplete: boolean;
+  missingProfileFields: string[];
+  dataNotice: string;
 }
 
 /**

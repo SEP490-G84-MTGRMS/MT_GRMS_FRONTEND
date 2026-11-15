@@ -1,14 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Calculator,
   Scale,
-  Building2,
   FileSpreadsheet,
   AlertCircle,
-  ChevronDown,
-  ChevronUp,
   Clock,
   Sparkles,
+  Eye,
 } from 'lucide-react';
 import {
   TaxCalculationMethod,
@@ -26,8 +24,9 @@ interface TaxDeclarationFormViewProps {
   customVatRate?: number | null;
   customPitRate?: number | null;
   vatReductionPercentage?: number | null;
-  onOpenRateConfig?: () => void;
+  onPreviewDeclaration?: () => void;
   isLoading?: boolean;
+  isRefreshing?: boolean;
 }
 
 export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
@@ -39,11 +38,10 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
   customVatRate,
   customPitRate: _customPitRate,
   vatReductionPercentage,
-  onOpenRateConfig,
+  onPreviewDeclaration,
   isLoading,
+  isRefreshing,
 }) => {
-  const [showAccountantDetails, setShowAccountantDetails] = useState<boolean>(false);
-
   if (isLoading || !summary) {
     return (
       <div className="tax-declaration-card" style={{ padding: 48, textAlign: 'center' }}>
@@ -80,13 +78,13 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
 
   return (
     <div className="tax-declaration-card">
-      {/* Top Banner: Form Title + Interactive 20% VAT Reduction Toggle (Prototype Parity) */}
+      {/* Bảng tổng hợp nhanh; biểu mẫu pháp lý đầy đủ mở trong preview riêng. */}
       <div className="tax-declaration-header">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FileSpreadsheet size={22} />
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, letterSpacing: '-0.02em' }}>
-              📄 Tờ khai thuế Hộ kinh doanh (Mẫu 01/CNKD)
+              Bảng tổng hợp nghĩa vụ thuế
             </h2>
           </div>
           <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', opacity: 0.9 }}>
@@ -94,8 +92,10 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
           </p>
         </div>
 
-        {/* 20% VAT Reduction Resolution Toggle matching Prototype */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button type="button" className="btn-export-white" onClick={onPreviewDeclaration}>
+            <Eye size={15} /> Xem Mẫu 01/CNKD
+          </button>
           <label
             style={{
               display: 'flex',
@@ -116,6 +116,7 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
               type="button"
               role="switch"
               aria-checked={applyVatReduction}
+              aria-label="Giảm VAT 20%"
               className={`switch-toggle-btn ${applyVatReduction ? 'on' : ''}`}
               onClick={() => onToggleVatReduction(!applyVatReduction)}
               title="Bật/tắt giảm thuế GTGT theo Nghị quyết"
@@ -127,6 +128,7 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
       <div className="tax-declaration-body">
         {/* Prototype 4 KPI Cards Grid */}
         <div
+          className="tax-declaration-kpi-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -181,12 +183,12 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
           </div>
         </div>
 
-        {/* Prototype Form 01/CNKD Item Table ([28] Phân phối, cung cấp hàng hóa) */}
+        {/* Bảng đối chiếu nhanh theo ngành nghề; không thay thế biểu mẫu 01/CNKD. */}
         <div style={{ border: '1px solid #E2E8F0', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
           <table className="tax-table" style={{ margin: 0 }}>
             <thead>
               <tr>
-                <th>Chỉ tiêu tờ khai 01/CNKD</th>
+                <th>Nhóm ngành nghề đối chiếu</th>
                 <th style={{ textAlign: 'right' }}>Doanh thu tính thuế</th>
                 <th style={{ textAlign: 'right' }}>Thuế suất GTGT</th>
                 <th style={{ textAlign: 'right' }}>Tiền GTGT (đ)</th>
@@ -217,6 +219,7 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
 
         {/* Method Switcher Banner */}
         <div
+          className="tax-method-panel"
           style={{
             background: '#F8FAFC',
             border: '1px solid #E2E8F0',
@@ -227,8 +230,9 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
             <div>
-              <strong style={{ fontSize: '0.92rem', color: '#0F172A', display: 'block' }}>
+              <strong style={{ fontSize: '0.92rem', color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
                 Phương pháp tính thuế áp dụng
+                {isRefreshing && <span className="tax-inline-refresh" role="status">Đang tính lại…</span>}
               </strong>
               <span style={{ fontSize: '0.8rem', color: '#64748B' }}>
                 Quy định theo nhóm doanh thu: <strong>{summary.householdGroupName || 'Nhóm 2: Doanh thu 1 - 3 tỷ/năm'}</strong>
@@ -400,51 +404,6 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
           </div>
         )}
 
-        {/* Collapsible Options for Accountant */}
-        <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: 14 }}>
-          <button
-            type="button"
-            onClick={() => setShowAccountantDetails(!showAccountantDetails)}
-            style={{
-              background: '#F8FAFC',
-              border: '1px solid #CBD5E1',
-              borderRadius: '8px',
-              color: '#0F766E',
-              fontSize: '0.82rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 14px',
-            }}
-          >
-            <Building2 size={15} />
-            <span>Tùy chọn chính sách thuế & Thông số nâng cao</span>
-            {showAccountantDetails ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </button>
-
-          {showAccountantDetails && onOpenRateConfig && (
-            <div style={{ marginTop: 12, padding: 14, background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-                <div>
-                  <strong style={{ fontSize: '0.86rem', color: '#0F172A' }}>Mức thuế suất áp dụng:</strong>
-                  <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: 2 }}>
-                    GTGT: {summary.vatRate}% | TNCN: {summary.pitRate}% | Giảm VAT: {applyVatReduction ? `${reductionPct}%` : 'Tắt'}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={onOpenRateConfig}
-                  className="btn-secondary-pill"
-                  style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                >
-                  Điều chỉnh mức thuế suất
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Lock,
@@ -20,6 +20,7 @@ import {
   type HouseholdTaxSnapshotDto,
 } from '../types/taxSnapshot';
 import { formatMoney } from '../../finance/utils/formatters';
+import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
 
 interface CreateTaxSnapshotModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
   onOpenPinModal,
   onSubmit,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [pin, setPin] = useState<string>('');
   const [showPin, setShowPin] = useState<boolean>(false);
@@ -60,6 +62,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [sealedSnapshot, setSealedSnapshot] = useState<HouseholdTaxSnapshotDto | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
+  useDialogFocusTrap(isOpen && Boolean(summary), dialogRef, () => { if (!isSubmitting) onClose(); });
 
   useEffect(() => {
     if (isOpen) {
@@ -178,8 +181,8 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
   };
 
   return (
-    <div className="tax-modal-backdrop">
-      <div className="tax-modal-card" style={{ maxWidth: 580 }}>
+    <div className="tax-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !isSubmitting) onClose(); }}>
+      <div ref={dialogRef} className="tax-modal-card" role="dialog" aria-modal="true" aria-label={`Chốt kỳ sổ ${periodLabel}`} style={{ maxWidth: 580 }}>
         {/* Header */}
         <div className="tax-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -199,7 +202,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#0F172A' }}>
-                🔐 Chốt kỳ sổ {periodLabel} (3 bước)
+                Chốt kỳ sổ {periodLabel}
               </h3>
               <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
                 Niêm phong bất biến Thông tư 152 & chữ ký số HMAC server-side
