@@ -45,13 +45,13 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   const renderStatusBadge = (status: PromotionStatus) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="badge-status badge-active">● Đang chạy</span>;
+        return <span className="badge-status badge-active" style={{ whiteSpace: 'nowrap' }}>● Đang chạy</span>;
       case 'UPCOMING':
-        return <span className="badge-status badge-upcoming">● Sắp diễn ra</span>;
+        return <span className="badge-status badge-upcoming" style={{ whiteSpace: 'nowrap' }}>● Sắp diễn ra</span>;
       case 'PAUSED':
-        return <span className="badge-status badge-paused">⏸ Tạm dừng</span>;
+        return <span className="badge-status badge-paused" style={{ whiteSpace: 'nowrap' }}>⏸ Tạm dừng</span>;
       case 'EXPIRED':
-        return <span className="badge-status badge-expired">✕ Đã kết thúc</span>;
+        return <span className="badge-status badge-expired" style={{ whiteSpace: 'nowrap' }}>✕ Đã kết thúc</span>;
     }
   };
 
@@ -100,14 +100,14 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   return (
     <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
       <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1320, width: '100%', tableLayout: 'fixed' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1390, width: '100%', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 44 }} />
-            <col style={{ width: 120 }} />
+            <col style={{ width: 110 }} />
             <col style={{ width: 220 }} />
-            <col style={{ width: 140 }} />
-            <col style={{ width: 175 }} />
-            <col style={{ width: 180 }} />
+            <col style={{ width: 135 }} />
+            <col style={{ width: 185 }} />
+            <col style={{ width: 195 }} />
             <col style={{ width: 180 }} />
             <col style={{ width: 160 }} />
             <col style={{ width: 100 }} />
@@ -115,11 +115,11 @@ export const PromotionTable: FC<PromotionTableProps> = ({
           <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
               <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
-              <th style={{ ...thStyle, width: 120 }}>Mã CTKM</th>
+              <th style={{ ...thStyle, width: 110 }}>Mã CTKM</th>
               <th style={{ ...thStyle, width: 220 }}>Tên chương trình</th>
-              <th style={{ ...thStyle, width: 140 }}>Hình thức</th>
-              <th style={{ ...thStyle, width: 175 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 180 }}>Chi nhánh áp dụng</th>
+              <th style={{ ...thStyle, width: 135 }}>Hình thức</th>
+              <th style={{ ...thStyle, width: 185 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 195 }}>Chi nhánh áp dụng</th>
               <th style={{ ...thStyle, width: 180 }}>Lượt &amp; Ngân sách</th>
               <th style={{ ...thStyle, width: 160 }}>Trạng thái</th>
               <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Thao tác</th>

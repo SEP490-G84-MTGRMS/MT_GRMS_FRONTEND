@@ -92,13 +92,13 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   const renderBatchStatus = (status: VoucherBatchStatus) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="badge-status badge-active" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0 }}>● Đang lưu hành</span>;
+        return <span className="badge-status badge-active" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>● Đang lưu hành</span>;
       case 'EXPIRED':
-        return <span className="badge-status badge-expired" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0 }}>✕ Đã hết hạn</span>;
+        return <span className="badge-status badge-expired" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>✕ Đã hết hạn</span>;
       case 'PAUSED':
-        return <span className="badge-status badge-paused" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0 }}>⏸ Tạm dừng</span>;
+        return <span className="badge-status badge-paused" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>⏸ Tạm dừng</span>;
       case 'DEPLETED':
-        return <span className="badge-status badge-pill-neutral" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0 }}>Đã phát hết</span>;
+        return <span className="badge-status badge-pill-neutral" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Đã phát hết</span>;
     }
   };
 
@@ -169,7 +169,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   return (
     <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
       <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1390, width: '100%', tableLayout: 'fixed' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1450, width: '100%', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 44 }} />
             <col style={{ width: 110 }} />
@@ -178,8 +178,8 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
             <col style={{ width: 165 }} />
             <col style={{ width: 140 }} />
             <col style={{ width: 165 }} />
-            <col style={{ width: 185 }} />
-            <col style={{ width: 230 }} />
+            <col style={{ width: 180 }} />
+            <col style={{ width: 250 }} />
           </colgroup>
           <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
@@ -190,8 +190,8 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
               <th style={{ ...thStyle, width: 165 }}>Điều kiện áp dụng</th>
               <th style={{ ...thStyle, width: 140 }}>Đã dùng / Phát hành</th>
               <th style={{ ...thStyle, width: 165 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 185 }}>Trạng thái</th>
-              <th style={{ ...thStyle, width: 230, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 180 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 250, textAlign: 'right', paddingRight: 16 }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -322,12 +322,13 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
-                        <div className="promo-status-cell" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap' }}>
+                      <td className="so-list-td" style={{ overflow: 'hidden', padding: '8px 10px', boxSizing: 'border-box' }}>
+                        <div className="promo-status-cell" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
                           <div
                             className="switch-container"
                             onClick={() => onToggleBatchStatus(batch.id)}
                             title={batch.status === 'ACTIVE' ? 'Tạm dừng đợt phát hành' : 'Kích hoạt đợt'}
+                            style={{ flexShrink: 0 }}
                           >
                             <div className={`switch-track ${batch.status === 'ACTIVE' ? 'switch-active' : ''}`}>
                               <div className="switch-thumb" />
@@ -336,12 +337,12 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           {renderBatchStatus(batch.status)}
                         </div>
                       </td>
-                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden' }}>
-                        <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap', width: '100%' }}>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden', padding: '8px 14px', boxSizing: 'border-box' }}>
+                        <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap', maxWidth: '100%' }}>
                           <button
                             onClick={() => onOpenGenerateCodes(batch)}
                             className="btn-secondary-pill"
-                            style={{ padding: '4px 8px', fontSize: '0.75rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            style={{ padding: '3px 8px', fontSize: '11.5px', height: 28, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
                             title="Phát hành thêm mã cho đợt này"
                           >
                             <PlusCircle size={13} color="#0F766E" />

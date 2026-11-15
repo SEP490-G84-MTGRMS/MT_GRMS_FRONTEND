@@ -303,6 +303,8 @@
 .so-list-table-card--wrap .so-list-table tbody td.so-list-td--actions {
   white-space: nowrap !important;
   overflow: hidden !important;
+  text-overflow: clip !important;
+  box-sizing: border-box;
 }
 
 .so-list-table-card--wrap .so-list-code {

@@ -696,80 +696,55 @@ export const PosShiftPage: FC = () => {
   };
 
   return (
-    <div className="pos-shift-page-root flex flex-col flex-1 w-full min-h-0 overflow-hidden bg-[#F7FAFF]" style={{ minHeight: 0 }}>
-      {/* ─── 1. HEADER DUY NHẤT ĐỒNG BỘ ─── */}
-      <header className="pos-shift-unified-header" style={{ padding: '12px 24px', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <button
-              type="button"
-              className="pos-back-to-sales-btn"
-              onClick={() => navigate(returnPath)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 12px',
-                borderRadius: 8,
-                backgroundColor: '#F1F5F9',
-                color: '#334155',
-                border: '1px solid #CBD5E1',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-              title="Quay lại giao diện trước"
-            >
-              <ArrowLeft size={15} />
-              <span>{isStoreOwner ? 'Lịch Làm Việc' : 'Bán Hàng'}</span>
-            </button>
+    <div
+      className="so-list-page pos-shift-page"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
+      {/* ─── 1. HEADER CHUẨN SO-LIST-HEADER (ĐỒNG BỘ STORE PRODUCT) ─── */}
+      <div className="so-list-header" style={{ flexShrink: 0, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            onClick={() => navigate(returnPath)}
+            title="Quay lại giao diện trước"
+          >
+            <ArrowLeft size={14} />
+            <span>{isStoreOwner ? 'Lịch Làm Việc' : 'Bán Hàng'}</span>
+          </button>
 
-            <div style={{ width: 1, height: 28, backgroundColor: '#E2E8F0' }} />
-
-            <div>
-              <h1 style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <History size={20} className="text-teal-700" />
-                <span>Lịch Sử Chốt Ca &amp; Bàn Giao Quầy</span>
-              </h1>
-              <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                Nhật ký các phiên ca thu ngân, đối soát chênh lệch két tiền mặt và xác nhận bàn giao
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Nút Làm Mới */}
-            <button
-              type="button"
-              onClick={fetchShiftHistory}
-              disabled={isLoading}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                height: 36,
-                padding: '0 12px',
-                borderRadius: 6,
-                border: '1px solid #CBD5E1',
-                backgroundColor: '#FFFFFF',
-                color: '#475569',
-                fontSize: 13,
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-              title="Tải lại dữ liệu lịch sử ca"
-            >
-              <RefreshCw size={14} className={isLoading ? 'spin' : ''} />
-              <span>Làm mới</span>
-            </button>
-          </div>
+          <h1 className="so-list-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <History size={20} color="var(--blue-primary, #0f766e)" />
+            <span>Lịch Sử Chốt Ca &amp; Bàn Giao Quầy</span>
+            {isLoading && <RefreshCw size={14} className="spin text-teal-700" />}
+          </h1>
         </div>
-      </header>
 
-      {/* ─── 2. THÂN TRANG NỘI DUNG ─── */}
-      <main className="pos-shift-body-container flex-1 min-h-0 flex flex-col overflow-hidden" style={{ padding: '12px 20px 4px 20px', minHeight: 0 }}>
-        {/* ── THANH BỘ LỌC CHUẨN SO-LIST-FILTER (GIỐNG STORE PRODUCT) ── */}
-        <div className="so-list-filter" style={{ flexShrink: 0, marginBottom: 12 }}>
+        <div className="so-list-header-actions">
+          <button
+            type="button"
+            onClick={fetchShiftHistory}
+            disabled={isLoading}
+            className="po-btn po-btn-secondary"
+            title="Tải lại dữ liệu lịch sử ca"
+          >
+            <RefreshCw size={13} className={isLoading ? 'spin' : ''} />
+            <span>Làm mới</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ─── 2. THANH BỘ LỌC CHUẨN SO-LIST-FILTER (GIỐNG STORE PRODUCT) ─── */}
+      <div className="so-list-filter" style={{ flexShrink: 0, marginBottom: 12 }}>
           <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
             {/* 1. Ô Tìm kiếm Mã ca / Thu ngân */}
             <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
@@ -917,29 +892,29 @@ export const PosShiftPage: FC = () => {
           </div>
 
           <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-            <table className="so-list-table" style={{ minWidth: 1230, width: '100%', tableLayout: 'fixed' }}>
+            <table className="so-list-table" style={{ minWidth: 1205, width: '100%', tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: 120 }} />
-                <col style={{ width: 145 }} />
-                <col style={{ width: 200 }} />
+                <col style={{ width: 110 }} />
+                <col style={{ width: 160 }} />
+                <col style={{ width: 185 }} />
                 <col style={{ width: 110 }} />
                 <col style={{ width: 115 }} />
                 <col style={{ width: 115 }} />
                 <col style={{ width: 115 }} />
                 <col style={{ width: 135 }} />
-                <col style={{ width: 175 }} />
+                <col style={{ width: 160 }} />
               </colgroup>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
                 <tr>
-                  <th style={{ width: 120, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Mã ca</th>
-                  <th style={{ width: 145, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thời gian mở - đóng</th>
-                  <th style={{ width: 200, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thu ngân</th>
+                  <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Mã ca</th>
+                  <th style={{ width: 160, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thời gian mở - đóng</th>
+                  <th style={{ width: 185, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thu ngân</th>
                   <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền đầu ca</th>
                   <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền lý thuyết</th>
                   <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Thực đếm</th>
                   <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Chênh lệch</th>
                   <th style={{ width: 135, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Xác nhận kết ca</th>
-                  <th style={{ width: 175, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Thao tác</th>
+                  <th style={{ width: 160, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -1172,7 +1147,6 @@ export const PosShiftPage: FC = () => {
             />
           )}
         </div>
-      </main>
 
       {/* ─── 3. MODAL XÁC NHẬN BÀN GIAO CA (HANDOVER CONFIRMATION) ─── */}
       {isOwnerOrAdmin && handoverShift && (
