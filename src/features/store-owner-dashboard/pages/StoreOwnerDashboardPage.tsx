@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Boxes, CalendarDays, ChartNoAxesCombined, ClipboardList, RefreshCw, ShoppingCart, Users } from 'lucide-react';
+import { ArrowRight, Boxes, CalendarDays, ChartNoAxesCombined, ClipboardList, RefreshCw, ShoppingCart, Store, Users } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { getStoreOwnerDashboard, type DashboardBranch, type DashboardPeriod, type StoreOwnerDashboardData } from '../api/dashboardApi';
 import './storeOwnerDashboard.css';
@@ -58,6 +58,10 @@ export const StoreOwnerDashboardPage = () => {
         <label><span>Thời gian</span><select value={period} onChange={(event) => { startLoad(); setPeriod(event.target.value as DashboardPeriod); }}>{periods.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <label><span>Chi nhánh</span><select value={branchId ?? ''} onChange={(event) => { startLoad(); setBranchId(event.target.value || null); }}><option value="">Toàn bộ chi nhánh</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
         <button type="button" className="owner-dash-refresh" onClick={() => { startLoad(); setReload((value) => value + 1); }} aria-label="Làm mới dữ liệu"><RefreshCw size={17} /></button>
+        <Link to="/pos" className="owner-dash-pos-btn" title="Vào màn hình bán hàng POS">
+          <Store size={17} />
+          <span>Vào màn bán hàng</span>
+        </Link>
       </div>
     </header>
 
