@@ -44,6 +44,20 @@
 .plans-row-actions button { display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 1px solid #d9e4eb; border-radius: 6px; background: #fff; color: #0f766e; cursor: pointer; }
 .plans-row-actions button:hover { border-color: #0f766e; background: #edf7f5; }
 .plans-empty { padding: 50px !important; text-align: center; color: #718096; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-store { width: 23%; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-owner { width: 22%; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-scale { width: 12%; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-status { width: 11%; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-actions { width: 12%; }
+.admin-tenant-list .admin-tenant-table td { white-space: normal; }
+.admin-tenant-list .admin-tenant-store-cell { gap: 12px; }
+.admin-tenant-list .admin-tenant-cell-copy > span { margin-top: 5px; font-size: 11px; }
+.admin-tenant-list .admin-tenant-scale { gap: 5px; font-family: inherit; font-size: 12px; }
+.admin-tenant-list .admin-tenant-expiry { font-size: 12px; font-weight: 500; }
+.admin-tenant-list .plans-table .tenant-cell--actions { overflow: visible; }
+.admin-tenant-list .plans-row-actions button { flex-shrink: 0; }
+.admin-tenant-list .admin-tenant-empty { text-align: center; padding: 50px 20px !important; }
+.admin-tenant-list .plans-table td:nth-child(3) > span { border-radius: 9999px !important; border: 0 !important; padding: 4px 9px !important; font-size: 11px !important; }
 .admin-plans-form { min-height: 0 !important; padding: 4px 0 32px !important; background: transparent !important; }
 .plans-page-heading { padding: 22px 24px; border: 1px solid #e2eaf0; border-radius: 24px; background: #fff; margin-bottom: 20px !important; }
 .plans-page-heading > div:last-child { flex-wrap: wrap; }

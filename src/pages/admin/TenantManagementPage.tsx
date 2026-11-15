@@ -19,6 +19,7 @@ import {
 } from '../../features/admin/api';
 import { Loader2 } from 'lucide-react';
 import { CreateTenantModal } from '../../features/admin/components/tenants/CreateTenantModal';
+import './adminPlans.css';
 
 export const TenantManagementPage: FC = () => {
   const navigate = useNavigate();
@@ -194,19 +195,20 @@ export const TenantManagementPage: FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
+    <div className="admin-plans admin-tenant-list" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
       {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
       {/* Page Header */}
-      <div className="admin-page-header" style={{ flexShrink: 0, marginBottom: 14 }}>
+      <div className="plans-hero">
         <div>
-          <h1>Quản lý Khách hàng thuê (Tenants)</h1>
+          <p className="plans-eyebrow">KHÁCH HÀNG THUÊ</p>
+          <h1>Quản lý khách hàng thuê</h1>
           <p>
-            Theo dõi danh sách khách hàng doanh nghiệp, quản lý subdomain, tài nguyên và thời hạn hợp đồng dịch vụ.
+            Cửa hàng, gói dịch vụ và thời hạn hợp đồng
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="plans-toolbar-actions">
           <button
             type="button"
             className="admin-btn admin-btn-secondary"
@@ -227,7 +229,7 @@ export const TenantManagementPage: FC = () => {
       </div>
 
       {/* Filter & Search Toolbar */}
-      <div className="admin-toolbar-card" style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 16px', marginBottom: 12, flexShrink: 0 }}>
+      <div style={{ flexShrink: 0 }}>
         <TenantSearchToolbar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
