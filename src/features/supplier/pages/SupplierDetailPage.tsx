@@ -4,7 +4,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
-  APLedgerEntry,
   SupplierDeliveryConfig,
   SupplierReturnPolicy,
   PurchaseOrderItem,
@@ -156,7 +155,6 @@ export const SupplierDetailPage: FC<Props> = ({
     holidays: [],
   });
 
-  const [apLedgers] = useState<APLedgerEntry[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
   const [returnPolicy, setReturnPolicy] = useState<SupplierReturnPolicy | null>(null);
 
@@ -476,7 +474,11 @@ export const SupplierDetailPage: FC<Props> = ({
           {activeTab === 'payables' && isStoreOwner && (
             <SupplierPayablesTab
               supplier={currentSupplier}
-              apLedgers={apLedgers}
+              onDebtUpdated={(debt) => {
+                setCurrentSupplier((prev) => (prev ? { ...prev, currentDebt: debt } : prev));
+                onSupplierUpdated?.({ ...currentSupplier, currentDebt: debt });
+              }}
+              onToast={(type, message) => showToast(message, type)}
             />
           )}
 

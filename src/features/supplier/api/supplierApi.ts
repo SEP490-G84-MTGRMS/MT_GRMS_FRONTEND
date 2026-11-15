@@ -11,8 +11,57 @@ import type {
   SupplierStatus,
   SupplierType,
   APLedgerEntry,
+  APDocType,
+  RecordAPTransactionInput,
+  SupplierApSummary,
   SupplierSearchSuggestions,
 } from '../types/supplier.types';
+
+const DOC_TYPE_BY_NUMBER: Record<number, APDocType> = {
+  1: 'PurchaseInvoice',
+  2: 'ServiceInvoice',
+  3: 'PaymentVoucher',
+  4: 'ReturnAdjustment',
+};
+
+const DOC_TYPE_TO_NUMBER: Record<APDocType, number> = {
+  PurchaseInvoice: 1,
+  ServiceInvoice: 2,
+  PaymentVoucher: 3,
+  ReturnAdjustment: 4,
+};
+
+export function normalizeApDocType(raw: unknown): APDocType {
+  if (typeof raw === 'number') {
+    return DOC_TYPE_BY_NUMBER[raw] ?? 'PurchaseInvoice';
+  }
+  if (typeof raw === 'string') {
+    if (raw in DOC_TYPE_TO_NUMBER) return raw as APDocType;
+    const asNum = Number(raw);
+    if (!Number.isNaN(asNum) && DOC_TYPE_BY_NUMBER[asNum]) {
+      return DOC_TYPE_BY_NUMBER[asNum];
+    }
+  }
+  return 'PurchaseInvoice';
+}
+
+function mapLedgerEntry(item: any): APLedgerEntry {
+  return {
+    id: item.id || '',
+    supplierId: item.supplierId || '',
+    transactionDate: item.transactionDate || new Date().toISOString(),
+    docType: normalizeApDocType(item.docType),
+    docNo: item.docNo || '',
+    description: item.description || '',
+    amount: Number(item.amount) || 0,
+    direction: item.direction === -1 || item.direction === '-1' ? -1 : 1,
+    balanceAfter: Number(item.balanceAfter) || 0,
+    createdByName: item.createdByName || '',
+    idempotencyKey: item.idempotencyKey || undefined,
+    paymentMethod: item.paymentMethod || null,
+    referenceNo: item.referenceNo || null,
+  };
+}
 
 // Map enums between Frontend and Backend
 const typeMapFrontendToBackend = (type?: string): number | undefined => {
@@ -335,34 +384,73 @@ export const supplierApi = {
    */
   async getAPLedger(
     id: string,
-    params?: { fromDate?: string; toDate?: string; pageIndex?: number; pageSize?: number }
-  ): Promise<PagedResult<APLedgerEntry>> {
-    try {
-      const res = await httpClient.get<ApiResponse<PagedResult<APLedgerEntry>>>(`/suppliers/${id}/ap/ledger`, {
-        params,
-      });
-      if (res.data?.success && res.data.data) {
-        return res.data.data;
-      }
-    } catch (err) {
-      console.warn(`Backend API /suppliers/${id}/ap/ledger failed:`, err);
+    params?: {
+      fromDate?: string;
+      toDate?: string;
+      docType?: APDocType | '';
+      pageIndex?: number;
+      pageSize?: number;
     }
-
-    return {
-      items: [],
-      page: 1,
-      pageSize: 20,
-      totalItems: 0,
+  ): Promise<PagedResult<APLedgerEntry>> {
+    const query: Record<string, string | number> = {
+      pageIndex: params?.pageIndex ?? 1,
+      pageSize: params?.pageSize ?? 20,
     };
+    if (params?.fromDate) query.fromDate = params.fromDate;
+    if (params?.toDate) query.toDate = params.toDate;
+    if (params?.docType) query.docType = DOC_TYPE_TO_NUMBER[params.docType];
+
+    const res = await httpClient.get<ApiResponse<PagedResult<any>>>(`/suppliers/${id}/ap/ledger`, {
+      params: query,
+    });
+    if (res.data?.success && res.data.data) {
+      const data = res.data.data;
+      const rawItems = data.items ?? data.Items ?? [];
+      return {
+        items: (rawItems as any[]).map(mapLedgerEntry),
+        page: data.page ?? data.Page ?? query.pageIndex,
+        pageSize: data.pageSize ?? data.PageSize ?? query.pageSize,
+        totalItems: data.totalItems ?? data.TotalItems ?? 0,
+      };
+    }
+    throw new Error(res.data?.message || 'Không thể tải sổ cái công nợ.');
+  },
+
+  async getApSummary(id: string): Promise<SupplierApSummary> {
+    const res = await httpClient.get<ApiResponse<any>>(`/suppliers/${id}/ap/summary`);
+    if (res.data?.success && res.data.data) {
+      const d = res.data.data;
+      return {
+        supplierId: d.supplierId || id,
+        currentDebt: Number(d.currentDebt) || 0,
+        overdueDebt: Number(d.overdueDebt) || 0,
+        creditLimit: Number(d.creditLimit) || 0,
+        openPurchaseOrderCount: Number(d.openPurchaseOrderCount) || 0,
+      };
+    }
+    throw new Error(res.data?.message || 'Không thể tải tóm tắt công nợ.');
   },
 
   /**
    * Ghi nhận giao dịch công nợ AP
    */
-  async recordAPTransaction(id: string, command: any): Promise<any> {
-    const res = await httpClient.post<ApiResponse<any>>(`/suppliers/${id}/ap/transactions`, command);
+  async recordAPTransaction(id: string, command: RecordAPTransactionInput): Promise<APLedgerEntry> {
+    const body = {
+      supplierId: id,
+      docType: DOC_TYPE_TO_NUMBER[command.docType],
+      direction: command.direction,
+      amount: command.amount,
+      description: command.description,
+      transactionDate: command.transactionDate,
+      docNo: command.docNo || '',
+      paymentMethod: command.paymentMethod,
+      referenceNo: command.referenceNo,
+      idempotencyKey: command.idempotencyKey,
+      createdByName: command.createdByName || 'Chủ cửa hàng',
+    };
+    const res = await httpClient.post<ApiResponse<any>>(`/suppliers/${id}/ap/transactions`, body);
     if (res.data?.success && res.data.data) {
-      return res.data.data;
+      return mapLedgerEntry(res.data.data);
     }
     throw new Error(res.data?.message || 'Không thể ghi nhận giao dịch công nợ.');
   },

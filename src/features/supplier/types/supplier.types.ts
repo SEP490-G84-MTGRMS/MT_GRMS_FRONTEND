@@ -29,11 +29,19 @@ export interface SupplierSummary {
   createdAt: string;
 }
 
+export type APDocType =
+  | 'PurchaseInvoice'
+  | 'ServiceInvoice'
+  | 'PaymentVoucher'
+  | 'ReturnAdjustment';
+
+export type APPaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'OTHER';
+
 export interface APLedgerEntry {
   id: string;
   supplierId: string;
   transactionDate: string;
-  docType: 'PurchaseInvoice' | 'ServiceInvoice' | 'PaymentVoucher' | 'ReturnAdjustment';
+  docType: APDocType;
   docNo: string;
   description: string;
   amount: number;
@@ -41,6 +49,29 @@ export interface APLedgerEntry {
   balanceAfter: number;
   createdByName: string;
   idempotencyKey?: string;
+  paymentMethod?: APPaymentMethod | string | null;
+  referenceNo?: string | null;
+}
+
+export interface RecordAPTransactionInput {
+  docType: APDocType;
+  direction: 1 | -1;
+  amount: number;
+  description: string;
+  transactionDate?: string;
+  docNo?: string;
+  paymentMethod?: APPaymentMethod;
+  referenceNo?: string;
+  idempotencyKey: string;
+  createdByName?: string;
+}
+
+export interface SupplierApSummary {
+  supplierId: string;
+  currentDebt: number;
+  overdueDebt: number;
+  creditLimit: number;
+  openPurchaseOrderCount?: number;
 }
 
 export interface SupplierStats {

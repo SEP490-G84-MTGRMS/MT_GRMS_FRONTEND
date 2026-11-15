@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { SupplierGeneralProfileTab } from '../components/detail/SupplierGeneralProfileTab';
 import { EditSupplierModal } from '../components/EditSupplierModal';
 import { SupplierBankModal, normalizeAccountHolderName } from '../components/detail/SupplierBankModal';
@@ -10,7 +11,30 @@ import { SupplierHolidaysTab } from '../components/detail/SupplierHolidaysTab';
 import { SupplierPayablesTab } from '../components/detail/SupplierPayablesTab';
 import { SupplierHistoryTab } from '../components/detail/SupplierHistoryTab';
 import { getVietQrUrl, resolveBankCodeOrBin } from '../lib/vietQrHelper';
-import type { SupplierSummary, SupplierDeliveryConfig, APLedgerEntry, PurchaseOrderItem } from '../types/supplier.types';
+import type { SupplierSummary, SupplierDeliveryConfig, PurchaseOrderItem } from '../types/supplier.types';
+
+vi.mock('../api/supplierApi', () => ({
+  supplierApi: {
+    getAPLedger: vi.fn().mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 20,
+      totalItems: 0,
+    }),
+    getApSummary: vi.fn().mockResolvedValue({
+      supplierId: 'sup-guid-001',
+      currentDebt: 12500000,
+      overdueDebt: 0,
+      creditLimit: 50000000,
+    }),
+    recordAPTransaction: vi.fn(),
+  },
+}));
+
+vi.mock('../../../stores/useAuthStore', () => ({
+  useAuthStore: (selector: (s: any) => unknown) =>
+    selector({ user: { fullName: 'Tester', email: 't@test.com', role: 'STORE_OWNER' } }),
+}));
 
 // Fixture: Standard supplier
 const baseSupplier: SupplierSummary = {
@@ -57,22 +81,6 @@ const baseDeliveryConfig: SupplierDeliveryConfig = {
     },
   ],
 };
-
-// Fixture: AP Ledgers
-const baseApLedgers: APLedgerEntry[] = [
-  {
-    id: 'ledger-01',
-    supplierId: 'sup-guid-001',
-    transactionDate: '2026-10-20',
-    docType: 'PurchaseInvoice',
-    docNo: 'PINV-202610-001',
-    description: 'Nhập lô hàng nông sản tươi',
-    amount: 12500000,
-    direction: 1,
-    balanceAfter: 12500000,
-    createdByName: 'Kế toán trưởng',
-  },
-];
 
 // Fixture: Purchase Orders
 const basePurchaseOrders: PurchaseOrderItem[] = [
@@ -723,16 +731,18 @@ describe('MASTER AUDIT SUITE – Supplier Detail Management', () => {
       expect(screen.getByText(/30\/04\/2026/i)).toBeDefined();
     });
 
-    it('Tab 4: Debt & Payment Tab renders aging buckets and financial ledgers', () => {
+    it('Tab 4: Debt & Payment Tab renders ledger and debt summary', async () => {
       render(
-        <SupplierPayablesTab
-          supplier={baseSupplier}
-          apLedgers={baseApLedgers}
-        />
+        <MemoryRouter>
+          <SupplierPayablesTab supplier={baseSupplier} />
+        </MemoryRouter>
       );
 
-      expect(screen.getByText(/Phân Tích Tuổi Nợ/i)).toBeDefined();
-      expect(screen.getByText('PINV-202610-001')).toBeDefined();
+      expect(screen.getByText(/Sổ cái công nợ/i)).toBeDefined();
+      expect(screen.getByText(/Dư nợ hiện tại/i)).toBeDefined();
+      await waitFor(() => {
+        expect(screen.getByText(/Chưa có giao dịch/i)).toBeDefined();
+      });
     });
 
     it('Tab 5: Transaction History Tab renders purchase orders with status badges', () => {
