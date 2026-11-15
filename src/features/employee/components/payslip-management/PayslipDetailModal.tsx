@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, CreditCard, Loader2, AlertCircle, Check, Unlock, Banknote } from 'lucide-react';
+import { Printer, CreditCard, Loader2, AlertCircle, Banknote } from 'lucide-react';
 import type { PayslipDetailedRecord } from '../../types';
 import {
   payslipApi,
@@ -16,8 +16,6 @@ interface PayslipDetailModalProps {
   payslipId?: string | null;
   payslip?: PayslipDetailedRecord | null;
   canManage?: boolean;
-  onFinalize?: (payslip: PayslipDetailedRecord) => Promise<void> | void;
-  onUnfinalize?: (payslip: PayslipDetailedRecord) => Promise<void> | void;
   onAdvance?: (payslip: PayslipDetailedRecord) => void;
   onPayNow: (payslip: PayslipDetailedRecord) => void;
 }
@@ -28,8 +26,6 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
   payslipId,
   payslip: initialPayslip,
   canManage = true,
-  onFinalize,
-  onUnfinalize,
   onAdvance,
   onPayNow,
 }) => {
@@ -205,11 +201,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
         })()
       : '—';
 
-  const statusText = isPaid
-    ? 'Đã thanh toán'
-    : effectivePayslip?.approvedAt
-      ? 'Đã chốt lương'
-      : 'Chưa chốt lương';
+  const statusText = isPaid ? 'Đã thanh toán' : 'Chưa thanh toán';
 
   const primarySalaryTypeLabel =
     effectivePayslip?.salaryType === 'HOURLY'
@@ -512,11 +504,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                     <span style={{ color: '#475569' }}>Trạng thái :</span>
                     <span
                       style={{
-                        color: isPaid
-                          ? 'var(--green-money)'
-                          : effectivePayslip.approvedAt
-                            ? '#0369A1'
-                            : 'var(--orange-accent)',
+                        color: isPaid ? 'var(--green-money)' : 'var(--orange-accent)',
                         fontWeight: 600,
                       }}
                     >
@@ -693,64 +681,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
             </button>
           )}
 
-          {!isPaid && effectivePayslip && canManage && !effectivePayslip.approvedAt && onFinalize && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-primary"
-              disabled={isActionLoading}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 16px',
-                fontSize: 13,
-                background: '#0369A1',
-              }}
-              onClick={async () => {
-                setIsActionLoading(true);
-                try {
-                  await onFinalize(effectivePayslip);
-                  setDetail((prev) =>
-                    prev ? { ...prev, approvedAt: new Date().toISOString() } : prev
-                  );
-                } finally {
-                  setIsActionLoading(false);
-                }
-              }}
-            >
-              <Check size={15} />
-              <span>{isActionLoading ? 'Đang chốt...' : 'Chốt lương'}</span>
-            </button>
-          )}
-
-          {!isPaid && effectivePayslip && canManage && effectivePayslip.approvedAt && onUnfinalize && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-secondary"
-              disabled={isActionLoading}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                fontSize: 13,
-              }}
-              onClick={async () => {
-                setIsActionLoading(true);
-                try {
-                  await onUnfinalize(effectivePayslip);
-                  setDetail((prev) => (prev ? { ...prev, approvedAt: undefined } : prev));
-                } finally {
-                  setIsActionLoading(false);
-                }
-              }}
-            >
-              <Unlock size={14} />
-              <span>Mở chốt</span>
-            </button>
-          )}
-
-          {!isPaid && effectivePayslip && effectivePayslip.approvedAt && (
+          {!isPaid && effectivePayslip && (
             <button
               type="button"
               className="emp-btn emp-btn-primary"

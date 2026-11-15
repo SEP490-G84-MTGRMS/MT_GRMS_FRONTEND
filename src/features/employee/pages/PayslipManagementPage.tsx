@@ -287,73 +287,6 @@ export const PayslipManagementPage: React.FC = () => {
     );
   };
 
-  // Finalize / Unfinalize handlers
-  const handleFinalizePayslip = async (payslip: PayslipDetailedRecord) => {
-    try {
-      await payslipApi.finalizePayslip(payslip.id);
-      showNotification(
-        'success',
-        'Chốt phiếu lương thành công',
-        `Đã chốt phiếu lương ${payslip.payslipCode || payslip.employeeName}. Hiện đã có thể thực hiện thanh toán.`
-      );
-      await fetchPayslips();
-    } catch (err: any) {
-      showNotification(
-        'error',
-        'Không thể chốt phiếu lương',
-        extractErrorMessage(err, 'Không thể chốt phiếu lương.')
-      );
-    }
-  };
-
-  const handleUnfinalizePayslip = async (payslip: PayslipDetailedRecord) => {
-    try {
-      await payslipApi.unfinalizePayslip(payslip.id);
-      showNotification(
-        'info',
-        'Đã mở chốt phiếu lương',
-        `Phiếu lương ${payslip.payslipCode || payslip.employeeName} đã được mở chốt để tính lại hoặc chỉnh sửa.`
-      );
-      await fetchPayslips();
-    } catch (err: any) {
-      showNotification(
-        'error',
-        'Không thể mở chốt phiếu lương',
-        extractErrorMessage(err, 'Không thể mở chốt phiếu lương.')
-      );
-    }
-  };
-
-  const handleBatchFinalizePayslips = async () => {
-    const unfinalizedSelected = filteredPayslips.filter(
-      (p) => selectedIds.includes(p.id) && p.status === 'UNPAID' && !p.approvedAt
-    );
-    if (unfinalizedSelected.length === 0) {
-      showNotification(
-        'warning',
-        'Không có phiếu lương cần chốt',
-        'Vui lòng tích chọn ít nhất một phiếu lương chưa chốt.'
-      );
-      return;
-    }
-    try {
-      const res = await payslipApi.batchFinalizePayslips(unfinalizedSelected.map((p) => p.id));
-      setSelectedIds([]);
-      showNotification(
-        'success',
-        'Chốt bảng lương thành công',
-        `Đã chốt ${res.successCount}/${res.totalRequested} phiếu lương.`
-      );
-      await fetchPayslips();
-    } catch (err: any) {
-      showNotification(
-        'error',
-        'Lỗi chốt hàng loạt',
-        extractErrorMessage(err, 'Không thể chốt hàng loạt phiếu lương.')
-      );
-    }
-  };
-
   // Batch Payment modal trigger
   const handleOpenBatchPayModal = () => {
     const unpaidSelected = filteredPayslips.filter(
@@ -368,17 +301,7 @@ export const PayslipManagementPage: React.FC = () => {
       return;
     }
 
-    const finalizedSelected = unpaidSelected.filter((p) => Boolean(p.approvedAt));
-    if (finalizedSelected.length === 0) {
-      showNotification(
-        'warning',
-        'Chưa chốt bảng lương',
-        'Các phiếu lương đã chọn chưa được chốt. Vui lòng bấm "Chốt đã chọn" trước khi thanh toán.'
-      );
-      return;
-    }
-
-    setBatchPayingPayslips(finalizedSelected);
+    setBatchPayingPayslips(unpaidSelected);
   };
 
   // Tính lại bảng lương cho các phiếu lương chưa chi trả (chỉ áp dụng cho nhân viên có ca làm trong tháng)
@@ -706,36 +629,20 @@ export const PayslipManagementPage: React.FC = () => {
         {/* Nút hành động */}
         <div className="emp-header-actions">
           {isOwnerOrAdmin && selectedIds.length > 0 && (
-            <>
-              <button
-                type="button"
-                className="emp-btn emp-btn-primary"
-                onClick={handleBatchFinalizePayslips}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: '#0369A1',
-                }}
-              >
-                <Check size={15} />
-                <span>Chốt lương ({selectedIds.length})</span>
-              </button>
-              <button
-                type="button"
-                className="emp-btn emp-btn-primary"
-                onClick={handleOpenBatchPayModal}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: '#0F766E',
-                }}
-              >
-                <CreditCard size={15} />
-                <span>Chi trả đã chọn ({selectedIds.length})</span>
-              </button>
-            </>
+            <button
+              type="button"
+              className="emp-btn emp-btn-primary"
+              onClick={handleOpenBatchPayModal}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: '#0F766E',
+              }}
+            >
+              <CreditCard size={15} />
+              <span>Chi trả đã chọn ({selectedIds.length})</span>
+            </button>
           )}
 
           {/* Action Dropdown */}
@@ -1096,7 +1003,7 @@ export const PayslipManagementPage: React.FC = () => {
                         >
                           Đã thanh toán
                         </span>
-                      ) : isOwnerOrAdmin && item.approvedAt ? (
+                      ) : isOwnerOrAdmin ? (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -1110,22 +1017,22 @@ export const PayslipManagementPage: React.FC = () => {
                             margin: 0,
                             fontSize: 13,
                             fontWeight: 600,
-                            color: 'var(--blue-primary, #0F766E)',
+                            color: 'var(--orange-accent)',
                             cursor: 'pointer',
                           }}
-                          title="Đã chốt lương — Nhấn để chi trả phiếu lương này"
+                          title="Chưa thanh toán — Nhấn để chi trả phiếu lương này"
                         >
-                          Đã chốt lương
+                          Chưa thanh toán
                         </button>
                       ) : (
                         <span
                           style={{
                             fontSize: 13,
                             fontWeight: 600,
-                            color: item.approvedAt ? 'var(--blue-primary, #0F766E)' : 'var(--orange-accent)',
+                            color: 'var(--orange-accent)',
                           }}
                         >
-                          {item.approvedAt ? 'Đã chốt lương' : 'Chưa chốt lương'}
+                          Chưa thanh toán
                         </span>
                       )}
                     </td>
@@ -1162,8 +1069,6 @@ export const PayslipManagementPage: React.FC = () => {
         onClose={() => setViewingPayslipId(null)}
         payslipId={viewingPayslipId}
         canManage={isOwnerOrAdmin}
-        onFinalize={handleFinalizePayslip}
-        onUnfinalize={handleUnfinalizePayslip}
         onAdvance={(p) => {
           setViewingPayslipId(null);
           setAdvancingPayslip(p);

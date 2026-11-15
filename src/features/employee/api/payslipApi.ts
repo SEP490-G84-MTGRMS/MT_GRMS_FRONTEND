@@ -120,14 +120,6 @@ export interface BatchPayResultDto {
   errors: string[];
 }
 
-export interface BatchFinalizeResultDto {
-  totalRequested: number;
-  successCount: number;
-  failedCount: number;
-  finalizedPayslipCodes: string[];
-  errors: string[];
-}
-
 export interface PayslipQueryFilter {
   keyword?: string;
   periodMonth?: string;
@@ -427,32 +419,6 @@ export const payslipApi = {
     }
 
     throw new Error(res.data?.message || 'Không thể chi trả hàng loạt phiếu lương.');
-  },
-
-  async finalizePayslip(id: string): Promise<PayslipResponse> {
-    const res = await httpClient.post<ApiResponse<PayslipResponse>>(`/payslips/${id}/finalize`);
-    if (res.data?.success && res.data.data) {
-      return res.data.data;
-    }
-    throw new Error(res.data?.message || 'Không thể chốt phiếu lương.');
-  },
-
-  async batchFinalizePayslips(payslipIds: string[]): Promise<BatchFinalizeResultDto> {
-    const res = await httpClient.post<ApiResponse<BatchFinalizeResultDto>>('/payslips/batch-finalize', {
-      payslipIds,
-    });
-    if (res.data?.success && res.data.data) {
-      return res.data.data;
-    }
-    throw new Error(res.data?.message || 'Không thể chốt hàng loạt phiếu lương.');
-  },
-
-  async unfinalizePayslip(id: string): Promise<PayslipResponse> {
-    const res = await httpClient.post<ApiResponse<PayslipResponse>>(`/payslips/${id}/unfinalize`);
-    if (res.data?.success && res.data.data) {
-      return res.data.data;
-    }
-    throw new Error(res.data?.message || 'Không thể mở chốt phiếu lương.');
   },
 
   async advanceSalary(id: string, data: SalaryAdvanceRequest): Promise<PayslipResponse> {
