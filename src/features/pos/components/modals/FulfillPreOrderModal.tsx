@@ -50,6 +50,15 @@ export const FulfillPreOrderModal: FC<Props> = ({
   )}&accountName=MT%20GROCERY%20STORE`;
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+    if (!Number.isSafeInteger(remaining) || remaining < 0 || (paymentMethod === 'CASH' && (!Number.isSafeInteger(cashTendered) || cashTendered < 0))) {
+      alert('Số tiền thanh toán phải là số nguyên không âm.');
+      return;
+    }
+    if (note.trim().length > 500) {
+      alert('Ghi chú tối đa 500 ký tự.');
+      return;
+    }
     if (!isCashSufficient) {
       alert(`Tiền khách đưa (${cashTendered.toLocaleString('vi-VN')} đ) chưa đủ để thanh toán phần còn lại (${remaining.toLocaleString('vi-VN')} đ)!`);
       return;
