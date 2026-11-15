@@ -1,0 +1,12 @@
+{
+  "rows": [
+    {
+      "width": 375,
+      "height": 812,
+      "mode": "catalog",
+      "audit": "{\"width\":375,\"height\":812,\"scrollWidth\":365,\"root\":true,\"payment\":{\"x\":10,\"y\":621.1875,\"width\":345,\"height\":598.9375,\"top\":621.1875,\"right\":355,\"bottom\":1220.125,\"left\":10},\"note\":{\"x\":32,\"y\":525.1875,\"width\":301,\"height\":30,\"top\":525.1875,\"right\":333,\"bottom\":555.1875,\"left\":32},\"dialog\":{\"x\":8,\"y\":32.484375,\"width\":359,\"height\":747.03125,\"top\":32.484375,\"right\":367,\"bottom\":779.515625,\"left\":8},\"inventoryRequests\":[]}",
+      "text": "Chi nhánh:\nChi nhánh Cầu Giấy (Trung tâm)\nTìm kiếm\n● Bán nhanh\n○ Bán thường\nBán riêng (Két sắt)\n[Đổi]\nChủ cửa hàng: Người kiểm tra\nThao tác\nHóa đơn kiểm tra\n×\n[F1]\nDANH SÁCH MẶT HÀNG TRONG ĐƠN HÀNG\nSTT\tXóa\tMã hàng\tTên mặt hàng & Quy cách\tĐVT\tSố lượng\tĐơn giá\tThành tiền\n1\t\n\tAUDIT\t\nSản phẩm kiểm tra m"
+    }
+  ],
+  "errors": []
+}

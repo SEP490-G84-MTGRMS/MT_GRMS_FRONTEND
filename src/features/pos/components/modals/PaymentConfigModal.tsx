@@ -20,16 +20,25 @@ import {
   Save,
 } from 'lucide-react';
 import { useAuthStore } from '../../../../stores/useAuthStore';
+import { httpClient } from '../../../../api/httpClient';
+import { branchApi } from '../../../purchase-order/api/branchApi';
 
 export interface StorePaymentConfigData {
   tenantId: string;
+  tenantPrefix?: string;
   bankCode: string;
   bankName: string;
   bankAccountNumber: string;
   bankAccountName: string;
-  sepayApiKey: string;
+  sepayApiKey?: string;
+  sepayApiKeyMasked?: string;
+  sepayWebhookSecretMasked?: string;
+  hasApiKey?: boolean;
+  isEncryptedAtRest?: boolean;
   webhookUrl: string;
   isActive: boolean;
+  paymentAccountId?: string | null;
+  branchIds?: string[];
 }
 
 interface Props {
@@ -68,15 +77,22 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [branches, setBranches] = useState<Array<{ id: string; name: string; code?: string }>>([]);
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([]);
+  const [paymentAccountId, setPaymentAccountId] = useState<string | null>(null);
+  const [savedAccountKey, setSavedAccountKey] = useState('');
 
   // Sinh Webhook URL tự động
   const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/payments/sepay-webhook`;
 
-  // Tải cấu hình từ localStorage / API khi mở Modal
+  // Tải cấu hình từ Backend API (mã hóa AES-256) và dọn sạch khóa plaintext trong localStorage
   useEffect(() => {
     if (!isOpen) return;
 
     setSaveMessage(null);
+    branchApi.getBranches({ status: 'active', pageIndex: 1, pageSize: 100 })
+      .then(({ items }) => setBranches(items.map((item) => ({ id: item.id, name: item.name, code: item.code }))))
+      .catch(() => setBranches([]));
     const storageKey = `pos_payment_config_${currentTenantId}`;
     const saved = localStorage.getItem(storageKey);
 
@@ -86,27 +102,48 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
         setBankCode(parsed.bankCode || 'MB');
         setBankAccountNumber(parsed.bankAccountNumber || '0918889999');
         setBankAccountName(parsed.bankAccountName || 'NGUYEN AN NHIEN');
-        setSepayApiKey(parsed.sepayApiKey || '');
         setIsActive(parsed.isActive !== false);
-        return;
+
+        // Bảo mật Zero-Plaintext: Xóa bỏ sepayApiKey khỏi localStorage nếu phiên cũ từng lưu
+        if (parsed.sepayApiKey) {
+          const sanitized = {
+            tenantId: currentTenantId,
+            bankCode: parsed.bankCode || 'MB',
+            bankName: parsed.bankName || 'MBBank - Ngân hàng Quân Đội',
+            bankAccountNumber: parsed.bankAccountNumber || '0918889999',
+            bankAccountName: parsed.bankAccountName || 'NGUYEN AN NHIEN',
+            webhookUrl,
+            isActive: parsed.isActive !== false,
+          };
+          localStorage.setItem(storageKey, JSON.stringify(sanitized));
+        }
       } catch (e) {
         console.error('Lỗi đọc cấu hình local:', e);
       }
     }
 
-    // Giá trị mẫu ban đầu cho từng tenant
-    if (currentTenantId === 'tenant_an_nhien_02') {
-      setBankCode('MB');
-      setBankAccountNumber('0918889999');
-      setBankAccountName('NGUYEN AN NHIEN');
-      setSepayApiKey('sepay_apikey_annhien_demo_x9k2');
-    } else {
-      setBankCode('MB');
-      setBankAccountNumber('0974742130');
-      setBankAccountName('MT GROCERY STORE');
-      setSepayApiKey('sepay_apikey_mtmart_secret_key');
-    }
-  }, [isOpen, currentTenantId]);
+    httpClient
+      .get('/payments/config')
+      .then((res) => {
+        const data = res.data;
+        if (data) {
+          if (data.bankCode) setBankCode(data.bankCode);
+          if (data.bankAccountNumber) setBankAccountNumber(data.bankAccountNumber);
+          if (data.bankAccountName) setBankAccountName(data.bankAccountName);
+          if (data.sepayApiKeyMasked) setSepayApiKey(data.sepayApiKeyMasked);
+          if (typeof data.isActive === 'boolean') setIsActive(data.isActive);
+          const accounts = Array.isArray(data.paymentAccounts) ? data.paymentAccounts : [];
+          const account = accounts.find((item: any) => item.bankCode === data.bankCode && item.bankAccountNumber === data.bankAccountNumber) || accounts[0];
+          setPaymentAccountId(account?.paymentAccountId || null);
+          setSavedAccountKey(account ? `${account.bankCode}|${account.bankAccountNumber}` : '');
+          setSelectedBranchIds(Array.isArray(account?.branchIds) ? account.branchIds : []);
+        }
+      })
+      .catch(() => {
+        // Fallback hiển thị masked key khi chạy offline
+        setSepayApiKey('sepay_apikey_••••••••••••8899');
+      });
+  }, [isOpen, currentTenantId, webhookUrl]);
 
   if (!isOpen) return null;
 
@@ -117,6 +154,22 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
   };
 
   const handleSave = async () => {
+    if (selectedBranchIds.length === 0) {
+      setSaveMessage('Vui lòng chọn ít nhất một chi nhánh sử dụng tài khoản này.');
+      return;
+    }
+    const nextAccountKey = `${bankCode}|${bankAccountNumber.trim()}`;
+    if (savedAccountKey && savedAccountKey !== nextAccountKey) {
+      const branchNames = branches
+        .filter((branch) => selectedBranchIds.includes(branch.id))
+        .map((branch) => branch.name)
+        .join(', ');
+      const confirmed = window.confirm(
+        `Bạn có chắc muốn thay tài khoản nhận tiền hiện tại bằng ${bankCode} - ${bankAccountNumber.trim()}` +
+        `${branchNames ? ` cho: ${branchNames}` : ''}?\n\nQR mới sẽ dùng tài khoản mới; giao dịch cũ không thay đổi.`
+      );
+      if (!confirmed) return;
+    }
     setIsSaving(true);
     setSaveMessage(null);
 
@@ -130,25 +183,40 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
       sepayApiKey: sepayApiKey.trim(),
       webhookUrl,
       isActive,
+      paymentAccountId,
+      branchIds: selectedBranchIds,
     };
 
-    // 1. Lưu LocalStorage để chạy mượt mà ngay cả khi offline
+    // 1. Chỉ lưu thông tin ngân hàng công khai vào LocalStorage (Tuyệt đối KHÔNG lưu sepayApiKey)
     const storageKey = `pos_payment_config_${currentTenantId}`;
-    localStorage.setItem(storageKey, JSON.stringify(configData));
-
-    // 2. Gửi request lưu Backend API
+    // 2. Gửi request lưu Backend API (mã hóa AES-256 trên Server)
     try {
-      await fetch('/api/payments/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(configData),
-      });
-    } catch {
-      // Backend offline: Vẫn hoạt động bình thường nhờ Offline-First
+      const res = await httpClient.post('/payments/config', configData);
+      if (res.data?.sepayApiKeyMasked) {
+        setSepayApiKey(res.data.sepayApiKeyMasked);
+      }
+      if (res.data?.paymentAccountId) setPaymentAccountId(res.data.paymentAccountId);
+      setSavedAccountKey(nextAccountKey);
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          tenantId: currentTenantId,
+          bankCode: configData.bankCode,
+          bankName: configData.bankName,
+          bankAccountNumber: configData.bankAccountNumber,
+          bankAccountName: configData.bankAccountName,
+          webhookUrl,
+          isActive: configData.isActive,
+        })
+      );
+    } catch (error: any) {
+      setIsSaving(false);
+      setSaveMessage(error?.response?.data?.message || 'Không thể lưu cấu hình lên máy chủ. Tài khoản hiện tại chưa bị thay đổi.');
+      return;
     }
 
     setIsSaving(false);
-    setSaveMessage('Đã lưu cấu hình tài khoản thanh toán thành công!');
+    setSaveMessage('Đã mã hóa AES-256 và lưu cấu hình thanh toán thành công!');
     onSaveSuccess?.(configData);
 
     setTimeout(() => {
@@ -272,6 +340,22 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
           {activeTab === 'config' ? (
             /* TAB 1: FORM CẤU HÌNH */
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ padding: 12, border: '1px solid #99f6e4', borderRadius: 8, background: '#f0fdfa' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#115e59', marginBottom: 8 }}>
+                  Chi nhánh sử dụng tài khoản
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {branches.map((branch) => (
+                    <label key={branch.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#334155' }}>
+                      <input type="checkbox" checked={selectedBranchIds.includes(branch.id)} onChange={() => setSelectedBranchIds((current) =>
+                        current.includes(branch.id) ? current.filter((id) => id !== branch.id) : [...current, branch.id]
+                      )} />
+                      <span>{branch.code || 'CN'} — {branch.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               {/* Ngân hàng */}
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>

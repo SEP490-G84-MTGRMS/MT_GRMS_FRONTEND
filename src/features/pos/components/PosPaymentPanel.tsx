@@ -490,8 +490,11 @@ export const PosPaymentPanel: FC<Props> = ({
                 <td style={{ textAlign: 'right' }}>
                   <input
                     type="number"
+                    min={0}
+                    max={Number.MAX_SAFE_INTEGER}
+                    step={1000}
                     value={cashTendered || ''}
-                    onChange={(e) => onCashTenderedChange(Number(e.target.value))}
+                    onChange={(e) => onCashTenderedChange(Number(e.target.value) || 0)}
                     className="pos-input"
                     style={{
                       width: 120,
