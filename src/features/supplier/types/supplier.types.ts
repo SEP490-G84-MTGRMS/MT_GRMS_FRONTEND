@@ -141,6 +141,14 @@ export interface HolidayDateRange {
   reason: string;
 }
 
+export interface SupplierReturnPolicyCategoryCostShare {
+  id?: string;
+  categoryId: string;
+  categoryName: string;
+  storeCostSharePercent: number;
+  supplierCostSharePercent: number;
+}
+
 export interface SupplierReturnPolicy {
   id: string;
   supplierId: string;
@@ -152,12 +160,15 @@ export interface SupplierReturnPolicy {
   requireEvidenceImage: boolean;
   maxReturnDaysAfterReceipt?: number | null;
   costShareEnabled: boolean;
+  /** True = tỷ lệ theo nhóm SP; nhóm chưa cấu hình dùng % mặc định NCC. */
+  costShareByCategoryEnabled: boolean;
   storeCostSharePercent?: number | null;
   supplierCostSharePercent?: number | null;
   costShareBase: string;
   requireStorePaymentBeforeReplacement: boolean;
   notes?: string | null;
   isActive: boolean;
+  categoryCostShares: SupplierReturnPolicyCategoryCostShare[];
 }
 
 export interface SupplierDeliveryConfig {

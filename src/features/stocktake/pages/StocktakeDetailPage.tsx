@@ -20,12 +20,13 @@ import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { supplierReturnApi } from '../../supplier-return/api/supplierReturnApi';
 import type { EligibleGrnLookup } from '../../supplier-return/types/supplierReturn.types';
+import { supplierApi } from '../../supplier/api/supplierApi';
 import { stocktakeApi } from '../api/stocktakeApi';
 import { stocktakeStatusBadge } from './StocktakeListPage';
 import {
   SCOPE_TYPE_LABELS,
   DEFECTIVE_REASON_OPTIONS,
-  NEAR_EXPIRY_ACTION_OPTIONS,
+  type StockDispositionAction,
   type StocktakeDetail,
 } from '../types/stocktake.types';
 import '../../purchase-order/purchase-order.css';
@@ -36,8 +37,52 @@ const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 const reasonLabel = (code?: string | null) =>
   DEFECTIVE_REASON_OPTIONS.find((o) => o.value === code)?.label || code || '—';
 
-const nearExpiryLabel = (action?: string | null) =>
-  NEAR_EXPIRY_ACTION_OPTIONS.find((o) => o.value === action)?.label || action || '—';
+interface SupplierPolicyHint {
+  allowReturn: boolean;
+  allowDamagedReturn: boolean;
+  allowExpiredReturn: boolean;
+  allowedResolutions: string[];
+  defaultResolutionType: string;
+  maxReturnDaysAfterReceipt: number | null;
+  notes?: string | null;
+}
+
+const RESOLUTION_OPTIONS: {
+  value: 'DEDUCT_INVOICE' | 'REFUND' | 'REPLACE_GOODS' | 'SUPPLIER_CREDIT';
+  policyValue: string;
+  label: string;
+}[] = [
+  { value: 'DEDUCT_INVOICE', policyValue: 'REDUCE_PAYABLE', label: 'Cấn trừ công nợ / Hóa đơn' },
+  { value: 'REPLACE_GOODS', policyValue: 'EXCHANGE', label: 'Đổi hàng bù từ NCC' },
+  { value: 'REFUND', policyValue: 'REFUND', label: 'Hoàn tiền mặt / Chuyển khoản' },
+  { value: 'SUPPLIER_CREDIT', policyValue: 'SUPPLIER_CREDIT', label: 'Ghi nhận Credit Note' },
+];
+
+const mapPolicyResolutionToUi = (
+  policyValue: string
+): 'DEDUCT_INVOICE' | 'REFUND' | 'REPLACE_GOODS' | 'SUPPLIER_CREDIT' => {
+  const raw = policyValue.toUpperCase();
+  if (raw === 'EXCHANGE' || raw === 'REPLACE_GOODS') return 'REPLACE_GOODS';
+  if (raw === 'REFUND') return 'REFUND';
+  if (raw === 'SUPPLIER_CREDIT' || raw === 'OTHER') return 'SUPPLIER_CREDIT';
+  return 'DEDUCT_INVOICE';
+};
+
+const isWithinReturnWindow = (
+  receivedDate: string | null | undefined,
+  maxDays: number | null | undefined
+): boolean => {
+  if (maxDays == null || maxDays < 0 || !receivedDate) return true;
+  const received = new Date(receivedDate);
+  if (Number.isNaN(received.getTime())) return true;
+  const diffDays = Math.floor((Date.now() - received.getTime()) / (24 * 60 * 60 * 1000));
+  return diffDays <= maxDays;
+};
+
+type LineDispositionState = {
+  damagedAction: StockDispositionAction;
+  expiredAction: StockDispositionAction;
+};
 
 export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' }> = ({
   defaultRole = 'store_owner',
@@ -79,6 +124,10 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
   );
   const [reviewNote, setReviewNote] = useState('');
   const [confirmSurplusFound, setConfirmSurplusFound] = useState(false);
+  const [supplierPolicies, setSupplierPolicies] = useState<Record<string, SupplierPolicyHint>>({});
+  const [lineDispositions, setLineDispositions] = useState<Record<string, LineDispositionState>>(
+    {}
+  );
 
   // Create Return modal state
   const [isCreateReturnOpen, setIsCreateReturnOpen] = useState(false);
@@ -99,14 +148,22 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
       const data = await stocktakeApi.getById(id);
       setDetail(data);
       const initialQtys: Record<string, number> = {};
+      const dispositions: Record<string, LineDispositionState> = {};
       let firstGrnId = '';
       data.lines.forEach((l) => {
         if (l.returnableQty > 0) {
           initialQtys[l.id] = l.returnableQty;
           if (!firstGrnId && l.goodsReceiptId) firstGrnId = l.goodsReceiptId;
         }
+        dispositions[l.id] = {
+          damagedAction:
+            l.damagedAction === 'RETURN_SUPPLIER' ? 'RETURN_SUPPLIER' : 'WRITE_OFF',
+          expiredAction:
+            l.expiredAction === 'RETURN_SUPPLIER' ? 'RETURN_SUPPLIER' : 'WRITE_OFF',
+        };
       });
       setReturnQtys(initialQtys);
+      setLineDispositions(dispositions);
       if (firstGrnId) setSelectedGrnId(firstGrnId);
 
       supplierReturnApi
@@ -118,6 +175,53 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
           }
         })
         .catch(() => {});
+
+      const supplierIds = [
+        ...new Set(data.lines.map((l) => l.supplierId).filter((x): x is string => Boolean(x))),
+      ];
+      if (supplierIds.length > 0) {
+        const policyEntries = await Promise.all(
+          supplierIds.map(async (supplierId) => {
+            try {
+              const policy = await supplierApi.getReturnPolicy(supplierId);
+              const types = (policy?.allowedReturnTypes || []).map((t) => t.toUpperCase());
+              const allowReturn = !!policy?.allowReturn && !!policy?.isActive;
+              return [
+                supplierId,
+                {
+                  allowReturn,
+                  allowDamagedReturn: allowReturn && types.includes('QUALITY_DEFECT'),
+                  allowExpiredReturn: allowReturn && types.includes('EXPIRED'),
+                  allowedResolutions: (policy?.allowedResolutionTypes || []).map((t) =>
+                    t.toUpperCase()
+                  ),
+                  defaultResolutionType: (
+                    policy?.defaultResolutionType || 'REDUCE_PAYABLE'
+                  ).toUpperCase(),
+                  maxReturnDaysAfterReceipt: policy?.maxReturnDaysAfterReceipt ?? null,
+                  notes: policy?.notes || null,
+                } satisfies SupplierPolicyHint,
+              ] as const;
+            } catch {
+              return [
+                supplierId,
+                {
+                  allowReturn: false,
+                  allowDamagedReturn: false,
+                  allowExpiredReturn: false,
+                  allowedResolutions: [],
+                  defaultResolutionType: 'REDUCE_PAYABLE',
+                  maxReturnDaysAfterReceipt: null,
+                  notes: null,
+                } satisfies SupplierPolicyHint,
+              ] as const;
+            }
+          })
+        );
+        setSupplierPolicies(Object.fromEntries(policyEntries));
+      } else {
+        setSupplierPolicies({});
+      }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
       const msg = e.response?.data?.message || e.message || 'Không thể tải chi tiết phiếu kiểm kê.';
@@ -168,14 +272,31 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
         action: reviewAction,
         note: reviewNote.trim() || null,
         confirmSurplusFound: reviewAction === 'APPROVE' ? confirmSurplusFound : false,
+        lineActions:
+          reviewAction === 'APPROVE'
+            ? detail.lines.map((l) => ({
+                stocktakeLineId: l.id,
+                damagedAction:
+                  l.damagedQty > 0
+                    ? lineDispositions[l.id]?.damagedAction || 'WRITE_OFF'
+                    : null,
+                expiredAction:
+                  l.expiredQty > 0
+                    ? lineDispositions[l.id]?.expiredAction || 'WRITE_OFF'
+                    : null,
+              }))
+            : undefined,
       });
       setDetail(updated);
       setReviewAction(null);
       setReviewNote('');
       setConfirmSurplusFound(false);
+      const returnableAfter = updated.lines.reduce((s, l) => s + (l.returnableQty || 0), 0);
       showToast(
         reviewAction === 'APPROVE'
-          ? 'Đã duyệt kiểm kê và cập nhật tồn kho theo RULE-03.'
+          ? returnableAfter > 0
+            ? `Đã duyệt kiểm kê. Có ${fmt(returnableAfter)} ĐVT đủ điều kiện đổi/trả NCC — tạo yêu cầu trả khi sẵn sàng.`
+            : 'Đã duyệt kiểm kê và cập nhật tồn kho (xuất hủy hư hỏng/hết hạn đã chọn).'
           : 'Đã cập nhật kết quả duyệt phiếu kiểm kê thành công!',
         'success'
       );
@@ -218,10 +339,14 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
         lines: selectedLines,
       });
       setIsCreateReturnOpen(false);
-      showToast('Đã tạo phiếu trả hàng nhà cung cấp từ phiếu kiểm kê thành công!', 'success');
       if (createdIds.length === 1) {
+        showToast('Đã tạo phiếu trả hàng nhà cung cấp từ phiếu kiểm kê thành công!', 'success');
         navigate(`/store-owner/supplier-returns/${createdIds[0]}`);
       } else {
+        showToast(
+          `Đã tạo ${createdIds.length} phiếu trả NCC (tách theo GRN/NCC) từ phiếu kiểm kê.`,
+          'success'
+        );
         await loadDetail();
       }
     } catch (err: unknown) {
@@ -263,6 +388,46 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
 
   const badge = stocktakeStatusBadge(detail.status);
   const returnableLines = detail.lines.filter((l) => l.returnableQty > 0);
+  const returnSupplierIds = [
+    ...new Set(returnableLines.map((l) => l.supplierId).filter((x): x is string => Boolean(x))),
+  ];
+  const filteredEligibleGrns = eligibleGrns.filter((g) => {
+    if (returnSupplierIds.length === 0) return true;
+    if (!returnSupplierIds.includes(g.supplierId)) return false;
+    // Nếu mọi dòng returnable đều có maxDays, lọc GRN quá hạn theo policy nghiêm nhất của các NCC liên quan
+    const policy = supplierPolicies[g.supplierId];
+    return isWithinReturnWindow(g.receivedDate, policy?.maxReturnDaysAfterReceipt);
+  });
+  const activeReturnPolicies = returnSupplierIds
+    .map((id) => supplierPolicies[id])
+    .filter((p): p is SupplierPolicyHint => !!p);
+  const allowedResolutionSet = (() => {
+    if (activeReturnPolicies.length === 0) {
+      return new Set(RESOLUTION_OPTIONS.map((o) => o.policyValue));
+    }
+    // Giao các hình thức được phép của mọi NCC trong phiếu (chỉ hiện option chung)
+    return activeReturnPolicies.reduce<Set<string>>((acc, p, idx) => {
+      const set = new Set((p.allowedResolutions || []).map((x) => x.toUpperCase()));
+      if (idx === 0) return set;
+      return new Set([...acc].filter((x) => set.has(x)));
+    }, new Set());
+  })();
+  const filteredResolutionOptions = RESOLUTION_OPTIONS.filter((o) =>
+    allowedResolutionSet.has(o.policyValue)
+  );
+  const openCreateReturnModal = () => {
+    const preferred =
+      activeReturnPolicies[0]?.defaultResolutionType ||
+      filteredResolutionOptions[0]?.policyValue ||
+      'REDUCE_PAYABLE';
+    setResolutionType(mapPolicyResolutionToUi(preferred));
+    const preferredGrn =
+      returnableLines.find((l) => l.goodsReceiptId)?.goodsReceiptId ||
+      filteredEligibleGrns[0]?.id ||
+      '';
+    if (preferredGrn) setSelectedGrnId(preferredGrn);
+    setIsCreateReturnOpen(true);
+  };
   const canEdit = detail.status === 'DRAFT' || detail.status === 'NEEDS_RECOUNT';
 
   const steps = [
@@ -428,7 +593,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
               type="button"
               className="po-btn po-btn-primary"
               style={{ backgroundColor: '#ea580c' }}
-              onClick={() => setIsCreateReturnOpen(true)}
+              onClick={openCreateReturnModal}
             >
               <Truck size={14} />
               <span>
@@ -579,7 +744,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
           {detail.linkedSupplierReturns.length === 0 ? (
             <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>
               {returnableLines.length > 0
-                ? `Có ${returnableLines.length} dòng hàng lỗi NCC / cận hạn đủ điều kiện tạo phiếu trả NCC.`
+                ? `Có ${returnableLines.length} dòng đủ điều kiện tạo phiếu trả NCC (đã chọn đổi/trả).`
                 : 'Không có phiếu trả hàng NCC nào liên kết.'}
             </div>
           ) : (
@@ -660,7 +825,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
           }}
         >
           <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>
-            Kết quả kiểm kê &amp; Đề xuất xử lý theo dòng ({detail.lines.length} dòng lô hàng)
+            Kết quả kiểm kê theo dòng ({detail.lines.length} dòng lô hàng)
           </div>
           <div style={{ display: 'flex', gap: 16, fontSize: 12.5 }}>
             <span>
@@ -685,7 +850,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
         </div>
 
         <div style={{ overflowX: 'auto', flex: 1 }}>
-          <table style={{ width: '100%', minWidth: 1260, borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <table style={{ width: '100%', minWidth: 1080, borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
               <tr
                 style={{
@@ -699,33 +864,58 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                 <th style={{ padding: '8px 10px', textAlign: 'left' }}>Sản phẩm / SKU</th>
                 <th style={{ padding: '8px 10px', textAlign: 'left' }}>Lô / HSD / Kệ</th>
                 <th style={{ padding: '8px 10px', textAlign: 'left' }}>GRN gốc / NCC</th>
-                <th style={{ padding: '8px 10px', textAlign: 'right' }}>Tồn HT</th>
-                <th style={{ padding: '8px 10px', textAlign: 'right', color: '#15803d' }}>SL Tốt</th>
-                <th style={{ padding: '8px 10px', textAlign: 'right', color: '#dc2626' }}>
-                  Lỗi NCC
-                </th>
+                <th style={{ padding: '8px 10px', textAlign: 'right' }}>Tồn hệ thống</th>
                 <th style={{ padding: '8px 10px', textAlign: 'right', color: '#b45309' }}>
-                  Hỏng CH
-                </th>
-                <th style={{ padding: '8px 10px', textAlign: 'right', color: '#2563eb' }}>
-                  Cận hạn
+                  Số lượng hư hỏng
                 </th>
                 <th style={{ padding: '8px 10px', textAlign: 'right', color: '#be123c' }}>
-                  Hết hạn
+                  Số lượng hết hạn
                 </th>
                 <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thực đếm</th>
                 <th style={{ padding: '8px 10px', textAlign: 'right' }}>Chênh lệch</th>
-                <th style={{ padding: '8px 10px', textAlign: 'left' }}>
+                <th style={{ padding: '8px 10px', textAlign: 'center', width: 100 }}>
+                  Ảnh minh chứng
+                </th>
+                <th style={{ padding: '8px 10px', textAlign: 'left', minWidth: 200 }}>
                   Hướng xử lý sau kiểm kê
                 </th>
               </tr>
             </thead>
             <tbody>
               {detail.lines.map((line, idx) => {
-                const writeOffQty = line.damagedQty + line.expiredQty;
-                const returnCandidateQty =
-                  line.defectiveQty +
-                  (line.nearExpiryAction === 'RETURN_SUPPLIER' ? line.nearExpiryQty : 0);
+                const disp = lineDispositions[line.id] || {
+                  damagedAction: 'WRITE_OFF' as StockDispositionAction,
+                  expiredAction: 'WRITE_OFF' as StockDispositionAction,
+                };
+                const policy = line.supplierId ? supplierPolicies[line.supplierId] : undefined;
+                const canEditDisposition =
+                  isStoreOwner && detail.status === 'PENDING_APPROVAL';
+                const grnReceivedDate =
+                  eligibleGrns.find((g) => g.id === line.goodsReceiptId)?.receivedDate ?? null;
+                const withinReturnWindow = isWithinReturnWindow(
+                  grnReceivedDate,
+                  policy?.maxReturnDaysAfterReceipt
+                );
+                const damagedReturnAllowed =
+                  !!policy?.allowDamagedReturn && withinReturnWindow && !!line.supplierId;
+                const expiredReturnAllowed =
+                  !!policy?.allowExpiredReturn && withinReturnWindow && !!line.supplierId;
+                const noSupplierHint = !line.supplierId
+                  ? 'Lô chưa xác định NCC — không thể đổi/trả'
+                  : !withinReturnWindow
+                    ? `Đã quá ${policy?.maxReturnDaysAfterReceipt} ngày sau nhận hàng`
+                    : null;
+                const selectStyle = (border: string, bg: string, color: string) => ({
+                  height: 28,
+                  maxWidth: 200,
+                  borderRadius: 5,
+                  border: `1px solid ${border}`,
+                  background: bg,
+                  fontWeight: 600,
+                  fontSize: 11.5,
+                  color,
+                  padding: '0 6px',
+                });
 
                 return (
                   <tr key={line.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -761,20 +951,6 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                     <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>
                       {fmt(line.systemQty)}
                     </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#15803d' }}>
-                      {fmt(line.goodQty)}
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px 10px',
-                        textAlign: 'right',
-                        fontFamily: 'monospace',
-                        fontWeight: 700,
-                        color: line.defectiveQty > 0 ? '#dc2626' : '#94a3b8',
-                      }}
-                    >
-                      {fmt(line.defectiveQty)}
-                    </td>
                     <td
                       style={{
                         padding: '8px 10px',
@@ -785,17 +961,6 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                       }}
                     >
                       {fmt(line.damagedQty)}
-                    </td>
-                    <td
-                      style={{
-                        padding: '8px 10px',
-                        textAlign: 'right',
-                        fontFamily: 'monospace',
-                        fontWeight: 700,
-                        color: line.nearExpiryQty > 0 ? '#2563eb' : '#94a3b8',
-                      }}
-                    >
-                      {fmt(line.nearExpiryQty)}
                     </td>
                     <td
                       style={{
@@ -829,75 +994,146 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                         ? `+${fmt(line.varianceQty)}`
                         : fmt(line.varianceQty)}
                     </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                      {line.evidenceUrl ? (
+                        <a
+                          href={line.evidenceUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Xem ảnh minh chứng"
+                          style={{
+                            display: 'inline-block',
+                            width: 44,
+                            height: 44,
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            border: '1px solid #cbd5e1',
+                            verticalAlign: 'middle',
+                          }}
+                        >
+                          <img
+                            src={line.evidenceUrl}
+                            alt="Minh chứng kiểm kê"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </a>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
+                      )}
+                    </td>
                     <td style={{ padding: '8px 10px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {returnCandidateQty > 0 && (
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 6,
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                              backgroundColor: '#fff1f2',
-                              border: '1px solid #fecdd3',
-                              color: '#be123c',
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              width: 'fit-content',
-                            }}
-                          >
-                            <span>
-                              Đề nghị trả NCC: {fmt(returnCandidateQty)} {line.unit}
-                              {line.returnedQty > 0
-                                ? ` (Đã tạo phiếu trả: ${fmt(line.returnedQty)})`
-                                : ''}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {line.damagedQty > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309' }}>
+                              Hư hỏng
                             </span>
+                            {canEditDisposition ? (
+                              <select
+                                value={disp.damagedAction}
+                                title={
+                                  noSupplierHint ||
+                                  (policy?.allowReturn
+                                    ? `NCC cho trả hư hỏng: ${damagedReturnAllowed ? 'Có' : 'Không'}`
+                                    : 'NCC không cho trả hàng')
+                                }
+                                onChange={(e) => {
+                                  const next = e.target.value as StockDispositionAction;
+                                  if (next === 'RETURN_SUPPLIER' && !damagedReturnAllowed) {
+                                    showToast(
+                                      noSupplierHint ||
+                                        'Chính sách NCC không cho trả hàng hư hỏng (QUALITY_DEFECT).',
+                                      'warning'
+                                    );
+                                    return;
+                                  }
+                                  setLineDispositions((prev) => ({
+                                    ...prev,
+                                    [line.id]: { ...disp, damagedAction: next },
+                                  }));
+                                }}
+                                style={selectStyle('#fcd34d', '#fffbeb', '#92400e')}
+                              >
+                                <option value="WRITE_OFF">Xuất hủy trừ tồn</option>
+                                <option value="RETURN_SUPPLIER" disabled={!damagedReturnAllowed}>
+                                  {damagedReturnAllowed
+                                    ? 'Đổi/trả NCC'
+                                    : noSupplierHint
+                                      ? 'Đổi/trả NCC (thiếu NCC/hết hạn trả)'
+                                      : 'Đổi/trả NCC (không cho)'}
+                                </option>
+                              </select>
+                            ) : (
+                              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#92400e' }}>
+                                {disp.damagedAction === 'RETURN_SUPPLIER'
+                                  ? 'Đổi/trả NCC'
+                                  : 'Xuất hủy trừ tồn'}
+                              </span>
+                            )}
                           </div>
                         )}
-                        {line.defectiveQty > 0 && (
-                          <div style={{ fontSize: 11, color: '#991b1b' }}>
-                            Lý do lỗi: <b>{reasonLabel(line.defectiveReasonCode)}</b>
-                            {line.defectiveReasonDetail ? ` — ${line.defectiveReasonDetail}` : ''}
+
+                        {line.expiredQty > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#be123c' }}>
+                              Hết hạn
+                            </span>
+                            {canEditDisposition ? (
+                              <select
+                                value={disp.expiredAction}
+                                title={
+                                  noSupplierHint ||
+                                  (policy?.allowReturn
+                                    ? `NCC cho trả hết hạn (EXPIRED): ${expiredReturnAllowed ? 'Có' : 'Không'}`
+                                    : 'NCC không cho trả hàng')
+                                }
+                                onChange={(e) => {
+                                  const next = e.target.value as StockDispositionAction;
+                                  if (next === 'RETURN_SUPPLIER' && !expiredReturnAllowed) {
+                                    showToast(
+                                      noSupplierHint ||
+                                        'Chính sách NCC không cho trả hàng hết hạn (EXPIRED).',
+                                      'warning'
+                                    );
+                                    return;
+                                  }
+                                  setLineDispositions((prev) => ({
+                                    ...prev,
+                                    [line.id]: { ...disp, expiredAction: next },
+                                  }));
+                                }}
+                                style={selectStyle('#fecdd3', '#fff1f2', '#9f1239')}
+                              >
+                                <option value="WRITE_OFF">Xuất hủy trừ tồn</option>
+                                <option value="RETURN_SUPPLIER" disabled={!expiredReturnAllowed}>
+                                  {expiredReturnAllowed
+                                    ? 'Đổi/trả NCC'
+                                    : noSupplierHint
+                                      ? 'Đổi/trả NCC (thiếu NCC/hết hạn trả)'
+                                      : 'Đổi/trả NCC (không cho)'}
+                                </option>
+                              </select>
+                            ) : (
+                              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#9f1239' }}>
+                                {disp.expiredAction === 'RETURN_SUPPLIER'
+                                  ? 'Đổi/trả NCC'
+                                  : 'Xuất hủy trừ tồn'}
+                              </span>
+                            )}
                           </div>
                         )}
-                        {writeOffQty > 0 && (
-                          <div
-                            style={{
-                              display: 'inline-flex',
-                              padding: '2px 8px',
-                              borderRadius: 6,
-                              backgroundColor: '#fef3c7',
-                              border: '1px solid #fde68a',
-                              color: '#92400e',
-                              fontSize: 11.5,
-                              fontWeight: 700,
-                              width: 'fit-content',
-                            }}
-                          >
-                            Xuất hủy tại CH khi duyệt: {fmt(writeOffQty)} {line.unit}
-                          </div>
-                        )}
-                        {line.nearExpiryQty > 0 && (
-                          <div style={{ fontSize: 11, color: '#1e40af' }}>
-                            Cận hạn: <b>{nearExpiryLabel(line.nearExpiryAction)}</b>
-                          </div>
-                        )}
+
                         {line.varianceQty !== 0 && (
-                          <div style={{ fontSize: 11, color: '#475569', fontWeight: 600 }}>
-                            Điều chỉnh chênh lệch tồn:{' '}
-                            {line.varianceQty > 0 ? `+${line.varianceQty}` : line.varianceQty}{' '}
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>
+                            Lệch tồn:{' '}
+                            {line.varianceQty > 0 ? `+${fmt(line.varianceQty)}` : fmt(line.varianceQty)}{' '}
                             {line.unit}
-                          </div>
+                          </span>
                         )}
-                        {returnCandidateQty === 0 &&
-                          writeOffQty === 0 &&
-                          line.nearExpiryQty === 0 &&
-                          line.varianceQty === 0 && (
-                            <span style={{ color: '#15803d', fontSize: 11.5, fontWeight: 600 }}>
-                              ✓ Khớp tồn &amp; Hàng tốt 100%
-                            </span>
-                          )}
+
+                        {line.damagedQty === 0 && line.expiredQty === 0 && line.varianceQty === 0 && (
+                          <span style={{ color: '#94a3b8', fontSize: 11.5 }}>—</span>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -941,7 +1177,7 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
             </h3>
             <p style={{ fontSize: 12.5, color: '#475569', marginTop: 8 }}>
               {reviewAction === 'APPROVE'
-                ? 'Khi phê duyệt: điều chỉnh tồn đúng từng lô (BranchStock). Write-off hết hạn/hư hỏng; giảm tồn nếu thiếu; hàng thừa chỉ cộng sau khi xác minh. Không phân bổ chênh lệch sang lô khác / FEFO.'
+                ? 'Khi phê duyệt: trừ tồn các dòng xuất hủy (hư hỏng/hết hạn đã chọn WRITE_OFF); giữ tồn các dòng đổi/trả NCC để tạo phiếu trả sau; điều chỉnh thiếu/thừa theo từng lô. Không FEFO / không phân bổ sang lô khác.'
                 : 'Từ chối hoặc yêu cầu kiểm kê lại: không đổi tồn kho. Nhân viên sửa số liệu và gửi lại.'}
             </p>
             {reviewAction === 'APPROVE' && detail && (
@@ -1167,14 +1403,20 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                     fontSize: 13,
                   }}
                 >
-                  <option value="">-- Tự động lấy từ GRN gốc của lô hoặc chọn GRN --</option>
-                  {eligibleGrns.map((g) => (
+                  <option value="">-- Tự động lấy từ GRN gốc của lô hoặc chọn GRN cùng NCC --</option>
+                  {filteredEligibleGrns.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.code} — {g.supplierName} (Ngày nhận:{' '}
                       {new Date(g.receivedDate).toLocaleDateString('vi-VN')})
                     </option>
                   ))}
                 </select>
+                {filteredEligibleGrns.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#b45309', marginTop: 4 }}>
+                    Không có GRN phù hợp NCC / còn trong hạn trả. Kiểm tra chính sách hoặc GRN gốc của
+                    lô.
+                  </div>
+                )}
               </div>
               <div>
                 <label
@@ -1208,12 +1450,14 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                     fontSize: 13,
                   }}
                 >
-                  <option value="DEDUCT_INVOICE">Cấn trừ công nợ / Hóa đơn (DEDUCT_INVOICE)</option>
-                  <option value="REPLACE_GOODS">
-                    Đổi hàng bù từ NCC (trừ tồn lúc bàn giao → PO → GRN)
-                  </option>
-                  <option value="REFUND">Hoàn tiền mặt / Chuyển khoản (REFUND)</option>
-                  <option value="SUPPLIER_CREDIT">Ghi nhận Credit Note (SUPPLIER_CREDIT)</option>
+                  {(filteredResolutionOptions.length > 0
+                    ? filteredResolutionOptions
+                    : RESOLUTION_OPTIONS
+                  ).map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

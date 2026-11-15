@@ -18,14 +18,25 @@ interface ProductOption {
   productId: string;
   sku: string;
   productName: string;
-  unit: string;
+  /** ĐVT tồn (base) — qtyCurrent luôn theo đơn vị này */
+  stockUnit: string;
+  /** ĐVT nhập (purchase) */
+  purchaseUnit: string;
+  purchaseToStockRate: number;
   lotCount: number;
-  totalQty: number;
+  /** Tổng QuantityOnHand theo ĐVT tồn */
+  totalStockQty: number;
   sample: BatchItem;
 }
 
 const fmtQty = (n: number) =>
   n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+
+/** qtyCurrent lưu theo ĐVT tồn → quy đổi ra ĐVT nhập để hiển thị phụ. */
+const toPurchaseQty = (stockQty: number, rate: number) => {
+  const r = rate > 0 ? rate : 1;
+  return Math.round((stockQty / r) * 1000) / 1000;
+};
 
 export const StocktakeAddProductModal: FC<StocktakeAddProductModalProps> = ({
   isOpen,
@@ -63,13 +74,25 @@ export const StocktakeAddProductModal: FC<StocktakeAddProductModalProps> = ({
       const opts: ProductOption[] = [];
       grouped.forEach((lots, productId) => {
         const sample = lots[0];
+        const stockUnit = (sample.stockUnit || sample.unit || 'Cái').trim() || 'Cái';
+        const purchaseUnit = (sample.unit || stockUnit).trim() || stockUnit;
+        // Mỗi lô có thể khác rate (hiếm) — quy đổi từng lô rồi cộng theo base, không cộng thùng + chai.
+        const totalStockQty = lots.reduce((s, l) => s + (Number(l.qtyCurrent) || 0), 0);
+        const rate =
+          lots
+            .map((l) => Number(l.purchaseToStockRate))
+            .find((r) => r > 0) ||
+          Number(sample.purchaseToStockRate) ||
+          1;
         opts.push({
           productId,
           sku: sample.sku,
           productName: sample.productName,
-          unit: sample.unit,
+          stockUnit,
+          purchaseUnit,
+          purchaseToStockRate: rate > 0 ? rate : 1,
           lotCount: lots.length,
-          totalQty: lots.reduce((s, l) => s + Number(l.qtyCurrent || 0), 0),
+          totalStockQty,
           sample,
         });
       });
@@ -272,7 +295,9 @@ export const StocktakeAddProductModal: FC<StocktakeAddProductModalProps> = ({
                   </th>
                   <th style={{ padding: '8px 12px' }}>SKU / Sản phẩm</th>
                   <th style={{ padding: '8px 12px', textAlign: 'center' }}>Số lô</th>
-                  <th style={{ padding: '8px 12px', textAlign: 'right' }}>Tổng tồn</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right' }} title="Theo ĐVT tồn (base)">
+                    Tổng tồn
+                  </th>
                   <th style={{ padding: '8px 12px' }}>TT</th>
                 </tr>
               </thead>
@@ -318,7 +343,44 @@ export const StocktakeAddProductModal: FC<StocktakeAddProductModalProps> = ({
                           fontWeight: 700,
                         }}
                       >
-                        {fmtQty(p.totalQty)} {p.unit}
+                        {(() => {
+                          const rate = p.purchaseToStockRate > 0 ? p.purchaseToStockRate : 1;
+                          const sameUnit =
+                            rate === 1 ||
+                            p.purchaseUnit.toLowerCase() === p.stockUnit.toLowerCase();
+                          const purchaseQty = toPurchaseQty(p.totalStockQty, rate);
+                          const rateLabel = Number.isInteger(rate)
+                            ? String(rate)
+                            : rate.toLocaleString('vi-VN');
+                          return (
+                            <div
+                              title={
+                                sameUnit
+                                  ? undefined
+                                  : `1 ${p.purchaseUnit} = ${rateLabel} ${p.stockUnit}`
+                              }
+                            >
+                              <div>
+                                {fmtQty(p.totalStockQty)}{' '}
+                                <span style={{ fontWeight: 600, color: '#64748b' }}>
+                                  {p.stockUnit}
+                                </span>
+                              </div>
+                              {!sameUnit && (
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: '#94a3b8',
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  ≈ {fmtQty(purchaseQty)} {p.purchaseUnit}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td
                         style={{

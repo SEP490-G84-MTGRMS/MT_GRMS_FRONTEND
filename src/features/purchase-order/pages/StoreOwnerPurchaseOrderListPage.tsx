@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Grid, Zap, Layers, Loader2 } from 'lucide-react';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import { branchApi } from '../api/branchApi';
@@ -96,9 +96,10 @@ const mapFilterStatusToBackend = (status: PoListFilterState['status']): string |
 
 export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const supplierIdFromUrl = searchParams.get('supplierId') || searchParams.get('supplier') || '';
-  const codeFromUrl = searchParams.get('code') || '';
+  const codeFromUrl = searchParams.get('code') || searchParams.get('keyword') || '';
 
   const [orders, setOrders] = useState<PurchaseOrderListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -127,6 +128,14 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  useEffect(() => {
+    const state = location.state as { toastMessage?: string } | null;
+    if (!state?.toastMessage) return;
+    showToast(state.toastMessage, 'success');
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ đọc toast khi vào trang
+  }, [location.state]);
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);

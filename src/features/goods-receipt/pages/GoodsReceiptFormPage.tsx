@@ -42,8 +42,8 @@ const toDateInput = (value?: string | null): string => {
   return s.length >= 10 ? s.slice(0, 10) : s;
 };
 
-/** Tự sinh mã lô: BAT-{SKU}-{YYYYMMDD}[-n] */
-const generateBatchCode = (productCode: string, lotIndex = 1): string => {
+/** Tự sinh mã lô: BAT-{SKU}-{YYYYMMDD}[-n] · đổi hàng dùng BAT-EX-… để không trùng lô trả */
+const generateBatchCode = (productCode: string, lotIndex = 1, isExchange = false): string => {
   const now = new Date();
   const ymd = [
     now.getFullYear(),
@@ -51,7 +51,7 @@ const generateBatchCode = (productCode: string, lotIndex = 1): string => {
     String(now.getDate()).padStart(2, '0'),
   ].join('');
   const sku = (productCode || 'SKU').replace(/\s+/g, '').slice(0, 12).toUpperCase() || 'SKU';
-  const base = `BAT-${sku}-${ymd}`;
+  const base = isExchange ? `BAT-EX-${sku}-${ymd}` : `BAT-${sku}-${ymd}`;
   return lotIndex > 1 ? `${base}-${lotIndex}` : base;
 };
 
@@ -364,8 +364,10 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         setBranchId(
           role === 'employee' && employeeBranchId ? employeeBranchId : details.branchId
         );
+        const isExchangePo =
+          String(details.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN';
         setItems(
-          details.items.map((it) => {
+          details.items.map((it, idx) => {
             const manageBatch = !!it.hasBatches;
             return {
               id: it.purchaseOrderDetailId,
@@ -385,7 +387,10 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
               differenceQty: 0,
               unitPrice: it.unitPrice,
               lineTotal: it.orderedQty * it.unitPrice,
-              batchCode: manageBatch ? generateBatchCode(it.productCode) : '',
+              // Đổi hàng: luôn BAT-EX-… — không dùng BAT-SKU-ngày trùng lô hàng trả cận hạn
+              batchCode: manageBatch
+                ? generateBatchCode(it.productCode, idx + 1, isExchangePo)
+                : '',
               manufactureDate: '',
               expiryDate: '',
             };

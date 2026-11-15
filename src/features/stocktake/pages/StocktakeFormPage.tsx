@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { branchApi } from '../../purchase-order/api/branchApi';
@@ -21,6 +21,11 @@ import {
 } from '../components/form/StocktakeProductEntryTable';
 import { StocktakeFormFooter } from '../components/form/StocktakeFormFooter';
 import { fetchLotsForProduct } from '../utils/stocktakeLotExpand';
+import {
+  buildCountUnitOptionsFromBatch,
+  mergeProductUnitOptions,
+} from '../utils/stocktakeCountUnit';
+import { productApi } from '../../product/api/productApi';
 
 interface LocationState {
   preselectedBatches?: Array<BatchItem & { confirmQty?: number }>;
@@ -81,12 +86,25 @@ const mapBatchToLine = (
   const isExpired = b.status === 'Expired';
   const confirmed =
     typeof b.confirmQty === 'number' && b.confirmQty >= 0 ? b.confirmQty : b.qtyCurrent;
+  const countOpts = buildCountUnitOptionsFromBatch(b);
+  const stockUnit = countOpts[0]?.name || b.stockUnit || b.unit || 'Cái';
+  const purchaseUnit = (b.unit || stockUnit).trim() || stockUnit;
+  const purchaseRate =
+    Number(b.purchaseToStockRate) > 0 ? Number(b.purchaseToStockRate) : 1;
+  // Mặc định nhập theo ĐVT tồn (base). User có thể đổi sang thùng/hộp trên từng dòng.
+  const defaultCount = countOpts[0];
   return {
     branchStockId: b.id,
     productId: b.productId,
     sku: b.sku,
     productName: b.productName,
-    unit: b.unit,
+    unit: defaultCount?.name || stockUnit,
+    stockUnit,
+    purchaseUnit,
+    purchaseToStockRate: purchaseRate,
+    countUnit: defaultCount?.name || stockUnit,
+    countToStockRate: defaultCount?.toStockRate || 1,
+    countUnitOptions: countOpts,
     batchCode: b.batchCode !== '—' ? b.batchCode : null,
     expiryDate: b.rawExpiryDate ? new Date(b.rawExpiryDate).toISOString() : null,
     shelfLocation: b.shelfLocation !== '—' ? b.shelfLocation : null,
@@ -149,17 +167,28 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
   const [addProductOpen, setAddProductOpen] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const showToast = useCallback(
     (message: string, type: ToastState['type'] = 'error') => {
-      setErrorMsg(type === 'error' ? message : '');
       setToast({ id: Date.now().toString(), message, type });
-      setTimeout(() => setToast(null), 4000);
+      setTimeout(() => setToast(null), 4500);
     },
     []
   );
+
+  const extractErrorMessage = (err: unknown, fallback: string) => {
+    const e = err as {
+      response?: { data?: { message?: string; error?: string } };
+      message?: string;
+    };
+    const apiMsg = e.response?.data?.message || e.response?.data?.error;
+    if (apiMsg) return apiMsg;
+    if (e.message && !/^Request failed with status code \d+$/i.test(e.message)) {
+      return e.message;
+    }
+    return fallback;
+  };
 
   // Resolve branch list (Owner chọn CN; Employee dùng CN tài khoản)
   useEffect(() => {
@@ -234,6 +263,12 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
               sku: l.sku,
               productName: l.productName,
               unit: l.unit,
+              stockUnit: l.unit,
+              purchaseUnit: l.unit,
+              purchaseToStockRate: 1,
+              countUnit: l.unit,
+              countToStockRate: 1,
+              countUnitOptions: [{ name: l.unit || 'Cái', toStockRate: 1 }],
               batchCode: l.batchCode,
               expiryDate: l.expiryDate,
               shelfLocation: l.shelfLocation,
@@ -258,6 +293,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
             }))
           )
         );
+        void enrichCountUnitsFromProduct(detail.lines.map((l) => l.productId));
       })
       .catch((err) => {
         const msg =
@@ -265,6 +301,8 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         showToast(msg, 'error');
       })
       .finally(() => setIsLoadingEdit(false));
+    // enrichCountUnitsFromProduct ổn định (useCallback [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, showToast, user?.fullName, isStoreOwner]);
 
   const sortLinesByProduct = (list: UpsertStocktakeLineInput[]) =>
@@ -273,6 +311,28 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       if (c !== 0) return c;
       return (a.batchCode || '').localeCompare(b.batchCode || '');
     });
+
+  const enrichCountUnitsFromProduct = useCallback(async (productIds: string[]) => {
+    const unique = [...new Set(productIds.filter(Boolean))];
+    if (unique.length === 0) return;
+    await Promise.all(
+      unique.map(async (productId) => {
+        try {
+          const units = await productApi.getProductUnits(productId);
+          if (!units.length) return;
+          setLines((prev) =>
+            prev.map((line) => {
+              if (line.productId !== productId) return line;
+              const merged = mergeProductUnitOptions(line.countUnitOptions || [], units);
+              return { ...line, countUnitOptions: merged };
+            })
+          );
+        } catch {
+          // ignore — vẫn dùng stock/purchase từ lô
+        }
+      })
+    );
+  }, []);
 
   const addBatchesToLines = useCallback(
     (batches: BatchItem[], toastOk = true) => {
@@ -297,11 +357,27 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
             'success'
           );
         }
+        void enrichCountUnitsFromProduct(mapped.map((m) => m.productId));
         return sortLinesByProduct([...prev, ...mapped]);
       });
     },
-    [showToast]
+    [showToast, enrichCountUnitsFromProduct]
   );
+
+  const handleCountUnitChange = (idx: number, unitName: string, toStockRate: number) => {
+    setLines((prev) =>
+      prev.map((line, i) =>
+        i === idx
+          ? {
+              ...line,
+              unit: unitName,
+              countUnit: unitName,
+              countToStockRate: toStockRate > 0 ? toStockRate : 1,
+            }
+          : line
+      )
+    );
+  };
 
   const handleQuickSearch = async () => {
     if (!branchId) {
@@ -360,8 +436,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       addBatchesToLines(allLots);
       setSearchKeyword('');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tìm sản phẩm trong tồn kho.';
-      showToast(msg, 'error');
+      showToast(extractErrorMessage(err, 'Không thể tìm sản phẩm trong tồn kho.'), 'error');
     } finally {
       setIsSearching(false);
     }
@@ -383,8 +458,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       handleCountChange(idx, { evidenceUrl: url });
       showToast('Đã tải ảnh minh chứng lên thành công.', 'success');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể tải ảnh minh chứng.';
-      showToast(msg, 'error');
+      showToast(extractErrorMessage(err, 'Không thể tải ảnh minh chứng.'), 'error');
     } finally {
       setUploadingIdx(null);
     }
@@ -395,11 +469,9 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     setBranchId(nextBranchId);
     setLines([]);
     setSearchKeyword('');
-    setErrorMsg('');
   };
 
   const handleSave = async (submitImmediately: boolean) => {
-    setErrorMsg('');
     if (!branchId) {
       showToast(
         isStoreOwner
@@ -414,7 +486,25 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       return;
     }
 
-    for (const l of lines) {
+    // Chỉ đưa vào phiếu các lô có hư hỏng hoặc hết hạn.
+    const abnormalLines = lines.filter((l) => l.damagedQty > 0 || l.expiredQty > 0);
+    if (abnormalLines.length === 0) {
+      showToast(
+        'Chỉ lưu các lô có số lượng hư hỏng hoặc hết hạn. Hãy nhập hư hỏng/hết hạn trước khi lưu.',
+        'error'
+      );
+      return;
+    }
+
+    const skipped = lines.length - abnormalLines.length;
+    if (skipped > 0) {
+      showToast(
+        `Đã bỏ ${skipped} lô không có hư hỏng/hết hạn khỏi phiếu kiểm kê.`,
+        'warning'
+      );
+    }
+
+    for (const l of abnormalLines) {
       const actual = lineActualQty(l);
       if (l.expiredQty + l.damagedQty > actual) {
         showToast(
@@ -423,7 +513,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         );
         return;
       }
-      if ((l.expiredQty > 0 || l.damagedQty > 0) && !l.evidenceUrl) {
+      if (!l.evidenceUrl) {
         showToast(
           `Dòng "${l.productName}": cần ảnh minh chứng khi có số lượng hết hạn hoặc hư hỏng.`,
           'error'
@@ -441,7 +531,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         note: note.trim() || null,
         submitImmediately,
         createdByName: createdByName || user?.fullName || null,
-        lines: lines.map((l) => applyCount(l, {})),
+        lines: abnormalLines.map((l) => applyCount(l, {})),
       };
 
       const saved =
@@ -464,13 +554,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         },
       });
     } catch (err: unknown) {
-      const e = err as {
-        response?: { status?: number; data?: { message?: string } };
-        message?: string;
-      };
-      const rawMsg =
-        e.response?.data?.message || e.message || 'Lỗi khi lưu phiếu kiểm kê hàng hóa.';
-      showToast(rawMsg, 'error');
+      showToast(extractErrorMessage(err, 'Lỗi khi lưu phiếu kiểm kê hàng hóa.'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -574,26 +658,6 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         </div>
       </div>
 
-      {errorMsg && (
-        <div
-          style={{
-            flexShrink: 0,
-            padding: '8px 12px',
-            borderRadius: 8,
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#b91c1c',
-            fontSize: 13,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <AlertTriangle size={16} />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
       <div
         style={{
           flex: 1,
@@ -644,8 +708,10 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
               setAddProductOpen(true);
             }}
             onCountChange={handleCountChange}
+            onCountUnitChange={handleCountUnitChange}
             onRemoveLine={handleRemoveLine}
             onEvidenceUpload={(idx, file) => void handleEvidenceUpload(idx, file)}
+            onAlert={(msg) => showToast(msg, 'warning')}
             lineActualQty={lineActualQty}
           />
         </div>

@@ -487,18 +487,7 @@ export const PoListTable: FC<PoListTableProps> = ({
                         </span>
                         {String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN' && (
                           <span
-                            style={{
-                              display: 'inline-flex',
-                              alignSelf: 'flex-start',
-                              marginTop: 2,
-                              padding: '1px 6px',
-                              borderRadius: 999,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: '#0369a1',
-                              background: '#e0f2fe',
-                              border: '1px solid #7dd3fc',
-                            }}
+                            style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}
                             title={
                               order.sourceSupplierReturnId
                                 ? `PO đổi hàng từ phiếu trả ${order.sourceSupplierReturnId}`

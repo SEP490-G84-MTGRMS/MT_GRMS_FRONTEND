@@ -401,14 +401,17 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         onClose={() => setIsAlertOpen(false)}
         onCreated={(codes) => {
           setIsAlertOpen(false);
-          showToast(
+          const msg =
             codes.length === 1
-              ? `Đã tạo phiếu trả hàng nháp ${codes[0]} — gửi Store Owner xem trên Phiếu trả NCC.`
-              : `Đã tạo ${codes.length} phiếu trả hàng nháp: ${codes.join(', ')}.`,
-            'success'
-          );
+              ? `Đã tạo phiếu trả hàng nháp ${codes[0]} — xem tại Phiếu trả NCC.`
+              : `Đã tạo ${codes.length} phiếu trả hàng nháp: ${codes.join(', ')}.`;
           if (role !== 'employee') {
-            navigate('/store-owner/supplier-returns');
+            // Toast gắn vào trang đích — navigate ngay sẽ unmount toast của trang lô.
+            navigate('/store-owner/supplier-returns', {
+              state: { toastMessage: msg },
+            });
+          } else {
+            showToast(msg, 'success');
           }
         }}
         onCreateStocktake={(items) => {

@@ -87,7 +87,7 @@ export const BatchTable: FC<BatchTableProps> = ({
   onWriteOffClick: _onWriteOffClick,
   onResetFilters,
 }) => {
-  const [sortField, setSortField] = useState<SortField | null>('expiryDate');
+  const [sortField, setSortField] = useState<SortField | null>('sku');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const headerRef = useRef<HTMLDivElement>(null);
@@ -109,9 +109,26 @@ export const BatchTable: FC<BatchTableProps> = ({
   };
 
   const sortedBatches = useMemo(() => {
-    if (!sortField) return batches;
+    const qtyOf = (r: BatchItem) => {
+      if (isKgBatch(r)) {
+        return Number(
+          r.rawSellableQty ??
+            r.qtyAvailable ??
+            Math.max(0, (Number(r.qtyCurrent) || 0) - (Number(r.packagedQty) || 0))
+        );
+      }
+      return Number(r.qtyCurrent) || 0;
+    };
 
     return [...batches].sort((a, b) => {
+      // Mặc định / tie-break: gom các dòng cùng SKU lại với nhau
+      const skuCmp = a.sku.toLowerCase().localeCompare(b.sku.toLowerCase(), 'vi');
+
+      if (!sortField) {
+        if (skuCmp !== 0) return skuCmp;
+        return a.daysLeft - b.daysLeft;
+      }
+
       let valA: string | number = '';
       let valB: string | number = '';
 
@@ -136,21 +153,10 @@ export const BatchTable: FC<BatchTableProps> = ({
           valA = a.daysLeft;
           valB = b.daysLeft;
           break;
-        case 'qtyCurrent': {
-          const qtyOf = (r: BatchItem) => {
-            if (isKgBatch(r)) {
-              return Number(
-                r.rawSellableQty ??
-                  r.qtyAvailable ??
-                  Math.max(0, (Number(r.qtyCurrent) || 0) - (Number(r.packagedQty) || 0))
-              );
-            }
-            return Number(r.qtyCurrent) || 0;
-          };
+        case 'qtyCurrent':
           valA = qtyOf(a);
           valB = qtyOf(b);
           break;
-        }
         case 'costPrice':
           valA = a.costPrice;
           valB = b.costPrice;
@@ -163,7 +169,10 @@ export const BatchTable: FC<BatchTableProps> = ({
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+
+      // Cùng giá trị cột đang sort → giữ nhóm SKU, trong SKU theo HSD (FEFO)
+      if (sortField !== 'sku' && skuCmp !== 0) return skuCmp;
+      return a.daysLeft - b.daysLeft;
     });
   }, [batches, sortField, sortOrder]);
 

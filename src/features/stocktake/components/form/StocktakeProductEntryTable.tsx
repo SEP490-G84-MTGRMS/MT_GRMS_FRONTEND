@@ -1,6 +1,5 @@
 import {
   useRef,
-  useState,
   type ChangeEvent,
   type CSSProperties,
   type FC,
@@ -17,6 +16,11 @@ import {
   Plus,
 } from 'lucide-react';
 import type { UpsertStocktakeLineInput } from '../../types/stocktake.types';
+import {
+  formatCountQty,
+  toBaseQty,
+  toCountQty,
+} from '../../utils/stocktakeCountUnit';
 
 export interface StocktakeCountPatch {
   actualQty?: number;
@@ -35,8 +39,10 @@ interface StocktakeProductEntryTableProps {
   onQuickSearch: () => void;
   onOpenFindModal: () => void;
   onCountChange: (idx: number, patch: StocktakeCountPatch) => void;
+  onCountUnitChange: (idx: number, unitName: string, toStockRate: number) => void;
   onRemoveLine: (idx: number) => void;
   onEvidenceUpload: (idx: number, file: File | null) => void;
+  onAlert?: (message: string) => void;
   lineActualQty: (line: UpsertStocktakeLineInput) => number;
 }
 
@@ -72,19 +78,19 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
   onQuickSearch,
   onOpenFindModal,
   onCountChange,
+  onCountUnitChange,
   onRemoveLine,
   onEvidenceUpload,
+  onAlert,
   lineActualQty,
 }) => {
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
-  const [localAlert, setLocalAlert] = useState<string | null>(null);
 
   const handleSearchKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       if (!searchKeyword.trim()) {
-        setLocalAlert('Nhập SKU hoặc tên sản phẩm rồi Enter để thêm.');
-        setTimeout(() => setLocalAlert(null), 3000);
+        onAlert?.('Nhập SKU hoặc tên sản phẩm rồi Enter để thêm.');
         return;
       }
       onQuickSearch();
@@ -241,22 +247,6 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
         </div>
       </div>
 
-      {localAlert && (
-        <div
-          style={{
-            marginBottom: 10,
-            padding: '6px 12px',
-            borderRadius: 6,
-            fontSize: 12,
-            backgroundColor: '#fffbeb',
-            color: '#b45309',
-            border: '1px solid #fcd34d',
-          }}
-        >
-          {localAlert}
-        </div>
-      )}
-
       <div
         style={{
           width: '100%',
@@ -294,7 +284,7 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
               <th style={{ ...thSticky, width: 100 }}>Mã SKU</th>
               <th style={{ ...thSticky, width: 200 }}>Tên sản phẩm</th>
               <th style={{ ...thSticky, width: 110 }}>Mã lô</th>
-              <th style={{ ...thSticky, textAlign: 'center', width: 88 }}>Đơn vị nhập</th>
+              <th style={{ ...thSticky, textAlign: 'center', width: 120 }}>ĐVT kiểm kê</th>
               <th style={{ ...thSticky, width: 90 }}>Vị trí kệ</th>
               <th style={{ ...thSticky, textAlign: 'right', width: 96 }}>Tồn hệ thống</th>
               <th style={{ ...thSticky, textAlign: 'right', width: 100 }}>Số lượng thực tế</th>
@@ -399,6 +389,17 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
                     const varianceQty = actualQty - line.systemQty;
                     const needsEvidence = line.expiredQty > 0 || line.damagedQty > 0;
                     const hasIssue = needsEvidence || varianceQty !== 0;
+                    const rate = Number(line.countToStockRate) > 0 ? Number(line.countToStockRate) : 1;
+                    const unitOpts =
+                      line.countUnitOptions && line.countUnitOptions.length > 0
+                        ? line.countUnitOptions
+                        : [{ name: line.countUnit || line.unit || 'Cái', toStockRate: rate }];
+                    const countUnitLabel = line.countUnit || line.unit || 'Cái';
+                    const systemCount = toCountQty(line.systemQty, rate);
+                    const actualCount = toCountQty(actualQty, rate);
+                    const expiredCount = toCountQty(line.expiredQty, rate);
+                    const damagedCount = toCountQty(line.damagedQty, rate);
+                    const varianceCount = toCountQty(varianceQty, rate);
 
                     rows.push(
                       <tr
@@ -445,15 +446,46 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
                         >
                           {line.batchCode || '—'}
                         </td>
-                        <td
-                          style={{
-                            padding: '8px',
-                            textAlign: 'center',
-                            fontWeight: 600,
-                            color: '#475569',
-                          }}
-                        >
-                          {line.unit || '—'}
+                        <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                          <select
+                            value={countUnitLabel}
+                            disabled={unitOpts.length <= 1}
+                            onChange={(e) => {
+                              const selected = unitOpts.find((o) => o.name === e.target.value);
+                              onCountUnitChange(
+                                idx,
+                                selected?.name || e.target.value,
+                                selected?.toStockRate || 1
+                              );
+                            }}
+                            title={
+                              rate > 1
+                                ? `1 ${countUnitLabel} = ${formatCountQty(rate)} ${line.stockUnit || 'đvt tồn'}`
+                                : 'Đơn vị tồn kho'
+                            }
+                            style={{
+                              maxWidth: 110,
+                              height: 30,
+                              borderRadius: 5,
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: unitOpts.length > 1 ? '#f0fdfa' : '#ffffff',
+                              fontWeight: 700,
+                              color: '#0f766e',
+                              fontSize: 12,
+                              padding: '0 4px',
+                            }}
+                          >
+                            {unitOpts.map((o) => (
+                              <option key={o.name} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                          </select>
+                          {rate > 1 && (
+                            <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                              1={formatCountQty(rate)} {line.stockUnit || 'base'}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '8px 10px', color: '#475569' }}>
                           {line.shelfLocation || '—'}
@@ -466,16 +498,20 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
                         fontWeight: 800,
                       }}
                     >
-                      {line.systemQty}
+                      {formatCountQty(systemCount)}
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8' }}>
+                        {countUnitLabel}
+                      </div>
                     </td>
                     <td style={{ padding: '8px 6px', textAlign: 'right' }}>
                       <input
                         type="number"
                         min={0}
-                        value={actualQty}
+                        step="any"
+                        value={formatCountQty(actualCount)}
                         onChange={(e) =>
                           onCountChange(idx, {
-                            actualQty: Math.max(0, Number(e.target.value) || 0),
+                            actualQty: toBaseQty(Math.max(0, Number(e.target.value) || 0), rate),
                           })
                         }
                         style={qtyInputStyle()}
@@ -485,10 +521,11 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
                       <input
                         type="number"
                         min={0}
-                        value={line.expiredQty}
+                        step="any"
+                        value={formatCountQty(expiredCount)}
                         onChange={(e) =>
                           onCountChange(idx, {
-                            expiredQty: Math.max(0, Number(e.target.value) || 0),
+                            expiredQty: toBaseQty(Math.max(0, Number(e.target.value) || 0), rate),
                           })
                         }
                         style={qtyInputStyle(line.expiredQty > 0, '#be123c')}
@@ -498,10 +535,11 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
                       <input
                         type="number"
                         min={0}
-                        value={line.damagedQty}
+                        step="any"
+                        value={formatCountQty(damagedCount)}
                         onChange={(e) =>
                           onCountChange(idx, {
-                            damagedQty: Math.max(0, Number(e.target.value) || 0),
+                            damagedQty: toBaseQty(Math.max(0, Number(e.target.value) || 0), rate),
                           })
                         }
                         style={qtyInputStyle(line.damagedQty > 0, '#b45309')}
@@ -517,7 +555,12 @@ export const StocktakeProductEntryTable: FC<StocktakeProductEntryTableProps> = (
                           varianceQty < 0 ? '#dc2626' : varianceQty > 0 ? '#2563eb' : '#15803d',
                       }}
                     >
-                      {varianceQty > 0 ? `+${varianceQty}` : varianceQty}
+                      {varianceCount > 0
+                        ? `+${formatCountQty(varianceCount)}`
+                        : formatCountQty(varianceCount)}
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8' }}>
+                        {countUnitLabel}
+                      </div>
                     </td>
                     <td style={{ padding: '8px', textAlign: 'center' }}>
                       <input
