@@ -905,9 +905,9 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                             <span style={{ color: '#334155' }}>ghi nhận</span>
                             <input
                               type="number"
-                              min={0.1}
+                              min={0.01}
                               max={5}
-                              step={0.25}
+                              step={0.01}
                               value={rule.workUnits}
                               onChange={(e) => {
                                 const val = parseFloat(e.target.value);

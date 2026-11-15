@@ -23,6 +23,7 @@ import {
 } from '../../types/scheduleApprovalTypes';
 import { scheduleApprovalApi } from '../../api/scheduleApprovalApi';
 import { scheduleApi } from '../../api/scheduleApi';
+import { extractErrorMessage } from '../../api/payslipApi';
 import { formatLocalDateIso, getVietnamToday } from '../../lib/vietnamTime';
 import { readFileAsDataUrl } from '../../../../utils/imageFile';
 import { NotificationModal } from '../../../../components/common';
@@ -71,6 +72,23 @@ const safeFormatTime = (timeStr?: string | null, fallback = '00:00') => {
   return timeStr.length >= 5 ? timeStr.substring(0, 5) : timeStr;
 };
 
+const resolveIsoDatePrefix = (workDate?: string | null): string => {
+  const raw = (workDate || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    return raw.slice(0, 10);
+  }
+  const dmyFull = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmyFull) {
+    return `${dmyFull[3]}-${dmyFull[2].padStart(2, '0')}-${dmyFull[1].padStart(2, '0')}`;
+  }
+  const dmyShort = raw.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (dmyShort) {
+    const year = getVietnamToday().getFullYear();
+    return `${year}-${dmyShort[2].padStart(2, '0')}-${dmyShort[1].padStart(2, '0')}`;
+  }
+  return formatLocalDateIso(getVietnamToday());
+};
+
 export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProps> = ({
   isOpen,
   onClose,
@@ -92,6 +110,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
   const [reason, setReason] = useState<string>('');
 
   // Tệp đính kèm nhiều ảnh (Cloudinary)
+  const modalBodyRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [evidenceImageUrls, setEvidenceImageUrls] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
@@ -432,31 +451,36 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
     setEvidenceImageUrls((prev) => prev.filter((_, idx) => idx !== indexToRemove));
   };
 
+  const showFormError = (msg: string) => {
+    setErrorMessage(msg);
+    modalBodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setReasonTouched(true);
     if (!selectedSchedule) {
-      setErrorMessage('Vui lòng chọn ca làm việc.');
+      showFormError('Vui lòng chọn ca làm việc.');
       return;
     }
 
     if (selectedOptionDisabledReason) {
-      setErrorMessage(selectedOptionDisabledReason);
+      showFormError(selectedOptionDisabledReason);
       return;
     }
 
     if (uploadingImage) {
-      setErrorMessage('Ảnh minh chứng đang được tải lên, vui lòng chờ giây lát.');
+      showFormError('Ảnh minh chứng đang được tải lên, vui lòng chờ giây lát.');
       return;
     }
 
     if (overtimeError) {
-      setErrorMessage(overtimeError);
+      showFormError(overtimeError);
       return;
     }
 
     if (reasonError) {
-      setErrorMessage(reasonError);
+      showFormError(reasonError);
       return;
     }
 
@@ -476,11 +500,11 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       } else if (requestType === ScheduleRequestType.ShiftSwap) {
         // Đơn đổi ca chỉ gửi thông tin ca hiện tại & lý do muốn đổi để Store Owner xem xét duyệt
       } else if (requestType === ScheduleRequestType.CheckInIncident) {
-        const datePrefix = (selectedSchedule.workDate || '').slice(0, 10);
-        payload.requestedCheckInTime = `${datePrefix}T${checkInTime}:00`;
+        const datePrefix = resolveIsoDatePrefix(selectedSchedule.workDate);
+        payload.requestedCheckInTime = `${datePrefix}T${safeFormatTime(checkInTime, '08:00')}:00`;
       } else if (requestType === ScheduleRequestType.CheckOutIncident) {
-        const datePrefix = (selectedSchedule.workDate || '').slice(0, 10);
-        payload.requestedCheckOutTime = `${datePrefix}T${checkOutTime}:00`;
+        const datePrefix = resolveIsoDatePrefix(selectedSchedule.workDate);
+        payload.requestedCheckOutTime = `${datePrefix}T${safeFormatTime(checkOutTime, '17:00')}:00`;
       } else if (requestType === ScheduleRequestType.Overtime) {
         payload.requestedOvertimeMinutes = overtimeMinutes;
       }
@@ -497,10 +521,8 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
         shiftInfo: workDateLabel ? `${shiftName} (${workDateLabel})` : shiftName,
       });
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Gửi yêu cầu thất bại. Vui lòng thử lại sau.';
-      setErrorMessage(msg);
+      const msg = extractErrorMessage(err, 'Gửi yêu cầu thất bại. Vui lòng thử lại sau.');
+      showFormError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -545,7 +567,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
         className="emp-modal-box"
         style={{
           width: '100%',
-          maxWidth: 580,
+          maxWidth: 760,
           maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
@@ -593,6 +615,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
           }}
         >
           <div
+            ref={modalBodyRef}
             className="emp-modal-body"
             style={{
               padding: '18px 20px',

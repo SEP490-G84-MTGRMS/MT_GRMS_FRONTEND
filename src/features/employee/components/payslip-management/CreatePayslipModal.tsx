@@ -5,6 +5,7 @@ import { MOCK_BRANCHES } from '../../services/mockData';
 import { AttendanceConfigModal } from '../shift-config/AttendanceConfigModal';
 import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
 import { scheduleApi } from '../../api/scheduleApi';
+import { attendancePolicyApi } from '../../api/attendancePolicyApi';
 import { getVietnamCurrentMonthIso } from '../../lib/vietnamTime';
 
 interface CreatePayslipModalProps {
@@ -40,6 +41,29 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
     }
     setSubmitError(null);
   }, [initialPeriodMonth, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || isAttendanceConfigOpen) return;
+    const targetBranchId = branchId !== 'ALL' ? branchId : branches[0]?.id;
+    if (!targetBranchId) return;
+
+    let cancelled = false;
+    attendancePolicyApi
+      .getByBranch(targetBranchId)
+      .then((policy) => {
+        if (!cancelled && policy?.standardDayHours) {
+          setStandardDayHours(policy.standardDayHours);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStandardDayHours(8.0);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, isAttendanceConfigOpen, branchId, branches]);
 
   if (!isOpen) return null;
 

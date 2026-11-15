@@ -136,17 +136,21 @@ export function extractErrorMessage(error: any, fallbackMessage: string): string
   if (error?.response?.data) {
     const data = error.response.data;
     if (typeof data === 'string') return data;
+    if (data.errors && typeof data.errors === 'object') {
+      const messages: string[] = [];
+      for (const key of Object.keys(data.errors)) {
+        const val = data.errors[key];
+        if (Array.isArray(val)) {
+          messages.push(...val.filter((item): item is string => typeof item === 'string' && item.trim().length > 0));
+        } else if (typeof val === 'string' && val.trim().length > 0) {
+          messages.push(val);
+        }
+      }
+      if (messages.length > 0) return messages.join(' ');
+    }
     if (data.message) return data.message;
     if (data.detail) return data.detail;
     if (data.title) return data.title;
-    if (data.errors && typeof data.errors === 'object') {
-      const errorKeys = Object.keys(data.errors);
-      if (errorKeys.length > 0) {
-        const firstErr = data.errors[errorKeys[0]];
-        if (Array.isArray(firstErr) && firstErr.length > 0) return firstErr[0];
-        if (typeof firstErr === 'string') return firstErr;
-      }
-    }
   }
   if (error?.message) return error.message;
   return fallbackMessage;
