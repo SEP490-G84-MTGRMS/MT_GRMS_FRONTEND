@@ -1,0 +1,44 @@
+.invoice-management .invoice-list-table {
+  width: 100%;
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.invoice-management .shift-content-layout { max-width: none; }
+.invoice-management .pos-shift-body-container { overflow-y: auto; padding-bottom: 16px; }
+.invoice-management .pos-shift-table-responsive {
+  max-height: calc(100vh - 285px);
+  min-height: 280px;
+  overflow: auto;
+}
+.invoice-management .table-pagination-container {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+}
+.invoice-management .invoice-list-table > thead > tr > th,
+.invoice-management .invoice-list-table > tbody > tr > td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+.invoice-management .so-list-table-card > :last-child { flex-shrink: 0; }
+
+.invoice-management .invoice-list-table > tbody > tr > td[colspan] {
+  white-space: normal;
+  overflow: visible;
+}
+
+.invoice-management .so-list-table-card {
+  min-height: calc(100vh - 175px);
+  max-height: none;
+  overflow: visible;
+}
+
+.invoice-management .so-list-table-card .pos-shift-table-responsive {
+  flex: 1 1 auto;
+}

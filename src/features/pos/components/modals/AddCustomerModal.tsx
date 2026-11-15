@@ -30,21 +30,51 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
     setErrorMessage(null);
 
     const trimmedName = name.trim();
-    const trimmedPhone = phone.trim();
+    const normalizedPhone = phone.trim().replace(/[\s().-]/g, '');
+    const trimmedEmail = email.trim();
 
-    if (!trimmedName || !trimmedPhone) {
+    if (!trimmedName || !normalizedPhone) {
       setErrorMessage('Vui lòng nhập Tên KH (*) và Số điện thoại (*)!');
       return;
     }
 
+    if (trimmedName.length < 2 || trimmedName.length > 100) {
+      setErrorMessage('Tên khách hàng phải có từ 2 đến 100 ký tự.');
+      return;
+    }
+
+    if (!/^\+?\d{9,15}$/.test(normalizedPhone)) {
+      setErrorMessage('Số điện thoại phải gồm 9–15 chữ số; có thể bắt đầu bằng mã quốc gia +.');
+      return;
+    }
+
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setErrorMessage('Email không đúng định dạng.');
+      return;
+    }
+
+    if (dob && new Date(`${dob}T00:00:00`).getTime() > Date.now()) {
+      setErrorMessage('Ngày sinh không thể ở tương lai.');
+      return;
+    }
+
+    if (address.trim().length > 250 || area.trim().length > 120 || ward.trim().length > 120 || note.trim().length > 500) {
+      setErrorMessage('Địa chỉ/khu vực/phường xã tối đa 120–250 ký tự; ghi chú tối đa 500 ký tự.');
+      return;
+    }
+
     const fullAddress = [address.trim(), ward.trim(), area.trim()].filter(Boolean).join(', ');
+    if (fullAddress.length > 250) {
+      setErrorMessage('Địa chỉ sau khi ghép tối đa 250 ký tự.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
       const created = await customerApi.createCustomer({
         fullName: trimmedName,
-        phoneNumber: trimmedPhone,
-        email: email.trim() || undefined,
+        phoneNumber: normalizedPhone,
+        email: trimmedEmail || undefined,
         address: fullAddress || undefined,
         debtLimit: 0,
         membershipTier: 'Standard',
@@ -55,8 +85,8 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
         id: created.id,
         code: cAny.code || cAny.customerCode || `KH${Math.floor(100000 + Math.random() * 900000)}`,
         name: created.fullName || trimmedName,
-        phone: created.phoneNumber || trimmedPhone,
-        email: created.email || email.trim() || undefined,
+        phone: created.phoneNumber || normalizedPhone,
+        email: created.email || trimmedEmail || undefined,
         group: created.membershipTier || 'Khách lẻ',
         dob: dob || undefined,
         gender,
@@ -171,6 +201,7 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      maxLength={100}
                       placeholder="Nhập họ và tên..."
                       style={{
                         width: '100%',
@@ -229,9 +260,11 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                   </td>
                   <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
                     <input
-                      type="text"
+                      type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
+                      maxLength={20}
+                      autoComplete="tel"
                       style={{
                         width: '100%',
                         padding: '4px 6px',
@@ -249,6 +282,7 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      maxLength={254}
                       placeholder="email@gmail.com"
                       style={{
                         width: '100%',
@@ -271,6 +305,7 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                       type="text"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
+                      maxLength={250}
                       placeholder="Số nhà, đường..."
                       style={{
                         width: '100%',
@@ -290,6 +325,7 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                       list="area-suggestions"
                       value={area}
                       onChange={(e) => setArea(e.target.value)}
+                      maxLength={120}
                       placeholder="Tỉnh/Thành - Quận/Huyện"
                       style={{
                         width: '100%',
@@ -321,6 +357,7 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                       type="text"
                       value={ward}
                       onChange={(e) => setWard(e.target.value)}
+                      maxLength={120}
                       placeholder="Phường/Xã"
                       style={{
                         width: '100%',
@@ -339,6 +376,7 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
                       type="text"
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
+                      maxLength={500}
                       placeholder="Ghi chú thêm..."
                       style={{
                         width: '100%',

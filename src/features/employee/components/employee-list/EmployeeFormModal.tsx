@@ -16,7 +16,20 @@ import {
   getVietnamTodayIso,
   normalizeVietnameseComparison,
 } from '../../lib/vietnamTime';
-import { uploadImageToCloudinary } from '../../../../utils/cloudinary';
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Không thể đọc dữ liệu ảnh.'));
+      }
+    };
+    reader.onerror = () => reject(new Error('Không thể đọc tệp ảnh.'));
+    reader.readAsDataURL(file);
+  });
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
@@ -98,6 +111,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   // Tab 2: Lương
   const [salaryType, setSalaryType] = useState<SalaryType>('monthly');
   const [baseSalary, setBaseSalary] = useState<number | ''>('');
+  const [hasLaborContract, setHasLaborContract] = useState<boolean>(false);
+  const [insuranceBaseSalary, setInsuranceBaseSalary] = useState<number | ''>('');
   const [otWeekday, setOtWeekday] = useState('');
   const [otSunday, setOtSunday] = useState('');
   const [otDayOff, setOtDayOff] = useState('');
@@ -196,6 +211,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       if (employee.salaryConfig) {
         setSalaryType(employee.salaryConfig.salaryType);
         setBaseSalary(employee.salaryConfig.baseSalary ?? '');
+        setHasLaborContract(Boolean(employee.salaryConfig.hasLaborContract));
+        setInsuranceBaseSalary(employee.salaryConfig.insuranceBaseSalary ?? '');
         setOtWeekday(employee.salaryConfig.otWeekday || '');
         setOtSunday(employee.salaryConfig.otSunday || '');
         setOtDayOff(employee.salaryConfig.otDayOff || '');
@@ -235,6 +252,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
       setSalaryType('monthly');
       setBaseSalary('');
+      setHasLaborContract(false);
+      setInsuranceBaseSalary('');
       setOtWeekday('');
       setOtSunday('');
       setOtDayOff('');
@@ -375,6 +394,39 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     return null;
   }, [baseSalary]);
 
+  const insuranceBaseSalaryError = useMemo(() => {
+    if (salaryType !== 'monthly' || !hasLaborContract) return null;
+    const effective =
+      insuranceBaseSalary === '' || insuranceBaseSalary === undefined
+        ? Number(baseSalary) || 0
+        : Number(insuranceBaseSalary);
+    if (isNaN(effective) || effective <= 0) {
+      return 'Mức lương đóng bảo hiểm phải lớn hơn 0 khi có hợp đồng lao động.';
+    }
+    if (effective > 1000000000) {
+      return 'Mức lương đóng bảo hiểm không được vượt quá 1.000.000.000 đ.';
+    }
+    return null;
+  }, [salaryType, hasLaborContract, insuranceBaseSalary, baseSalary]);
+
+  const otWeekdayError = useMemo(() => {
+    if (!otWeekday) return null;
+    const num = parseInt(otWeekday.replace('%', ''), 10);
+    if (isNaN(num) || num < 100) {
+      return 'Hệ số OT ngày thường không được nhỏ hơn 100%.';
+    }
+    return null;
+  }, [otWeekday]);
+
+  const otSundayError = useMemo(() => {
+    if (!otSunday) return null;
+    const num = parseInt(otSunday.replace('%', ''), 10);
+    if (isNaN(num) || num < 100) {
+      return 'Hệ số OT Chủ nhật / Nghỉ tuần không được nhỏ hơn 100%.';
+    }
+    return null;
+  }, [otSunday]);
+
   const noteError = useMemo(() => {
     if (note && note.length > 500) return 'Ghi chú không vượt quá 500 ký tự.';
     return null;
@@ -454,15 +506,14 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setIsUploadingAvatar(true);
       setFormError(null);
       setFaceScanStatus('scanning');
-      setFaceScanMessage('Đang tải ảnh và trích xuất vector khuôn mặt...');
-      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/employees');
-      setAvatarUrl(secureUrl);
+      setFaceScanMessage('Đang đọc ảnh và trích xuất vector khuôn mặt...');
+      const localDataUrl = await readFileAsDataUrl(file);
+      setAvatarUrl(localDataUrl);
 
       // Tự động trích xuất vector FaceID từ ảnh đại diện
       try {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = secureUrl;
+        img.src = localDataUrl;
         await new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
@@ -471,8 +522,8 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         const descriptor = await extractDescriptorFromImage(img);
         if (descriptor && descriptor.length === 128) {
           // Thêm/cập nhật ảnh đại diện vào vị trí đầu tiên của danh sách huấn luyện đa ảnh
-          const remainingUrls = faceImageUrls.filter((u) => u !== secureUrl);
-          const newUrls = [secureUrl, ...remainingUrls].slice(0, 4);
+          const remainingUrls = faceImageUrls.filter((u) => u !== localDataUrl);
+          const newUrls = [localDataUrl, ...remainingUrls].slice(0, 4);
           const newDescriptors = [descriptor, ...faceDescriptorsList.slice(1)].slice(0, 4);
 
           setFaceImageUrls(newUrls);
@@ -491,7 +542,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         setFaceScanMessage('Không thể trích xuất FaceID từ ảnh này.');
       }
     } catch (err: any) {
-      setFormError(err?.message || 'Không thể tải ảnh đại diện lên Cloudinary. Vui lòng thử lại.');
+      setFormError(err?.message || 'Không thể đọc ảnh đại diện. Vui lòng thử lại.');
       setFaceScanStatus('idle');
       setFaceScanMessage(null);
     } finally {
@@ -520,13 +571,12 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setIsUploadingAvatar(true);
       setFormError(null);
       setFaceScanStatus('scanning');
-      setFaceScanMessage('Đang tải ảnh mẫu và trích xuất vector khuôn mặt...');
-      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/employees');
+      setFaceScanMessage('Đang đọc ảnh mẫu và trích xuất vector khuôn mặt...');
+      const localDataUrl = await readFileAsDataUrl(file);
 
       try {
         const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = secureUrl;
+        img.src = localDataUrl;
         await new Promise((resolve, reject) => {
           img.onload = resolve;
           img.onerror = reject;
@@ -534,10 +584,10 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
 
         const descriptor = await extractDescriptorFromImage(img);
         if (descriptor && descriptor.length === 128) {
-          const newUrls = [...faceImageUrls, secureUrl].slice(0, 4);
+          const newUrls = [...faceImageUrls, localDataUrl].slice(0, 4);
           const newDescriptors = [...faceDescriptorsList, descriptor].slice(0, 4);
           if (!avatarUrl) {
-            setAvatarUrl(secureUrl);
+            setAvatarUrl(localDataUrl);
           }
           setFaceImageUrls(newUrls);
           setFaceDescriptorsList(newDescriptors);
@@ -554,7 +604,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         setFormError('Không thể trích xuất đặc trưng khuôn mặt từ ảnh này.');
       }
     } catch (err: any) {
-      setFormError(err?.message || 'Không thể tải ảnh mẫu lên Cloudinary.');
+      setFormError(err?.message || 'Không thể đọc ảnh mẫu.');
     } finally {
       setIsUploadingAvatar(false);
       if (trainingInputRef.current) {
@@ -660,7 +710,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     setFormError(null);
 
     if (isUploadingAvatar) {
-      setFormError('Ảnh đại diện đang được tải lên Cloudinary, vui lòng chờ trong giây lát!');
+      setFormError('Ảnh đại diện đang được xử lý, vui lòng chờ trong giây lát!');
       return;
     }
 
@@ -736,6 +786,24 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       return;
     }
 
+    if (insuranceBaseSalaryError) {
+      setFormError(insuranceBaseSalaryError);
+      setActiveTab('salary');
+      return;
+    }
+
+    if (otWeekdayError) {
+      setFormError(otWeekdayError);
+      setActiveTab('salary');
+      return;
+    }
+
+    if (otSundayError) {
+      setFormError(otSundayError);
+      setActiveTab('salary');
+      return;
+    }
+
     if (allowancesError) {
       setFormError(allowancesError);
       setActiveTab('salary');
@@ -792,6 +860,13 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       {
         salaryType,
         baseSalary: Number(baseSalary) || 0,
+        hasLaborContract: salaryType === 'monthly' && hasLaborContract,
+        insuranceBaseSalary:
+          salaryType === 'monthly' && hasLaborContract
+            ? insuranceBaseSalary === ''
+              ? Number(baseSalary) || 0
+              : Number(insuranceBaseSalary)
+            : undefined,
         otWeekday: otWeekday || '150%',
         otSunday: otSunday || '200%',
         otDayOff: otDayOff || '200%',
@@ -1856,6 +1931,96 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                       )}
                     </div>
                   </div>
+
+                  {salaryType === 'monthly' && (
+                    <div
+                      style={{
+                        marginTop: 14,
+                        paddingTop: 14,
+                        borderTop: '1px dashed #E2E8F0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12,
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          cursor: 'pointer',
+                          fontSize: 13.5,
+                          fontWeight: 600,
+                          color: '#0F172A',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={hasLaborContract}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setHasLaborContract(checked);
+                            if (checked && insuranceBaseSalary === '' && baseSalary !== '') {
+                              setInsuranceBaseSalary(baseSalary);
+                            }
+                            if (!touched.insuranceBaseSalary) markTouched('insuranceBaseSalary');
+                          }}
+                          style={{ width: 16, height: 16, accentColor: '#0F766E' }}
+                        />
+                        <span>Có hợp đồng lao động (Trích đóng BHXH 8% + BHYT 1.5% + BHTN 1% = 10.5%)</span>
+                      </label>
+
+                      {hasLaborContract && (
+                        <div className="emp-form-group" style={{ marginBottom: 0, maxWidth: 380 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <label className="emp-form-label" style={{ marginBottom: 0 }}>
+                              Mức lương đóng bảo hiểm (VNĐ/tháng) <span className="emp-required">*</span>
+                            </label>
+                            {insuranceBaseSalary !== '' && !isNaN(Number(insuranceBaseSalary)) && (
+                              <span style={{ fontSize: 11, color: '#0F766E', fontWeight: 600 }}>
+                                {Number(insuranceBaseSalary).toLocaleString('vi-VN')} đ
+                              </span>
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            step="50000"
+                            min="0"
+                            max="1000000000"
+                            className="emp-form-input"
+                            placeholder="VD: 5,000,000"
+                            value={insuranceBaseSalary === '' ? '' : insuranceBaseSalary}
+                            onChange={(e) => {
+                              setInsuranceBaseSalary(e.target.value === '' ? '' : Number(e.target.value));
+                              if (!touched.insuranceBaseSalary) markTouched('insuranceBaseSalary');
+                            }}
+                            onBlur={() => markTouched('insuranceBaseSalary')}
+                            style={{
+                              borderColor:
+                                (touched.insuranceBaseSalary || hasSubmitted) && insuranceBaseSalaryError
+                                  ? '#EF4444'
+                                  : undefined,
+                            }}
+                          />
+                          <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 4 }}>
+                            Dự kiến trích đóng 10.5%:{' '}
+                            <strong style={{ color: '#0F172A' }}>
+                              {Math.round(
+                                (insuranceBaseSalary === '' ? Number(baseSalary) || 0 : Number(insuranceBaseSalary) || 0) *
+                                  0.105
+                              ).toLocaleString('vi-VN')}{' '}
+                              đ/tháng
+                            </strong>
+                          </div>
+                          {(touched.insuranceBaseSalary || hasSubmitted) && insuranceBaseSalaryError && (
+                            <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>•</span> {insuranceBaseSalaryError}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* OT Config */}
@@ -1884,18 +2049,29 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           max={500}
                           step={10}
                           className="emp-form-input"
-                          style={{ paddingRight: 36, fontWeight: 600 }}
+                          style={{
+                            paddingRight: 36,
+                            fontWeight: 600,
+                            borderColor: (touched.otWeekday || hasSubmitted) && otWeekdayError ? '#EF4444' : undefined,
+                          }}
                           value={otWeekday ? otWeekday.replace('%', '') : ''}
                           onChange={(e) => {
                             const val = e.target.value.replace(/[^0-9]/g, '');
                             setOtWeekday(val ? `${val}%` : '');
+                            if (!touched.otWeekday) markTouched('otWeekday');
                           }}
+                          onBlur={() => markTouched('otWeekday')}
                           placeholder="150"
                         />
                         <span style={{ position: 'absolute', right: 12, color: '#64748B', fontWeight: 600, pointerEvents: 'none' }}>
                           %
                         </span>
                       </div>
+                      {(touched.otWeekday || hasSubmitted) && otWeekdayError && (
+                        <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {otWeekdayError}
+                        </div>
+                      )}
                     </div>
 
                     {/* Tăng ca Chủ nhật / Ngày nghỉ */}
@@ -1915,19 +2091,30 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                           max={500}
                           step={10}
                           className="emp-form-input"
-                          style={{ paddingRight: 36, fontWeight: 600 }}
+                          style={{
+                            paddingRight: 36,
+                            fontWeight: 600,
+                            borderColor: (touched.otSunday || hasSubmitted) && otSundayError ? '#EF4444' : undefined,
+                          }}
                           value={otSunday ? otSunday.replace('%', '') : ''}
                           onChange={(e) => {
                             const val = e.target.value.replace(/[^0-9]/g, '');
                             setOtSunday(val ? `${val}%` : '');
                             setOtDayOff(val ? `${val}%` : '');
+                            if (!touched.otSunday) markTouched('otSunday');
                           }}
+                          onBlur={() => markTouched('otSunday')}
                           placeholder="200"
                         />
                         <span style={{ position: 'absolute', right: 12, color: '#64748B', fontWeight: 600, pointerEvents: 'none' }}>
                           %
                         </span>
                       </div>
+                      {(touched.otSunday || hasSubmitted) && otSundayError && (
+                        <div style={{ color: '#DC2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span>•</span> {otSundayError}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

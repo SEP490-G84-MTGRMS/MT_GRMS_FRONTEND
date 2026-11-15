@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import type { InternalAxiosRequestConfig } from 'axios';
+import { attachSessionRefresh } from './sessionRefresh';
 
 export const httpClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -37,96 +37,11 @@ httpClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Cơ chế Silent Refresh với Axios Request Queue
-interface FailedQueueItem {
-  resolve: (value?: unknown) => void;
-  reject: (reason?: unknown) => void;
-}
-
-let isRefreshing = false;
-let failedQueue: FailedQueueItem[] = [];
-
-const processQueue = (error: unknown = null) => {
-  failedQueue.forEach((promise) => {
-    if (error) {
-      promise.reject(error);
-    } else {
-      promise.resolve();
-    }
-  });
-  failedQueue = [];
-};
+attachSessionRefresh(httpClient);
 
 httpClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
-
-    if (error.response?.status === 401 && originalRequest) {
-      const url = String(originalRequest.url || '');
-      const isAuthEndpoint =
-        url.includes('/auth/login') ||
-        url.includes('/auth/refresh') ||
-        url.includes('/auth/logout');
-
-      // Nếu chính endpoint đăng nhập hoặc làm mới thất bại -> không gọi refresh lặp vô tận
-      if (isAuthEndpoint) {
-        return Promise.reject(error);
-      }
-
-      // Đã retry một lần mà vẫn 401 -> phiên thực sự hết hạn
-      if (originalRequest._retry) {
-        return Promise.reject(error);
-      }
-
-      if (isRefreshing) {
-        // Đang có request khác thực hiện refresh -> xếp hàng chờ
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then(() => httpClient(originalRequest))
-          .catch((err) => Promise.reject(err));
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        // Gọi ngầm POST /api/auth/refresh (trình duyệt tự đính kèm HttpOnly Cookie refresh_token)
-        await httpClient.post('/auth/refresh');
-        processQueue(null);
-        return httpClient(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError);
-
-        // Refresh thất bại (Refresh Token hết hạn) -> Xóa session và chuyển hướng về đăng nhập
-        localStorage.removeItem('auth_user');
-        localStorage.removeItem('tenant_id');
-
-        const isAuthPage =
-          window.location.pathname.startsWith('/auth') ||
-          window.location.pathname === '/login' ||
-          window.location.pathname === '/register';
-
-        if (!isAuthPage) {
-          const currentPath = window.location.pathname + window.location.search;
-          const redirectParam = encodeURIComponent(currentPath);
-
-          // Phát sự kiện thông báo Toast phiên hết hạn
-          window.dispatchEvent(
-            new CustomEvent('session-expired', {
-              detail: { message: 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.' },
-            })
-          );
-
-          window.location.href = `/auth/login?redirect=${redirectParam}`;
-        }
-
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
-    }
 
     const responseData = error.response?.data as
       | { code?: string; errorCode?: string; detail?: string; message?: string }

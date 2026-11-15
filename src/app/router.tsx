@@ -111,7 +111,7 @@ import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
-import { CashControlHubPage } from '../features/cash-control';
+import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 /**
  * Application client-side router configuration across public, store-owner, POS, and admin portals.
@@ -294,11 +294,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <StoreOwnerDashboardPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><StoreOwnerDashboardPage /></ProtectedRoute>,
       },
       {
         path: 'dashboard',
-        element: <StoreOwnerDashboardPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><StoreOwnerDashboardPage /></ProtectedRoute>,
       },
       {
         path: 'products',
@@ -345,20 +345,20 @@ export const router = createBrowserRouter([
         element: <StorePaymentConfigPage />,
       },
       {
-        path: 'cash-control',
+        path: 'pos-cash-control',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <CashControlHubPage />
+            <StorePosCashControlPage />
           </ProtectedRoute>
         ),
       },
       {
-        path: 'cash-control/*',
-        element: <Navigate to="/store-owner/cash-control" replace />,
+        path: 'cash-control',
+        element: <Navigate to="/store-owner/pos-cash-control" replace />,
       },
       {
-        path: 'pos-cash-control',
-        element: <Navigate to="/store-owner/cash-control" replace />,
+        path: 'cash-control/*',
+        element: <Navigate to="/store-owner/pos-cash-control" replace />,
       },
       {
         path: 'account',
@@ -533,6 +533,10 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'finance/cashbook',
+        element: <Navigate to="/store-owner/cashbook" replace />,
+      },
+      {
         path: 'finance/*',
         element: <Navigate to="/store-owner/finance" replace />,
       },
@@ -545,16 +549,20 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'cash-control',
+        path: 'pos-cash-control',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <CashControlHubPage />
+            <StorePosCashControlPage />
           </ProtectedRoute>
         ),
       },
       {
+        path: 'cash-control',
+        element: <Navigate to="/store-owner/pos-cash-control" replace />,
+      },
+      {
         path: 'cash-control/*',
-        element: <Navigate to="/store-owner/cash-control" replace />,
+        element: <Navigate to="/store-owner/pos-cash-control" replace />,
       },
       {
         path: 'tax-snapshots',
@@ -642,11 +650,11 @@ export const router = createBrowserRouter([
           },
           {
             path: 'pos-cash-control',
-            element: <Navigate to="/store-owner/cash-control" replace />,
+            element: <StorePosCashControlPage />,
           },
           {
             path: 'shifts',
-            element: <Navigate to="/store-owner/cash-control?tab=history" replace />,
+            element: <PosShiftPage />,
           },
     ],
   },
@@ -738,7 +746,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'employees/schedule',
-        element: <WorkSchedulePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <WorkSchedulePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'employees/shifts',
@@ -849,7 +861,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'schedule',
-        element: <WorkSchedulePage />,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+            <WorkSchedulePage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'shifts',
@@ -889,11 +905,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/employee/schedule" replace />,
+        element: <Navigate to="/employee/attendance" replace />,
       },
       {
         path: 'schedule',
-        element: <WorkSchedulePage />,
+        element: <Navigate to="/employee/attendance" replace />,
       },
       {
         path: 'attendance',
@@ -1011,15 +1027,27 @@ export const router = createBrowserRouter([
   // Cash Control Shortcut - Drawers, Approvals & Shifts
   {
     path: '/cash-control',
-    element: <Navigate to="/store-owner/cash-control" replace />,
+    element: <Navigate to="/store-owner/pos-cash-control" replace />,
   },
   {
     path: '/cash-control/*',
-    element: <Navigate to="/store-owner/cash-control" replace />,
+    element: <Navigate to="/store-owner/pos-cash-control" replace />,
   },
   {
     path: '/pos-cash-control',
-    element: <Navigate to="/store-owner/cash-control" replace />,
+    element: <Navigate to="/store-owner/pos-cash-control" replace />,
+  },
+  {
+    path: '/pos-cash-control/*',
+    element: <Navigate to="/store-owner/pos-cash-control" replace />,
+  },
+  {
+    path: '/shifts',
+    element: <Navigate to="/store-owner/shifts" replace />,
+  },
+  {
+    path: '/shifts/*',
+    element: <Navigate to="/store-owner/shifts" replace />,
   },
 
   // Promotions

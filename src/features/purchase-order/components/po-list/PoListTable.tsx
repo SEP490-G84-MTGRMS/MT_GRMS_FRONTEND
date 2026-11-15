@@ -72,7 +72,7 @@ const resolveDisplayStatus = (
     CANCELLED: { label: 'Đã hủy', bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
   };
 
-  if (order.status === 'PARTIALLY_RECEIVED' || (isExchangePo(order) && order.status === 'PARTIALLY_RECEIVED')) {
+  if (order.status === 'PARTIALLY_RECEIVED') {
     return byStatus.PARTIALLY_RECEIVED;
   }
   if (
