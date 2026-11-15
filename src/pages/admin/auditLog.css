@@ -1,0 +1,33 @@
+/* Audit Log & Cronjob Monitoring Styles - KiotViet Style */
+.admin-audit-logs {
+  --blue-primary: #0066FF;
+  --blue-hover: #0052CC;
+  --bg-soft-blue: #F7FAFF;
+  --border-light: #E2EAF0;
+  width: 100%;
+  max-width: 1560px;
+  min-width: 0;
+  margin: 0 auto;
+  color: #14253E;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.audit-kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1024px) {
+  .audit-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .audit-kpis {
+    grid-template-columns: 1fr;
+  }
+}

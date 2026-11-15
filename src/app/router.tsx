@@ -101,6 +101,8 @@ import { SubscriptionPlanDetailPage } from '../pages/admin/SubscriptionPlanDetai
 import { SubscriptionPlanCreatePage } from '../pages/admin/SubscriptionPlanCreatePage';
 import { SubscriptionPlanEditPage } from '../pages/admin/SubscriptionPlanEditPage';
 import { TenantDetailPage } from '../pages/admin/TenantDetailPage';
+import { AdminBillingPage } from '../pages/admin/AdminBillingPage';
+import { AuditLogPage } from '../pages/admin/AuditLogPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 
 // 11. Accounting & Finance Features: Overview, P&L, Cashbook & Tax Snapshots
@@ -187,6 +189,22 @@ export const router = createBrowserRouter([
       {
         path: 'subscriptions/edit/:id',
         element: <SubscriptionPlanEditPage />,
+      },
+      {
+        path: 'billing',
+        element: <AdminBillingPage />,
+      },
+      {
+        path: 'audit-logs',
+        element: <AuditLogPage />,
+      },
+      {
+        path: 'system-logs',
+        element: <AuditLogPage />,
+      },
+      {
+        path: 'invoices',
+        element: <Navigate to="/admin/billing" replace />,
       },
       {
         path: 'plans',

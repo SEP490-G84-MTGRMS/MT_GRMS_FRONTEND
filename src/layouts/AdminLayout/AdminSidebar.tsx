@@ -3,10 +3,12 @@ import type { FC } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import {
   Layers,
+  Receipt,
   ExternalLink,
   LogOut,
   ChevronUp,
   ShieldCheck,
+  Activity,
 } from "lucide-react";
 import {
   DashboardIcon,
@@ -176,6 +178,28 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({
         >
           <Layers size={19} />
           <span className="admin-nav-label">Gói dịch vụ SaaS</span>
+        </NavLink>
+
+        <NavLink
+          to="/admin/billing"
+          title="Lịch sử giao dịch & Hóa đơn SaaS"
+          className={({ isActive }) =>
+            `admin-nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <Receipt size={19} />
+          <span className="admin-nav-label">Giao dịch & Hóa đơn</span>
+        </NavLink>
+
+        <NavLink
+          to="/admin/audit-logs"
+          title="Nhật ký kiểm toán & Giám sát tác vụ ngầm (FE-22, FE-26)"
+          className={({ isActive }) =>
+            `admin-nav-item ${isActive ? "active" : ""}`
+          }
+        >
+          <Activity size={19} />
+          <span className="admin-nav-label">Nhật ký & Tác vụ</span>
         </NavLink>
 
         <div className="admin-nav-section-title" style={{ marginTop: 14 }}>
