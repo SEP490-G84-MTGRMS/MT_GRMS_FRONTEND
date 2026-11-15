@@ -4,7 +4,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   Menu,
-  Clock,
   Plus,
   ChevronLeft,
   ChevronRight,
@@ -33,7 +32,6 @@ interface Props {
   onAddTab?: () => void;
   salesMode?: 'fast' | 'normal';
   onToggleSalesMode?: (mode: 'fast' | 'normal') => void;
-  onCloseShift?: () => void;
   branchName?: string;
   branches?: Array<{ id: string; name: string; address?: string }>;
   selectedBranchId?: string;
@@ -42,6 +40,7 @@ interface Props {
   currentShift?: ShiftDetailResponse | null;
   onOpenCashMovement?: () => void;
   onOpenShift?: () => void;
+  onOpenCloseShift?: () => void;
   ownerShiftMode?: 'attach' | 'shiftless' | null;
   onOpenOwnerShiftModeModal?: () => void;
 }
@@ -59,7 +58,6 @@ export const PosHeader: FC<Props> = ({
   onAddTab,
   salesMode = 'fast',
   onToggleSalesMode,
-  onCloseShift,
   branchName,
   branches = [],
   selectedBranchId,
@@ -68,6 +66,7 @@ export const PosHeader: FC<Props> = ({
   currentShift,
   onOpenCashMovement,
   onOpenShift,
+  onOpenCloseShift,
   ownerShiftMode,
   onOpenOwnerShiftModeModal,
 }) => {
@@ -428,23 +427,56 @@ export const PosHeader: FC<Props> = ({
           {!isStoreOwner && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {currentShift ? (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: '4px 8px',
-                    borderRadius: 6,
-                    backgroundColor: '#f1f5f9',
-                    border: '1px solid #cbd5e1',
-                    fontSize: 12,
-                    color: '#334155',
-                  }}
-                  title={`Ca đang mở: ${currentShift.shiftName}`}
-                >
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: '#10b981' }} />
-                  <b>{currentShift.shiftCode}</b>
-                </div>
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      backgroundColor: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      fontSize: 12,
+                      color: '#334155',
+                    }}
+                    title={`Ca đang mở: ${currentShift.shiftName}`}
+                  >
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        backgroundColor:
+                          currentShift.status === 'Closing' || currentShift.status === 3 ? '#ef4444' : '#10b981',
+                      }}
+                    />
+                    <b>{currentShift.shiftCode}</b>
+                  </div>
+                  {onOpenCloseShift && (
+                    <button
+                      type="button"
+                      onClick={onOpenCloseShift}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: '1px solid #dc2626',
+                        backgroundColor: '#fef2f2',
+                        color: '#b91c1c',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                      title="Kiểm đếm tiền mặt & Chốt ca hiện tại"
+                    >
+                      <Lock size={13} />
+                      <span>Chốt ca</span>
+                    </button>
+                  )}
+                </>
               ) : (
                 onOpenShift && (
                   <button
@@ -669,26 +701,25 @@ export const PosHeader: FC<Props> = ({
                   </button>
                 )}
 
-                {!isStoreOwner && (
+                {!isStoreOwner && currentShift && onOpenCloseShift && (
                   <button
                     type="button"
-                    className="pos-dropdown-item highlight"
+                    className="pos-dropdown-item"
                     onClick={() => {
                       setIsMenuOpen(false);
-                      if (onCloseShift) {
-                        onCloseShift();
-                      } else {
-                        navigate(location.pathname.startsWith('/employee') ? '/employee/pos/shift' : '/pos/shift');
-                      }
+                      onOpenCloseShift();
                     }}
                   >
-                    <Clock size={16} className="text-teal-700" />
+                    <Lock size={16} className="text-teal-700" />
                     <div className="item-content">
-                      <div className="item-title">Sổ ca & Chốt ca quầy</div>
-                      <div className="item-desc">Kiểm đếm két, thu chi & bàn giao ca</div>
+                      <div className="item-title">Kiểm đếm &amp; Chốt ca</div>
+                      <div className="item-desc">
+                        Khóa bán quầy, kiểm đếm tiền và bàn giao ca hiện tại
+                      </div>
                     </div>
                   </button>
                 )}
+
               </div>
             )}
           </div>

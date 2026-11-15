@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import { ArrowLeftRight, AlertTriangle, X } from 'lucide-react';
 import { posShiftApi } from '../../api/posShiftApi';
+import { MANUAL_CASH_MOVEMENT_CATEGORY } from '../../types/posShift.types';
 import type { ShiftDetailResponse, ShiftCashMovementDto } from '../../types/posShift.types';
 import { useAuthStore } from '../../../../stores/useAuthStore';
+import { MANUAL_CASH_MOVEMENT_OPTIONS } from '../../config/manualCashMovementConfig';
 
 interface Props {
   isOpen: boolean;
@@ -21,7 +23,7 @@ export const CashMovementModal: FC<Props> = ({
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
   const [movementType, setMovementType] = useState<'IN' | 'OUT'>('OUT');
-  const [category, setCategory] = useState<number>(1); // 1 = EXPENSE, 2 = CASH_DRAW, 3 = CASH_DEPOSIT, 4 = DEBT_COLLECT
+  const [category, setCategory] = useState<number>(MANUAL_CASH_MOVEMENT_CATEGORY.EXPENSE);
   const [amount, setAmount] = useState<number>(100000);
   const [reason, setReason] = useState<string>('Mua giấy in nhiệt k80');
   const [threshold, setThreshold] = useState<number>(200000);
@@ -50,20 +52,20 @@ export const CashMovementModal: FC<Props> = ({
   if (!isOpen) return null;
 
   const currentDrawerCash = Math.max(0, shift.expectedCash ?? (shift.openingFloat + shift.totalCashIn - shift.totalCashOut));
-  const isExceedThreshold = movementType === 'OUT' && category === 1 && amount > threshold;
+  const isExceedThreshold = movementType === 'OUT' && category === MANUAL_CASH_MOVEMENT_CATEGORY.EXPENSE && amount > threshold;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (amount <= 0) {
-      setErrorMsg('Số tiền phải lớn hơn 0');
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      setErrorMsg('Số tiền phải là số nguyên dương trong giới hạn hợp lệ.');
       return;
     }
     if (movementType === 'OUT' && amount > currentDrawerCash) {
       setErrorMsg(`Số tiền chi (${amount.toLocaleString('vi-VN')} đ) vượt quá số tiền mặt hiện có trong két (${currentDrawerCash.toLocaleString('vi-VN')} đ)!`);
       return;
     }
-    if (!reason.trim()) {
-      setErrorMsg('Vui lòng nhập lý do thu/chi');
+    if (reason.trim().length < 2 || reason.trim().length > 300) {
+      setErrorMsg('Lý do thu/chi phải có từ 2 đến 300 ký tự.');
       return;
     }
 
@@ -177,72 +179,34 @@ export const CashMovementModal: FC<Props> = ({
               <div className="modal-form-group">
                 <label className="modal-label" style={{ fontWeight: 600, fontSize: 13 }}>Loại nghiệp vụ (*):</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMovementType('OUT');
-                      setCategory(1);
-                      setReason('Chi vặt quầy thu ngân');
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      border: movementType === 'OUT' && category === 1 ? '2px solid #dc2626' : '1px solid #cbd5e1',
-                      backgroundColor: movementType === 'OUT' && category === 1 ? '#fef2f2' : '#ffffff',
-                      color: movementType === 'OUT' && category === 1 ? '#991b1b' : '#334155',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    [-] Chi vặt quầy (Mua đá, bill...)
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMovementType('OUT');
-                      setCategory(2);
-                      setReason('Rút bớt tiền nộp Chủ cửa hàng');
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      border: movementType === 'OUT' && category === 2 ? '2px solid #ea580c' : '1px solid #cbd5e1',
-                      backgroundColor: movementType === 'OUT' && category === 2 ? '#fff7ed' : '#ffffff',
-                      color: movementType === 'OUT' && category === 2 ? '#c2410c' : '#334155',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    [↓] Rút két nộp Chủ / Két sắt
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMovementType('IN');
-                      setCategory(3);
-                      setReason('Nạp thêm tiền lẻ vào két');
-                    }}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 6,
-                      border: movementType === 'IN' && category === 3 ? '2px solid #059669' : '1px solid #cbd5e1',
-                      backgroundColor: movementType === 'IN' && category === 3 ? '#ecfdf5' : '#ffffff',
-                      color: movementType === 'IN' && category === 3 ? '#065f46' : '#334155',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      gridColumn: '1 / -1',
-                    }}
-                  >
-                    [+] Nạp thêm tiền lẻ vào két
-                  </button>
+                  {MANUAL_CASH_MOVEMENT_OPTIONS.map((option) => {
+                    const isActive = movementType === option.movementType && category === option.category;
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => {
+                          setMovementType(option.movementType);
+                          setCategory(option.category);
+                          setReason(option.defaultReason);
+                        }}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: 6,
+                          border: isActive ? `2px solid ${option.activeBorder}` : '1px solid #cbd5e1',
+                          backgroundColor: isActive ? option.activeBackground : '#ffffff',
+                          color: isActive ? option.activeColor : '#334155',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          gridColumn: option.fullWidth ? '1 / -1' : undefined,
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -252,6 +216,7 @@ export const CashMovementModal: FC<Props> = ({
                 <input
                   type="number"
                   min={1000}
+                  max={Number.MAX_SAFE_INTEGER}
                   step={1000}
                   value={amount === 0 ? '' : amount}
                   onChange={(e) => setAmount(Number(e.target.value) || 0)}
@@ -314,6 +279,7 @@ export const CashMovementModal: FC<Props> = ({
                   type="text"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
+                  maxLength={300}
                   className="modal-input"
                   placeholder="Nhập lý do cụ thể..."
                   required
@@ -377,7 +343,7 @@ export const CashMovementModal: FC<Props> = ({
                   const isPending = m.status === 'PendingApproval' || m.status === 2;
                   const isRejected = m.status === 'Rejected' || m.status === 3;
                   const isCancelled = m.status === 'Cancelled' || m.status === 4;
-                  const isCashDraw = m.category === 'CASH_DRAW' || m.category === 2;
+                  const isCashDraw = m.category === 'CASH_DRAW' || m.category === MANUAL_CASH_MOVEMENT_CATEGORY.CASH_DRAW;
 
                   return (
                     <div
