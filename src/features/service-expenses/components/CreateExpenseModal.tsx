@@ -19,7 +19,7 @@ import {
 } from '../types/expense.types';
 import { MoneyInput } from '../../../components/common/MoneyInput';
 import { formatMoney } from '../../finance/utils/formatters';
-import { uploadImageToCloudinary } from '../../../utils/cloudinary';
+import { readFileAsDataUrl } from '../../../utils/imageFile';
 
 interface CreateExpenseModalProps {
   isOpen: boolean;
@@ -205,15 +205,15 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
     });
 
     try {
-      // Tải hình ảnh hóa đơn lên Cloudinary lưu trữ an toàn, nhận về đường dẫn HTTPS
-      const secureUrl = await uploadImageToCloudinary(file, 'mtgrms/expenses');
-      setFormData((prev) => ({ ...prev, attachedBillUrl: secureUrl }));
+      // Đọc ảnh cục bộ để xem trước; backend sẽ upload lên Cloudinary khi bấm Lưu phiếu chi
+      const dataUrl = await readFileAsDataUrl(file);
+      setFormData((prev) => ({ ...prev, attachedBillUrl: dataUrl }));
       setUploadedFile({ name: file.name, size: fileSizeStr });
     } catch (uploadErr: unknown) {
       const err = uploadErr as { message?: string };
       setErrors((prev) => ({
         ...prev,
-        attachedBillUrl: err?.message || 'Không thể tải ảnh chứng từ lên Cloudinary',
+        attachedBillUrl: err?.message || 'Không thể đọc tệp ảnh chứng từ',
       }));
     } finally {
       setIsUploadingImage(false);

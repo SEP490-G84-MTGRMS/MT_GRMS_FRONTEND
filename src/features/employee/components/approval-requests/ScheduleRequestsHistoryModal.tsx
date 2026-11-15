@@ -183,8 +183,8 @@ export const ScheduleRequestsHistoryModal: React.FC<ScheduleRequestsHistoryModal
       <div
         className="emp-modal-box"
         style={{
-          maxWidth: 600,
-          width: '92%',
+          maxWidth: 760,
+          width: '100%',
           maxHeight: '85vh',
           display: 'flex',
           flexDirection: 'column',
