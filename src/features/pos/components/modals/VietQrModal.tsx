@@ -12,11 +12,13 @@ import {
   Building2
 } from 'lucide-react';
 import { useAuthStore } from '../../../../stores/useAuthStore';
+import { financeAccountsApi } from '../../../finance-accounts/api/financeAccountsApi';
 
 interface Props {
   isOpen: boolean;
   orderCode: string;
   amount: number;
+  branchId?: string;
   onClose: () => void;
   onConfirmAndPrint: () => void;
 }
@@ -25,6 +27,7 @@ export const VietQrModal: FC<Props> = ({
   isOpen,
   orderCode,
   amount,
+  branchId,
   onClose,
   onConfirmAndPrint,
 }) => {
@@ -37,10 +40,11 @@ export const VietQrModal: FC<Props> = ({
   const [copiedContent, setCopiedContent] = useState(false);
 
   // Đọc cấu hình ngân hàng của cửa hàng
-  const [bankCode, setBankCode] = useState('MB');
-  const [bankAccountNumber, setBankAccountNumber] = useState('0918889999');
-  const [bankAccountName, setBankAccountName] = useState('NGUYEN AN NHIEN');
-  const [bankName, setBankName] = useState('MBBank');
+  const [bankCode, setBankCode] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankAccountName, setBankAccountName] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [configError, setConfigError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -49,35 +53,16 @@ export const VietQrModal: FC<Props> = ({
     setIsSuccessPaid(false);
     setIsChecking(false);
 
-    const storageKey = `pos_payment_config_${currentTenantId}`;
-    const saved = localStorage.getItem(storageKey);
-
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.bankCode) setBankCode(parsed.bankCode);
-        if (parsed.bankAccountNumber) setBankAccountNumber(parsed.bankAccountNumber);
-        if (parsed.bankAccountName) setBankAccountName(parsed.bankAccountName);
-        if (parsed.bankName) setBankName(parsed.bankName);
-        return;
-      } catch (e) {
-        console.error('Lỗi nạp config thanh toán:', e);
-      }
-    }
-
-    // Mặc định theo tenant
-    if (currentTenantId === 'tenant_an_nhien_02') {
-      setBankCode('MB');
-      setBankAccountNumber('0918889999');
-      setBankAccountName('NGUYEN AN NHIEN');
-      setBankName('MBBank - Ngân hàng Quân Đội');
-    } else {
-      setBankCode('MB');
-      setBankAccountNumber('0974742130');
-      setBankAccountName('MT GROCERY STORE');
-      setBankName('MBBank - Ngân hàng Quân Đội');
-    }
-  }, [isOpen, currentTenantId]);
+    setConfigError('');
+    financeAccountsApi.getVietQrDefault(branchId).then((account) => {
+      setBankCode(account.bankCode);
+      setBankAccountNumber(account.accountNumber);
+      setBankAccountName(account.accountHolderName);
+      setBankName(account.bankName);
+    }).catch((error: { vietnameseMessage?: string }) => {
+      setConfigError(error.vietnameseMessage || 'Chi nhánh chưa có tài khoản ngân hàng đã kết nối SePay.');
+    });
+  }, [isOpen, branchId]);
 
   // Bộ đếm ngược 5 phút
   useEffect(() => {
@@ -89,6 +74,8 @@ export const VietQrModal: FC<Props> = ({
   }, [isOpen, isSuccessPaid]);
 
   if (!isOpen) return null;
+
+  if (configError) return <div className="pos-modal-overlay" role="dialog" aria-modal="true"><div className="pos-modal-dialog" style={{ maxWidth: 460, padding: 24, textAlign: 'center' }}><ShieldCheck size={38} color="#b86712"/><h3>Chưa thể nhận VietQR</h3><p style={{ color: '#64748b', fontSize: 13 }}>{configError}</p><button type="button" onClick={onClose} style={{ marginTop: 8, padding: '9px 18px', border: 0, borderRadius: 8, background: '#0f766e', color: '#fff', fontWeight: 700 }}>Đóng</button></div></div>;
 
   const minutes = Math.floor(countdown / 60);
   const seconds = countdown % 60;

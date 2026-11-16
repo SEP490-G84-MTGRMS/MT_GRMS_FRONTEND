@@ -111,7 +111,6 @@ import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPa
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
-import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
 import { CashControlHubPage } from '../features/cash-control';
 
 /**
@@ -343,7 +342,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'payment-config',
-        element: <StorePaymentConfigPage />,
+        element: <Navigate to="/store-owner/subscriptions?tab=finance-accounts" replace />,
       },
       {
         path: 'cash-control',
@@ -635,7 +634,7 @@ export const router = createBrowserRouter([
       },
           {
             path: 'payment-config',
-            element: <StorePaymentConfigPage />,
+            element: <Navigate to="/store-owner/subscriptions?tab=finance-accounts" replace />,
           },
           {
             path: 'pos-cash-control',
@@ -892,6 +891,22 @@ export const router = createBrowserRouter([
         path: 'transfers/:id/receive',
         element: <ReceiveTransferPage />,
       },
+      {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/request',
+        element: <CreateUrgentTransferRequestPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
+      },
     ],
   },
 
@@ -931,6 +946,22 @@ export const router = createBrowserRouter([
       {
         path: 'stocktakes/:id/edit',
         element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/request',
+        element: <CreateUrgentTransferRequestPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
       },
     ],
   },

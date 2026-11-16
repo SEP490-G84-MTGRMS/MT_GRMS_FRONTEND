@@ -18,7 +18,8 @@ export type StoreHubTabKey =
   | 'subscriptions'
   | 'order-history'
   | 'terms'
-  | 'wallet';
+  | 'wallet'
+  | 'finance-accounts';
 
 interface StoreSidebarNavProps {
   activeTab: StoreHubTabKey;
@@ -125,13 +126,13 @@ export const StoreSidebarNav: FC<StoreSidebarNavProps> = ({
         </button>
         <button
           type="button"
-          className="store-sidebar-item"
-          onClick={() => navigate('/store-owner/payment-config')}
+          className={`store-sidebar-item ${activeTab === 'finance-accounts' ? 'active' : ''}`}
+          onClick={() => onSelectTab('finance-accounts')}
         >
           <span className="store-sidebar-icon">
             <CreditCard size={18} strokeWidth={1.8} />
           </span>
-          <span>Cấu hình VietQR & SePay</span>
+          <span>Tài khoản & Két quỹ</span>
         </button>
       </div>
     </aside>

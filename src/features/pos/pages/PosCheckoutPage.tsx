@@ -1433,6 +1433,7 @@ export const PosCheckoutPage: FC = () => {
         isOpen={isVietQrOpen}
         orderCode={`HD${Math.floor(100000 + Math.random() * 900000)}`}
         amount={finalAmount}
+        branchId={activeBranch.id}
         onClose={() => setIsVietQrOpen(false)}
         onConfirmAndPrint={() => {
           setIsVietQrOpen(false);
