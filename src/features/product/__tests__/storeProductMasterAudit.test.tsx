@@ -20,6 +20,14 @@ vi.mock('../api/storeProductApi', () => ({
   },
 }));
 
+vi.mock('../components/PriceHistoryModal', () => ({
+  PriceHistoryModal: ({ productId, branchId }: { productId: string; branchId?: string }) => (
+    <div data-testid="price-history-modal">
+      {productId}:{branchId}
+    </div>
+  ),
+}));
+
 // Test Fixtures
 const mockStores: StoreSummary[] = [
   {
@@ -495,7 +503,25 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       expect(screen.getByLabelText(/Đang KD/i)).toBeChecked();
       expect(screen.queryByText(/Lãi gộp/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/Bán dưới giá vốn/i)).not.toBeInTheDocument();
-      expect(screen.queryByText(/Lịch sử giá/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Lịch sử giá/i })).toBeInTheDocument();
+    });
+
+    it('TC-EDIT-001A: Opens price history for the selected product and branch', () => {
+      render(
+        <EditStoreProductModal
+          isOpen={true}
+          onClose={vi.fn()}
+          product={mockItemStore1}
+          stores={mockStores}
+          onSave={vi.fn()}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Lịch sử giá/i }));
+
+      expect(screen.getByTestId('price-history-modal')).toHaveTextContent(
+        `${mockItemStore1.productId}:${mockItemStore1.storeId}`
+      );
     });
 
     it('TC-EDIT-002: Read-only fields cannot be edited and maintain readOnly attribute', () => {

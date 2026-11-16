@@ -255,12 +255,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     setPageIndex(1);
   }, [supplierIdFromUrl, codeFromUrl]);
 
-  useEffect(() => {
-    if (!codeFromUrl || orders.length === 0) return;
-    const found = orders.find((o) => o.poCode.toLowerCase() === codeFromUrl.toLowerCase());
-    if (found) setSelectedOrder(found);
-  }, [codeFromUrl, orders]);
-
   const handleSearch = () => {
     setAppliedFilters(filterInputs);
     setPageIndex(1);

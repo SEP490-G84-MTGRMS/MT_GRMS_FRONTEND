@@ -254,6 +254,8 @@ export interface ProductPriceHistoryDto {
   productId: string;
   branchId?: string | null;
   branchName?: string | null;
+  productUnitId?: string | null;
+  productUnitName?: string | null;
   priceScope: 'MASTER' | 'BRANCH' | string;
   priceType: 'SELLING_PRICE' | 'COST_PRICE' | string;
   oldPrice: number;
@@ -266,4 +268,20 @@ export interface ProductPriceHistoryDto {
   changedByUserName: string;
   reason: string;
   createdAt: string;
+}
+
+export interface ProductPriceHistoryQuery {
+  productUnitId?: string;
+  priceScope?: 'MASTER' | 'BRANCH';
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ProductPriceHistoryPagedResult {
+  items: ProductPriceHistoryDto[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
 }
