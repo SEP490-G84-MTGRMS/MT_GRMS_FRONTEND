@@ -124,7 +124,7 @@ const formatTime = (isoOrTime?: string | null): string | undefined => {
   return isoOrTime;
 };
 
-const parseMinutesFromHHmm = (hhmm: string): number | null => {
+const parseMinutesFromHHmm = (hhmm?: string | null): number | null => {
   if (!hhmm || hhmm === '--:--') return null;
   const parts = hhmm.split(':');
   if (parts.length < 2) return null;
@@ -136,8 +136,8 @@ const parseMinutesFromHHmm = (hhmm: string): number | null => {
 
 const evaluateAttendanceThresholds = (
   s: ScheduleResponse,
-  checkInTime: string,
-  checkOutTime: string,
+  checkInTime?: string | null,
+  checkOutTime?: string | null,
   policy?: AttendancePolicyDto
 ): { effectiveLateMinutes: number; effectiveEarlyLeaveMinutes: number } => {
   if (!policy) {
@@ -291,7 +291,7 @@ export const AttendancePage: React.FC = () => {
   // Backend data states
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [todayMySchedules, setTodayMySchedules] = useState<ScheduleResponse[]>([]);
-  const [selfCheckInNotice, setSelfCheckInNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [selfCheckInNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [shifts, setShifts] = useState<ShiftRowItem[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);

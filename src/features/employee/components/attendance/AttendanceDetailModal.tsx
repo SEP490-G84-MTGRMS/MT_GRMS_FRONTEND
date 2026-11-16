@@ -95,7 +95,6 @@ interface StaffAttendanceDetailViewProps {
 const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
   record,
   onClose,
-  onRequestIncident,
 }) => {
   const [scheduleDetail, setScheduleDetail] = useState<ScheduleResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);

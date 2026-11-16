@@ -15,7 +15,6 @@ import {
   XCircle,
   CheckCircle2,
   User,
-  UserCheck,
   Phone,
   FileText,
   DollarSign,
@@ -1177,16 +1176,16 @@ export const InvoiceManagementPage: FC = () => {
                 <table className="pos-shift-table so-list-table invoice-list-table">
                   <thead>
                     <tr>
-                      <th style={{ width: '13%' }}>Mã hóa đơn</th>
-                      <th style={{ width: '8%' }}>Thời gian lập</th>
-                      <th style={{ width: '8%' }}>Khách hàng</th>
-                      <th style={{ width: '11%' }}>Người tạo</th>
-                      <th style={{ textAlign: 'right', width: '8%' }}>Tổng tiền hàng</th>
-                      <th style={{ textAlign: 'right', width: '6%' }}>Giảm giá</th>
-                      <th style={{ textAlign: 'right', width: '8%' }}>Khách đã trả</th>
-                      <th style={{ textAlign: 'center', width: '10%' }}>Phương thức TT</th>
-                      <th style={{ textAlign: 'center', width: '9%' }}>Trạng thái</th>
-                      <th style={{ textAlign: 'center', width: '19%' }}>Thao tác</th>
+                      <th style={{ textAlign: 'left', width: '13%' }}>Mã hóa đơn</th>
+                      <th style={{ textAlign: 'left', width: '8%' }}>Thời gian lập</th>
+                      <th style={{ textAlign: 'left', width: '8%' }}>Khách hàng</th>
+                      <th style={{ textAlign: 'left', width: '11%' }}>Người tạo</th>
+                      <th style={{ textAlign: 'left', width: '9%' }}>Tổng tiền hàng</th>
+                      <th style={{ textAlign: 'left', width: '7%' }}>Giảm giá</th>
+                      <th style={{ textAlign: 'left', width: '9%' }}>Khách đã trả</th>
+                      <th style={{ textAlign: 'left', width: '10%' }}>Phương thức TT</th>
+                      <th style={{ textAlign: 'left', width: '10%' }}>Trạng thái</th>
+                      <th style={{ textAlign: 'left', width: '15%' }}>Thao tác</th>
                     </tr>
                   </thead>
                   {paginatedInvoices.map((inv) => {
@@ -1244,19 +1243,16 @@ export const InvoiceManagementPage: FC = () => {
                             )}
                           </td>
                           <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                              <User size={13} className="text-teal-700" style={{ flexShrink: 0 }} />
-                              <span style={{ fontWeight: 600, color: '#334155', fontSize: 12, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
-                                {inv.cashierName || 'Phạm Thị Yến'}
-                              </span>
-                            </div>
+                            <span style={{ fontWeight: 600, color: '#334155', fontSize: 12, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                              {inv.cashierName || 'Phạm Thị Yến'}
+                            </span>
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                          <td style={{ textAlign: 'left', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                             {inv.totalMerchandiseAmount.toLocaleString('vi-VN')}
                           </td>
-                          <td style={{ textAlign: 'right', color: inv.totalDiscount > 0 ? '#dc2626' : '#94a3b8' }}>
+                          <td style={{ textAlign: 'left', color: inv.totalDiscount > 0 ? '#dc2626' : '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
                             <div>{inv.totalDiscount.toLocaleString('vi-VN')}</div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 3, marginTop: 2 }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 3, marginTop: 2 }}>
                               {inv.appliedVoucherCode && (
                                 <span
                                   style={{
@@ -1331,14 +1327,15 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td
                             style={{
-                              textAlign: 'right',
+                              textAlign: 'left',
                               fontWeight: 700,
                               color: isCompleted ? '#15803d' : isDebt ? '#d97706' : '#dc2626',
+                              fontVariantNumeric: 'tabular-nums',
                             }}
                           >
                             {(isDebt ? (inv.paidDebtAmount || 0) : inv.finalPaidAmount).toLocaleString('vi-VN')}
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td style={{ textAlign: 'left' }}>
                             <span
                               className={`pos-method-pill ${inv.paymentMethod === 'VIETQR' ? 'vietqr' : isDebtMethod ? 'debt' : 'cash'
                                 }`}
@@ -1358,7 +1355,7 @@ export const InvoiceManagementPage: FC = () => {
                               <span>{inv.paymentMethodLabel}</span>
                             </span>
                           </td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td style={{ textAlign: 'left' }}>
                             <span
                               className={`pos-status-pill ${isCompleted ? 'completed' : isDebt ? 'debt' : 'cancelled'
                                 }`}
@@ -1381,8 +1378,8 @@ export const InvoiceManagementPage: FC = () => {
                               )}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                            <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                          <td style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-start', maxWidth: 175 }}>
                               <button
                                 type="button"
                                 className="pos-btn-secondary-pill"
@@ -1530,21 +1527,21 @@ export const InvoiceManagementPage: FC = () => {
                                 <table className="pos-shift-table">
                                   <thead>
                                     <tr>
-                                      <th style={{ width: 140 }}>Mã SKU</th>
-                                      <th>Tên mặt hàng</th>
-                                      <th style={{ width: 120, textAlign: 'center' }}>Mã Lô (FEFO)</th>
-                                      <th style={{ width: 70, textAlign: 'center' }}>ĐVT</th>
-                                      <th style={{ width: 80, textAlign: 'right' }}>Số lượng</th>
-                                      <th style={{ width: 110, textAlign: 'right' }}>Đơn giá</th>
-                                      <th style={{ width: 90, textAlign: 'right' }}>Giảm giá</th>
-                                      <th style={{ width: 120, textAlign: 'right' }}>Thành tiền</th>
+                                      <th style={{ width: 140, textAlign: 'left' }}>Mã SKU</th>
+                                      <th style={{ textAlign: 'left' }}>Tên mặt hàng</th>
+                                      <th style={{ width: 120, textAlign: 'left' }}>Mã Lô (FEFO)</th>
+                                      <th style={{ width: 70, textAlign: 'left' }}>ĐVT</th>
+                                      <th style={{ width: 80, textAlign: 'left' }}>Số lượng</th>
+                                      <th style={{ width: 110, textAlign: 'left' }}>Đơn giá</th>
+                                      <th style={{ width: 90, textAlign: 'left' }}>Giảm giá</th>
+                                      <th style={{ width: 120, textAlign: 'left' }}>Thành tiền</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {inv.items.map((item) => (
                                       <tr key={item.itemId} style={{ backgroundColor: item.isGift ? '#f0fdf4' : undefined }}>
-                                        <td style={{ color: '#0f766e', fontWeight: 600 }}>{item.sku}</td>
-                                        <td>
+                                        <td style={{ color: '#0f766e', fontWeight: 600, textAlign: 'left' }}>{item.sku}</td>
+                                        <td style={{ textAlign: 'left' }}>
                                           <b>{item.productName}</b>
                                           {item.isGift && (
                                             <span
@@ -1566,20 +1563,20 @@ export const InvoiceManagementPage: FC = () => {
                                             </span>
                                           )}
                                         </td>
-                                        <td style={{ textAlign: 'center' }}>
+                                        <td style={{ textAlign: 'left' }}>
                                           <span style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>
                                             {item.batchId || 'LOT-AUTO'}
                                           </span>
                                         </td>
-                                        <td style={{ textAlign: 'center' }}>{item.unitName}</td>
-                                        <td style={{ textAlign: 'right', fontWeight: 600 }}>{item.quantity}</td>
-                                        <td style={{ textAlign: 'right' }}>
+                                        <td style={{ textAlign: 'left' }}>{item.unitName}</td>
+                                        <td style={{ textAlign: 'left', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{item.quantity}</td>
+                                        <td style={{ textAlign: 'left', fontVariantNumeric: 'tabular-nums' }}>
                                           {item.isGift ? '0 đ' : `${item.unitPrice.toLocaleString('vi-VN')} đ`}
                                         </td>
-                                        <td style={{ textAlign: 'right', color: item.discountAmount > 0 ? '#dc2626' : '#94a3b8' }}>
+                                        <td style={{ textAlign: 'left', color: item.discountAmount > 0 ? '#dc2626' : '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
                                           {item.isGift ? '0 đ' : `${item.discountAmount.toLocaleString('vi-VN')} đ`}
                                         </td>
-                                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
+                                        <td style={{ textAlign: 'left', fontWeight: 700, color: '#15803d', fontVariantNumeric: 'tabular-nums' }}>
                                           {item.isGift ? '0 đ' : `${item.totalAmount.toLocaleString('vi-VN')} đ`}
                                         </td>
                                       </tr>
@@ -1649,18 +1646,18 @@ export const InvoiceManagementPage: FC = () => {
                 <table className="pos-shift-table so-list-table invoice-list-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 145 }}>Mã đơn đặt trước</th>
-                      <th style={{ width: 112 }}>Khách hàng</th>
-                      <th style={{ width: 105 }}>Người tạo</th>
-                      <th style={{ width: 115 }}>Thời gian hẹn nhận</th>
-                      <th style={{ width: 112, textAlign: 'right', lineHeight: 1.35 }}>
+                      <th style={{ width: 145, textAlign: 'left' }}>Mã đơn đặt trước</th>
+                      <th style={{ width: 112, textAlign: 'left' }}>Khách hàng</th>
+                      <th style={{ width: 105, textAlign: 'left' }}>Người tạo</th>
+                      <th style={{ width: 115, textAlign: 'left' }}>Thời gian hẹn nhận</th>
+                      <th style={{ width: 120, textAlign: 'left', lineHeight: 1.35 }}>
                         Tổng sau<br />khuyến mại
                       </th>
-                      <th style={{ width: 78, textAlign: 'right' }}>Tiền cọc</th>
-                      <th style={{ width: 92, textAlign: 'right' }}>Còn phải thu</th>
-                      <th style={{ width: 100 }}>Giữ kho</th>
-                      <th style={{ width: 108, textAlign: 'center' }}>Trạng thái</th>
-                      <th style={{ width: 155, textAlign: 'center' }}>Thao tác</th>
+                      <th style={{ width: 85, textAlign: 'left' }}>Tiền cọc</th>
+                      <th style={{ width: 95, textAlign: 'left' }}>Còn phải thu</th>
+                      <th style={{ width: 110, textAlign: 'left' }}>Giữ kho</th>
+                      <th style={{ width: 108, textAlign: 'left' }}>Trạng thái</th>
+                      <th style={{ width: 155, textAlign: 'left' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1726,12 +1723,9 @@ export const InvoiceManagementPage: FC = () => {
                               </div>
                             </td>
                             <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <UserCheck size={13} className="text-teal-700" />
-                                <span style={{ fontWeight: 600, color: '#0f766e', fontSize: 12, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
-                                  {pre.cashierName || 'Thu ngân POS'}
-                                </span>
-                              </div>
+                              <span style={{ fontWeight: 600, color: '#0f766e', fontSize: 12, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                                {pre.cashierName || 'Thu ngân POS'}
+                              </span>
                               {pre.fulfilledByCashierName ? (
                                 <div style={{ fontSize: 11, color: '#166534', marginTop: 3 }}>
                                   Bàn giao: <b>{pre.fulfilledByCashierName}</b>
@@ -1752,7 +1746,7 @@ export const InvoiceManagementPage: FC = () => {
                                 </div>
                               )}
                             </td>
-                            <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                            <td style={{ textAlign: 'left', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                               <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 800 }}>
                                 {pre.totalOrderAmount.toLocaleString('vi-VN')} đ
                               </div>
@@ -1768,12 +1762,12 @@ export const InvoiceManagementPage: FC = () => {
                                 </div>
                               )}
                               {pre.appliedPromotionSummary && (
-                                <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }} title={pre.appliedPromotionSummary}>
+                                <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-start' }} title={pre.appliedPromotionSummary}>
                                   <Gift size={10} color="#0f766e" /> {pre.appliedPromotionSummary}
                                 </div>
                               )}
                               {giftItems.length > 0 && (
-                                <div style={{ fontSize: 10, color: '#15803d', fontWeight: 600, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                                <div style={{ fontSize: 10, color: '#15803d', fontWeight: 600, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
                                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                                     <Gift size={10} color="#15803d" /> Quà tặng 0 đ · đã giữ kho
                                   </span>
@@ -1785,24 +1779,24 @@ export const InvoiceManagementPage: FC = () => {
                                 </div>
                               )}
                             </td>
-                            <td style={{ textAlign: 'right', color: '#15803d', fontWeight: 600 }}>
+                            <td style={{ textAlign: 'left', color: '#15803d', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                               {pre.depositAmount.toLocaleString('vi-VN')} đ
                             </td>
-                            <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 700 }}>
+                            <td style={{ textAlign: 'left', color: '#dc2626', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
                               {pre.remainingAmount.toLocaleString('vi-VN')} đ
                             </td>
-                            <td>
+                            <td style={{ textAlign: 'left' }}>
                               <span className="shift-status-badge on-duty">
                                 <CheckCircle2 size={12} /> Đã giữ kho Lô FEFO
                               </span>
                             </td>
-                            <td>
+                            <td style={{ textAlign: 'left' }}>
                               <span className="pos-status-pill reserved">
                                 {pre.statusLabel}
                               </span>
                             </td>
-                            <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <td style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 6 }}>
                                 <button
                                   type="button"
                                   className="pos-btn-secondary-pill"
@@ -1923,21 +1917,21 @@ export const InvoiceManagementPage: FC = () => {
                                   <table className="pos-shift-table">
                                     <thead>
                                       <tr>
-                                        <th style={{ width: 130 }}>Mã SKU</th>
-                                        <th>Tên mặt hàng giữ kho</th>
-                                        <th style={{ width: 140, textAlign: 'center' }}>Lô giữ kho (FEFO)</th>
-                                        <th style={{ width: 80, textAlign: 'center' }}>ĐVT</th>
-                                        <th style={{ width: 90, textAlign: 'right' }}>Số lượng</th>
-                                        <th style={{ width: 110, textAlign: 'right' }}>Đơn giá</th>
-                                        <th style={{ width: 100, textAlign: 'right' }}>Giảm giá</th>
-                                        <th style={{ width: 120, textAlign: 'right' }}>Thành tiền</th>
+                                        <th style={{ width: 130, textAlign: 'left' }}>Mã SKU</th>
+                                        <th style={{ textAlign: 'left' }}>Tên mặt hàng giữ kho</th>
+                                        <th style={{ width: 140, textAlign: 'left' }}>Lô giữ kho (FEFO)</th>
+                                        <th style={{ width: 80, textAlign: 'left' }}>ĐVT</th>
+                                        <th style={{ width: 90, textAlign: 'left' }}>Số lượng</th>
+                                        <th style={{ width: 110, textAlign: 'left' }}>Đơn giá</th>
+                                        <th style={{ width: 100, textAlign: 'left' }}>Giảm giá</th>
+                                        <th style={{ width: 120, textAlign: 'left' }}>Thành tiền</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {pre.items.map((item) => (
                                         <tr key={item.itemId || item.productId} style={{ backgroundColor: item.isGift ? '#f0fdf4' : undefined }}>
-                                          <td style={{ color: '#0f766e', fontWeight: 600 }}>{item.sku || 'SKU'}</td>
-                                          <td>
+                                          <td style={{ color: '#0f766e', fontWeight: 600, textAlign: 'left' }}>{item.sku || 'SKU'}</td>
+                                          <td style={{ textAlign: 'left' }}>
                                             <b>{item.productName}</b>
                                             {item.isGift && (
                                               <span
@@ -1955,18 +1949,18 @@ export const InvoiceManagementPage: FC = () => {
                                               </span>
                                             )}
                                           </td>
-                                          <td style={{ textAlign: 'center', color: '#0284c7', fontWeight: 600 }}>
+                                          <td style={{ textAlign: 'left', color: '#0284c7', fontWeight: 600 }}>
                                             {item.batchId || 'Lô FEFO gần hạn'}
                                           </td>
-                                          <td style={{ textAlign: 'center' }}>{item.unitName || 'Cái'}</td>
-                                          <td style={{ textAlign: 'right', fontWeight: 600 }}>{item.quantity}</td>
-                                          <td style={{ textAlign: 'right' }}>
+                                          <td style={{ textAlign: 'left' }}>{item.unitName || 'Cái'}</td>
+                                          <td style={{ textAlign: 'left', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{item.quantity}</td>
+                                          <td style={{ textAlign: 'left', fontVariantNumeric: 'tabular-nums' }}>
                                             {item.isGift ? '0' : item.unitPrice.toLocaleString('vi-VN')}
                                           </td>
-                                          <td style={{ textAlign: 'right', color: '#dc2626' }}>
+                                          <td style={{ textAlign: 'left', color: '#dc2626', fontVariantNumeric: 'tabular-nums' }}>
                                             {item.discountAmount ? `-${item.discountAmount.toLocaleString('vi-VN')}` : '-'}
                                           </td>
-                                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                                          <td style={{ textAlign: 'left', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
                                             {item.isGift ? '0' : item.totalAmount.toLocaleString('vi-VN')}
                                           </td>
                                         </tr>
@@ -1974,12 +1968,12 @@ export const InvoiceManagementPage: FC = () => {
                                     </tbody>
                                     <tfoot>
                                       <tr style={{ fontWeight: 700, backgroundColor: '#f8fafc', borderTop: '2px solid #cbd5e1' }}>
-                                        <td colSpan={4} style={{ textAlign: 'right' }}>Phải thanh toán sau khuyến mại:</td>
-                                        <td style={{ textAlign: 'right', color: '#0f766e' }}>
+                                        <td colSpan={4} style={{ textAlign: 'left' }}>Phải thanh toán sau khuyến mại:</td>
+                                        <td style={{ textAlign: 'left', color: '#0f766e', fontVariantNumeric: 'tabular-nums' }}>
                                           {pre.items.reduce((sum, it) => sum + (it.quantity || 0), 0)}
                                         </td>
                                         <td colSpan={2}></td>
-                                        <td style={{ textAlign: 'right', color: '#0f766e', fontSize: 13 }}>
+                                        <td style={{ textAlign: 'left', color: '#0f766e', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
                                           {pre.totalOrderAmount.toLocaleString('vi-VN')} đ
                                         </td>
                                       </tr>

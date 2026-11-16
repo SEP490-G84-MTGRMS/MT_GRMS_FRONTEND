@@ -209,10 +209,11 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         const resolved = preferredOk || (isStoreOwner ? list[0]?.id || '' : '');
 
         if (!resolved) {
-          setErrorMsg(
+          showToast(
             isStoreOwner
               ? 'Chưa có chi nhánh nào trong hệ thống — hãy tạo chi nhánh trước.'
-              : 'Tài khoản chưa được gán chi nhánh — không thể lập phiếu kiểm kê.'
+              : 'Tài khoản chưa được gán chi nhánh — không thể lập phiếu kiểm kê.',
+            'error'
           );
           return;
         }
@@ -226,7 +227,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       })
       .catch(() => {
         if (!mounted) return;
-        setErrorMsg('Không thể tải danh sách chi nhánh.');
+        showToast('Không thể tải danh sách chi nhánh.', 'error');
       });
     return () => {
       mounted = false;

@@ -9,7 +9,8 @@ import type {
   ProductUnitUpdatePayload,
   ProductCreatePayload,
   ProductUpdatePayload,
-  ProductPriceHistoryDto,
+  ProductPriceHistoryQuery,
+  ProductPriceHistoryPagedResult,
 } from '../types';
 
 export const productApi = {
@@ -160,18 +161,30 @@ export const productApi = {
    * Lấy lịch sử biến động giá bán sản phẩm (FE-03.2 Price Change History Tracking)
    * Endpoint Backend: GET /api/products/{id}/price-history
    */
-  async getPriceHistory(productId: string, branchId?: string): Promise<ProductPriceHistoryDto[]> {
-    const params: Record<string, any> = {};
+  async getPriceHistory(
+    productId: string,
+    branchId?: string,
+    query: ProductPriceHistoryQuery = {}
+  ): Promise<ProductPriceHistoryPagedResult> {
+    const params: Record<string, any> = {
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 15,
+    };
     if (branchId) {
       params.branchId = branchId;
     }
-    const res = await httpClient.get<ApiResponse<ProductPriceHistoryDto[]>>(`/products/${productId}/price-history`, {
+    if (query.productUnitId) params.productUnitId = query.productUnitId;
+    if (query.priceScope) params.priceScope = query.priceScope;
+    if (query.fromDate) params.fromDate = query.fromDate;
+    if (query.toDate) params.toDate = query.toDate;
+
+    const res = await httpClient.get<ApiResponse<ProductPriceHistoryPagedResult>>(`/products/${productId}/price-history`, {
       params,
     });
     if (res.data?.success && res.data.data) {
       return res.data.data;
     }
-    return [];
+    return { items: [], page: params.page, pageSize: params.pageSize, totalItems: 0 };
   },
 };
 

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Pencil, Download, Banknote, Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Pencil, Loader2 } from 'lucide-react';
 import type { Employee, DebtTransaction } from '../../types';
 import { employeeApi } from '../../api/employeeApi';
 import { CreateUserModal } from './CreateUserModal';
@@ -11,7 +11,7 @@ interface EmployeeDetailModalProps {
   onEdit: (employee: Employee) => void;
   onToggleStatus: (employeeId: string) => void;
   onDelete?: (employeeId: string) => void;
-  onAddPayment: (employeeId: string, payment: DebtTransaction) => void;
+  onAddPayment?: (employeeId: string, payment: DebtTransaction) => void;
   initialTab?: 'info' | 'schedule' | 'salary' | 'payslip' | 'debt';
 }
 
@@ -22,7 +22,6 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
   onEdit,
   onToggleStatus,
   onDelete,
-  onAddPayment,
   initialTab = 'info',
 }) => {
   const [detail, setDetail] = useState<Employee | null>(null);
@@ -64,105 +63,9 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
       setActiveTab(initialTab === 'salary' ? 'salary' : 'info');
     }
   }, [isOpen, initialTab]);
-  const [scheduleView, setScheduleView] = useState<'table' | 'list'>('table');
   const [showCreateUser, setShowCreateUser] = useState(false);
 
-  // Schedule Filter State (Chỉ theo tuần)
-  const [scheduleWeek, setScheduleWeek] = useState<number>(1);
-  const [scheduleMonth, setScheduleMonth] = useState<number>(10);
-  const [scheduleYear, setScheduleYear] = useState<number>(2026);
-
-  const handlePrevSchedule = () => {
-    if (scheduleWeek > 1) {
-      setScheduleWeek(scheduleWeek - 1);
-    } else {
-      if (scheduleMonth === 1) {
-        setScheduleMonth(12);
-        setScheduleYear((prev) => prev - 1);
-      } else {
-        setScheduleMonth((prev) => prev - 1);
-      }
-      setScheduleWeek(4);
-    }
-  };
-
-  const handleNextSchedule = () => {
-    if (scheduleWeek < 4) {
-      setScheduleWeek(scheduleWeek + 1);
-    } else {
-      if (scheduleMonth === 12) {
-        setScheduleMonth(1);
-        setScheduleYear((prev) => prev + 1);
-      } else {
-        setScheduleMonth((prev) => prev + 1);
-      }
-      setScheduleWeek(1);
-    }
-  };
-
-  const schedulePeriodLabel = useMemo(() => {
-    return `Tuần ${scheduleWeek} - Th. ${scheduleMonth} ${scheduleYear}`;
-  }, [scheduleWeek, scheduleMonth, scheduleYear]);
-
-  // Payslip Filter State (Lọc theo trạng thái)
-  const [payslipStatusFilter, setPayslipStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
-
-  const filteredPayslips = useMemo(() => {
-    if (!employee?.payslips) return [];
-    if (payslipStatusFilter === 'all') return employee.payslips;
-    return employee.payslips.filter((ps) => ps.status === payslipStatusFilter);
-  }, [employee?.payslips, payslipStatusFilter]);
-
-  // Payment modal state
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [payAmount, setPayAmount] = useState<number>(0);
-  const [payMethod, setPayMethod] = useState<'transfer' | 'cash'>('transfer');
-  const [payNote, setPayNote] = useState('');
-
   if (!isOpen || !employee) return null;
-
-  const handleOpenPayment = () => {
-    setPayAmount(employee.debtAmount > 0 ? employee.debtAmount : 5000000);
-    setPayNote(
-      employee.debtAmount > 0
-        ? `Thanh toán nợ lương cho nhân viên ${employee.fullName}`
-        : `Tạm ứng lương tháng cho nhân viên ${employee.fullName}`
-    );
-    setShowPaymentModal(true);
-  };
-
-  const handleConfirmPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (payAmount <= 0) {
-      alert('Vui lòng nhập số tiền chi lớn hơn 0!');
-      return;
-    }
-
-    const isAdvance = employee.debtAmount === 0;
-    const newTransaction: DebtTransaction = {
-      id: `pc_${Date.now()}`,
-      code: `PC${String(Math.floor(Math.random() * 90000) + 10000)}`,
-      date: new Date().toLocaleString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      type: isAdvance ? 'advance_payment' : 'salary_payment',
-      amount: payAmount,
-      method: payMethod,
-      accountNumber:
-        payMethod === 'transfer'
-          ? `${employee.bankAccountNumber || 'Chưa có STK'} (${employee.bankName || 'NH'})`
-          : undefined,
-      note: payNote,
-      remainingDebtAfter: Math.max(0, employee.debtAmount - payAmount),
-    };
-
-    onAddPayment(employee.id, newTransaction);
-    setShowPaymentModal(false);
-  };
 
   const formatVND = (num?: number) => {
     if (num === undefined || num === null) return '0 ₫';
@@ -548,106 +451,6 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Sub-Modal Thanh Toán Lương / Tạm Ứng */}
-      {showPaymentModal && (
-        <div className="emp-modal-overlay" style={{ zIndex: 1200 }}>
-          <div className="emp-modal-card">
-            <div className="emp-modal-header">
-              <h3>
-                {employee.debtAmount > 0
-                  ? 'Thanh toán nợ lương nhân viên'
-                  : 'Tạo phiếu tạm ứng lương'}
-              </h3>
-              <button
-                type="button"
-                className="emp-modal-close-btn"
-                onClick={() => setShowPaymentModal(false)}
-              >
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmPayment}>
-              <div className="emp-modal-body">
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, color: '#64748B' }}>Nhân viên thụ hưởng:</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A' }}>
-                    {employee.fullName} ({employee.employeeCode})
-                  </div>
-                </div>
-
-                <div className="emp-form-group">
-                  <label className="emp-form-label">
-                    Số tiền chi trả (VNĐ) <span className="required">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step={100000}
-                    className="emp-form-input"
-                    value={payAmount}
-                    onChange={(e) => setPayAmount(Number(e.target.value))}
-                    required
-                  />
-                  <small style={{ color: '#64748B', fontSize: 11 }}>
-                    {employee.debtAmount > 0
-                      ? `Nợ hiện tại: ${formatVND(employee.debtAmount)}`
-                      : 'Công nợ hiện tại = 0 (Khoản này sẽ được hạch toán vào Tạm ứng kỳ tới)'}
-                  </small>
-                </div>
-
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Phương thức thanh toán</label>
-                  <select
-                    className="emp-form-select"
-                    value={payMethod}
-                    onChange={(e) => setPayMethod(e.target.value as 'transfer' | 'cash')}
-                  >
-                    <option value="transfer">Chuyển khoản ngân hàng</option>
-                    <option value="cash">Tiền mặt tại quỹ</option>
-                  </select>
-                </div>
-
-                {payMethod === 'transfer' && (
-                  <div className="emp-form-group">
-                    <label className="emp-form-label">Tài khoản nhận tiền</label>
-                    <input
-                      type="text"
-                      className="emp-form-input"
-                      readOnly
-                      style={{ background: '#F8FAFC' }}
-                      value={`${employee.bankAccountNumber || 'Chưa có'} - ${employee.bankName || 'Ngân hàng'}`}
-                    />
-                  </div>
-                )}
-
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Nội dung / Ghi chú</label>
-                  <input
-                    type="text"
-                    className="emp-form-input"
-                    value={payNote}
-                    onChange={(e) => setPayNote(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="emp-modal-footer">
-                <button
-                  type="button"
-                  className="emp-btn emp-btn-secondary"
-                  onClick={() => setShowPaymentModal(false)}
-                >
-                  Hủy
-                </button>
-                <button type="submit" className="emp-btn emp-btn-primary">
-                  Tạo phiếu chi
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {employee && (
         <CreateUserModal

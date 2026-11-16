@@ -6,7 +6,8 @@ import type {
   EditStoreProductInput,
   StoreProductUnitPrice,
 } from '../types/storeProduct.types';
-import { X, Save, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
+import { X, Save, AlertTriangle, Loader2, AlertCircle, History } from 'lucide-react';
+import { PriceHistoryModal } from './PriceHistoryModal';
 import '../../supplier/supplier.css';
 
 interface EditStoreProductModalProps {
@@ -111,6 +112,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState<boolean>(false);
+  const [showPriceHistory, setShowPriceHistory] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen && product) {
@@ -132,12 +134,14 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       setFormError('');
       setIsSaving(false);
       setShowUnsavedConfirm(false);
+      setShowPriceHistory(false);
     } else if (!isOpen) {
       setMinOrderQuantityStr('');
       setUnitPriceDrafts([]);
       setFieldErrors({});
       setFormError('');
       setShowUnsavedConfirm(false);
+      setShowPriceHistory(false);
     }
   }, [isOpen, product]);
 
@@ -312,6 +316,29 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
               </h2>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowPriceHistory(true)}
+                disabled={isSaving}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  height: 32,
+                  padding: '0 10px',
+                  borderRadius: 7,
+                  border: '1px solid #ddd6fe',
+                  backgroundColor: '#f5f3ff',
+                  color: '#6d28d9',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+                title="Xem lịch sử thay đổi giá"
+              >
+                <History size={14} />
+                <span>Lịch sử giá</span>
+              </button>
               <button
                 type="button"
                 id="btnCloseEditProductModalX"
@@ -729,6 +756,17 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showPriceHistory && product && (
+        <PriceHistoryModal
+          isOpen={showPriceHistory}
+          onClose={() => setShowPriceHistory(false)}
+          productId={product.productId}
+          productName={product.name}
+          branchId={product.storeId}
+          branchName={product.storeName}
+        />
       )}
 
     </>

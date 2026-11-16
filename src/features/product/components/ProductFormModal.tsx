@@ -11,10 +11,12 @@ import {
   Folder,
   Plus,
   Loader2,
+  History,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { readFileAsDataUrl } from '../../../utils/imageFile';
 import { productApi } from '../api/productApi';
+import { PriceHistoryModal } from './PriceHistoryModal';
 
 /** ĐVT "Khay/Tray" không dùng làm quy đổi cố định — giá khay = kg × PROCESSED lúc đóng khay. */
 const isTrayUnitName = (name?: string | null): boolean => {
@@ -210,6 +212,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [barcode, setBarcode] = useState('');
   const [productName, setProductName] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [showPriceHistory, setShowPriceHistory] = useState(false);
 
   // Category Searchable Dropdown state (phong cách tương tự EmployeeFormModal)
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -238,6 +241,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (!isOpen) {
       setIsCategoryDropdownOpen(false);
       setCategorySearchKeyword('');
+      setShowPriceHistory(false);
     }
   }, [isOpen]);
 
@@ -1080,6 +1084,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   };
 
   return (
+    <>
     <div className="custom-modal-backdrop">
       <div
         className="custom-modal-box"
@@ -1124,15 +1129,42 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
             )}
           </div>
-          <button
-            type="button"
-            className="custom-modal-close"
-            onClick={onClose}
-            disabled={isSubmitting}
-            title="Đóng"
-          >
-            <X size={20} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {isEditing && productToEdit && (
+              <button
+                type="button"
+                onClick={() => setShowPriceHistory(true)}
+                disabled={isSubmitting}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 34,
+                  padding: '0 12px',
+                  borderRadius: 8,
+                  border: '1px solid #ddd6fe',
+                  background: '#f5f3ff',
+                  color: '#6d28d9',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                }}
+                title="Xem lịch sử thay đổi giá trước khi chỉnh sửa"
+              >
+                <History size={15} />
+                Lịch sử giá
+              </button>
+            )}
+            <button
+              type="button"
+              className="custom-modal-close"
+              onClick={onClose}
+              disabled={isSubmitting}
+              title="Đóng"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* ========================================================= */}
@@ -2495,5 +2527,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       )}
 
     </div>
+    {showPriceHistory && productToEdit && (
+      <PriceHistoryModal
+        isOpen={showPriceHistory}
+        onClose={() => setShowPriceHistory(false)}
+        productId={productToEdit.id}
+        productName={productToEdit.productName}
+      />
+    )}
+    </>
   );
 };

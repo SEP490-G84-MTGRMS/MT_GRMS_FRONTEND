@@ -22,6 +22,7 @@ import {
 import { useAuthStore } from '../../../../stores/useAuthStore';
 import { httpClient } from '../../../../api/httpClient';
 import { branchApi } from '../../../purchase-order/api/branchApi';
+import { resolveSePayWebhookUrl } from '../../utils/sePayWebhookUrl';
 
 export interface StorePaymentConfigData {
   tenantId: string;
@@ -82,8 +83,8 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
   const [paymentAccountId, setPaymentAccountId] = useState<string | null>(null);
   const [savedAccountKey, setSavedAccountKey] = useState('');
 
-  // Sinh Webhook URL tự động
-  const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/payments/sepay-webhook`;
+  // Sinh Webhook URL tự động theo môi trường deploy/local.
+  const [webhookUrl, setWebhookUrl] = useState(() => resolveSePayWebhookUrl());
 
   // Tải cấu hình từ Backend API (mã hóa AES-256) và dọn sạch khóa plaintext trong localStorage
   useEffect(() => {
@@ -112,7 +113,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
             bankName: parsed.bankName || 'MBBank - Ngân hàng Quân Đội',
             bankAccountNumber: parsed.bankAccountNumber || '0918889999',
             bankAccountName: parsed.bankAccountName || 'NGUYEN AN NHIEN',
-            webhookUrl,
+            webhookUrl: resolveSePayWebhookUrl(parsed.webhookUrl),
             isActive: parsed.isActive !== false,
           };
           localStorage.setItem(storageKey, JSON.stringify(sanitized));
@@ -127,6 +128,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
       .then((res) => {
         const data = res.data;
         if (data) {
+          setWebhookUrl(resolveSePayWebhookUrl(data.webhookUrl));
           if (data.bankCode) setBankCode(data.bankCode);
           if (data.bankAccountNumber) setBankAccountNumber(data.bankAccountNumber);
           if (data.bankAccountName) setBankAccountName(data.bankAccountName);
@@ -143,7 +145,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
         // Fallback hiển thị masked key khi chạy offline
         setSepayApiKey('sepay_apikey_••••••••••••8899');
       });
-  }, [isOpen, currentTenantId, webhookUrl]);
+  }, [isOpen, currentTenantId]);
 
   if (!isOpen) return null;
 

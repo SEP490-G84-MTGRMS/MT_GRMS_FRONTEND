@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProductFormModal } from '../components/ProductFormModal';
@@ -19,6 +20,56 @@ vi.mock('../api/productApi', () => ({
     ]),
   },
 }));
+
+vi.mock('../components/PriceHistoryModal', () => ({
+  PriceHistoryModal: ({ productId, productName }: { productId: string; productName: string }) => (
+    <div data-testid="master-price-history-modal">{productId}:{productName}</div>
+  ),
+}));
+
+it('FE-03: Chỉ hiển thị lịch sử giá khi chỉnh sửa và mở đúng sản phẩm', () => {
+  const categories = [{ id: 'cat-1', code: 'CAT01', name: 'Đồ uống', productCount: 1 }];
+  const productToEdit: any = {
+    id: 'product-history-01',
+    productCode: 'SP-HISTORY',
+    productName: 'Sản phẩm kiểm tra lịch sử',
+    categoryId: 'cat-1',
+    categoryName: 'Đồ uống',
+    baseUnit: 'Chai',
+    sellingPrice: 10000,
+    costPrice: 7000,
+    status: 'Active',
+    createdAt: '2026-11-16',
+    uomConversions: [],
+  };
+
+  const { rerender } = render(
+    <ProductFormModal
+      isOpen={true}
+      productToEdit={null}
+      categories={categories}
+      onClose={vi.fn()}
+      onSave={vi.fn()}
+      onOpenCreateCategoryModal={vi.fn()}
+    />
+  );
+  expect(screen.queryByRole('button', { name: /Lịch sử giá/i })).not.toBeInTheDocument();
+
+  rerender(
+    <ProductFormModal
+      isOpen={true}
+      productToEdit={productToEdit}
+      categories={categories}
+      onClose={vi.fn()}
+      onSave={vi.fn()}
+      onOpenCreateCategoryModal={vi.fn()}
+    />
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Lịch sử giá/i }));
+  expect(screen.getByTestId('master-price-history-modal')).toHaveTextContent(
+    'product-history-01:Sản phẩm kiểm tra lịch sử'
+  );
+});
 
 const mockCategories = [
   {

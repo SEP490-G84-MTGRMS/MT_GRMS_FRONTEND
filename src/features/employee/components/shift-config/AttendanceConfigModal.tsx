@@ -52,7 +52,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
   const [currentConfig, setCurrentConfig] = useState<AttendanceConfig>(EMPTY_ATTENDANCE_CONFIG);
   const [rules, setRules] = useState<WorkHourConversionRule[]>([]);
-  const [isCustomized, setIsCustomized] = useState<boolean>(false);
+  const [, setIsCustomized] = useState<boolean>(false);
 
   // Trạng thái async
   const [isLoading, setIsLoading] = useState<boolean>(false);
