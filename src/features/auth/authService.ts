@@ -1,7 +1,6 @@
 import { httpClient } from '../../api/httpClient';
 import {
   ApiError,
-  SystemRoles,
   UserRoleEnum,
   type UserRole,
   type UserRoleType,
@@ -71,256 +70,6 @@ export function unwrapLogin(body: any): AuthResponse | null {
   };
 }
 
-// Danh sách tài khoản demo tiện lợi cho kiểm thử giao diện & nghiệm thu
-export const DEMO_ACCOUNTS = [
-  {
-    roleLabel: '👑 Chủ Cửa Hàng (Store Owner)',
-    username: 'store_owner',
-    email: 'owner@mtgrms.vn',
-    password: 'Owner@123456',
-    tenantCode: SEED_TENANT_ID,
-    user: {
-      id: 'user-owner-001',
-      email: 'owner@mtgrms.vn',
-      fullName: 'Chủ Cửa Hàng (Store Owner)',
-      role: 'STORE_OWNER' as const,
-      tenantId: SEED_TENANT_ID,
-      tenantName: 'Cửa hàng MT-GRMS',
-      branchId: undefined,
-      phone: '0901234567',
-      isAdmin: false,
-    },
-  },
-  {
-    roleLabel: '👷‍♂️ Nhân Viên Cửa Hàng (Staff)',
-    username: 'staff_employee',
-    email: 'staff@mtgrms.vn',
-    password: 'Staff@123456',
-    tenantCode: SEED_TENANT_ID,
-    user: {
-      id: 'user-staff-001',
-      email: 'staff@mtgrms.vn',
-      fullName: 'Nhân Viên Cửa Hàng (Staff)',
-      role: SystemRoles.STAFF,
-      tenantId: SEED_TENANT_ID,
-      tenantName: 'Cửa hàng MT-GRMS',
-      branchId: undefined,
-      phone: '0912345678',
-      isAdmin: false,
-    },
-  },
-  {
-    roleLabel: 'Chủ cửa hàng (Store Owner - Được phép bán nợ)',
-    username: 'chucuahang',
-    email: 'chucuahang@mtmart.vn',
-    password: '123456',
-    tenantCode: 'tenant_mt_mart_01',
-    user: {
-      id: 'usr_store_owner',
-      email: 'chucuahang@mtmart.vn',
-      fullName: 'Trần Văn Chủ (Chủ cửa hàng)',
-      role: SystemRoles.STORE_OWNER,
-      tenantId: 'tenant_mt_mart_01',
-      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
-      branchId: 'BR-HCM-01',
-      phone: '0901 234 567',
-      isAdmin: false,
-    },
-  },
-  {
-    roleLabel: 'Nhân viên bán hàng (Staff - POS)',
-    username: 'nhanvien',
-    email: 'nhanvien@mtmart.vn',
-    password: '123456',
-    tenantCode: 'tenant_mt_mart_01',
-    user: {
-      id: 'usr_staff_cashier',
-      email: 'nhanvien@mtmart.vn',
-      fullName: 'Lê Thị Thu Ngân (Nhân viên bán hàng)',
-      role: SystemRoles.STAFF,
-      tenantId: 'tenant_mt_mart_01',
-      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
-      branchId: 'BR-HCM-01',
-      phone: '0988 765 432',
-      isAdmin: false,
-    },
-  },
-  {
-    roleLabel: 'Chủ Cửa Hàng Khác (Tenant B - Cửa Hàng An Khang)',
-    username: 'chucuahang2',
-    email: 'chucuahang2@ankhang.vn',
-    password: '123456',
-    tenantCode: 'tenant_ankhang_02',
-    user: {
-      id: 'usr_owner_ankhang_02',
-      email: 'chucuahang2@ankhang.vn',
-      fullName: 'Hoàng Văn An (Chủ tiệm An Khang)',
-      role: SystemRoles.STORE_OWNER,
-      tenantId: 'tenant_ankhang_02',
-      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Khang',
-      branchId: 'BR-AK-01',
-      phone: '0912 888 999',
-      isAdmin: false,
-    },
-  },
-  {
-    roleLabel: 'Chủ chuỗi / Super Admin',
-    username: 'admin',
-    email: 'admin@mtgrms.vn',
-    password: 'password123',
-    tenantCode: 'tenant_mt_mart_01',
-    user: {
-      id: 'usr_super_admin',
-      email: 'admin@mtgrms.vn',
-      fullName: 'Hệ Thống Super Admin',
-      role: SystemRoles.ADMIN,
-      tenantId: 'tenant_mt_mart_01',
-      tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT-Mart',
-      branchId: 'BR-001',
-      phone: '0901 234 567',
-      isAdmin: true,
-    },
-  },
-  {
-    roleLabel: 'Chủ cửa hàng (Store Owner)',
-    email: 'hung.nguyen@mtmart.vn',
-    password: 'password123',
-    tenantCode: 'TENANT-HCM-01',
-    user: {
-      id: 'usr_store_manager',
-      email: 'hung.nguyen@mtmart.vn',
-      fullName: 'Nguyễn Văn Hùng (Chủ Cửa Hàng)',
-      role: SystemRoles.STORE_OWNER,
-      tenantId: 'tenant_mt_mart_01',
-      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
-      branchId: 'BR-HCM-01',
-      phone: '0909 876 543',
-      isAdmin: false,
-    },
-  },
-  {
-    roleLabel: 'Thu ngân quầy POS (Lê Thị Thảo)',
-    username: 'staff_cashier',
-    email: 'cashier@mtgrms.vn',
-    password: 'Staff@123456',
-    tenantCode: SEED_TENANT_ID,
-    user: {
-      id: 'user-cashier-001',
-      email: 'cashier@mtgrms.vn',
-      fullName: 'Lê Thị Thảo (Thu Ngân POS)',
-      role: SystemRoles.STAFF,
-      tenantId: 'tenant_mt_mart_01',
-      tenantName: 'Chuỗi Siêu Thị Thực Phẩm Sạch MT-Mart',
-      branchId: 'BR-001',
-      phone: '0988 765 432',
-      isAdmin: false,
-    },
-  },
-  {
-    roleLabel: 'Thu ngân POS Demo (Trần Thị Thu Ngân)',
-    username: 'poscashier',
-    email: 'pos.cashier@mtgrms.vn',
-    password: 'password123',
-    tenantCode: 'tenant_mt_mart_01',
-    user: {
-      id: 'usr_cashier',
-      email: 'thao.le@mtmart.vn',
-      fullName: 'Lê Thị Thảo (Thu Ngân POS)',
-      role: SystemRoles.STAFF,
-      tenantId: 'tenant_mt_mart_01',
-      tenantName: 'Chuỗi Bán Lẻ Thực Phẩm Sạch MT',
-      branchId: 'BR-001',
-      phone: '0988 765 432',
-      isAdmin: false,
-    },
-  },
-  {
-    roleLabel: 'Chủ Cửa Hàng An Nhiên (Tenant Mới - An Nhiên Mart)',
-    username: '0918889999',
-    email: 'chucuahang.annhien@gmail.com',
-    password: '123456',
-    tenantCode: 'tenant_an_nhien_02',
-    user: {
-      id: 'usr_owner_annhien_02',
-      email: 'chucuahang.annhien@gmail.com',
-      fullName: 'Trần Quốc An (Chủ tiệm An Nhiên)',
-      role: SystemRoles.STORE_OWNER,
-      tenantId: 'tenant_an_nhien_02',
-      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
-      branchId: 'b1000000-0000-0000-0000-000000000001',
-      phone: '0918889999',
-    },
-  },
-  {
-    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Ba Đình All-time 1 (Phạm Thị Yến)',
-    username: '0917778888',
-    email: 'nhanvien.annhien@gmail.com',
-    password: '123456',
-    tenantCode: 'tenant_an_nhien_02',
-    user: {
-      id: 'usr_employee_annhien_02',
-      email: 'nhanvien.annhien@gmail.com',
-      fullName: 'Phạm Thị Yến (Nhân viên Ba Đình)',
-      role: SystemRoles.STAFF,
-      tenantId: 'tenant_an_nhien_02',
-      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
-      branchId: 'b1000000-0000-0000-0000-000000000001',
-      phone: '0917778888',
-    },
-  },
-  {
-    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Ba Đình All-time 2 (Trần Minh Quân)',
-    username: '0914445555',
-    email: 'quan.tran@annhienmart.vn',
-    password: '123456',
-    tenantCode: 'tenant_an_nhien_02',
-    user: {
-      id: 'usr_employee_annhien_05',
-      email: 'quan.tran@annhienmart.vn',
-      fullName: 'Trần Minh Quân (Nhân viên Ba Đình)',
-      role: SystemRoles.STAFF,
-      tenantId: 'tenant_an_nhien_02',
-      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
-      branchId: 'b1000000-0000-0000-0000-000000000001',
-      phone: '0914445555',
-    },
-  },
-  {
-    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Ba Đình (Nguyễn Văn Minh)',
-    username: '0915556666',
-    email: 'minh.nguyen@annhienmart.vn',
-    password: '123456',
-    tenantCode: 'tenant_an_nhien_02',
-    user: {
-      id: 'usr_employee_annhien_04',
-      email: 'minh.nguyen@annhienmart.vn',
-      fullName: 'Nguyễn Văn Minh (Nhân viên bán hàng An Nhiên)',
-      role: 'STAFF' as const,
-      tenantId: 'tenant_an_nhien_02',
-      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
-      branchId: 'b1000000-0000-0000-0000-000000000001',
-      phone: '0915556666',
-    },
-  },
-  {
-    roleLabel: 'Nhân Viên Bán Hàng An Nhiên - Cầu Giấy (Lê Hoàng Nam)',
-    username: '0916667777',
-    email: 'nam.le@annhienmart.vn',
-    password: '123456',
-    tenantCode: 'tenant_an_nhien_02',
-    user: {
-      id: 'usr_employee_annhien_03',
-      email: 'nam.le@annhienmart.vn',
-      fullName: 'Lê Hoàng Nam (Nhân viên Cầu Giấy)',
-      role: 'STAFF' as const,
-      tenantId: 'tenant_an_nhien_02',
-      tenantName: 'Cửa Hàng Thực Phẩm Sạch An Nhiên (An Nhiên Mart)',
-      branchId: 'b2000000-0000-0000-0000-000000000001',
-      phone: '0916667777',
-    },
-  },
-];
-
 export const mapAuthProblemMessage = (
   code?: string,
   fallbackMessage?: string,
@@ -345,34 +94,12 @@ export const mapAuthProblemMessage = (
 
 export const authService = {
   /**
-   * Đăng nhập hệ thống (kết nối Backend API, tự động fallback dữ liệu demo nếu backend chưa sẵn sàng)
+   * Đăng nhập hệ thống qua Backend API
    */
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      let usernameOrEmail = credentials.email.trim();
-      let password = credentials.password;
-
-      // Hỗ trợ đăng nhập linh hoạt: map số điện thoại demo / email / username sang tài khoản seed backend
-      const phoneClean = usernameOrEmail.replace(/\s+/g, '');
-      if (
-        (phoneClean === '0901234567' || usernameOrEmail.toLowerCase() === 'admin@mtgrms.vn' || usernameOrEmail === 'admin') &&
-        (password === 'password123' || password === 'Admin@123')
-      ) {
-        usernameOrEmail = 'admin';
-        password = 'Admin@123';
-      } else if (
-        (phoneClean === '0909876543' || usernameOrEmail.toLowerCase() === 'manager01' || usernameOrEmail.toLowerCase() === 'hung.nguyen@mtmart.vn') &&
-        (password === 'password123' || password === 'Manager@123')
-      ) {
-        usernameOrEmail = 'manager01';
-        password = 'Manager@123';
-      } else if (
-        (phoneClean === '0912345678' || usernameOrEmail.toLowerCase() === 'cashier01' || usernameOrEmail.toLowerCase() === 'pos.cashier@mtgrms.vn') &&
-        (password === 'password123' || password === 'Cashier@123')
-      ) {
-        usernameOrEmail = 'cashier01';
-        password = 'Cashier@123';
-      }
+      const usernameOrEmail = credentials.email.trim();
+      const password = credentials.password;
 
       const response = await httpClient.post<any>('/auth/login', {
         usernameOrEmail,
@@ -390,28 +117,6 @@ export const authService = {
 
       throw new Error('Dữ liệu phản hồi xác thực không hợp lệ.');
     } catch (err: any) {
-      // Kiểm tra tài khoản demo nếu backend offline hoặc chưa có bản ghi mới
-      const phoneClean = credentials.email.trim().replace(/\s+/g, '');
-      const usernameOrEmail = credentials.email.trim();
-      const password = credentials.password;
-
-      const foundDemo = DEMO_ACCOUNTS.find(
-        (a) =>
-          (a.username === usernameOrEmail ||
-            a.email.toLowerCase() === usernameOrEmail.toLowerCase() ||
-            a.user.phone === phoneClean) &&
-          (a.password === password || password === '123456')
-      );
-
-      if (foundDemo) {
-        return {
-          accessToken: `mock_jwt_token_${foundDemo.user.id}`,
-          refreshToken: `mock_refresh_${foundDemo.user.id}`,
-          expiresIn: 7200,
-          user: foundDemo.user,
-        };
-      }
-
       if (err instanceof ApiError) {
         throw err;
       }
@@ -444,29 +149,8 @@ export const authService = {
    */
   async sendLoginOtp(credentials: LoginCredentials): Promise<SendLoginOtpResult> {
     try {
-      let usernameOrEmail = credentials.email.trim();
-      let password = credentials.password;
-
-      const phoneClean = usernameOrEmail.replace(/\s+/g, '');
-      if (
-        (phoneClean === '0901234567' || usernameOrEmail.toLowerCase() === 'admin@mtgrms.vn' || usernameOrEmail === 'admin') &&
-        (password === 'password123' || password === 'Admin@123')
-      ) {
-        usernameOrEmail = 'admin';
-        password = 'Admin@123';
-      } else if (
-        (phoneClean === '0909876543' || usernameOrEmail.toLowerCase() === 'manager01' || usernameOrEmail.toLowerCase() === 'hung.nguyen@mtmart.vn') &&
-        (password === 'password123' || password === 'Manager@123')
-      ) {
-        usernameOrEmail = 'manager01';
-        password = 'Manager@123';
-      } else if (
-        (phoneClean === '0912345678' || usernameOrEmail.toLowerCase() === 'cashier01' || usernameOrEmail.toLowerCase() === 'pos.cashier@mtgrms.vn') &&
-        (password === 'password123' || password === 'Cashier@123')
-      ) {
-        usernameOrEmail = 'cashier01';
-        password = 'Cashier@123';
-      }
+      const usernameOrEmail = credentials.email.trim();
+      const password = credentials.password;
 
       const response = await httpClient.post<any>('/auth/login/send-otp', {
         usernameOrEmail,

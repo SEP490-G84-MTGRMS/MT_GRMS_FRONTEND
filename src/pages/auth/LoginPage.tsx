@@ -15,6 +15,7 @@ import {
 import { authService } from "../../features/auth/authService";
 import { ApiError } from "../../features/auth/authTypes";
 import { LoginOtpModal } from "../../features/auth/components/LoginOtpModal";
+import { AdminToast } from "../../features/admin/components/common/AdminToast";
 import { useAuthStore } from "../../stores/useAuthStore";
 
 export const LoginPage: FC = () => {
@@ -23,8 +24,8 @@ export const LoginPage: FC = () => {
   const redirectUrl = searchParams.get("redirect");
   const setAuth = useAuthStore((state) => state.setAuth);
 
-  const [phoneOrEmail, setPhoneOrEmail] = useState("admin@mtgrms.vn");
-  const [password, setPassword] = useState("Admin@123");
+  const [phoneOrEmail, setPhoneOrEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -182,7 +183,7 @@ export const LoginPage: FC = () => {
       <h1 className="auth-card-heading">Đăng nhập</h1>
 
       {/* FORM ĐĂNG NHẬP */}
-      <form onSubmit={handleLoginSubmit} className="auth-form-fields">
+      <form onSubmit={handleLoginSubmit} className="auth-form-fields" autoComplete="off">
         {/* 1. Email / Tài khoản */}
         <div className="auth-field-block">
           <label
@@ -200,10 +201,10 @@ export const LoginPage: FC = () => {
               id="username-input"
               type="text"
               className="auth-styled-input"
-              placeholder="admin@mtgrms.vn hoặc số điện thoại"
+              placeholder="Nhập email hoặc tài khoản"
               value={phoneOrEmail}
               onChange={(e) => setPhoneOrEmail(e.target.value)}
-              autoComplete="username"
+              autoComplete="off"
               disabled={isLoading}
               required
               maxLength={254}
@@ -231,7 +232,7 @@ export const LoginPage: FC = () => {
               placeholder="Nhập mật khẩu..."
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
+              autoComplete="new-password"
               disabled={isLoading}
               required
               maxLength={128}
@@ -297,35 +298,6 @@ export const LoginPage: FC = () => {
           </div>
         )}
 
-        {/* Thông báo lỗi màu đỏ */}
-        {errorMessage && (
-          <div
-            className="auth-alert auth-alert-error"
-            role="alert"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "10px 14px",
-              backgroundColor: "#FEF2F2",
-              border: "1px solid #FCA5A5",
-              borderRadius: "10px",
-              color: "#DC2626",
-              fontSize: "13.5px",
-              fontWeight: 600,
-              margin: "6px 0 8px 0",
-              lineHeight: 1.4,
-            }}
-          >
-            <AlertCircle
-              size={17}
-              strokeWidth={2.2}
-              style={{ flexShrink: 0, color: "#DC2626" }}
-            />
-            <span style={{ color: "#DC2626" }}>{errorMessage}</span>
-          </div>
-        )}
-
         {/* Nút chính: ĐĂNG NHẬP VÀO HỆ THỐNG full pill */}
         <button
           type="submit"
@@ -355,6 +327,11 @@ export const LoginPage: FC = () => {
           <span>Vào Nhanh Quầy POS Thu Ngân</span>
         </button>
       </form>
+
+      <AdminToast
+        toast={errorMessage ? { id: "login-error", type: "error", message: errorMessage } : null}
+        onClose={() => setErrorMessage(null)}
+      />
 
       <LoginOtpModal
         isOpen={isOtpModalOpen}
