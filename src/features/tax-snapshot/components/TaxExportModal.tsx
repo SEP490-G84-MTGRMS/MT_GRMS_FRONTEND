@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FC } from 'react';
 import { X, FileSpreadsheet, Code, CheckCircle, Download } from 'lucide-react';
 import { formatTaxPeriodLabel, type TaxSnapshot } from '../types/taxSnapshot';
 import { taxSnapshotApi } from '../api/taxSnapshotApi';
+import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
 
 interface Props {
   snapshot: TaxSnapshot | null;
@@ -11,14 +12,20 @@ interface Props {
 }
 
 export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [exportType, setExportType] = useState<'excel' | 'xml'>('excel');
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [isDone, setIsDone] = useState<boolean>(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  useDialogFocusTrap(isOpen, dialogRef, onClose);
 
   if (!isOpen || !snapshot) return null;
 
   const periodTitle = formatTaxPeriodLabel(snapshot.periodType, snapshot.periodNumber ?? snapshot.quarter, snapshot.year);
+  const normalizedStatus = String(snapshot.status ?? '').toLowerCase();
+  const canExportXml =
+    snapshot.isIntegrityValid !== false &&
+    (normalizedStatus === 'finalized' || normalizedStatus === '1' || Boolean(snapshot.auditSignatureHash));
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -46,23 +53,7 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       } else {
-        const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<HSoThueDTu xmlns="http://kekhaithue.gdt.gov.vn/TKhai">
-  <ThongTinChung>
-    <MaTKhai>01_CNKD</MaTKhai>
-    <TenTKhai>Tờ khai thuế đối với hộ kinh doanh, cá nhân kinh doanh</TenTKhai>
-    <KyKKhai>${pCode}/${snapshot.year}</KyKKhai>
-    <NguoiNopThue>${snapshot.finalizedBy || 'Chủ hộ kinh doanh'}</NguoiNopThue>
-  </ThongTinChung>
-  <ChiTiet>
-    <DoanhThu>${snapshot.taxableRevenueInPeriod ?? snapshot.taxableRevenue ?? 0}</DoanhThu>
-    <ThueGTGT>${snapshot.vatAmount}</ThueGTGT>
-    <ThueTNCN>${snapshot.pitAmount}</ThueTNCN>
-    <TongThue>${snapshot.totalTaxAmount}</TongThue>
-    <MaChungTu>${snapshot.auditSignatureHash || snapshot.id}</MaChungTu>
-  </ChiTiet>
-</HSoThueDTu>`;
-        const blob = new Blob([xmlContent], { type: 'application/xml;charset=utf-8' });
+        const blob = await taxSnapshotApi.exportDeclarationXml(snapshot.id);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -81,8 +72,8 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
   };
 
   return (
-    <div className="tax-modal-backdrop" onClick={onClose}>
-      <div className="tax-modal-card" onClick={(e) => e.stopPropagation()}>
+    <div className="tax-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div ref={dialogRef} className="tax-modal-card" role="dialog" aria-modal="true" aria-label="Xuất hồ sơ khai thuế">
         <div className="tax-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(15, 118, 110, 0.1)', color: '#0F766E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -144,22 +135,27 @@ export const TaxExportModal: FC<Props> = ({ snapshot, isOpen, onClose }) => {
 
             <label
               className={'tax-radio-option ' + (exportType === 'xml' ? 'selected' : '')}
-              onClick={() => setExportType('xml')}
+              onClick={() => canExportXml && setExportType('xml')}
+              aria-disabled={!canExportXml}
+              style={!canExportXml ? { opacity: 0.58, cursor: 'not-allowed' } : undefined}
             >
               <input
                 type="radio"
                 name="exportType"
                 checked={exportType === 'xml'}
                 onChange={() => setExportType('xml')}
+                disabled={!canExportXml}
                 style={{ accentColor: '#0F766E', width: 16, height: 16 }}
               />
               <Code size={24} color="#4F46E5" />
               <div>
                 <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#0F172A' }}>
-                  File XML chuẩn TCT (Mẫu 01/CNKD)
+                  XML Mẫu 01/CNKD từ bản chốt
                 </div>
                 <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: 2 }}>
-                  Dùng nộp tờ khai trực tiếp lên cổng Thuedientu.gdt.gov.vn
+                  {canExportXml
+                    ? 'Máy chủ tạo từ snapshot đã chốt và kiểm tra chữ ký HMAC. Cần đối chiếu XSD của cổng thuế trước khi nộp.'
+                    : 'Chỉ khả dụng sau khi kỳ được chốt thành công và chữ ký toàn vẹn còn hợp lệ.'}
                 </div>
               </div>
             </label>

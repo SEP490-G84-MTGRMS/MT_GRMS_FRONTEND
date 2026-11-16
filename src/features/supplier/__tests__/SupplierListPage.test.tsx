@@ -12,6 +12,7 @@ vi.mock('../api/supplierApi', () => ({
     getSuppliers: vi.fn(),
     getSupplierById: vi.fn(),
     getSupplierTransactions: vi.fn().mockResolvedValue([]),
+    getReturnPolicy: vi.fn().mockResolvedValue(null),
     getDeliveryConfig: vi.fn().mockResolvedValue(null),
     createSupplier: vi.fn(),
     updateBasicSupplier: vi.fn(),

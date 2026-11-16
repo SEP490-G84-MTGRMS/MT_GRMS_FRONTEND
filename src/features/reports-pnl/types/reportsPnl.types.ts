@@ -8,6 +8,7 @@ export type PresetPeriod =
   | 'THIS_MONTH'
   | 'LAST_MONTH'
   | 'THIS_QUARTER'
+  | 'THIS_YEAR'
   | 'CUSTOM';
 
 export interface PnlFilterParams {

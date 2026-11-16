@@ -30,6 +30,10 @@ export interface BackendCashbookEntryResponse {
   auditHash: string;
   description: string;
   occurredAtUtc: string;
+  categoryCode?: string;
+  financialNature?: string;
+  taxTreatment?: LedgerTransaction['taxTreatment'];
+  taxTreatmentReason?: string | null;
 }
 
 export interface BackendCashAccountResponse {
@@ -220,6 +224,46 @@ const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
     createdBy: 'Quản lý Q7',
     createdAt: '2026-10-11T21:00:00Z',
   },
+  {
+    id: 'TX-006',
+    transactionCode: 'PT-20261114-001',
+    accountId: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
+    accountName: 'Két tiền mặt quầy Q1',
+    branchId: 'BR-01',
+    transactionType: 'RECEIPT',
+    category: 'Doanh thu bán lẻ POS',
+    amount: 2450000,
+    balanceAfter: 12500000,
+    counterpartyType: 'CUSTOMER',
+    counterpartyName: 'Khách mua tại quầy #1102',
+    description: 'Thanh toán tiền mặt đơn hàng POS #1102',
+    referenceDocType: 'POS_ORDER',
+    referenceDocId: 'ORD-1102',
+    sourceModuleName: 'POS_RETAIL',
+    isAutomated: true,
+    createdBy: 'Thu ngân Ca sáng',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'TX-007',
+    transactionCode: 'PC-20261114-002',
+    accountId: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
+    accountName: 'Két tiền mặt quầy Q1',
+    branchId: 'BR-01',
+    transactionType: 'PAYMENT',
+    category: 'Chi phí vận hành',
+    amount: 150000,
+    balanceAfter: 12350000,
+    counterpartyType: 'SUPPLIER',
+    counterpartyName: 'Văn phòng phẩm An Phát',
+    description: 'Mua giấy in hóa đơn nhiệt cho quầy thu ngân',
+    referenceDocType: 'SERVICE_EXPENSE',
+    referenceDocId: 'EXP-1105',
+    sourceModuleName: 'SERVICE_OPEX',
+    isAutomated: false,
+    createdBy: 'Cửa hàng trưởng',
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+  },
 ];
 
 const STORAGE_KEYS = {
@@ -271,13 +315,26 @@ function mapBackendEntryToLedgerTransaction(
     entry.sourceType === 'DEBT_REPAYMENT' ||
     Boolean(entry.description?.includes('Thu nợ'));
   const isPos = entry.sourceType === 'POS' || entry.sourceType === 'POS_SALE';
+  const isTaxPayment = entry.sourceType === 'TAX_PAYMENT';
   const isInternalTransfer =
     entry.sourceType === 'CASH_DROP' ||
     entry.sourceType === 'BANK_DEPOSIT' ||
     entry.sourceType === 'INTERNAL_TRANSFER';
 
+  const categoryLabels: Record<string, string> = {
+    OWNER_DEPOSIT: 'Chủ nạp thêm vốn',
+    OFF_POS_SALE: 'Thu bán hàng ngoài POS',
+    INTERNAL_REIMBURSEMENT: 'Hoàn ứng nội bộ',
+    BANK_INTEREST: 'Thu lãi tiền gửi ngân hàng',
+    OTHER_INCOME: 'Thu nhập khác',
+    OWNER_DRAW: 'Rút vốn chủ',
+    TAX_PAYMENT: 'Nộp thuế nhà nước',
+    ASSET_PURCHASE: 'Mua sắm trang thiết bị / Tài sản',
+    OTHER_PAYMENT: 'Chi khác ngoài hóa đơn',
+  };
   const defaultCategory =
-    isPos
+    (entry.categoryCode && categoryLabels[entry.categoryCode]) ||
+    (isPos
       ? 'Doanh thu bán hàng POS'
       : isExpense
       ? 'Chi phí vận hành'
@@ -291,7 +348,7 @@ function mapBackendEntryToLedgerTransaction(
       ? 'Kiểm kê chênh lệch két'
       : isCompensating
       ? 'Bút toán đảo hủy giao dịch'
-      : 'Giao dịch thu chi';
+      : 'Giao dịch thu chi');
 
   const counterpartyType =
     isPos || isDebt
@@ -314,6 +371,8 @@ function mapBackendEntryToLedgerTransaction(
     ? 'SERVICE_OPEX'
     : isDebt
     ? 'CRM_DEBT'
+    : isTaxPayment
+    ? 'TAX_SNAPSHOT'
     : isInternalTransfer
     ? 'INTERNAL_TRANSFER'
     : 'MANUAL';
@@ -324,6 +383,8 @@ function mapBackendEntryToLedgerTransaction(
     ? 'SERVICE_EXPENSE'
     : isDebt
     ? 'DEBT_PAYMENT'
+    : isTaxPayment
+    ? 'TAX_PAYMENT'
     : isInternalTransfer
     ? 'INTERNAL_TRANSFER'
     : isAdjustment
@@ -348,6 +409,10 @@ function mapBackendEntryToLedgerTransaction(
     sourceId: entry.sourceId,
     sourceModuleName,
     sourceType: entry.sourceType,
+    categoryCode: entry.categoryCode,
+    financialNature: entry.financialNature,
+    taxTreatment: entry.taxTreatment,
+    taxTreatmentReason: entry.taxTreatmentReason || undefined,
     isAutomated: entry.sourceType !== 'MANUAL',
     isCompensating,
     originalEntryId: isCompensating ? entry.sourceId || undefined : undefined,
@@ -461,6 +526,8 @@ export const cashbookService = {
         counterpartyType: 'INTERNAL',
         counterpartyName: transit.fromAccountName,
         description: `[ĐÃ NHẬN ĐỦ KÉT SẮT] Bởi ${performedBy} từ ${transit.fromAccountName} (Mã chuyển: ${transit.transferCode})`,
+        categoryCode: 'INTERNAL_REIMBURSEMENT',
+        taxTreatment: 'NonTaxableReceipt',
         referenceDocType: 'CASH_TRANSIT',
         referenceDocId: transit.id,
         sourceModuleName: 'INTERNAL_TRANSFER',
@@ -527,6 +594,31 @@ export const cashbookService = {
       );
     }
 
+    if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
+      const cq = params.counterpartyQuery.trim().toLowerCase();
+      filtered = filtered.filter((tx) => tx.counterpartyName?.toLowerCase().includes(cq));
+    }
+
+    if (params.status && params.status !== 'ALL') {
+      if (params.status === 'VOIDED') {
+        filtered = filtered.filter((tx) => tx.isVoided);
+      } else if (params.status === 'COMPENSATING') {
+        filtered = filtered.filter((tx) => tx.isCompensating);
+      } else if (params.status === 'ACTIVE') {
+        filtered = filtered.filter((tx) => !tx.isVoided && !tx.isCompensating);
+      }
+    }
+
+    if (params.startDate) {
+      const startStr = params.startDate.slice(0, 10);
+      filtered = filtered.filter((tx) => tx.createdAt.slice(0, 10) >= startStr);
+    }
+
+    if (params.endDate) {
+      const endStr = params.endDate.slice(0, 10);
+      filtered = filtered.filter((tx) => tx.createdAt.slice(0, 10) <= endStr);
+    }
+
     filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const totalItems = filtered.length;
@@ -554,9 +646,14 @@ export const cashbookService = {
       if (params.branchId && params.branchId !== 'ALL') queryParams.branchId = params.branchId;
       if (params.startDate) queryParams.fromDate = params.startDate;
       if (params.endDate) queryParams.toDate = params.endDate;
+      if (params.transactionType && params.transactionType !== 'ALL') {
+        queryParams.entryType = params.transactionType;
+      }
       if (params.sourceType) queryParams.sourceType = params.sourceType;
       if (params.searchQuery && params.searchQuery.trim()) {
         queryParams.keyword = params.searchQuery.trim();
+      } else if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
+        queryParams.keyword = params.counterpartyQuery.trim();
       }
 
       const res = await financeHttpClient.get<{ data: BackendCashbookEntryResponse[] }>('/cashbook/entries', {
@@ -605,6 +702,23 @@ export const cashbookService = {
         );
       }
 
+      if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
+        const cq = params.counterpartyQuery.trim().toLowerCase();
+        mappedItems = mappedItems.filter((tx) =>
+          tx.counterpartyName?.toLowerCase().includes(cq)
+        );
+      }
+
+      if (params.status && params.status !== 'ALL') {
+        if (params.status === 'VOIDED') {
+          mappedItems = mappedItems.filter((tx) => tx.isVoided);
+        } else if (params.status === 'COMPENSATING') {
+          mappedItems = mappedItems.filter((tx) => tx.isCompensating);
+        } else if (params.status === 'ACTIVE') {
+          mappedItems = mappedItems.filter((tx) => !tx.isVoided && !tx.isCompensating);
+        }
+      }
+
       return {
         items: mappedItems,
         totalItems: mappedItems.length,
@@ -631,6 +745,9 @@ export const cashbookService = {
           accountId: dto.accountId,
           amount: dto.amount,
           category: dto.category,
+          categoryCode: dto.categoryCode,
+          taxTreatment: dto.taxTreatment,
+          taxTreatmentReason: dto.taxTreatmentReason,
           description: dto.description,
           referenceCode: dto.referenceDocId,
         },
@@ -666,6 +783,9 @@ export const cashbookService = {
       branchId: targetAccount.branchId,
       transactionType: 'RECEIPT',
       category: dto.category,
+      categoryCode: dto.categoryCode,
+      taxTreatment: dto.taxTreatment,
+      taxTreatmentReason: dto.taxTreatmentReason,
       amount: dto.amount,
       balanceAfter: newBalance,
       counterpartyType: dto.counterpartyType,
@@ -696,12 +816,34 @@ export const cashbookService = {
 
     if (!isMockMode()) {
       const idempotencyKey = generateUuidV7();
+      if (dto.categoryCode === 'TAX_PAYMENT') {
+        if (!dto.referenceDocId?.trim()) {
+          throw new Error('Nộp thuế bắt buộc có số giấy nộp tiền hoặc mã giao dịch ngân hàng');
+        }
+        const taxRes = await financeHttpClient.post<{ data: { entry: BackendCashbookEntryResponse } }>(
+          '/cashbook/tax-payments',
+          {
+            sourceAccountId: dto.accountId,
+            amount: dto.amount,
+            beneficiaryName: dto.counterpartyName,
+            paymentReference: dto.referenceDocId.trim(),
+            evidenceAttachmentUrl: null,
+            householdTaxSnapshotId: null,
+            note: dto.description,
+          },
+          { headers: { 'Idempotency-Key': idempotencyKey } }
+        );
+        return mapBackendEntryToLedgerTransaction(taxRes.data.data.entry);
+      }
       const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
         '/cashbook/payments',
         {
           accountId: dto.accountId,
           amount: dto.amount,
           category: dto.category,
+          categoryCode: dto.categoryCode,
+          taxTreatment: dto.taxTreatment,
+          taxTreatmentReason: dto.taxTreatmentReason,
           description: dto.description,
           referenceCode: dto.referenceDocId,
         },
@@ -745,6 +887,9 @@ export const cashbookService = {
       branchId: targetAccount.branchId,
       transactionType: 'PAYMENT',
       category: dto.category,
+      categoryCode: dto.categoryCode,
+      taxTreatment: dto.taxTreatment,
+      taxTreatmentReason: dto.taxTreatmentReason,
       amount: dto.amount,
       balanceAfter: newBalance,
       counterpartyType: dto.counterpartyType,
@@ -845,7 +990,7 @@ export const cashbookService = {
       branchId: targetAccount.branchId,
       transactionType: compType,
       category: `Gạch bỏ [${origTx.transactionCode}]`,
-      amount: origTx.amount,
+      amount: compType === 'RECEIPT' ? Math.abs(origTx.amount) : -Math.abs(origTx.amount),
       balanceAfter: targetAccount.currentBalance,
       counterpartyType: origTx.counterpartyType,
       counterpartyName: origTx.counterpartyName,

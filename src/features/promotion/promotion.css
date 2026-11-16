@@ -361,6 +361,8 @@
   padding: 10px 12px;
   border-bottom: 1px solid #cbd5e1;
   white-space: nowrap;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .promotion-table td {
@@ -369,6 +371,8 @@
   color: #1e293b;
   font-size: 12.5px;
   vertical-align: middle;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .promotion-table tbody tr:hover {
@@ -383,10 +387,18 @@
 .promo-code-text {
   font-family: var(--font-mono, monospace);
   font-weight: 700;
-  font-size: 0.85rem;
-  color: #1e293b;
+  font-size: 0.82rem;
+  color: #0f766e;
+  background-color: #f0fdfa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #ccfbf1;
   white-space: nowrap;
   letter-spacing: 0.02em;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .promo-title-box {

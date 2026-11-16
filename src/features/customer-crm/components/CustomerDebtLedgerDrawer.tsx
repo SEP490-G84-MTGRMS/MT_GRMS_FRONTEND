@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { CustomerDto, CustomerDebtLedgerDto } from '../types/customer.types';
 import { customerApi } from '../api/customerApi';
-import { sanitizeCustomerText, normalizeDebtLimit } from '../utils/customerValidation';
+import { sanitizeCustomerText } from '../utils/customerValidation';
 
 interface CustomerDebtLedgerDrawerProps {
   customer: CustomerDto | null;
@@ -69,9 +69,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
     .reduce((sum, l) => sum + l.amount, 0);
 
   const safeFullName = sanitizeCustomerText(customer.fullName, 'Khách hàng');
-  const safeDebtLimit = normalizeDebtLimit(customer.debtLimit);
   const hasDebt = customer.currentDebtAR > 0;
-  const isOverLimit = customer.currentDebtAR > safeDebtLimit && safeDebtLimit > 0;
 
   return (
     <div className="customer-drawer-backdrop" onClick={onClose}>
@@ -99,9 +97,6 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main, #111827)' }}>
                   Sổ Biến Động Công Nợ
                 </h3>
-                <span className={'tier-badge tier-badge-' + customer.membershipTier.toLowerCase()}>
-                  {customer.membershipTier}
-                </span>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
                 Khách hàng: <strong>{safeFullName}</strong> ({customer.phoneNumber})
@@ -122,7 +117,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                 background: '#ffffff',
                 padding: '12px 14px',
                 borderRadius: '12px',
-                border: isOverLimit ? '1px solid #FECACA' : '1px solid #E2E8F0',
+                border: '1px solid #E2E8F0',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
               }}
             >
@@ -132,17 +127,12 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                   fontSize: '1.05rem',
                   fontWeight: 800,
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: isOverLimit ? '#DC2626' : hasDebt ? '#D97706' : '#059669',
+                  color: hasDebt ? '#D97706' : '#059669',
                   marginTop: '4px',
                 }}
               >
                 {formatCurrency(customer.currentDebtAR)}
               </div>
-              {safeDebtLimit > 0 && (
-                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px' }}>
-                  Hạn mức: {formatCurrency(safeDebtLimit)}
-                </div>
-              )}
             </div>
 
             {/* Tổng phát sinh tăng */}

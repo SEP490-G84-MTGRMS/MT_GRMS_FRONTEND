@@ -1,7 +1,7 @@
 # Tổng hợp logic nghiệp vụ — Quản lý tồn kho & Kiểm kê (MT-GRMS)
 
-> **Ngày cập nhật:** 2026-11-15  
-> **Phạm vi:** đúng code hiện tại (Backend + Frontend), không OpenSpec/SEP.  
+> **Ngày cập nhật:** 2026-11-15
+> **Phạm vi:** đúng code hiện tại (Backend + Frontend), không OpenSpec/SEP.
 > **Nguồn sự thật tồn:** bảng `BranchStocks` (chi nhánh × sản phẩm × lô).
 
 ---
@@ -190,7 +190,7 @@ varianceQty = actual − systemQty
 | Lưu nháp | `DRAFT` | **Không đổi** |
 | Gửi duyệt (hoặc lưu + autoSubmit) | `PENDING_APPROVAL` | **Không đổi** (đã bỏ quarantine lúc submit) |
 
-Employee: BE **ép** `BranchId` từ token; không tin BranchId FE.  
+Employee: BE **ép** `BranchId` từ token; không tin BranchId FE.
 Update dòng: match theo `StocktakeLine.Id` hoặc `BranchStockId` — **không** fallback `ProductId` (tránh ghi đè nhầm khi 1 SP nhiều lô).
 
 ### 7.4. Owner duyệt (`/stocktakes/:id`)

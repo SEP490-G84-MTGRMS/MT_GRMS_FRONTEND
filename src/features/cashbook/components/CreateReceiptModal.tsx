@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { CashAccount, CreateReceiptDTO, CounterpartyType } from '../types/cashbook.types';
+import { ArrowDownToLine, Info, X } from 'lucide-react';
+import type { CashAccount, CashbookTaxTreatment, CreateReceiptDTO, CounterpartyType } from '../types/cashbook.types';
 
 interface CreateReceiptModalProps {
   isOpen: boolean;
@@ -10,6 +11,15 @@ interface CreateReceiptModalProps {
   onSubmit: (dto: CreateReceiptDTO) => Promise<void>;
   initialCategory?: string;
 }
+
+const MAX_DESCRIPTION_LENGTH = 255;
+const RECEIPT_CATEGORIES = [
+  { code: 'OWNER_DEPOSIT', label: 'Chủ nạp thêm vốn', treatment: 'NonTaxableReceipt' as const },
+  { code: 'OFF_POS_SALE', label: 'Thu bán hàng ngoài POS', treatment: 'TaxableRevenue' as const },
+  { code: 'INTERNAL_REIMBURSEMENT', label: 'Hoàn ứng nội bộ', treatment: 'NonTaxableReceipt' as const },
+  { code: 'BANK_INTEREST', label: 'Thu lãi tiền gửi ngân hàng', treatment: 'TaxableRevenue' as const },
+  { code: 'OTHER_INCOME', label: 'Thu nhập khác', treatment: null },
+];
 
 export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
   isOpen,
@@ -21,7 +31,9 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
   const navigate = useNavigate();
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [amountStr, setAmountStr] = useState('');
-  const [category, setCategory] = useState(initialCategory || 'Chủ nạp thêm vốn (Capital Contribution)');
+  const [category, setCategory] = useState(initialCategory || RECEIPT_CATEGORIES[0].label);
+  const [taxTreatment, setTaxTreatment] = useState<CashbookTaxTreatment>('NonTaxableReceipt');
+  const [taxTreatmentReason, setTaxTreatmentReason] = useState('');
   const [counterpartyType, setCounterpartyType] = useState<CounterpartyType>('CUSTOMER');
   const [counterpartyName, setCounterpartyName] = useState('');
   const [description, setDescription] = useState('');
@@ -30,6 +42,9 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
 
   const applyCategoryDefaults = (cat: string) => {
     setCategory(cat);
+    const option = RECEIPT_CATEGORIES.find((item) => item.label === cat);
+    setTaxTreatment(option?.treatment || 'ReviewRequired');
+    setTaxTreatmentReason('');
     if (cat.includes('nạp thêm vốn')) {
       setCounterpartyType('OTHER');
       setCounterpartyName('Chủ hộ kinh doanh');
@@ -55,7 +70,9 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
     if (isOpen) {
       setAmountStr('');
       setErrorMsg('');
-      const targetCat = initialCategory || 'Chủ nạp thêm vốn (Capital Contribution)';
+      const targetCat = RECEIPT_CATEGORIES.some((item) => item.label === initialCategory)
+        ? initialCategory!
+        : RECEIPT_CATEGORIES[0].label;
       applyCategoryDefaults(targetCat);
     }
   }, [isOpen, initialCategory, accounts]);
@@ -63,13 +80,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
   if (!isOpen) return null;
 
   // Single-source Debt Collection (FE-08) rule: Excludes "Thu nợ khách hàng" to avoid off-book discrepancy
-  const categories = [
-    'Chủ nạp thêm vốn (Capital Contribution)',
-    'Thu bán hàng ngoài POS',
-    'Hoàn ứng nội bộ',
-    'Thu lãi tiền gửi ngân hàng',
-    'Thu nhập khác',
-  ];
+  const selectedCategory = RECEIPT_CATEGORIES.find((item) => item.label === category)!;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -86,6 +97,19 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
       return;
     }
 
+    if (description.trim().length > MAX_DESCRIPTION_LENGTH) {
+      setErrorMsg(`Diễn giải không được vượt quá ${MAX_DESCRIPTION_LENGTH} ký tự`);
+      return;
+    }
+    if (selectedCategory.code === 'OTHER_INCOME' && taxTreatment === 'ReviewRequired') {
+      setErrorMsg('Vui lòng chọn cách xử lý thuế cho khoản thu nhập khác');
+      return;
+    }
+    if (taxTreatment === 'NonTaxableReceipt' && selectedCategory.code === 'OTHER_INCOME' && !taxTreatmentReason.trim()) {
+      setErrorMsg('Khoản thu không tính thuế bắt buộc có lý do');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       await onSubmit({
@@ -95,6 +119,9 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
         counterpartyType,
         counterpartyName: counterpartyName.trim(),
         description: description.trim() || 'Thu tiền vào quỹ',
+        categoryCode: selectedCategory.code,
+        taxTreatment,
+        taxTreatmentReason: taxTreatmentReason.trim() || undefined,
       });
       onClose();
     } catch (err: unknown) {
@@ -107,61 +134,18 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
   return (
     <div className="cb-modal-backdrop" onClick={onClose}>
       <div className="cb-modal-container" onClick={(e) => e.stopPropagation()}>
-        <div className="cb-modal-header">
-          <h2 className="cb-modal-title">
-            <span>🟢</span> Lập Phiếu Thu Tiền
-          </h2>
-          <button type="button" className="cb-modal-close-btn" onClick={onClose}>
-            ✕
+        <div className="cb-modal-header cb-modal-header--receipt">
+          <div className="cb-modal-heading">
+            <span className="cb-modal-icon"><ArrowDownToLine size={20} /></span>
+            <div><h2 className="cb-modal-title">Lập phiếu thu</h2><p className="cb-modal-subtitle">Ghi nhận tiền vào quỹ hoặc tài khoản</p></div>
+          </div>
+          <button type="button" className="cb-modal-close-btn" onClick={onClose} aria-label="Đóng">
+            <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="cb-modal-body">
-            {/* Guide to Single-Source Debt Collection Module (FE-08) */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-                padding: '10px 14px',
-                borderRadius: 12,
-                backgroundColor: '#EFF6FF',
-                border: '1px solid #BFDBFE',
-                color: '#1E40AF',
-                fontSize: '12px',
-              }}
-            >
-              <div>
-                <strong>💡 Bạn muốn thu nợ khách hàng?</strong>
-                <div style={{ color: '#1E3A8A', marginTop: 2 }}>
-                  Để cấn trừ công nợ tự động theo chuẩn 1 nguồn, vui lòng thực hiện tại Phân hệ Công nợ (FE-08), tránh thu lệch ngoài sổ.
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  navigate('/store-owner/customers');
-                }}
-                style={{
-                  flexShrink: 0,
-                  backgroundColor: '#2563EB',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '6px 12px',
-                  fontWeight: 700,
-                  fontSize: '11.5px',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Mở Sổ nợ FE-08 →
-              </button>
-            </div>
-
             {errorMsg && (
               <div className="cb-overdraft-alert">
                 <span>⚠️</span> {errorMsg}
@@ -203,16 +187,21 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
                 value={category}
                 onChange={(e) => applyCategoryDefaults(e.target.value)}
               >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {RECEIPT_CATEGORIES.map((item) => (
+                  <option key={item.code} value={item.label}>
+                    {item.label}
                   </option>
                 ))}
               </select>
-              {category.includes('nạp thêm vốn') && (
-                <div style={{ marginTop: 6, padding: '8px 12px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: 8, fontSize: '12px', color: '#065F46' }}>
-                  💡 <strong>Bổ sung vốn chủ:</strong> Tăng số dư quỹ tiền mặt/ngân hàng, được hệ thống cách ly 100% khỏi Doanh thu tính thuế.
+              {selectedCategory.code === 'OTHER_INCOME' ? (
+                <div className="cb-tax-choice" role="group" aria-label="Xử lý thuế">
+                  <span className="cb-tax-choice__label">Xử lý thuế *</span>
+                  <label><input type="radio" name="receipt-tax" checked={taxTreatment === 'TaxableRevenue'} onChange={() => setTaxTreatment('TaxableRevenue')} /> Tính vào doanh thu chịu thuế</label>
+                  <label><input type="radio" name="receipt-tax" checked={taxTreatment === 'NonTaxableReceipt'} onChange={() => setTaxTreatment('NonTaxableReceipt')} /> Không tính thuế</label>
+                  {taxTreatment === 'NonTaxableReceipt' && <input className="cb-form-input" value={taxTreatmentReason} maxLength={255} onChange={(e) => setTaxTreatmentReason(e.target.value)} placeholder="Lý do: tiền vay, thu hộ, hoàn tiền..." />}
                 </div>
+              ) : (
+                <p className="cb-field-hint"><Info size={13} /> {taxTreatment === 'TaxableRevenue' ? 'Khoản thu được tính vào doanh thu chịu thuế.' : 'Khoản thu không tính vào doanh thu chịu thuế.'}</p>
               )}
             </div>
 
@@ -241,28 +230,34 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
               </div>
             </div>
 
+            <button type="button" className="cb-context-link" onClick={() => { onClose(); navigate('/store-owner/customers'); }}>
+              Thu nợ khách hàng? Thực hiện tại Sổ công nợ →
+            </button>
+
             <div className="cb-form-group">
               <label className="cb-form-label">Diễn giải lý do thu</label>
               <textarea
                 className="cb-form-textarea"
                 rows={2}
+                maxLength={MAX_DESCRIPTION_LENGTH}
                 placeholder="Ghi chú nội dung nộp tiền..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+              <span className="cb-character-count">{description.length}/{MAX_DESCRIPTION_LENGTH}</span>
             </div>
           </div>
 
           <div className="cb-modal-footer">
             <button type="button" className="cb-btn cb-btn-outline" onClick={onClose}>
-              Hủy bỏ
+              Hủy
             </button>
             <button
               type="submit"
               className="cb-btn cb-btn-receipt"
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Đang lưu...' : '✓ Lưu Phiếu Thu'}
+              {isSubmitting ? 'Đang lưu...' : 'Lưu phiếu thu'}
             </button>
           </div>
         </form>

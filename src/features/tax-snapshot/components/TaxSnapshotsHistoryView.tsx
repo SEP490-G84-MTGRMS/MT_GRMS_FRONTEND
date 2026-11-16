@@ -106,7 +106,7 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
             style={{ fontSize: '0.82rem', padding: '8px 16px', background: '#0F766E' }}
           >
             <Plus size={15} />
-            <span>Chốt kỳ sổ mới (3 bước)</span>
+            <span>Chốt kỳ sổ mới</span>
           </button>
         )}
       </div>
@@ -118,7 +118,7 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
             Chưa có kỳ tính thuế nào được chốt
           </h3>
           <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: 6 }}>
-            Bấm "Chốt kỳ sổ mới (3 bước)" để niêm phong kỳ tính thuế với chữ ký số bảo mật HMAC server-side.
+            Bấm "Chốt kỳ sổ mới" để niêm phong kỳ tính thuế với chữ ký số bảo mật HMAC server-side.
           </p>
         </div>
       ) : (

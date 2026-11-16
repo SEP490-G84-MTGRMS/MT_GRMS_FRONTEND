@@ -53,6 +53,7 @@ export interface CustomerDto {
   createdAt: string;
   invoices?: CustomerInvoiceSummary[];
   payments?: CustomerDebtPaymentSummary[];
+  branchId?: string;
 }
 
 /**

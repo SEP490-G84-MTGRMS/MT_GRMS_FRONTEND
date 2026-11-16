@@ -9,3 +9,4 @@ export * from './pages/TransferListPage';
 export * from './pages/CreateTransferPage';
 export * from './pages/ReceiveTransferPage';
 export * from './pages/TransferDetailPage';
+export * from './pages/CreateUrgentTransferRequestPage';

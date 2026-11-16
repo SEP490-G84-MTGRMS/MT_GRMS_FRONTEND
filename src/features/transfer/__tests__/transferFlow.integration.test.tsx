@@ -56,7 +56,7 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
       createdBy: 'Nguyễn Quản Lý',
       transferDate: '14/11/2026 08:30:00',
       expectedDeliveryDate: '15/11/2026',
-      status: 'In-Transit',
+      status: 'InTransit',
       totalAmount: 540000,
       note: 'Chuyển hàng định kỳ',
       items: [
@@ -152,6 +152,56 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
       expect(screen.getAllByText('Phiếu tạm').length).toBeGreaterThan(0);
     });
 
+    it('TC-INT-01b: Filters transfers by note keyword and resets filters correctly', async () => {
+      render(
+        <MemoryRouter>
+          <TransferListPage />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('TRF-20261114-001')).toBeInTheDocument();
+        expect(screen.getByText('TRF-20261114-002')).toBeInTheDocument();
+      });
+
+      // Search by note "mì gói"
+      const searchInput = screen.getByPlaceholderText('Mã phiếu, ghi chú...');
+      fireEvent.change(searchInput, { target: { value: 'mì gói' } });
+      const searchBtn = screen.getByText('Tìm kiếm');
+      fireEvent.click(searchBtn);
+
+      await waitFor(() => {
+        expect(screen.queryByText('TRF-20261114-001')).not.toBeInTheDocument();
+        expect(screen.getByText('TRF-20261114-002')).toBeInTheDocument();
+      });
+
+      // Click Reset
+      const resetBtn = screen.getByText('Đặt lại');
+      fireEvent.click(resetBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText('TRF-20261114-001')).toBeInTheDocument();
+        expect(screen.getByText('TRF-20261114-002')).toBeInTheDocument();
+      });
+    });
+
+    it('TC-INT-01c: Parses deep link query parameters on mount', async () => {
+      render(
+        <MemoryRouter initialEntries={['/store-owner/transfers?search=TRF-20261114-001&status=InTransit']}>
+          <TransferListPage />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(transferService.list).toHaveBeenCalledWith(
+          expect.objectContaining({
+            search: 'TRF-20261114-001',
+            statuses: ['InTransit'],
+          })
+        );
+      });
+    });
+
     it('TC-INT-02: Clicking on transfer row opens TransferDetailModal with correct details', async () => {
       render(
         <MemoryRouter>
@@ -225,7 +275,7 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
     it('TC-INT-04: Loads In-Transit transfer details and submits receive confirmation', async () => {
       vi.mocked(transferService.receive).mockResolvedValue({
         ...mockTransfers[0],
-        status: 'Received',
+        status: 'Completed',
       });
 
       render(
@@ -243,6 +293,20 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
 
       expect(screen.getByText('TRF-20261114-001')).toBeInTheDocument();
       expect(screen.getByText('Bia Heineken Sleek')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('SL nhận Bia Heineken Sleek'), { target: { value: '29' } });
+      fireEvent.change(screen.getByLabelText('SL hỏng Bia Heineken Sleek'), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText('Lý do chênh lệch Bia Heineken Sleek'), { target: { value: 'Móp khi vận chuyển' } });
+      fireEvent.change(screen.getByPlaceholderText('Nhập lý do chênh lệch nhận hàng...'), { target: { value: 'Kiểm nhận có 1 lon hỏng' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Nhận hàng' }));
+
+      await waitFor(() => {
+        expect(transferService.receive).toHaveBeenCalledWith(
+          'trf-001',
+          [expect.objectContaining({ receivedQty: 29, damagedQty: 1, note: 'Móp khi vận chuyển' })],
+          'Kiểm nhận có 1 lon hỏng'
+        );
+      });
     });
   });
 });

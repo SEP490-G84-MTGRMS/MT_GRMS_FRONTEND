@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ExcelJS from 'exceljs';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import {
@@ -9,52 +9,103 @@ import {
   Truck,
   CheckCircle,
   FileText,
+  RotateCcw,
+  Loader2,
 } from 'lucide-react';
 import type { Branch, TransferOrder, TransferStatus } from '../types';
 import { transferService } from '../services/transferService';
-import { TransferFilterSidebar } from '../components/TransferFilterSidebar';
 import { TransferDetailModal } from '../components/TransferDetailModal';
 import { TablePagination } from '../../../components/common';
 import { AdminToast, type ToastState } from '../../admin/components';
+import '../../../styles/so-list-page.css';
+import '../../purchase-order/purchase-order.css';
 import '../transfer.css';
 
 export const TransferListPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const querySearch =
+    searchParams.get('search') || searchParams.get('code') || searchParams.get('transferCode') || '';
+  const queryStatus = searchParams.get('status') || 'ALL';
+  const queryFromBranch = searchParams.get('fromBranchId') || '';
+  const queryToBranch = searchParams.get('toBranchId') || '';
+  const queryDetailId = searchParams.get('id') || searchParams.get('detailId');
 
   // State
   const [transfers, setTransfers] = useState<TransferOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [totalItems, setTotalItems] = useState(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [totalItems, setTotalItems] = useState<number>(0);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   // User role & current branch context (BR-SEC-02 simulation)
   const user = useAuthStore((state) => state.user);
-  const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
+  const isStoreOwner = user?.role === 'STORE_OWNER';
+  const transferBasePath = isStoreOwner ? '/store-owner/transfers' : '/employee/transfers';
 
   // Filters
-  const [searchCode, setSearchCode] = useState('');
-  const [fromBranchId, setFromBranchId] = useState('');
-  const [toBranchId, setToBranchId] = useState('');
-  const [selectedStatuses, setSelectedStatuses] = useState<TransferStatus[]>([
-    'Draft',
-    'In-Transit',
-    'Received',
-    'Cancelled',
-  ]);
+  const [searchInput, setSearchInput] = useState<string>(() => querySearch);
+  const [appliedSearch, setAppliedSearch] = useState<string>(() => querySearch);
+  const [fromBranchId, setFromBranchId] = useState<string>(() => queryFromBranch);
+  const [toBranchId, setToBranchId] = useState<string>(() => queryToBranch);
+  const [selectedStatuses, setSelectedStatuses] = useState<TransferStatus[]>(() => {
+    if (queryStatus === 'Draft' || queryStatus === 'Pending' || queryStatus === 'Cancelled') {
+      return [queryStatus];
+    }
+    if (queryStatus === 'InTransit') {
+      return ['InTransit'];
+    }
+    if (queryStatus === 'Completed') {
+      return ['Completed'];
+    }
+    return ['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled'];
+  });
+  const [statusDropdown, setStatusDropdown] = useState<string>(() => queryStatus);
   const [timeRange, setTimeRange] = useState<'all' | 'this_month' | 'custom'>('this_month');
-  const [customDate, setCustomDate] = useState('');
+  const [customDate, setCustomDate] = useState<string>('');
   const [recvStatus, setRecvStatus] = useState<'all' | 'match' | 'mismatch'>('all');
   const [dateField, setDateField] = useState<'transfer' | 'receive'>('transfer');
 
   // Modals & Selection
   const [selectedTransfer, setSelectedTransfer] = useState<TransferOrder | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pageIndex, setPageIndex] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(15);
 
+  // Scroll synchronization between fixed header and scrollable body
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState<boolean>(false);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    setToast({ id: Date.now().toString(), message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // Deep link: auto-open modal if id provided
+  useEffect(() => {
+    if (queryDetailId) {
+      transferService
+        .get(queryDetailId)
+        .then((detail) => {
+          setSelectedTransfer(detail);
+          setIsDetailModalOpen(true);
+        })
+        .catch(() => {
+          // non-blocking
+        });
+    }
+  }, [queryDetailId]);
 
   const loadTransfers = useCallback(() => {
     setIsLoading(true);
@@ -64,25 +115,56 @@ export const TransferListPage: React.FC = () => {
       setIsLoading(false);
       return;
     }
-    const activeStatuses = selectedStatuses.map((status) => status === 'In-Transit' ? 'InTransit' : status);
+    const activeStatuses = selectedStatuses;
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
-    const date = timeRange === 'this_month' && dateField === 'transfer' ? monthStart : timeRange === 'custom' && customDate ? new Date(`${customDate}T00:00:00`).toISOString() : undefined;
-    transferService.list({
-      page: pageIndex, pageSize, search: searchCode.trim() || undefined,
-      fromBranchId: fromBranchId || undefined, toBranchId: toBranchId || undefined,
-      statuses: activeStatuses.length ? activeStatuses : undefined,
-      receiveStatus: recvStatus,
-      fromDate: date,
-      toDate: timeRange === 'custom' && customDate ? customDate : undefined,
-      dateField,
-    })
-      .then((result) => { setTransfers(result.items); setTotalItems(result.totalItems); })
-      .catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không tải được phiếu điều chuyển.', 'warning'))
-      .finally(() => setIsLoading(false));
-  }, [pageIndex, pageSize, searchCode, fromBranchId, toBranchId, selectedStatuses, timeRange, customDate, dateField, recvStatus]);
+    const date =
+      timeRange === 'this_month' && dateField === 'transfer'
+        ? monthStart
+        : timeRange === 'custom' && customDate
+        ? new Date(`${customDate}T00:00:00`).toISOString()
+        : undefined;
 
-  useEffect(() => { void loadTransfers(); }, [loadTransfers]);
+    transferService
+      .list({
+        page: pageIndex,
+        pageSize,
+        search: appliedSearch.trim() || undefined,
+        fromBranchId: fromBranchId || undefined,
+        toBranchId: toBranchId || undefined,
+        statuses: activeStatuses.length ? activeStatuses : undefined,
+        receiveStatus: recvStatus,
+        fromDate: date,
+        toDate: timeRange === 'custom' && customDate ? customDate : undefined,
+        dateField,
+      })
+      .then((result) => {
+        setTransfers(result.items);
+        setTotalItems(result.totalItems);
+      })
+      .catch((error: unknown) => {
+        showToast(
+          error instanceof Error ? error.message : 'Không tải được phiếu điều chuyển.',
+          'warning'
+        );
+      })
+      .finally(() => setIsLoading(false));
+  }, [
+    pageIndex,
+    pageSize,
+    appliedSearch,
+    fromBranchId,
+    toBranchId,
+    selectedStatuses,
+    timeRange,
+    customDate,
+    dateField,
+    recvStatus,
+  ]);
+
+  useEffect(() => {
+    void loadTransfers();
+  }, [loadTransfers]);
 
   useEffect(() => {
     transferService
@@ -91,30 +173,42 @@ export const TransferListPage: React.FC = () => {
         setBranches(data);
       })
       .catch((error: unknown) => {
-        showToast(error instanceof Error ? error.message : 'Không tải được danh sách chi nhánh.', 'warning');
+        showToast(
+          error instanceof Error ? error.message : 'Không tải được danh sách chi nhánh.',
+          'warning'
+        );
       });
   }, []);
 
-  useEffect(() => { setPageIndex(1); }, [searchCode, fromBranchId, toBranchId, selectedStatuses, timeRange, customDate, recvStatus, dateField]);
+  useEffect(() => {
+    setPageIndex(1);
+  }, [
+    appliedSearch,
+    fromBranchId,
+    toBranchId,
+    selectedStatuses,
+    timeRange,
+    customDate,
+    recvStatus,
+    dateField,
+  ]);
 
-  const showToast = (message: string, type: ToastState['type'] = 'success') => {
-    setToast({ id: Date.now().toString(), message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleToggleStatus = (status: TransferStatus) => {
-    if (selectedStatuses.includes(status)) {
-      setSelectedStatuses(selectedStatuses.filter((s) => s !== status));
+  const handleStatusDropdownChange = (value: string) => {
+    setStatusDropdown(value);
+    if (value === 'ALL') {
+      setSelectedStatuses(['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled']);
     } else {
-      setSelectedStatuses([...selectedStatuses, status]);
+      setSelectedStatuses([value as TransferStatus]);
     }
   };
 
   const handleResetFilters = () => {
-    setSearchCode('');
+    setSearchInput('');
+    setAppliedSearch('');
     setFromBranchId('');
     setToBranchId('');
-    setSelectedStatuses(['Draft', 'In-Transit', 'Received', 'Cancelled']);
+    setStatusDropdown('ALL');
+    setSelectedStatuses(['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled']);
     setTimeRange('this_month');
     setCustomDate('');
     setRecvStatus('all');
@@ -135,10 +229,12 @@ export const TransferListPage: React.FC = () => {
         if (!isRelated) return false;
       }
 
-      // Search code
-      if (searchCode.trim()) {
-        const kw = searchCode.trim().toLowerCase();
-        if (!t.transferCode.toLowerCase().includes(kw)) return false;
+      // Search code & notes
+      if (appliedSearch.trim()) {
+        const kw = appliedSearch.trim().toLowerCase();
+        const codeMatch = t.transferCode.toLowerCase().includes(kw);
+        const noteMatch = (t.note || '').toLowerCase().includes(kw);
+        if (!codeMatch && !noteMatch) return false;
       }
 
       // From branch
@@ -153,7 +249,7 @@ export const TransferListPage: React.FC = () => {
       // Recv status
       if (recvStatus === 'match') {
         const isAllMatch = t.items.every((it) => it.receivedQty === it.sentQty);
-        if (!isAllMatch || t.status !== 'Received') return false;
+        if (!isAllMatch || t.status !== 'Completed') return false;
       } else if (recvStatus === 'mismatch') {
         const hasMismatch = t.items.some((it) => (it.receivedQty ?? it.sentQty) < it.sentQty);
         if (!hasMismatch) return false;
@@ -161,33 +257,79 @@ export const TransferListPage: React.FC = () => {
 
       return true;
     });
-  }, [transfers, isStoreOwner, user?.branchId, searchCode, fromBranchId, toBranchId, selectedStatuses, recvStatus]);
+  }, [
+    transfers,
+    isStoreOwner,
+    user?.branchId,
+    appliedSearch,
+    fromBranchId,
+    toBranchId,
+    selectedStatuses,
+    recvStatus,
+  ]);
+
+  // Update vertical scrollbar detection
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+    updateScrollState();
+    window.addEventListener('resize', updateScrollState);
+    return () => window.removeEventListener('resize', updateScrollState);
+  }, [filteredTransfers]);
 
   const totalTransferValue = filteredTransfers.reduce((sum, t) => sum + t.totalAmount, 0);
-  const pagedTransfers = useMemo(() => {
-    return filteredTransfers;
-  }, [filteredTransfers]);
 
   const exportExcel = async () => {
     if (!filteredTransfers.length) {
       showToast('Không có phiếu chuyển để xuất.', 'warning');
       return;
     }
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Phiếu chuyển');
-    sheet.addRow(['Mã phiếu', 'Ngày chuyển', 'Chi nhánh gửi', 'Chi nhánh nhận', 'Trạng thái', 'Tổng tiền']);
-    filteredTransfers.forEach((transfer) => sheet.addRow([
-      transfer.transferCode, transfer.transferDate, transfer.fromBranchName, transfer.toBranchName, transfer.status, transfer.totalAmount,
-    ]));
-    sheet.getRow(1).font = { bold: true };
-    sheet.columns.forEach((column) => { column.width = 22; });
-    const buffer = await workbook.xlsx.writeBuffer();
-    const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'danh-sach-phieu-chuyen.xlsx';
-    link.click();
-    URL.revokeObjectURL(url);
+    setIsExporting(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Phiếu chuyển');
+      sheet.addRow([
+        'Mã phiếu',
+        'Ngày chuyển',
+        'Chi nhánh gửi',
+        'Chi nhánh nhận',
+        'Trạng thái',
+        ...(isStoreOwner ? ['Tổng tiền'] : []),
+      ]);
+      filteredTransfers.forEach((transfer) =>
+        sheet.addRow([
+          transfer.transferCode,
+          transfer.transferDate,
+          transfer.fromBranchName,
+          transfer.toBranchName,
+          transfer.status,
+          ...(isStoreOwner ? [transfer.totalAmount] : []),
+        ])
+      );
+      sheet.getRow(1).font = { bold: true };
+      sheet.columns.forEach((column) => {
+        column.width = 22;
+      });
+      const buffer = await workbook.xlsx.writeBuffer();
+      const url = URL.createObjectURL(
+        new Blob([buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'danh-sach-phieu-chuyen.xlsx';
+      link.click();
+      URL.revokeObjectURL(url);
+      showToast('Đã xuất danh sách phiếu chuyển ra Excel thành công.');
+    } catch {
+      showToast('Lỗi khi xuất tệp Excel.', 'warning');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const renderStatus = (status: TransferStatus) => {
@@ -212,7 +354,11 @@ export const TransferListPage: React.FC = () => {
             Phiếu tạm
           </span>
         );
-      case 'In-Transit':
+      case 'Pending':
+        return (
+          <span className="transfer-status transfer-status--pending">Chờ xử lý</span>
+        );
+      case 'InTransit':
         return (
           <span
             style={{
@@ -232,7 +378,7 @@ export const TransferListPage: React.FC = () => {
             Đang chuyển
           </span>
         );
-      case 'Received':
+      case 'Completed':
         return (
           <span
             style={{
@@ -249,7 +395,7 @@ export const TransferListPage: React.FC = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            Đã nhận
+            Hoàn tất
           </span>
         );
       case 'Cancelled':
@@ -275,252 +421,527 @@ export const TransferListPage: React.FC = () => {
     }
   };
 
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: 44 }} />
+      <col style={{ width: 40 }} />
+      <col style={{ width: 150 }} />
+      <col style={{ width: 140 }} />
+      <col style={{ width: 140 }} />
+      <col style={{ width: 190 }} />
+      <col style={{ width: 190 }} />
+      {isStoreOwner && <col style={{ width: 140 }} />}
+      <col style={{ width: 120 }} />
+    </colgroup>
+  );
+
   return (
-    <div className="transfer-container">
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       {/* Toast Notification */}
       {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
 
-      {/* Title Area bên ngoài, phía trên Header Toolbar */}
-      <div className="transfer-title-area">
-        <Truck size={28} color="#0F766E" />
-        <h1>Chuyển hàng</h1>
-        <span
+      {/* ── 1. HEADER BAR CHUẨN DESIGN SYSTEM (~44px) ── */}
+      <div className="so-list-header" style={{ minHeight: 44 }}>
+        <div>
+          <h1 className="so-list-title">
+            <Truck size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Điều Chuyển Hàng Liên Chi Nhánh</span>
+            <span className="so-list-filter-badge">
+              {totalItems} phiếu
+            </span>
+            {isLoading && (
+              <Loader2
+                size={16}
+                className="animate-spin"
+                style={{ color: 'var(--blue-primary, #0f766e)' }}
+              />
+            )}
+          </h1>
+        </div>
+
+        <div className="so-list-header-actions">
+          {isStoreOwner && <span
+            className="so-list-filter-badge"
+            style={{
+              backgroundColor: '#F0FDFA',
+              color: '#0F766E',
+              borderColor: '#CCFBF1',
+              height: 32,
+              fontSize: 12.5,
+            }}
+            title="Tổng giá trị các phiếu chuyển theo bộ lọc"
+          >
+            Tổng giá trị:{' '}
+            <strong style={{ marginLeft: 4 }}>{totalTransferValue.toLocaleString()} đ</strong>
+          </span>}
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            disabled={isExporting}
+            onClick={() => void exportExcel()}
+            title="Xuất danh sách phiếu chuyển ra tệp Excel"
+          >
+            {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            <span>Xuất Excel</span>
+          </button>
+          <button
+            type="button"
+            className="po-btn po-btn-primary"
+            onClick={() => navigate(isStoreOwner ? `${transferBasePath}/create` : `${transferBasePath}/request`)}
+            title="Tạo phiếu chuyển kho mới"
+          >
+            <Plus size={15} />
+            <span>+ Tạo phiếu chuyển kho</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── 2. FILTER CARD CSS GRID 4 CỘT x 2 DÒNG (~86px) ── */}
+      <div className="so-list-filter" style={{ marginBottom: 8 }}>
+        {/* ROW 1: Tìm kiếm mã/ghi chú, Kho gửi, Kho nhận, Trạng thái chuyển */}
+        <div
           style={{
-            fontSize: 13,
-            fontWeight: 600,
-            padding: '3px 10px',
-            borderRadius: 9999,
-            backgroundColor: '#ccfbf1',
-            color: '#0f766e',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '10px 14px',
+            alignItems: 'center',
           }}
         >
-          {filteredTransfers.length} phiếu
-        </span>
-      </div>
-
-      {/* 1. Header Toolbar Đồng nhất Design System (24px radius, Deep Teal) */}
-      <div className="transfer-header-toolbar">
-
-
-        {/* Ô tìm kiếm nhanh bo tròn dạng pill */}
-        <div style={{ flex: 1, maxWidth: 360, position: 'relative', margin: '0 12px' }}>
-          <input
-            type="text"
-            className="filter-input"
-            style={{ paddingLeft: 34, borderRadius: 9999 }}
-            placeholder="Theo mã phiếu chuyển (TRFxxxxxx)..."
-            value={searchCode}
-            onChange={(e) => setSearchCode(e.target.value)}
-          />
-          <Search size={16} style={{ position: 'absolute', left: 12, top: 11, color: '#94a3b8' }} />
-        </div>
-
-        {/* Hành động chính bên phải */}
-        <div className="transfer-header-actions">
-          {/* User role and branch are taken from the authenticated session. */}
-
-          <button
-            type="button"
-            className="btn-primary-teal"
-            onClick={() => navigate('/store-owner/transfers/create')}
-          >
-            <Plus size={16} /> Chuyển hàng
-          </button>
-
-          <button
-            type="button"
-            className="btn-secondary-white"
-            onClick={() => void exportExcel()}
-            title="Xuất file Excel"
-          >
-            <Download size={15} /> Xuất file
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Main Body Grid: Sidebar (280px) + Table (1fr) */}
-      <div className="transfer-grid">
-        {/* Cột trái: Bộ lọc Sidebar */}
-        <TransferFilterSidebar
-          branches={branches}
-          fromBranchId={fromBranchId}
-          onChangeFromBranch={setFromBranchId}
-          toBranchId={toBranchId}
-          onChangeToBranch={setToBranchId}
-          selectedStatuses={selectedStatuses}
-          onToggleStatus={handleToggleStatus}
-          timeRange={timeRange}
-          onChangeTimeRange={setTimeRange}
-          customDate={customDate}
-          onChangeCustomDate={setCustomDate}
-          dateField={dateField}
-          onChangeDateField={setDateField}
-          recvStatus={recvStatus}
-          onChangeRecvStatus={setRecvStatus}
-          onResetFilters={handleResetFilters}
-        />
-
-        {/* Cột phải: Bảng dữ liệu phiếu chuyển bo tròn 24px */}
-        <div className="transfer-table-wrapper">
-          {/* Summary bar */}
-          <div className="transfer-table-summary-bar">
-            <div>
-              Hiển thị <b>{filteredTransfers.length}</b> phiếu chuyển
-            </div>
-            <div>
-              Tổng giá trị chuyển: <b style={{ color: '#0F766E', fontSize: 14.5 }}>{totalTransferValue.toLocaleString()} đ</b>
+          {/* Cột 1: Tìm kiếm mã phiếu / ghi chú */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <label className="so-list-filter-label" style={{ minWidth: 65 }}>
+              Tìm kiếm:
+            </label>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <input
+                type="text"
+                className="so-list-filter-input"
+                style={{ width: '100%', paddingLeft: 28 }}
+                placeholder="Mã phiếu, ghi chú..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setAppliedSearch(searchInput.trim());
+                  }
+                }}
+              />
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute',
+                  left: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#94a3b8',
+                }}
+              />
             </div>
           </div>
 
-          <div className="transfer-table-scroll supplier-table-scroll-container">
-            <table className="transfer-table">
-              <thead>
-                <tr>
-                  <th style={{ width: 36, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={
-                        filteredTransfers.length > 0 &&
-                        selectedIds.length === filteredTransfers.length
-                      }
-                      onChange={() => {
-                        if (selectedIds.length === filteredTransfers.length) {
-                          setSelectedIds([]);
-                        } else {
-                          setSelectedIds(filteredTransfers.map((t) => t.id));
-                        }
-                      }}
-                      style={{ accentColor: '#0F766E', cursor: 'pointer' }}
-                    />
-                  </th>
-                  <th style={{ width: 36, textAlign: 'center' }}>★</th>
-                  <th style={{ width: 140 }}>Mã chuyển hàng</th>
-                  <th style={{ width: 140 }}>Ngày chuyển</th>
-                  <th style={{ width: 140 }}>Ngày nhận</th>
-                  <th>Từ chi nhánh</th>
-                  <th>Tới chi nhánh</th>
-                  <th style={{ width: 130, textAlign: 'right' }}>Giá trị chuyển</th>
-                  <th style={{ width: 130, textAlign: 'center' }}>Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedTransfers.map((t) => {
-                  const isChecked = selectedIds.includes(t.id);
-                  const isReceiving = t.status === 'In-Transit';
+          {/* Cột 2: Kho gửi (Từ chi nhánh) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <label className="so-list-filter-label" style={{ minWidth: 60 }}>
+              Kho gửi:
+            </label>
+            <select
+              className={`so-list-filter-select ${fromBranchId ? 'so-list-filter-select--active' : ''}`}
+              style={{ flex: 1, minWidth: 0 }}
+              value={fromBranchId}
+              onChange={(e) => setFromBranchId(e.target.value)}
+            >
+              <option value="">Tất cả kho gửi</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-                  return (
-                    <tr
-                      key={t.id}
-                      onClick={() => {
-                        setSelectedTransfer(t);
-                        setIsDetailModalOpen(true);
-                      }}
-                      style={{ cursor: 'pointer' }}
+          {/* Cột 3: Kho nhận (Tới chi nhánh) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <label className="so-list-filter-label" style={{ minWidth: 65 }}>
+              Kho nhận:
+            </label>
+            <select
+              className={`so-list-filter-select ${toBranchId ? 'so-list-filter-select--active' : ''}`}
+              style={{ flex: 1, minWidth: 0 }}
+              value={toBranchId}
+              onChange={(e) => setToBranchId(e.target.value)}
+            >
+              <option value="">Tất cả kho nhận</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Cột 4: Trạng thái (All, Draft, InTransit, Completed, Cancelled) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <label className="so-list-filter-label" style={{ minWidth: 68 }}>
+              Trạng thái:
+            </label>
+            <select
+              className={`so-list-filter-select ${statusDropdown !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+              style={{ flex: 1, minWidth: 0 }}
+              value={statusDropdown}
+              onChange={(e) => handleStatusDropdownChange(e.target.value)}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="Draft">Phiếu tạm (Draft)</option>
+              <option value="Pending">Chờ xử lý (Pending)</option>
+              <option value="InTransit">Đang chuyển (InTransit)</option>
+              <option value="Completed">Hoàn tất (Completed)</option>
+              <option value="Cancelled">Đã hủy (Cancelled)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ROW 2: Tình trạng nhận/hư hại, Thời gian/kỳ lọc, Lọc theo ngày, Nút Tìm kiếm & Đặt lại */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '10px 14px',
+            alignItems: 'center',
+            paddingTop: 8,
+            borderTop: '1px dashed #f1f5f9',
+          }}
+        >
+          {/* Cột 1: Tình trạng nhận hàng / lệch hàng */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <label className="so-list-filter-label" style={{ minWidth: 65 }}>
+              Nhận hàng:
+            </label>
+            <select
+              className={`so-list-filter-select ${recvStatus !== 'all' ? 'so-list-filter-select--active' : ''}`}
+              style={{ flex: 1, minWidth: 0 }}
+              value={recvStatus}
+              onChange={(e) => setRecvStatus(e.target.value as 'all' | 'match' | 'mismatch')}
+            >
+              <option value="all">Tất cả tình trạng nhận</option>
+              <option value="match">Đủ hàng (Khớp số lượng)</option>
+              <option value="mismatch">Có chênh lệch / hư hại</option>
+            </select>
+          </div>
+
+          {/* Cột 2: Thời gian / Khoảng ngày */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <label className="so-list-filter-label" style={{ minWidth: 60 }}>
+              Thời gian:
+            </label>
+            <select
+              className={`so-list-filter-select ${timeRange !== 'all' ? 'so-list-filter-select--active' : ''}`}
+              style={{ flex: timeRange === 'custom' ? '0 0 95px' : 1, minWidth: 0 }}
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value as 'all' | 'this_month' | 'custom')}
+            >
+              <option value="this_month">Tháng này</option>
+              <option value="all">Tất cả thời gian</option>
+              <option value="custom">Tùy chọn ngày</option>
+            </select>
+            {timeRange === 'custom' && (
+              <input
+                type="date"
+                className="so-list-filter-input"
+                style={{ flex: 1, minWidth: 105 }}
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+              />
+            )}
+          </div>
+
+          {/* Cột 3: Loại mốc ngày lọc */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <label className="so-list-filter-label" style={{ minWidth: 60 }}>
+              Lọc theo:
+            </label>
+            <select
+              className="so-list-filter-select"
+              style={{ flex: 1, minWidth: 0 }}
+              value={dateField}
+              onChange={(e) => setDateField(e.target.value as 'transfer' | 'receive')}
+            >
+              <option value="transfer">Ngày chuyển</option>
+              <option value="receive">Ngày nhận</option>
+            </select>
+          </div>
+
+          {/* Cột 4: Nút Tìm kiếm & Đặt lại */}
+          <div
+            className="so-list-filter-actions"
+            style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', width: '100%' }}
+          >
+            <button
+              type="button"
+              className="so-list-filter-search"
+              onClick={() => {
+                setAppliedSearch(searchInput.trim());
+                loadTransfers();
+              }}
+              title="Tìm kiếm theo tiêu chí đã chọn"
+            >
+              <Search size={14} />
+              <span>Tìm kiếm</span>
+            </button>
+            <button
+              type="button"
+              className="so-list-filter-reset"
+              onClick={handleResetFilters}
+              title="Xóa bộ lọc về mặc định"
+            >
+              <RotateCcw size={14} />
+              <span>Đặt lại</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 3. TABLE CARD VỚI FIXED HEADER & SCROLLABLE BODY ── */}
+      <div className="so-list-table-card">
+        {/* Fixed Head */}
+        <div
+          ref={headerRef}
+          className="so-list-table-head"
+          style={{ paddingRight: hasScrollY ? 6 : 0 }}
+        >
+          <table className="so-list-table" style={{ minWidth: 1100, tableLayout: 'fixed' }}>
+            {tableColGroup}
+            <thead>
+              <tr>
+                <th className="so-list-th" style={{ textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={
+                      filteredTransfers.length > 0 &&
+                      selectedIds.length === filteredTransfers.length
+                    }
+                    onChange={() => {
+                      if (selectedIds.length === filteredTransfers.length) {
+                        setSelectedIds([]);
+                      } else {
+                        setSelectedIds(filteredTransfers.map((t) => t.id));
+                      }
+                    }}
+                    style={{ accentColor: '#0F766E', cursor: 'pointer' }}
+                  />
+                </th>
+                <th className="so-list-th" style={{ textAlign: 'center' }}>
+                  ★
+                </th>
+                <th className="so-list-th">Mã Chuyển Hàng</th>
+                <th className="so-list-th">Ngày Chuyển</th>
+                <th className="so-list-th">Ngày Nhận</th>
+                <th className="so-list-th">Kho Gửi</th>
+                <th className="so-list-th">Kho Nhận</th>
+                {isStoreOwner && <th className="so-list-th" style={{ textAlign: 'right' }}>
+                  Giá Trị Chuyển
+                </th>}
+                <th className="so-list-th" style={{ textAlign: 'center' }}>
+                  Trạng Thái
+                </th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+
+        {/* Scrollable Body (12-15 dòng trong viewport) */}
+        <div
+          ref={bodyRef}
+          className="so-list-table-body supplier-table-scroll-container"
+          onScroll={handleBodyScroll}
+        >
+          <table className="so-list-table" style={{ minWidth: 1100, tableLayout: 'fixed' }}>
+            {tableColGroup}
+            <tbody>
+              {filteredTransfers.map((t) => {
+                const isChecked = selectedIds.includes(t.id);
+                const isReceiving = t.status === 'InTransit';
+
+                return (
+                  <tr
+                    key={t.id}
+                    className="so-list-row"
+                    onClick={() => {
+                      setSelectedTransfer(t);
+                      setIsDetailModalOpen(true);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {/* Checkbox */}
+                    <td
+                      className="so-list-td"
+                      style={{ textAlign: 'center' }}
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            if (isChecked) {
-                              setSelectedIds(selectedIds.filter((id) => id !== t.id));
-                            } else {
-                              setSelectedIds([...selectedIds, t.id]);
-                            }
-                          }}
-                          style={{ accentColor: '#0F766E', cursor: 'pointer' }}
-                        />
-                      </td>
-                      <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => {
+                          if (isChecked) {
+                            setSelectedIds(selectedIds.filter((id) => id !== t.id));
+                          } else {
+                            setSelectedIds([...selectedIds, t.id]);
+                          }
+                        }}
+                        style={{ accentColor: '#0F766E', cursor: 'pointer' }}
+                      />
+                    </td>
+
+                    {/* Favorite ★ */}
+                    <td
+                      className="so-list-td"
+                      style={{ textAlign: 'center' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleFavorite(t.id, e)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: 15,
+                          color: t.isFavorite ? '#eab308' : '#94a3b8',
+                          padding: 0,
+                        }}
+                      >
+                        {t.isFavorite ? '★' : '☆'}
+                      </button>
+                    </td>
+
+                    {/* Mã phiếu */}
+                    <td className="so-list-td">
+                      <span className="so-list-code">{t.transferCode}</span>
+                    </td>
+
+                    {/* Ngày chuyển */}
+                    <td className="so-list-td" style={{ fontSize: 12.5, color: '#475569' }}>
+                      {t.transferDate}
+                    </td>
+
+                    {/* Ngày nhận / Nhận hàng button */}
+                    <td className="so-list-td" style={{ fontSize: 12.5, color: '#475569' }}>
+                      {t.receiveDate ? (
+                        t.receiveDate
+                      ) : isReceiving ? (
                         <button
                           type="button"
-                          onClick={(e) => handleToggleFavorite(t.id, e)}
+                          className="so-list-action-btn so-list-action-btn--success"
                           style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: 15,
-                            color: t.isFavorite ? '#eab308' : '#94a3b8',
-                            padding: 0,
+                            height: 26,
+                            padding: '0 8px',
+                            fontSize: 11.5,
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`${transferBasePath}/${t.id}/receive`);
                           }}
                         >
-                          {t.isFavorite ? '★' : '☆'}
+                          <CheckCircle size={12} />
+                          <span>Nhận hàng</span>
                         </button>
-                      </td>
-                      <td>
-                        <span className="transfer-link">
-                          {t.transferCode}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 13, color: '#475569' }}>{t.transferDate}</td>
-                      <td style={{ fontSize: 13, color: '#475569' }}>
-                        {t.receiveDate ? (
-                          t.receiveDate
-                        ) : isReceiving ? (
-                          <button
-                            type="button"
-                            className="btn-primary-teal"
-                            style={{
-                              padding: '3px 10px',
-                              fontSize: 12,
-                              borderRadius: 9999,
-                              fontWeight: 600,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/store-owner/transfers/${t.id}/receive`);
-                            }}
-                          >
-                            <CheckCircle size={13} /> Nhận hàng
-                          </button>
-                        ) : t.status === 'Draft' ? (
-                          <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa nhận)</span>
-                        ) : (
-                          <span style={{ fontStyle: 'italic', color: '#dc2626' }}>(Đã hủy)</span>
-                        )}
-                      </td>
-                      <td style={{ fontWeight: 600, color: '#1e293b' }}>{t.fromBranchName}</td>
-                      <td style={{ fontWeight: 600, color: '#1e293b' }}>{t.toBranchName}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                        {t.totalAmount.toLocaleString()} đ
-                      </td>
-                      <td style={{ textAlign: 'center' }}>{renderStatus(t.status)}</td>
-                    </tr>
-                  );
-                })}
+                      ) : t.status === 'Draft' ? (
+                        <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa nhận)</span>
+                      ) : (
+                        <span style={{ fontStyle: 'italic', color: '#dc2626' }}>(Đã hủy)</span>
+                      )}
+                    </td>
 
-                      {isLoading && <tr><td colSpan={9} style={{ padding: 28, textAlign: 'center' }}>Đang tải phiếu...</td></tr>}
-      {!isLoading && filteredTransfers.length === 0 && (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}>
-                      <FileText size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
-                      <div style={{ fontSize: 15, fontWeight: 600 }}>Không tìm thấy phiếu chuyển hàng nào</div>
-                      <div style={{ fontSize: 13, marginTop: 4 }}>
-                        Vui lòng kiểm tra lại điều kiện lọc hoặc tạo phiếu chuyển mới.
-                      </div>
+                    {/* Kho gửi */}
+                    <td className="so-list-td" style={{ fontWeight: 600, color: '#1e293b' }}>
+                      {t.fromBranchName}
+                    </td>
+
+                    {/* Kho nhận */}
+                    <td className="so-list-td" style={{ fontWeight: 600, color: '#1e293b' }}>
+                      {t.toBranchName}
+                    </td>
+
+                    {/* Giá trị chuyển */}
+                    {isStoreOwner && <td
+                      className="so-list-td"
+                      style={{
+                        textAlign: 'right',
+                        fontWeight: 700,
+                        color: '#0f172a',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {t.totalAmount.toLocaleString()} đ
+                    </td>}
+
+                    {/* Trạng thái */}
+                    <td className="so-list-td" style={{ textAlign: 'center' }}>
+                      {renderStatus(t.status)}
                     </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
 
-          <TablePagination
-            currentPage={pageIndex}
-            pageSize={pageSize}
-            totalItems={totalItems}
-            pageSizeOptions={[10, 15, 20, 50]}
-            onPageChange={(page) => setPageIndex(page)}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPageIndex(1);
-            }}
-            itemLabel="phiếu chuyển"
-          />
+              {isLoading && (
+                <tr>
+                  <td colSpan={isStoreOwner ? 9 : 8} style={{ padding: 28, textAlign: 'center' }}>
+                    <Loader2
+                      size={24}
+                      className="animate-spin"
+                      style={{ margin: '0 auto 8px', color: '#0F766E' }}
+                    />
+                    <div style={{ color: '#64748b', fontSize: 13, fontWeight: 500 }}>
+                      Đang tải danh sách phiếu chuyển...
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {!isLoading && filteredTransfers.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={isStoreOwner ? 9 : 8}
+                    style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
+                  >
+                    <FileText size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
+                    <div style={{ fontSize: 15, fontWeight: 600, color: '#334155' }}>
+                      Không tìm thấy phiếu chuyển hàng nào
+                    </div>
+                    <div style={{ fontSize: 13, marginTop: 4, color: '#64748b' }}>
+                      Vui lòng kiểm tra lại điều kiện lọc hoặc tạo phiếu chuyển mới.
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {/* ── 4. FOOTER PHÂN TRANG GẮN LIỀN VỚI BẢNG ── */}
+        <TablePagination
+          currentPage={pageIndex}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          pageSizeOptions={[10, 15, 20, 50]}
+          onPageChange={(page) => setPageIndex(page)}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPageIndex(1);
+          }}
+          itemLabel="phiếu chuyển"
+        />
       </div>
 
       {/* Modal Pop-up Chi tiết phiếu chuyển hàng */}
@@ -536,3 +957,5 @@ export const TransferListPage: React.FC = () => {
     </div>
   );
 };
+
+export default TransferListPage;

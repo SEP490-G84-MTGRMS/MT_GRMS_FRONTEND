@@ -68,6 +68,7 @@ import {
   CreateTransferPage,
   ReceiveTransferPage,
   TransferDetailPage,
+  CreateUrgentTransferRequestPage,
 } from '../features/transfer';
 
 // 7. Employee Management Feature
@@ -110,7 +111,7 @@ import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPa
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
-import { StorePaymentConfigPage } from '../features/pos/pages/StorePaymentConfigPage';
+import { CashControlHubPage } from '../features/cash-control';
 import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 /**
@@ -146,11 +147,11 @@ export const router = createBrowserRouter([
       // ─── Chuyển hướng các nghiệp vụ bán lẻ cửa hàng sang /store-owner ───
       {
         path: 'transfers',
-        element: <Navigate to="/store-owner/transfers" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'transfers/*',
-        element: <Navigate to="/store-owner/transfers" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'suppliers',
@@ -226,7 +227,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'expenses/*',
-        element: <Navigate to="/store-owner/expenses" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'customers/*',
@@ -246,27 +247,27 @@ export const router = createBrowserRouter([
       },
       {
         path: 'reports/pnl',
-        element: <Navigate to="/store-owner/finance?tab=pnl" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'pnl',
-        element: <Navigate to="/store-owner/finance?tab=pnl" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'cashbook',
-        element: <Navigate to="/store-owner/cashbook" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'cashbook/*',
-        element: <Navigate to="/store-owner/cashbook" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'tax-snapshots',
-        element: <Navigate to="/store-owner/tax-snapshots" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'tax-snapshots/*',
-        element: <Navigate to="/store-owner/tax-snapshots" replace />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'loyalty-config',
@@ -342,7 +343,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'payment-config',
-        element: <StorePaymentConfigPage />,
+        element: <Navigate to="/store-owner/subscriptions?tab=finance-accounts" replace />,
       },
       {
         path: 'pos-cash-control',
@@ -354,7 +355,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'cash-control',
-        element: <Navigate to="/store-owner/pos-cash-control" replace />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER']}><CashControlHubPage /></ProtectedRoute>,
       },
       {
         path: 'cash-control/*',
@@ -527,7 +528,7 @@ export const router = createBrowserRouter([
       {
         path: 'finance',
         element: (
-          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+          <ProtectedRoute allowedRoles={['STORE_OWNER']}>
             <FinanceOverviewPage />
           </ProtectedRoute>
         ),
@@ -543,7 +544,7 @@ export const router = createBrowserRouter([
       {
         path: 'cashbook',
         element: (
-          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+          <ProtectedRoute allowedRoles={['STORE_OWNER']}>
             <CashbookPage />
           </ProtectedRoute>
         ),
@@ -558,7 +559,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'cash-control',
-        element: <Navigate to="/store-owner/pos-cash-control" replace />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER']}><CashControlHubPage /></ProtectedRoute>,
       },
       {
         path: 'cash-control/*',
@@ -567,7 +568,7 @@ export const router = createBrowserRouter([
       {
         path: 'tax-snapshots',
         element: (
-          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
+          <ProtectedRoute allowedRoles={['STORE_OWNER']}>
             <TaxSnapshotPage />
           </ProtectedRoute>
         ),
@@ -646,7 +647,7 @@ export const router = createBrowserRouter([
       },
           {
             path: 'payment-config',
-            element: <StorePaymentConfigPage />,
+            element: <Navigate to="/store-owner/subscriptions?tab=finance-accounts" replace />,
           },
           {
             path: 'pos-cash-control',
@@ -895,6 +896,38 @@ export const router = createBrowserRouter([
         path: 'stocktakes/:id/edit',
         element: <StocktakeFormPage defaultRole="employee" />,
       },
+      {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/request',
+        element: <CreateUrgentTransferRequestPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
+      },
+      {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/request',
+        element: <CreateUrgentTransferRequestPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
+      },
     ],
   },
 
@@ -934,6 +967,22 @@ export const router = createBrowserRouter([
       {
         path: 'stocktakes/:id/edit',
         element: <StocktakeFormPage defaultRole="employee" />,
+      },
+      {
+        path: 'transfers',
+        element: <TransferListPage />,
+      },
+      {
+        path: 'transfers/request',
+        element: <CreateUrgentTransferRequestPage />,
+      },
+      {
+        path: 'transfers/:id',
+        element: <TransferDetailPage />,
+      },
+      {
+        path: 'transfers/:id/receive',
+        element: <ReceiveTransferPage />,
       },
     ],
   },

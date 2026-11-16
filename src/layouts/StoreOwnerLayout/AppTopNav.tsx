@@ -218,7 +218,7 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: "finance",
-    label: "Tiền & Báo cáo",
+    label: "Tài chính",
     icon: WalletNavIcon,
     sections: [
       {
@@ -1630,7 +1630,7 @@ export const AppTopNav: FC = () => {
                     <div style={{ padding: "8px 0" }}>
                       {/* Mục 1: Cấu hình VietQR & SePay */}
                       <Link
-                        to="/store-owner/payment-config"
+                        to="/store-owner/subscriptions?tab=finance-accounts"
                         onClick={() => setSettingsMenuOpen(false)}
                         style={{
                           display: "flex",
@@ -1679,7 +1679,7 @@ export const AppTopNav: FC = () => {
                                 color: "#065f46",
                               }}
                             >
-                              Cấu hình VietQR & SePay
+                              Tài khoản & Két quỹ
                             </span>
                           </div>
                           <div
@@ -1689,7 +1689,7 @@ export const AppTopNav: FC = () => {
                               marginTop: 2,
                             }}
                           >
-                            Tài khoản ngân hàng, SePay API Key & Webhook
+                            Ngân hàng, SePay và két theo chi nhánh
                           </div>
                         </div>
                       </Link>

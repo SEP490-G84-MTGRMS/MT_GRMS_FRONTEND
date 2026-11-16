@@ -147,14 +147,16 @@ const toggleRowStyle: React.CSSProperties = {
 const toggleTitleStyle: React.CSSProperties = { fontSize: 13.5, fontWeight: 600, color: '#0F172A' };
 const toggleHintStyle: React.CSSProperties = { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 1.45 };
 
-const ToggleSwitch: React.FC<{ checked: boolean; disabled?: boolean; onChange: (next: boolean) => void }> = ({
+const ToggleSwitch: React.FC<{ checked: boolean; disabled?: boolean; label?: string; onChange: (next: boolean) => void }> = ({
   checked,
   disabled,
+  label,
   onChange,
 }) => (
   <button
     type="button"
     role="switch"
+    aria-label={label}
     aria-checked={checked}
     disabled={disabled}
     onClick={() => onChange(!checked)}
@@ -2237,6 +2239,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   </div>
                 </div>
                 <ToggleSwitch
+                  label="Quản lý theo lô & hạn sử dụng (FEFO)"
                   checked={hasBatches || (allowRepack && isPurchaseUnitKg)}
                   disabled={allowRepack && isPurchaseUnitKg}
                   onChange={setHasBatches}

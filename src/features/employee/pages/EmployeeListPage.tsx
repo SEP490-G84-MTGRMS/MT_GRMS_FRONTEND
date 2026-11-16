@@ -736,10 +736,21 @@ export const EmployeeListPage: React.FC = () => {
       {/* ─── FULL-WIDTH TABLE CONTAINER ─── */}
       <div className="emp-table-container" style={{ width: '100%' }}>
         <div className="emp-table-scroll supplier-table-scroll-container">
-          <table className="emp-table">
+          <table className="emp-table" style={{ width: '100%', minWidth: 1100, tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '3.5%' }} />
+              <col style={{ width: '4.5%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '18%' }} />
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '8%' }} />
+            </colgroup>
             <thead>
               <tr>
-                <th style={{ width: 40, textAlign: 'center' }}>
+                <th style={{ textAlign: 'center' }}>
                   <input
                     type="checkbox"
                     onChange={handleSelectAll}
@@ -750,20 +761,20 @@ export const EmployeeListPage: React.FC = () => {
                     style={{ accentColor: '#0F766E' }}
                   />
                 </th>
-                <th style={{ width: 44, textAlign: 'center' }}></th>
-                <th style={{ width: 110 }}>Mã NV</th>
-                                <th>Tên nhân viên</th>
+                <th style={{ textAlign: 'center' }}></th>
+                <th>Mã NV</th>
+                <th>Tên nhân viên</th>
                 <th>Chi nhánh</th>
                 <th>Số điện thoại</th>
                 <th className="align-right">Nợ và tạm ứng</th>
                 <th>Trạng thái</th>
-                <th style={{ width: 60, textAlign: 'center' }}>Thao tác</th>
+                <th style={{ textAlign: 'center' }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: 48, color: '#64748B' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: 48, color: '#64748B' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
                       <RotateCw className="emp-spin-icon" size={18} />
                       <span>Đang tải danh sách nhân viên từ máy chủ...</span>
@@ -865,7 +876,7 @@ export const EmployeeListPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', color: '#94A3B8', padding: 48 }}>
+                  <td colSpan={9} style={{ textAlign: 'center', color: '#94A3B8', padding: 48 }}>
                     <p style={{ margin: 0, fontWeight: 500, color: '#475569' }}>
                       Không tìm thấy nhân viên nào phù hợp với bộ lọc hiện tại
                     </p>

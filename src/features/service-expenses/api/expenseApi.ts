@@ -125,6 +125,8 @@ export const getServiceExpenses = async (
         items = items.filter(
           (i) =>
             i.approvalStatus === 'PendingApproval' ||
+            i.approvalStatus === 'Draft' ||
+            i.approvalStatus === 'Unresolved' ||
             (i.status === 'Pending' && Boolean(i.isFlaggedAsSuspiciousSplit))
         );
       } else if (params.quickStatus === 'PENDING_PAYMENT') {
@@ -240,6 +242,33 @@ export const createServiceExpense = async (
 };
 
 /**
+ * Phê duyệt phiếu chi vận hành qua live Backend API
+ * @param expenseId Mã định danh phiếu chi
+ * @param note Ghi chú / giải trình phê duyệt (bắt buộc với phiếu nghi vấn)
+ * @returns Promise chứa phiếu chi đã phê duyệt
+ */
+export const approveServiceExpense = async (
+  expenseId: string,
+  note?: string
+): Promise<ServiceExpenseDto> => {
+  try {
+    const res = await financeHttpClient.post<ApiResponse<any>>(`/expenses/${expenseId}/approve`, {
+      expenseId,
+      note: note || 'Phê duyệt phiếu chi vận hành',
+    });
+
+    if (res.data?.data) {
+      return mapVoucherToExpenseDto(res.data.data);
+    }
+
+    throw new Error(res.data?.message || 'Lỗi khi phê duyệt phiếu chi');
+  } catch (err: any) {
+    const errMsg = err?.response?.data?.message || err?.message || 'Lỗi khi phê duyệt phiếu chi';
+    throw new Error(errMsg);
+  }
+};
+
+/**
  * Confirm payment for a service expense via live Backend API
  * @param expenseId Target ID
  * @param data Payment payload
@@ -251,21 +280,27 @@ export const payServiceExpense = async (
 ): Promise<ServiceExpenseDto> => {
   const idempotencyKey = typeof generateUuidV7 === 'function' ? generateUuidV7() : ('idemp-' + Date.now());
 
-  // Poka-yoke: Phê duyệt phiếu chi trước khi xuất quỹ, bắt buộc xử lý lỗi rõ ràng không nuốt lỗi
-  try {
-    await financeHttpClient.post(`/expenses/${expenseId}/approve`, {
-      expenseId,
-      note: data.approvalNote || data.note || 'Duyệt phiếu chi vận hành trước khi xuất quỹ',
-    });
-  } catch (approveErr: any) {
-    const errData = approveErr?.response?.data;
-    const errMsg = errData?.message || approveErr?.message || '';
-    // Nếu phiếu chi đã được duyệt từ trước, backend có thể báo INVALID_STATUS
-    const isAlreadyApproved =
-      errData?.code === 'INVALID_STATUS' &&
-      (errMsg.toLowerCase().includes('approved') || errMsg.toLowerCase().includes('đã duyệt'));
-    if (!isAlreadyApproved) {
-      throw new Error(errMsg || 'Lỗi khi phê duyệt phiếu chi phí nghi vấn');
+  // Kết hợp lý do giải trình phê duyệt và ghi chú thanh toán để bảo toàn dữ liệu kiểm toán
+  const effectiveDisburseNote = [data.approvalNote, data.note]
+    .filter(Boolean)
+    .join(' | ') || 'Xuất quỹ chi tiền qua hệ thống';
+
+  // Nếu phiếu chi đã được duyệt hoặc chi thất bại trước đó, bỏ qua bước gọi /approve và xuất quỹ trực tiếp
+  const isPreApproved = data.currentStatus === 'Approved' || data.currentStatus === 'PaymentFailed';
+
+  if (!isPreApproved) {
+    try {
+      const approveRes = await financeHttpClient.post<ApiResponse<any>>(`/expenses/${expenseId}/approve`, {
+        expenseId,
+        note: effectiveDisburseNote,
+      });
+
+      if (approveRes.data && approveRes.data.success === false) {
+        throw new Error(approveRes.data.message || 'Lỗi khi phê duyệt phiếu chi');
+      }
+    } catch (approveErr: any) {
+      const errMsg = approveErr?.response?.data?.message || approveErr?.message || 'Lỗi khi phê duyệt phiếu chi';
+      throw new Error(errMsg);
     }
   }
 
@@ -297,6 +332,10 @@ export const payServiceExpense = async (
     }
   }
 
+  if (!paymentSourceAccountId) {
+    throw new Error('Không tìm thấy tài khoản quỹ (tiền mặt / ngân hàng) khả dụng để xuất quỹ.');
+  }
+
   // Disburse xuất quỹ chi tiền trên Backend (tự động cập nhật Cashbook)
   const res = await financeHttpClient.post<ApiResponse<any>>(
     `/expenses/${expenseId}/disburse`,
@@ -304,7 +343,7 @@ export const payServiceExpense = async (
       expenseId,
       paymentSourceType,
       paymentSourceAccountId,
-      note: data.note || 'Xuất quỹ chi tiền qua hệ thống',
+      note: effectiveDisburseNote,
     },
     {
       headers: {
