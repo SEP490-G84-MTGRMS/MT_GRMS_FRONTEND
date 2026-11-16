@@ -27,7 +27,6 @@ import {
   type ExcelCellToApply,
   type ExcelValidationErrorItem,
 } from '../lib/matrixExcelService';
-import { OrderMatrixImportResultModal, type MatrixExcelImportResult } from '../components/matrix/OrderMatrixImportResultModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import { storeProductApi } from '../../product/api/storeProductApi';
@@ -439,8 +438,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   const [isSplitModalOpen, setIsSplitModalOpen] = useState<boolean>(false);
   const [importPreviewResult, setImportPreviewResult] = useState<ExcelValidationResult | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
-  const [importResult, setImportResult] = useState<MatrixExcelImportResult | null>(null);
-  const [isImportResultOpen, setIsImportResultOpen] = useState(false);
   const [pendingImportFileName, setPendingImportFileName] = useState<string>('');
 
   // State: Toast
@@ -810,7 +807,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     cellMap,
   ]);
 
-  // Real-time MOQ Fails check
+  // Real-time MOQ Fails: MOQ sản phẩm + MOQ tổng đơn NCC theo ngày
   const { moqFails } = useMemo(() => {
     const fails: string[] = [];
     const activeProducts =
@@ -822,13 +819,38 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       dayColumns.forEach((d) => {
         const q = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0;
         if (q > 0 && q < p.moq) {
-          fails.push(`${p.name} (${d.dateShort}): SL ${q} < MOQ ${p.moq}`);
+          fails.push(`${p.name} (${d.dateShort}): SL ${q} < MOQ SP ${p.moq}`);
+        }
+      });
+    });
+
+    const productsBySupplier = new Map<string, typeof activeProducts>();
+    activeProducts.forEach((p) => {
+      const sid = p.supplierId || 'none';
+      if (!productsBySupplier.has(sid)) productsBySupplier.set(sid, []);
+      productsBySupplier.get(sid)!.push(p);
+    });
+
+    productsBySupplier.forEach((items, supplierId) => {
+      const cfg = supplierConfigs.find((c) => c.supplierId === supplierId);
+      const orderMoq = cfg?.minOrderQuantity || 0;
+      if (orderMoq <= 0) return;
+
+      dayColumns.forEach((d) => {
+        if (d.isOff || d.isLocked) return;
+        const dayTotal = items.reduce((sum, p) => {
+          const q = cellMap[`${p.id}__${p.supplierId || 'none'}`]?.[d.dateKey]?.finalQty || 0;
+          return sum + q;
+        }, 0);
+        if (dayTotal > 0 && dayTotal < orderMoq) {
+          const name = cfg?.supplierName || items[0]?.supplierName || supplierId;
+          fails.push(`${name} (${d.dateShort}): tổng SL ${dayTotal} < MOQ đơn ${orderMoq}`);
         }
       });
     });
 
     return { moqFails: fails };
-  }, [dayColumns, cellMap, matchedSupplierIds, matrixProducts]);
+  }, [dayColumns, cellMap, matchedSupplierIds, matrixProducts, supplierConfigs]);
 
   // Change duration preset (7, 14, 21, 31)
   const handleSelectDuration = (days: number) => {
@@ -1041,6 +1063,20 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   });
 
   const mapBackendPreviewToFe = (d: any, file: File): ExcelValidationResult => {
+    const branch = branches.find((b) => b.id === selectedBranchId);
+    const supplier = suppliers.find((s) => s.id === selectedSupplierId);
+    const isGuidLike = (v?: string) =>
+      !!v &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.trim());
+
+    const pickReadable = (...candidates: Array<string | undefined>) => {
+      for (const c of candidates) {
+        const t = (c || '').trim();
+        if (t && !isGuidLike(t)) return t;
+      }
+      return '';
+    };
+
     const cellsToApply: ExcelCellToApply[] = (d.cellsToApply || []).map((c: any) => ({
       row: c.excelRow ?? 0,
       rowKey: productRowKey({ id: c.productId, supplierId: c.supplierId }),
@@ -1056,17 +1092,29 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       quantity: Number(c.quantity || 0),
     }));
 
+    const branchExpected = pickReadable(
+      d.scopeStatus?.branchExpected,
+      branch?.name,
+      branch?.code
+    );
+    const supplierExpected =
+      selectedSupplierId === 'ALL'
+        ? 'Tất cả nhà cung cấp'
+        : pickReadable(d.scopeStatus?.supplierExpected, supplier?.name, supplier?.code);
+    const branchActual = pickReadable(d.scopeStatus?.branchActual);
+    const supplierActual = pickReadable(d.scopeStatus?.supplierActual);
+
     return {
       valid: Boolean(d.valid),
       fileName: d.fileName || file.name,
       fileSize: d.fileSize || file.size,
       scopeStatus: {
         branchMatched: Boolean(d.scopeStatus?.branchMatched),
-        branchExpected: d.scopeStatus?.branchExpected || selectedBranchId,
-        branchActual: d.scopeStatus?.branchActual,
+        branchExpected,
+        branchActual: branchActual || undefined,
         supplierMatched: Boolean(d.scopeStatus?.supplierMatched),
-        supplierExpected: d.scopeStatus?.supplierExpected || selectedSupplierId,
-        supplierActual: d.scopeStatus?.supplierActual,
+        supplierExpected,
+        supplierActual: supplierActual || undefined,
         periodMatched: Boolean(d.scopeStatus?.periodMatched),
         periodExpected: d.scopeStatus?.periodExpected || '',
       },
@@ -1087,7 +1135,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   };
 
   // Excel Download — khớp filteredProducts + role + Mã NCC
-  const handleExcelDownload = (blankQty = false) => {
+  const handleExcelDownload = () => {
     try {
       const branch = branches.find((b) => b.id === selectedBranchId);
       const supplier = suppliers.find((s) => s.id === selectedSupplierId);
@@ -1099,16 +1147,10 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         viewTo: addDaysToDate(viewFrom, durationDays - 1),
         exportedBy: isStoreOwner ? 'Store Owner' : 'Nhân viên chi nhánh',
         isStoreOwner,
-        blankQty,
         supplierCodeById: buildSupplierCodeById(),
         isCellEditable,
       });
-      showToast(
-        blankQty
-          ? 'Đã tải mẫu Excel (ô editable trống) theo bộ lọc hiện tại.'
-          : 'Đã xuất file bảng ma trận đặt hàng (.xlsx) theo bộ lọc hiện tại!',
-        'success'
-      );
+      showToast('Đã xuất file bảng ma trận đặt hàng (.xlsx) theo bộ lọc hiện tại!', 'success');
     } catch (err: any) {
       showToast('Xuất file Excel thất bại: ' + (err?.message || err), 'error');
     }
@@ -1207,58 +1249,24 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         })),
       });
 
-      const mapped: MatrixExcelImportResult = {
-        success: Boolean(raw.success),
-        fileName: raw.fileName || pendingImportFileName,
-        summary: {
-          appliedCells: raw.summary?.appliedCells ?? 0,
-          skippedOwnerLocked: raw.summary?.skippedOwnerLocked ?? 0,
-          errorCount: raw.summary?.errorCount ?? (raw.errors?.length || 0),
-          warningCount: raw.summary?.warningCount ?? (raw.warnings?.length || 0),
-          successDayCount: raw.summary?.successDayCount ?? (raw.successDays?.length || 0),
-        },
-        successDays: (raw.successDays || []).map((d: any) => ({
-          deliveryDate:
-            typeof d.deliveryDate === 'string'
-              ? d.deliveryDate.slice(0, 10)
-              : dayjs(d.deliveryDate).format('YYYY-MM-DD'),
-          dateLabel: d.dateLabel || '',
-          appliedCells: d.appliedCells ?? 0,
-          productCount: d.productCount ?? 0,
-        })),
-        errors: (raw.errors || []).map((e: any) => ({
-          type: e.type,
-          row: e.row,
-          productCode: e.productCode,
-          productName: e.productName,
-          deliveryDate: e.deliveryDate,
-          dateLabel: e.dateLabel,
-          inputValue: e.inputValue,
-          code: e.code,
-          message: e.message,
-        })),
-        warnings: (raw.warnings || []).map((e: any) => ({
-          type: e.type,
-          row: e.row,
-          productCode: e.productCode,
-          productName: e.productName,
-          deliveryDate: e.deliveryDate,
-          dateLabel: e.dateLabel,
-          inputValue: e.inputValue,
-          code: e.code,
-          message: e.message,
-        })),
-        draftPoId: raw.draftPoId,
-      };
+      const appliedCells = raw.summary?.appliedCells ?? 0;
+      const successDayCount =
+        raw.summary?.successDayCount ?? (raw.successDays?.length || 0);
+      const skippedOwnerLocked = raw.summary?.skippedOwnerLocked ?? 0;
 
       setIsImportModalOpen(false);
-      setImportResult(mapped);
-      setIsImportResultOpen(true);
+      setImportPreviewResult(null);
+      setPendingImportFileName('');
       setIsDirty(false);
       setMatrixRefreshKey((k) => k + 1);
+
+      const skipNote =
+        skippedOwnerLocked > 0 ? ` · Bỏ qua ${skippedOwnerLocked} ô đã chốt chủ` : '';
       showToast(
-        `Đã nạp ${mapped.summary.appliedCells} ô vào ${mapped.summary.successDayCount} ngày giao.`,
-        mapped.summary.appliedCells > 0 ? 'success' : 'warning'
+        appliedCells > 0
+          ? `Đã nạp ${appliedCells} ô vào ${successDayCount} ngày giao${skipNote}.`
+          : `Không có ô nào được nạp${skipNote}.`,
+        appliedCells > 0 ? 'success' : 'warning'
       );
     } catch (err: any) {
       showToast(err?.message || 'Nạp Excel thất bại.', 'error');
@@ -1426,6 +1434,14 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
 
   // Save Draft
   const handleSaveDraft = async () => {
+    if (moqFails.length > 0) {
+      showToast(
+        `Không lưu được bản thảo — còn ${moqFails.length} ô dưới MOQ: ${moqFails.slice(0, 3).join('; ')}`,
+        'error'
+      );
+      return;
+    }
+
     try {
       setIsSaving(true);
       await purchaseOrderApi.saveMatrixDraft(
@@ -1469,8 +1485,12 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onBack={() => navigate('/store-owner/purchase-orders/branches')}
         onSave={handleSaveDraft}
         isSaving={isSaving}
-        onOpenSplitModal={() => setIsSplitModalOpen(true)}
-        onGoToCutoffHub={() => navigate('/store-owner/purchase-orders/dispatch-hub')}
+        saveDisabled={moqFails.length > 0}
+        saveDisabledReason={
+          moqFails.length > 0
+            ? `Không lưu được — còn ${moqFails.length} ô dưới MOQ`
+            : undefined
+        }
         readOnly={isReadOnly}
         isStoreOwner={isStoreOwner}
         title={
@@ -1554,8 +1574,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onThisWeek={handleThisWeek}
         onCopyPrevWeek={handleCopyPrevWeek}
         onAutoSuggest={handleAutoSuggest}
-        onExcelDownload={() => handleExcelDownload(false)}
-        onExcelTemplateDownload={() => handleExcelDownload(true)}
+        onExcelDownload={handleExcelDownload}
         onExcelUpload={handleExcelUpload}
       />
 
@@ -1594,15 +1613,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         onConfirmApply={handleConfirmApplyImport}
       />
 
-      {/* 6. Excel Import Result — ngày thành công + lỗi chi tiết */}
-      <OrderMatrixImportResultModal
-        isOpen={isImportResultOpen}
-        result={importResult}
-        onClose={() => {
-          setIsImportResultOpen(false);
-          setImportResult(null);
-        }}
-      />
     </div>
   );
 };

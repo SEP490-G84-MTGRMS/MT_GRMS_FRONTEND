@@ -87,7 +87,7 @@ export const BatchTable: FC<BatchTableProps> = ({
   onWriteOffClick: _onWriteOffClick,
   onResetFilters,
 }) => {
-  const [sortField, setSortField] = useState<SortField | null>('expiryDate');
+  const [sortField, setSortField] = useState<SortField | null>('sku');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
   const headerRef = useRef<HTMLDivElement>(null);
@@ -109,9 +109,26 @@ export const BatchTable: FC<BatchTableProps> = ({
   };
 
   const sortedBatches = useMemo(() => {
-    if (!sortField) return batches;
+    const qtyOf = (r: BatchItem) => {
+      if (isKgBatch(r)) {
+        return Number(
+          r.rawSellableQty ??
+            r.qtyAvailable ??
+            Math.max(0, (Number(r.qtyCurrent) || 0) - (Number(r.packagedQty) || 0))
+        );
+      }
+      return Number(r.qtyCurrent) || 0;
+    };
 
     return [...batches].sort((a, b) => {
+      // Mặc định / tie-break: gom các dòng cùng SKU lại với nhau
+      const skuCmp = a.sku.toLowerCase().localeCompare(b.sku.toLowerCase(), 'vi');
+
+      if (!sortField) {
+        if (skuCmp !== 0) return skuCmp;
+        return a.daysLeft - b.daysLeft;
+      }
+
       let valA: string | number = '';
       let valB: string | number = '';
 
@@ -137,8 +154,8 @@ export const BatchTable: FC<BatchTableProps> = ({
           valB = b.daysLeft;
           break;
         case 'qtyCurrent':
-          valA = a.qtyCurrent;
-          valB = b.qtyCurrent;
+          valA = qtyOf(a);
+          valB = qtyOf(b);
           break;
         case 'costPrice':
           valA = a.costPrice;
@@ -152,7 +169,10 @@ export const BatchTable: FC<BatchTableProps> = ({
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
       if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+
+      // Cùng giá trị cột đang sort → giữ nhóm SKU, trong SKU theo HSD (FEFO)
+      if (sortField !== 'sku' && skuCmp !== 0) return skuCmp;
+      return a.daysLeft - b.daysLeft;
     });
   }, [batches, sortField, sortOrder]);
 
@@ -324,14 +344,14 @@ export const BatchTable: FC<BatchTableProps> = ({
               <SortTh field="expiryDate" label="Hạn dùng" align="center" />
               <SortTh field="daysLeft" label="Còn (ngày)" align="right" />
               <th
-                style={{ ...thBaseStyle, textAlign: 'right' }}
-                title="Số lượng theo đơn vị nhập (quy đổi từ tồn)"
+                style={{ ...thBaseStyle, textAlign: 'center' }}
+                title="Đơn vị nhập (purchase UoM)"
               >
                 ĐVT nhập
               </th>
               <SortTh
                 field="qtyCurrent"
-                label="ĐVT tồn"
+                label="Tồn"
                 align="right"
               />
               <SortTh field="costPrice" label="Giá vốn" align="right" />
@@ -463,14 +483,43 @@ export const BatchTable: FC<BatchTableProps> = ({
                     {(() => {
                       const { stockUnit, purchaseUnit, rate, sameUnit, rateLabel } = getUnitMeta(row);
                       const stockQty = Number(row.qtyCurrent) || 0;
-                      const purchaseQty = getPurchaseQty(stockQty, rate);
+                      const packagedQty = Number(row.packagedQty) || 0;
+                      const isWeight = isKgBatch(row);
+                      // SP kg: Tồn = nguyên quả còn (đã trừ kg đóng khay). QOH vẫn gồm kg trong khay.
+                      const displayStock = isWeight
+                        ? Number(
+                            row.rawSellableQty ??
+                              row.qtyAvailable ??
+                              Math.max(0, stockQty - packagedQty)
+                          ) || 0
+                        : stockQty;
+                      const purchaseQty = getPurchaseQty(displayStock, rate);
                       const availStock = row.qtyAvailable ?? stockQty;
                       const availPurchase = getPurchaseQty(Number(availStock) || 0, rate);
                       const hasHold =
-                        (row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0;
+                        !isWeight &&
+                        ((row.qtyQuarantined ?? 0) > 0 || (row.qtyReserved ?? 0) > 0);
+                      const packagedPurchase = getPurchaseQty(packagedQty, rate);
 
                       return (
                         <>
+                          {/* Chỉ tên đơn vị nhập */}
+                          <td
+                            style={{
+                              textAlign: 'center',
+                              fontWeight: 700,
+                              color: '#334155',
+                            }}
+                            title={
+                              sameUnit
+                                ? purchaseUnit
+                                : `1 ${purchaseUnit} = ${rateLabel} ${stockUnit}`
+                            }
+                          >
+                            {purchaseUnit}
+                          </td>
+
+                          {/* Tồn theo đơn vị nhập */}
                           <td
                             style={{
                               textAlign: 'right',
@@ -479,55 +528,34 @@ export const BatchTable: FC<BatchTableProps> = ({
                               color: '#0f172a',
                             }}
                             title={
-                              sameUnit
-                                ? undefined
-                                : `1 ${purchaseUnit} = ${rateLabel} ${stockUnit}`
+                              isWeight
+                                ? `Nguyên quả còn: ${fmtQty(displayStock)} ${stockUnit}` +
+                                  (packagedQty > 0
+                                    ? ` · Đã đóng khay: ${fmtQty(packagedQty)} ${stockUnit}` +
+                                      ` · Tổng tồn: ${fmtQty(stockQty)} ${stockUnit}`
+                                    : ` · Tổng tồn: ${fmtQty(stockQty)} ${stockUnit}`)
+                                : sameUnit
+                                  ? undefined
+                                  : `Tồn gốc: ${fmtQty(stockQty)} ${stockUnit}`
                             }
                           >
                             <div>
                               {fmtQty(purchaseQty)}{' '}
                               <span style={{ fontWeight: 600, color: '#64748b' }}>{purchaseUnit}</span>
                             </div>
+                            {isWeight && packagedQty > 0 && (
+                              <div style={{ fontSize: 10, fontWeight: 600, color: '#0f766e', lineHeight: 1.2 }}>
+                                Khay: {fmtQty(packagedPurchase)} {purchaseUnit}
+                              </div>
+                            )}
                             {hasHold && (
                               <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
                                 KD: {fmtQty(availPurchase)} {purchaseUnit}
-                              </div>
-                            )}
-                          </td>
-
-                          <td
-                            style={{
-                              textAlign: 'right',
-                              fontFamily: 'monospace',
-                              fontWeight: 800,
-                              color: '#0f172a',
-                            }}
-                          >
-                            <div>
-                              {fmtQty(stockQty)}{' '}
-                              <span style={{ fontWeight: 600, color: '#64748b' }}>{stockUnit}</span>
-                            </div>
-                            {!sameUnit && (
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 600,
-                                  color: '#0f766e',
-                                  lineHeight: 1.25,
-                                  marginTop: 2,
-                                }}
-                              >
-                                1 {purchaseUnit} = {rateLabel} {stockUnit}
-                              </div>
-                            )}
-                            {hasHold && (
-                              <div style={{ fontSize: 10, fontWeight: 600, color: '#b45309', lineHeight: 1.2 }}>
-                                KD: {fmtQty(Number(availStock) || 0)} {stockUnit}
                                 {(row.qtyQuarantined ?? 0) > 0
-                                  ? ` · CL:${fmtQty(row.qtyQuarantined ?? 0)}`
+                                  ? ` · CL:${fmtQty(getPurchaseQty(row.qtyQuarantined ?? 0, rate))}`
                                   : ''}
                                 {(row.qtyReserved ?? 0) > 0
-                                  ? ` · RTV:${fmtQty(row.qtyReserved ?? 0)}`
+                                  ? ` · RTV:${fmtQty(getPurchaseQty(row.qtyReserved ?? 0, rate))}`
                                   : ''}
                               </div>
                             )}
@@ -583,8 +611,8 @@ export const BatchTable: FC<BatchTableProps> = ({
                             type="button"
                             className="so-list-action-btn so-list-action-btn--icon"
                             onClick={() => onProcessBatch(row)}
-                            title="Chế biến khay"
-                            aria-label="Chế biến khay"
+                            title="Quản lý / chế biến khay"
+                            aria-label="Quản lý khay"
                             style={{
                               color: '#b45309',
                               borderColor: '#fde68a',

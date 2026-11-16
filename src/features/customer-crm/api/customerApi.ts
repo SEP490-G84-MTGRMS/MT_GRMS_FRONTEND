@@ -86,7 +86,7 @@ export const customerApi = {
       address: input.address?.trim() || null,
       debtLimit: Number(input.debtLimit) || 0,
       membershipTier: input.membershipTier || 'Standard',
-      allowDebt: true,
+      allowDebt: input.allowDebt !== undefined ? Boolean(input.allowDebt) : (Number(input.debtLimit) || 0) > 0,
     });
 
     if (!res.data.success || !res.data.data) {
@@ -104,10 +104,10 @@ export const customerApi = {
       fullName: input.fullName !== undefined ? input.fullName.trim() : undefined,
       email: input.email !== undefined ? input.email.trim() : undefined,
       address: input.address !== undefined ? input.address.trim() : undefined,
-      debtLimit: input.debtLimit !== undefined ? Number(input.debtLimit) : 0,
+      debtLimit: input.debtLimit !== undefined ? Number(input.debtLimit) : undefined,
       membershipTier: input.membershipTier,
       status: input.status,
-      allowDebt: true,
+      allowDebt: input.allowDebt,
     });
 
     if (!res.data.success || !res.data.data) {

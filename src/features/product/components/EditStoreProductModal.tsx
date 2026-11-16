@@ -24,24 +24,28 @@ interface FieldErrors {
   minOrderQuantity?: string;
 }
 
-const rowStyle: CSSProperties = {
-  display: 'flex',
+/** Nhãn hẹp sát ô | Ô rộng | Nhãn | Ô rộng */
+const formGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'max-content minmax(0, 1fr) max-content minmax(0, 1fr)',
+  columnGap: 8,
+  rowGap: 12,
   alignItems: 'center',
-  gap: 12,
-  minHeight: 36,
 };
 
 const labelStyle: CSSProperties = {
-  width: 140,
-  flexShrink: 0,
-  fontSize: 13,
+  fontSize: 12.5,
   fontWeight: 600,
   color: '#475569',
   textAlign: 'left',
+  lineHeight: 1.3,
+  whiteSpace: 'nowrap',
+  paddingRight: 2,
 };
 
 const inputBase: CSSProperties = {
-  flex: 1,
+  width: '100%',
+  minWidth: 0,
   height: 36,
   padding: '0 10px',
   borderRadius: 6,
@@ -61,23 +65,35 @@ const readOnlyInput: CSSProperties = {
   cursor: 'default',
 };
 
-function FieldRow({
+const controlCellStyle: CSSProperties = {
+  minWidth: 0,
+  width: '100%',
+};
+
+/** Mỗi field chiếm 2 cột lưới (nhãn + ô). wide = ô kéo dài 3 cột. */
+function FieldPair({
   label,
   children,
   htmlFor,
+  wide = false,
 }: {
   label: string;
   children: ReactNode;
   htmlFor?: string;
+  wide?: boolean;
 }) {
   return (
-    <div style={rowStyle}>
+    <>
       <label htmlFor={htmlFor} style={labelStyle}>
         {label}
       </label>
-      {children}
-    </div>
+      <div style={{ ...controlCellStyle, gridColumn: wide ? 'span 3' : 'span 1' }}>{children}</div>
+    </>
   );
+}
+
+function GridDivider() {
+  return <div style={{ gridColumn: '1 / -1', height: 1, background: '#e2e8f0', margin: '2px 0' }} />;
 }
 
 export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
@@ -87,7 +103,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   stores = [],
   onSave,
 }) => {
-  const [retailPriceStr, setRetailPriceStr] = useState<string>('');
   const [minOrderQuantityStr, setMinOrderQuantityStr] = useState<string>('');
   const [unitPriceDrafts, setUnitPriceDrafts] = useState<StoreProductUnitPrice[]>([]);
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
@@ -101,7 +116,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
 
   useEffect(() => {
     if (isOpen && product) {
-      setRetailPriceStr(String(product.retailPrice ?? 0));
       setMinOrderQuantityStr(String(product.minOrderQuantity ?? 1));
       const units =
         product.unitPrices && product.unitPrices.length > 0
@@ -120,13 +134,14 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       setFormError('');
       setIsSaving(false);
       setShowUnsavedConfirm(false);
+      setShowPriceHistory(false);
     } else if (!isOpen) {
-      setRetailPriceStr('');
       setMinOrderQuantityStr('');
       setUnitPriceDrafts([]);
       setFieldErrors({});
       setFormError('');
       setShowUnsavedConfirm(false);
+      setShowPriceHistory(false);
     }
   }, [isOpen, product]);
 
@@ -139,40 +154,39 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
 
   const storeAddress = matchedStore?.address || '';
 
-  const parsedPrice = useMemo(() => {
-    const trimmed = retailPriceStr.trim();
-    if (!trimmed) return NaN;
-    const num = Number(trimmed);
-    return isNaN(num) ? NaN : num;
-  }, [retailPriceStr]);
+  const baseUnitPrice = useMemo(() => {
+    const base = unitPriceDrafts.find((u) => u.isBaseUnit) || unitPriceDrafts[0];
+    return base?.price ?? 0;
+  }, [unitPriceDrafts]);
 
   const isDirty = useMemo(() => {
     if (!product) return false;
-    const priceChanged = !isNaN(parsedPrice) && parsedPrice !== product.retailPrice;
     const statusChanged = status !== (product.status ?? 'Active');
-    const initialUnits = product.unitPrices && product.unitPrices.length > 0 ? product.unitPrices : null;
-    let unitsChanged = false;
-    if (initialUnits) {
-      unitsChanged =
-        unitPriceDrafts.length !== initialUnits.length ||
-        unitPriceDrafts.some((u, i) => {
-          const init = initialUnits[i];
-          return !init || u.price !== init.price || u.unitName !== init.unitName;
-        });
-    }
-    return priceChanged || statusChanged || unitsChanged;
-  }, [product, parsedPrice, status, unitPriceDrafts]);
+    const initialUnits =
+      product.unitPrices && product.unitPrices.length > 0
+        ? product.unitPrices
+        : [
+            {
+              unitName: product.unit || 'Cái',
+              conversionRate: 1,
+              price: product.retailPrice ?? 0,
+              isBaseUnit: true,
+            },
+          ];
+    const unitsChanged =
+      unitPriceDrafts.length !== initialUnits.length ||
+      unitPriceDrafts.some((u, i) => {
+        const init = initialUnits[i];
+        return !init || u.price !== init.price || u.unitName !== init.unitName;
+      });
+    return statusChanged || unitsChanged;
+  }, [product, status, unitPriceDrafts]);
 
   const handleUnitPriceChange = (index: number, raw: string) => {
     const num = Number(raw);
-    setUnitPriceDrafts((prev) => {
-      const next = prev.map((u, i) => (i === index ? { ...u, price: Number.isFinite(num) ? num : 0 } : u));
-      const base = next.find((u) => u.isBaseUnit) || next[0];
-      if (base && base.price > 0) {
-        setRetailPriceStr(String(base.price));
-      }
-      return next;
-    });
+    setUnitPriceDrafts((prev) =>
+      prev.map((u, i) => (i === index ? { ...u, price: Number.isFinite(num) ? num : 0 } : u))
+    );
     if (fieldErrors.retailPrice) {
       setFieldErrors((prev) => ({ ...prev, retailPrice: undefined }));
     }
@@ -208,14 +222,11 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
 
   const validateForm = (): boolean => {
     const errors: FieldErrors = {};
-    const trimmedPrice = retailPriceStr.trim();
-    if (!trimmedPrice) {
-      errors.retailPrice = 'Giá bán không được để trống.';
-    } else if (isNaN(parsedPrice)) {
+    if (!Number.isFinite(baseUnitPrice)) {
       errors.retailPrice = 'Giá bán phải là số hợp lệ.';
-    } else if (parsedPrice <= 0) {
+    } else if (baseUnitPrice <= 0) {
       errors.retailPrice = 'Giá bán phải lớn hơn 0.';
-    } else if (parsedPrice > 1_000_000_000) {
+    } else if (baseUnitPrice > 1_000_000_000) {
       errors.retailPrice = 'Giá bán vượt quá giới hạn.';
     }
     setFieldErrors(errors);
@@ -232,9 +243,9 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
 
     try {
       const payload: EditStoreProductInput = {
-        retailPrice: parsedPrice,
+        retailPrice: baseUnitPrice,
         status,
-        ...(product.unitPrices && product.unitPrices.length > 0 ? { unitPrices: unitPriceDrafts } : {}),
+        unitPrices: unitPriceDrafts,
       };
 
       await onSave(product.storeId, product.productId, payload);
@@ -262,8 +273,8 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
           id="modalEditStoreProductDialog"
           className="modal-box"
           style={{
-            maxWidth: 620,
-            width: '95%',
+            maxWidth: 980,
+            width: '96%',
             maxHeight: '90vh',
             display: 'flex',
             flexDirection: 'column',
@@ -308,22 +319,25 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowPriceHistory(true)}
+                disabled={isSaving}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 4,
-                  fontSize: 12,
-                  color: '#7c3aed',
-                  backgroundColor: '#f5f3ff',
+                  gap: 5,
+                  height: 32,
+                  padding: '0 10px',
+                  borderRadius: 7,
                   border: '1px solid #ddd6fe',
-                  borderRadius: 6,
-                  padding: '4px 10px',
-                  cursor: 'pointer',
-                  fontWeight: 500,
+                  backgroundColor: '#f5f3ff',
+                  color: '#6d28d9',
+                  cursor: isSaving ? 'not-allowed' : 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
                 }}
+                title="Xem lịch sử thay đổi giá"
               >
-                <History size={13} />
-                Lịch sử giá
+                <History size={14} />
+                <span>Lịch sử giá</span>
               </button>
               <button
                 type="button"
@@ -356,9 +370,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
               className="modal-body"
               style={{
                 padding: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 14,
                 overflowY: 'auto',
                 flex: 1,
               }}
@@ -371,6 +382,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     alignItems: 'center',
                     gap: 10,
                     padding: '10px 14px',
+                    marginBottom: 12,
                     backgroundColor: '#fef2f2',
                     border: '1px solid #fecaca',
                     borderRadius: 8,
@@ -383,220 +395,231 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 </div>
               )}
 
-              {/* Group A - Store Info */}
-              <FieldRow label="Mã chi nhánh" htmlFor="inputStoreCode">
-                <input
-                  id="inputStoreCode"
-                  type="text"
-                  readOnly
-                  value={product.storeCode || matchedStore?.code || ''}
-                  style={readOnlyInput}
-                />
-              </FieldRow>
+              <div style={formGridStyle}>
+                {/* Group A - Store Info */}
+                <FieldPair label="Mã chi nhánh" htmlFor="inputStoreCode">
+                  <input
+                    id="inputStoreCode"
+                    type="text"
+                    readOnly
+                    value={product.storeCode || matchedStore?.code || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Tên chi nhánh" htmlFor="inputStoreName">
-                <input
-                  id="inputStoreName"
-                  type="text"
-                  readOnly
-                  value={product.storeName || matchedStore?.name || ''}
-                  style={readOnlyInput}
-                />
-              </FieldRow>
+                <FieldPair label="Tên chi nhánh" htmlFor="inputStoreName">
+                  <input
+                    id="inputStoreName"
+                    type="text"
+                    readOnly
+                    value={product.storeName || matchedStore?.name || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Địa chỉ chi nhánh" htmlFor="inputStoreAddress">
-                <input
-                  id="inputStoreAddress"
-                  type="text"
-                  readOnly
-                  value={storeAddress || matchedStore?.address || ''}
-                  style={readOnlyInput}
-                />
-              </FieldRow>
+                <FieldPair label="Địa chỉ chi nhánh" htmlFor="inputStoreAddress" wide>
+                  <input
+                    id="inputStoreAddress"
+                    type="text"
+                    readOnly
+                    value={storeAddress || matchedStore?.address || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <div style={{ height: 1, background: '#e2e8f0', margin: '2px 0' }} />
+                <GridDivider />
 
-              {/* Group B - Product Info */}
-              <FieldRow label="SKU" htmlFor="inputProductSku">
-                <input
-                  id="inputProductSku"
-                  type="text"
-                  readOnly
-                  value={product.sku}
-                  style={{ ...readOnlyInput, fontFamily: 'monospace' }}
-                />
-              </FieldRow>
+                {/* Group B - Product Info */}
+                <FieldPair label="SKU" htmlFor="inputProductSku">
+                  <input
+                    id="inputProductSku"
+                    type="text"
+                    readOnly
+                    value={product.sku}
+                    style={{ ...readOnlyInput, fontFamily: 'monospace' }}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Sản phẩm" htmlFor="inputProductName">
-                <input id="inputProductName" type="text" readOnly value={product.name} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Sản phẩm" htmlFor="inputProductName">
+                  <input id="inputProductName" type="text" readOnly value={product.name} style={readOnlyInput} />
+                </FieldPair>
 
-              <FieldRow label="Mã vạch" htmlFor="inputProductBarcode">
-                <input id="inputProductBarcode" type="text" readOnly value={product.barcode} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Mã vạch" htmlFor="inputProductBarcode">
+                  <input
+                    id="inputProductBarcode"
+                    type="text"
+                    readOnly
+                    value={product.barcode}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Ngành hàng" htmlFor="inputProductCategory">
-                <input id="inputProductCategory" type="text" readOnly value={product.category} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Ngành hàng" htmlFor="inputProductCategory">
+                  <input
+                    id="inputProductCategory"
+                    type="text"
+                    readOnly
+                    value={product.category}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Đơn vị tính" htmlFor="inputProductUnit">
-                <input id="inputProductUnit" type="text" readOnly value={product.unit} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Đơn vị nhập" htmlFor="inputProductUnit">
+                  <input id="inputProductUnit" type="text" readOnly value={product.unit} style={readOnlyInput} />
+                </FieldPair>
 
-              <FieldRow label="Giá vốn" htmlFor="inputCostPrice">
-                <input id="inputCostPrice" type="text" readOnly value={`${fmt(product.costPrice)} đ`} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Giá vốn" htmlFor="inputCostPrice">
+                  <input
+                    id="inputCostPrice"
+                    type="text"
+                    readOnly
+                    value={`${fmt(product.costPrice)} đ`}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <FieldRow label="Tồn kho" htmlFor="inputCurrentStock">
-                <input id="inputCurrentStock" type="text" readOnly value={`${product.currentStock} ${product.unit}`} style={readOnlyInput} />
-              </FieldRow>
+                <FieldPair label="Tồn kho" htmlFor="inputCurrentStock">
+                  <input
+                    id="inputCurrentStock"
+                    type="text"
+                    readOnly
+                    value={`${product.currentStock} ${product.unit}`}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <div style={{ height: 1, background: '#e2e8f0', margin: '2px 0' }} />
+                <FieldPair label="MOQ" htmlFor="inputEditMoq">
+                  <input
+                    id="inputEditMoq"
+                    type="number"
+                    readOnly
+                    value={Number(minOrderQuantityStr) || 1}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              {/* Group C - Supplier Info */}
-              <FieldRow label="Mã NCC" htmlFor="inputSupplierCode">
-                <input id="inputSupplierCode" type="text" readOnly value={product.primarySupplierCode || ''} style={readOnlyInput} />
-              </FieldRow>
+                <GridDivider />
 
-              <FieldRow label="Tên NCC" htmlFor="inputSupplierName">
-                <input id="inputSupplierName" type="text" readOnly value={product.primarySupplierName || ''} style={readOnlyInput} />
-              </FieldRow>
+                {/* Group C - Supplier Info */}
+                <FieldPair label="Mã NCC" htmlFor="inputSupplierCode">
+                  <input
+                    id="inputSupplierCode"
+                    type="text"
+                    readOnly
+                    value={product.primarySupplierCode || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              <div style={{ height: 1, background: '#e2e8f0', margin: '2px 0' }} />
+                <FieldPair label="Tên NCC" htmlFor="inputSupplierName">
+                  <input
+                    id="inputSupplierName"
+                    type="text"
+                    readOnly
+                    value={product.primarySupplierName || ''}
+                    style={readOnlyInput}
+                  />
+                </FieldPair>
 
-              {/* Group D - Editable fields */}
-              <FieldRow label="Giá bán lẻ niêm yết" htmlFor="inputRetailPrice">
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      id="inputRetailPrice"
-                      type="number"
-                      min={0}
-                      step={100}
-                      value={retailPriceStr}
-                      onChange={(e) => {
-                        setRetailPriceStr(e.target.value);
-                        if (fieldErrors.retailPrice) {
-                          setFieldErrors((prev) => ({ ...prev, retailPrice: undefined }));
-                        }
-                      }}
+                <GridDivider />
+
+                {/* Group D - Editable fields */}
+                <FieldPair label="Trạng thái">
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      minHeight: 36,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <label
                       style={{
-                        ...inputBase,
-                        borderColor: fieldErrors.retailPrice ? '#ef4444' : '#cbd5e1',
-                        textAlign: 'left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: '#15803d',
+                        whiteSpace: 'nowrap',
                       }}
-                    />
-                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, width: 16 }}>đ</span>
+                    >
+                      <input
+                        type="radio"
+                        id="statusActive"
+                        name="storeProductStatus"
+                        value="Active"
+                        checked={status === 'Active'}
+                        onChange={() => setStatus('Active')}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>Đang KD</span>
+                    </label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        cursor: 'pointer',
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: '#64748b',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        id="statusInactive"
+                        name="storeProductStatus"
+                        value="Inactive"
+                        checked={status === 'Inactive'}
+                        onChange={() => setStatus('Inactive')}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <span>Tạm ngừng</span>
+                    </label>
                   </div>
-                  {product.costPrice != null && !isNaN(parsedPrice) && (
-                    <div style={{ fontSize: 12, marginTop: 2 }}>
-                      {parsedPrice >= product.costPrice ? (
-                        <span style={{ color: '#16a34a', fontWeight: 600 }}>
-                          Lãi gộp ước tính: +{fmt(parsedPrice - product.costPrice)} đ (
-                          {parsedPrice > 0 ? (((parsedPrice - product.costPrice) / parsedPrice) * 100).toFixed(1) : 0}%)
-                        </span>
-                      ) : (
-                        <span style={{ color: '#dc2626', fontWeight: 600 }}>
-                          Bán dưới giá vốn! Lỗ gộp: -{fmt(product.costPrice - parsedPrice)} đ
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </FieldRow>
+                </FieldPair>
 
-              {fieldErrors.retailPrice && (
-                <div style={{ paddingLeft: 152, fontSize: 12, color: '#ef4444' }}>{fieldErrors.retailPrice}</div>
-              )}
-
-              {product.costPrice && parsedPrice > 0 && parsedPrice < product.costPrice && (
-                <div
-                  style={{
-                    marginLeft: 152,
-                    marginTop: 4,
-                    padding: '8px 12px',
-                    backgroundColor: '#FEF3C7',
-                    border: '1px solid #F59E0B',
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: 12,
-                    color: '#92400E',
-                  }}
-                >
-                  <AlertTriangle size={15} color="#D97706" style={{ flexShrink: 0 }} />
-                  <span>
-                    <strong>Cảnh báo giá bán:</strong> Giá bán tại chi nhánh đang thấp hơn giá vốn ({fmt(product.costPrice)} đ). Cần sự xác nhận của Quản lý chi nhánh.
-                  </span>
-                </div>
-              )}
-
-              <FieldRow label="Số lượng đặt hàng tối thiểu" htmlFor="inputEditMoq">
-                <input
-                  id="inputEditMoq"
-                  type="number"
-                  readOnly
-                  value={Number(minOrderQuantityStr) || 1}
-                  style={readOnlyInput}
-                />
-              </FieldRow>
-
-              {/* Unit prices if multi-unit */}
-              {unitPriceDrafts.length > 1 && (
-                <>
-                  <div style={{ height: 1, background: '#e2e8f0', margin: '4px 0' }} />
-                  {unitPriceDrafts.map((u, idx) => (
-                    <FieldRow key={`${u.unitName}-${idx}`} label={`Giá ${u.unitName}`} htmlFor={`unitPrice-${idx}`}>
-                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          id={`unitPrice-${idx}`}
-                          type="number"
-                          min={0}
-                          step={100}
-                          value={u.price}
-                          onChange={(e) => handleUnitPriceChange(idx, e.target.value)}
-                          style={{
-                            ...inputBase,
-                            borderColor: fieldErrors.retailPrice && u.isBaseUnit ? '#ef4444' : '#cbd5e1',
-                            textAlign: 'left',
-                          }}
-                        />
-                        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, width: 16 }}>đ</span>
-                      </div>
-                    </FieldRow>
-                  ))}
-                </>
-              )}
-
-              <FieldRow label="Trạng thái">
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, height: 36 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#15803d' }}>
-                    <input
-                      type="radio"
-                      id="statusActive"
-                      name="storeProductStatus"
-                      value="Active"
-                      checked={status === 'Active'}
-                      onChange={() => setStatus('Active')}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>Đang kinh doanh</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#64748b' }}>
-                    <input
-                      type="radio"
-                      id="statusInactive"
-                      name="storeProductStatus"
-                      value="Inactive"
-                      checked={status === 'Inactive'}
-                      onChange={() => setStatus('Inactive')}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <span>Tạm ngừng bán</span>
-                  </label>
-                </div>
-              </FieldRow>
+                {unitPriceDrafts.length > 0 && (
+                  <>
+                    <GridDivider />
+                    {unitPriceDrafts.map((u, idx) => (
+                      <FieldPair
+                        key={`${u.unitName}-${idx}`}
+                        label={`Giá ${u.unitName}`}
+                        htmlFor={`unitPrice-${idx}`}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                            <input
+                              id={`unitPrice-${idx}`}
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={u.price}
+                              onChange={(e) => handleUnitPriceChange(idx, e.target.value)}
+                              style={{
+                                ...inputBase,
+                                borderColor:
+                                  fieldErrors.retailPrice && u.isBaseUnit ? '#ef4444' : '#cbd5e1',
+                              }}
+                            />
+                            <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>
+                              đ
+                            </span>
+                          </div>
+                          {fieldErrors.retailPrice && u.isBaseUnit && (
+                            <div style={{ fontSize: 12, color: '#ef4444' }}>{fieldErrors.retailPrice}</div>
+                          )}
+                        </div>
+                      </FieldPair>
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
 
             <div
@@ -745,6 +768,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
           branchName={product.storeName}
         />
       )}
+
     </>
   );
 };

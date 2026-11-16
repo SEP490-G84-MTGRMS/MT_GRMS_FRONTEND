@@ -13,11 +13,11 @@ interface OrderMatrixHeaderProps {
   daySummary?: MatrixDaySummary;
   onBack: () => void;
   onSave?: () => void;
-  onGoToCutoffHub?: () => void;
-  onOpenSplitModal?: () => void;
   title?: string;
   readOnly?: boolean;
   isSaving?: boolean;
+  saveDisabled?: boolean;
+  saveDisabledReason?: string;
   isStoreOwner?: boolean;
   onSwitchScreen?: () => void;
   switchScreenLabel?: string;
@@ -28,11 +28,11 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
   daySummary,
   onBack,
   onSave,
-  onGoToCutoffHub,
-  onOpenSplitModal,
   title,
   readOnly = false,
   isSaving = false,
+  saveDisabled = false,
+  saveDisabledReason,
   isStoreOwner = true,
   onSwitchScreen,
   switchScreenLabel,
@@ -101,65 +101,25 @@ export const OrderMatrixHeader: FC<OrderMatrixHeaderProps> = ({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {!readOnly && isStoreOwner && onOpenSplitModal && (
-          <button
-            type="button"
-            onClick={onOpenSplitModal}
-            className="po-btn"
-            style={{
-              height: 32,
-              padding: '0 16px',
-              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
-              border: 'none',
-              color: '#ffffff',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              borderRadius: 6,
-              boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
-            }}
-            title="Chốt đơn & Tách PO theo từng [Chi nhánh + Nhà cung cấp + Ngày giao hàng]"
-          >
-            <span>Chốt Đơn &amp; Tách PO</span>
-          </button>
-        )}
-
-        {isStoreOwner && onGoToCutoffHub && (
-          <button
-            type="button"
-            onClick={onGoToCutoffHub}
-            className="po-btn"
-            style={{
-              height: 32,
-              padding: '0 14px',
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#b91c1c',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-            title="Mở Trung tâm Chốt Đơn & Tách PO theo Nhà Cung Cấp"
-          >
-            <span>Chốt đơn (Cutoff Hub)</span>
-          </button>
-        )}
-
         {!readOnly && onSave && (
           <button
             type="button"
             onClick={onSave}
-            disabled={isSaving}
+            disabled={isSaving || saveDisabled}
             className="po-btn po-btn-primary"
             style={{
               height: 32,
               padding: '0 16px',
-              opacity: isSaving ? 0.7 : 1,
-              cursor: isSaving ? 'wait' : 'pointer',
+              opacity: isSaving || saveDisabled ? 0.55 : 1,
+              cursor: isSaving ? 'wait' : saveDisabled ? 'not-allowed' : 'pointer',
             }}
-            title={isStoreOwner ? 'Lưu bản thảo ma trận đặt hàng' : 'Lưu số lượng đề xuất của nhân viên'}
+            title={
+              saveDisabled
+                ? saveDisabledReason || 'Không lưu được vì còn ô dưới MOQ'
+                : isStoreOwner
+                ? 'Lưu bản thảo ma trận đặt hàng'
+                : 'Lưu số lượng đề xuất của nhân viên'
+            }
           >
             <span>{isSaving ? 'Đang lưu...' : isStoreOwner ? 'Lưu Bản Thảo' : 'Lưu Đề Xuất'}</span>
           </button>

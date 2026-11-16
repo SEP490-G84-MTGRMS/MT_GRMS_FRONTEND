@@ -105,6 +105,14 @@ const StatusToggle: FC<{
   </button>
 );
 
+const formatCurrency = (val: number): string =>
+  new Intl.NumberFormat('vi-VN').format(Number.isFinite(val) ? val : 0);
+
+const parseCurrency = (str: string): number => {
+  const cleaned = String(str ?? '').replace(/[^\d]/g, '');
+  return cleaned ? parseInt(cleaned, 10) : 0;
+};
+
 const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   item,
   supplierName,
@@ -112,9 +120,12 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   onClose,
 }) => {
   const masterCost = item.costPrice ?? 0;
-  // 0 / chưa thỏa thuận → giữ 0 (không copy Master vào field), BE lưu NULL
+  // 0 / chưa thỏa thuận → để trống (không copy Master vào field), BE lưu NULL
   const initialPrice = item.agreedPrice > 0 ? item.agreedPrice : 0;
-  const [purchasePrice, setPurchasePrice] = useState<number>(initialPrice);
+  const [purchasePriceText, setPurchasePriceText] = useState<string>(
+    initialPrice > 0 ? formatCurrency(initialPrice) : ''
+  );
+  const [isPriceFocused, setIsPriceFocused] = useState(false);
   const [moq, setMoq] = useState<number>(item.moq);
   const [allowedShortageQty, setAllowedShortageQty] = useState<number>(item.allowedShortageQty ?? 0);
   const [isActive, setIsActive] = useState<boolean>(item.status === 'Active');
@@ -122,11 +133,36 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const unitLabel = item.deliveryUoM || item.baseUoM || 'Cái';
 
+  const handlePurchasePriceChange = (raw: string) => {
+    // Khi đang gõ: chỉ giữ số (tránh nhảy caret vì dấu phân cách)
+    setPurchasePriceText(raw.replace(/[^\d]/g, ''));
+    if (errorMsg) setErrorMsg('');
+  };
+
+  const handlePurchasePriceFocus = () => {
+    setIsPriceFocused(true);
+    const digits = purchasePriceText.replace(/[^\d]/g, '');
+    setPurchasePriceText(digits);
+  };
+
+  const handlePurchasePriceBlur = () => {
+    setIsPriceFocused(false);
+    const amount = parseCurrency(purchasePriceText);
+    setPurchasePriceText(amount > 0 ? formatCurrency(amount) : '');
+  };
+
+  const purchasePriceDisplay = isPriceFocused
+    ? purchasePriceText
+    : purchasePriceText
+      ? formatCurrency(parseCurrency(purchasePriceText))
+      : '';
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (isNaN(purchasePrice) || purchasePrice < 0) {
+    const purchasePrice = parseCurrency(purchasePriceText);
+    if (Number.isNaN(purchasePrice) || purchasePrice < 0) {
       setErrorMsg('Giá nhập không được âm.');
       return;
     }
@@ -290,22 +326,38 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
 
           <FieldRow label="Giá nhập" htmlFor="inputSupplierPurchasePrice">
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <input
-                id="inputSupplierPurchasePrice"
-                type="number"
-                min={0}
-                step={1000}
-                value={Number.isFinite(purchasePrice) ? purchasePrice : 0}
-                onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
-                className="form-input"
-                style={editableInputStyle}
-                title="0 = chưa thỏa thuận (dùng giá Master khi đặt hàng)"
-              />
-              {masterCost > 0 && (
-                <span style={{ fontSize: 12, color: '#64748b' }}>
-                  Master: {new Intl.NumberFormat('vi-VN').format(masterCost)} · 0 = chưa thỏa thuận
-                </span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  id="inputSupplierPurchasePrice"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={purchasePriceDisplay}
+                  onChange={(e) => handlePurchasePriceChange(e.target.value)}
+                  onFocus={handlePurchasePriceFocus}
+                  onBlur={handlePurchasePriceBlur}
+                  className="form-input"
+                  style={{
+                    ...editableInputStyle,
+                    textAlign: 'right',
+                    fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
+                    fontVariantNumeric: 'tabular-nums',
+                    fontWeight: 700,
+                  }}
+                  placeholder={
+                    masterCost > 0
+                      ? `Master ${formatCurrency(masterCost)}`
+                      : 'Trống = dùng giá Master'
+                  }
+                  title="Để trống = chưa thỏa thuận (dùng giá Master khi đặt hàng)"
+                />
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b', flexShrink: 0 }}>đ</span>
+              </div>
+              <span style={{ fontSize: 12, color: '#64748b' }}>
+                {masterCost > 0
+                  ? `Master: ${formatCurrency(masterCost)} đ · Để trống = chưa thỏa thuận`
+                  : 'Để trống = chưa thỏa thuận (dùng giá Master khi đặt hàng)'}
+              </span>
             </div>
           </FieldRow>
 

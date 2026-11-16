@@ -482,7 +482,7 @@ export const OrderMatrixSplitModal: FC<OrderMatrixSplitModalProps> = ({
                         <thead>
                           <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', fontWeight: 600 }}>
                             <th style={{ padding: '6px 8px' }}>Sản phẩm</th>
-                            <th style={{ padding: '6px 8px' }}>ĐVT</th>
+                            <th style={{ padding: '6px 8px' }}>DVN</th>
                             <th style={{ padding: '6px 8px', textAlign: 'right' }}>Đơn giá (đ)</th>
                             <th style={{ padding: '6px 8px', textAlign: 'center' }}>MOQ</th>
                             <th style={{ padding: '6px 8px', textAlign: 'center' }}>NV đề xuất</th>

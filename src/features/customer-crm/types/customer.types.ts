@@ -47,6 +47,7 @@ export interface CustomerDto {
   membershipTier: MembershipTier;
   currentDebtAR: number;
   debtLimit: number;
+  allowDebt?: boolean;
   totalSpending: number;
   status: 'Active' | 'Inactive';
   createdAt: string;
@@ -65,6 +66,7 @@ export interface CreateCustomerInput {
   address?: string;
   taxCode?: string;
   debtLimit: number;
+  allowDebt?: boolean;
   membershipTier?: MembershipTier;
 }
 
@@ -77,6 +79,7 @@ export interface UpdateCustomerInput {
   address?: string;
   taxCode?: string;
   debtLimit?: number;
+  allowDebt?: boolean;
   membershipTier?: MembershipTier;
   status?: 'Active' | 'Inactive';
 }

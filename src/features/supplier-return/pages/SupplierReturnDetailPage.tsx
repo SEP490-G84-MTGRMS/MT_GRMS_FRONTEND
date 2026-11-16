@@ -23,31 +23,13 @@ import { supplierReturnApi } from '../api/supplierReturnApi';
 import { returnStatusBadge } from '../components/SupplierReturnTable';
 import { RecordSupplierResponseModal } from '../components/RecordSupplierResponseModal';
 import { CompleteHandoverModal } from '../components/CompleteHandoverModal';
+import { downloadSupplierReturnPdf } from '../lib/supplierReturnPdf';
 import '../../purchase-order/purchase-order.css';
 
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 
 const isExchangeResolution = (resolutionType?: string | null) =>
   !!resolutionType && resolutionType.toUpperCase().includes('EXCHANGE');
-
-const replacementStatusLabel = (status?: string | null) => {
-  switch ((status || '').toUpperCase()) {
-    case 'WAITING_HANDOVER':
-      return 'Chờ bàn giao hàng lỗi';
-    case 'WAITING_PURCHASE_ORDER':
-      return 'Chờ tạo PO đổi hàng';
-    case 'WAITING_RECEIPT':
-      return 'Chờ nhập hàng đổi';
-    case 'PARTIALLY_RECEIVED':
-      return 'Đã nhận một phần';
-    case 'COMPLETED':
-      return 'Đã nhận đủ hàng đổi';
-    case 'NOT_REQUIRED':
-      return 'Không đổi hàng';
-    default:
-      return status || '—';
-  }
-};
 
 export const SupplierReturnDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -63,6 +45,7 @@ export const SupplierReturnDetailPage: FC = () => {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (!id) return;
@@ -91,18 +74,62 @@ export const SupplierReturnDetailPage: FC = () => {
     loadDetail();
   }, [loadDetail]);
 
-  useEffect(() => {
-    if (searchParams.get('print') === 'true' && detail) {
-      setTimeout(() => window.print(), 300);
+  const handleDownloadPdf = async () => {
+    if (!detail) return;
+    try {
+      setIsPrinting(true);
+      setErrorMsg('');
+      await downloadSupplierReturnPdf(detail);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Không tạo được file PDF biên bản.');
+    } finally {
+      setIsPrinting(false);
     }
-  }, [searchParams, detail]);
+  };
+
+  useEffect(() => {
+    if (searchParams.get('print') !== 'true' || !detail) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        setIsPrinting(true);
+        await downloadSupplierReturnPdf(detail);
+        if (!cancelled) {
+          navigate(`/store-owner/supplier-returns/${detail.id}`, { replace: true });
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setErrorMsg(err instanceof Error ? err.message : 'Không tạo được file PDF biên bản.');
+        }
+      } finally {
+        if (!cancelled) setIsPrinting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, detail, navigate]);
 
   const handleSubmitDraft = async () => {
     if (!detail) return;
     try {
       setIsSubmitting(true);
+      setErrorMsg('');
       const updated = await supplierReturnApi.submit(detail.id);
       setDetail(updated);
+      if (isExchangeResolution(updated.resolutionType)) {
+        const pos = await supplierReturnApi.getRelatedPurchaseOrders(updated.id);
+        setRelatedPos(pos);
+        const code = pos[0]?.code;
+        if (code) {
+          navigate(`/store-owner/purchase-orders/list?code=${encodeURIComponent(code)}`, {
+            state: {
+              toastMessage: `Đã xác nhận, gửi email NCC và tạo PO đổi hàng ${code}.`,
+            },
+          });
+          return;
+        }
+      }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Lỗi khi gửi yêu cầu trả hàng.');
     } finally {
@@ -153,13 +180,29 @@ export const SupplierReturnDetailPage: FC = () => {
       setIsSubmitting(true);
       setErrorMsg('');
       const created = await supplierReturnApi.createExchangePurchaseOrders(detail.id);
-      const refreshed = await supplierReturnApi.getById(detail.id);
-      setDetail(refreshed);
-      setRelatedPos(created.length ? created : await supplierReturnApi.getRelatedPurchaseOrders(detail.id));
+      const pos =
+        created.length > 0
+          ? created
+          : await supplierReturnApi.getRelatedPurchaseOrders(detail.id);
+      setRelatedPos(pos);
+      const first = pos[0];
+      const code = first?.code || '';
+      // Sau khi tạo PO đổi hàng → sang màn danh sách PO (không ở lại phiếu trả).
+      navigate(
+        code
+          ? `/store-owner/purchase-orders/list?code=${encodeURIComponent(code)}`
+          : '/store-owner/purchase-orders/list',
+        {
+          state: {
+            toastMessage: code
+              ? `Đã tạo PO đổi hàng ${code} từ phiếu ${detail.code}.`
+              : `Đã tạo PO đổi hàng từ phiếu ${detail.code}.`,
+          },
+        }
+      );
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
       setErrorMsg(e.response?.data?.message || e.message || 'Lỗi khi tạo PO đổi hàng.');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -190,23 +233,54 @@ export const SupplierReturnDetailPage: FC = () => {
 
   const badge = returnStatusBadge(detail.status);
 
-  // Stepper logic
-  const steps = [
-    { key: 'DRAFT', label: '1. Khởi tạo nháp' },
-    { key: 'PENDING_SUPPLIER', label: '2. Chờ NCC duyệt' },
-    { key: 'APPROVED', label: '3. NCC chấp thuận' },
-    { key: 'COMPLETED', label: '4. Bàn giao hoàn tất' },
-  ];
+  const isExchange = isExchangeResolution(detail.resolutionType);
+
+  // Stepper: không còn bước chờ NCC duyệt — chỉ email thông báo.
+  const steps = isExchange
+    ? [
+        { key: 'DRAFT', label: '1. Nháp' },
+        { key: 'APPROVED', label: '2. Xác nhận + email NCC' },
+        { key: 'EXCHANGE_FLOW', label: '3. PO / nhập hàng đổi' },
+        { key: 'COMPLETED', label: '4. Bàn giao hoàn tất' },
+      ]
+    : [
+        { key: 'DRAFT', label: '1. Nháp' },
+        { key: 'APPROVED', label: '2. Xác nhận + email NCC' },
+        { key: 'HANDOVER', label: '3. Bàn giao hàng trả' },
+        { key: 'COMPLETED', label: '4. Hoàn tất' },
+      ];
 
   const getStepIndex = (st: string) => {
     if (st === 'DRAFT') return 0;
-    if (st === 'PENDING_SUPPLIER') return 1;
-    if (st === 'APPROVED' || st === 'PARTIALLY_HANDED_OVER') return 2;
+    if (st === 'PENDING_SUPPLIER') return 1; // legacy
+    if (st === 'APPROVED' || st === 'PARTIALLY_HANDED_OVER') {
+      if (isExchange) {
+        const rs = (detail.replacementStatus || '').toUpperCase();
+        if (rs === 'WAITING_RECEIPT' || rs === 'PARTIALLY_RECEIVED' || relatedPos.length > 0) {
+          return 2;
+        }
+        return 1;
+      }
+      return st === 'PARTIALLY_HANDED_OVER' ? 2 : 1;
+    }
     if (st === 'COMPLETED') return 3;
     return -1;
   };
 
   const currentStepIdx = getStepIndex(detail.status);
+
+  const canCreateExchangePo =
+    isExchange &&
+    detail.status === 'APPROVED' &&
+    (detail.replacementStatus === 'WAITING_PURCHASE_ORDER' ||
+      detail.replacementStatus === 'WAITING_HANDOVER' ||
+      (detail.settlementStatus === 'PAID' &&
+        detail.replacementStatus !== 'WAITING_RECEIPT' &&
+        detail.replacementStatus !== 'PARTIALLY_RECEIVED' &&
+        detail.replacementStatus !== 'COMPLETED') ||
+      (detail.settlementStatus === 'NOT_REQUIRED' &&
+        detail.replacementStatus !== 'WAITING_RECEIPT' &&
+        detail.replacementStatus !== 'COMPLETED'));
 
   return (
     <div
@@ -297,14 +371,22 @@ export const SupplierReturnDetailPage: FC = () => {
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 34, padding: '0 12px', display: 'flex', alignItems: 'center', gap: 6 }}
-            onClick={() => window.print()}
+            style={{
+              height: 34,
+              padding: '0 12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              ...(isPrinting ? { opacity: 0.6, cursor: 'wait' } : undefined),
+            }}
+            disabled={isPrinting || isSubmitting}
+            onClick={() => void handleDownloadPdf()}
           >
             <Printer size={14} />
-            <span>In biên bản A4</span>
+            <span>{isPrinting ? 'Đang tạo PDF…' : 'Tải PDF biên bản A4'}</span>
           </button>
 
-          {/* DRAFT -> Submit */}
+          {/* DRAFT -> xác nhận theo policy + email NCC */}
           {detail.status === 'DRAFT' && (
             <button
               type="button"
@@ -314,11 +396,11 @@ export const SupplierReturnDetailPage: FC = () => {
               onClick={handleSubmitDraft}
             >
               <Send size={14} />
-              <span>Gửi yêu cầu trả NCC</span>
+              <span>Xác nhận &amp; gửi email NCC</span>
             </button>
           )}
 
-          {/* PENDING_SUPPLIER -> Record Response */}
+          {/* Legacy: phiếu cũ còn PENDING_SUPPLIER */}
           {detail.status === 'PENDING_SUPPLIER' && (
             <button
               type="button"
@@ -327,28 +409,29 @@ export const SupplierReturnDetailPage: FC = () => {
               onClick={() => setIsResponseModalOpen(true)}
             >
               <CheckCircle size={14} />
-              <span>Ghi nhận phản hồi NCC</span>
+              <span>Ghi nhận phản hồi NCC (phiếu cũ)</span>
             </button>
           )}
 
-          {/* APPROVED or PARTIALLY_HANDED_OVER -> Handover */}
-          {(detail.status === 'APPROVED' || detail.status === 'PARTIALLY_HANDED_OVER') && (
-            <button
-              type="button"
-              className="po-btn po-btn-primary"
-              style={{ height: 34, padding: '0 16px', backgroundColor: '#15803d', display: 'flex', alignItems: 'center', gap: 6 }}
-              onClick={() => setIsHandoverModalOpen(true)}
-            >
-              <Truck size={14} />
-              <span>
-                {detail.status === 'PARTIALLY_HANDED_OVER'
-                  ? 'Bàn giao tiếp phần còn lại'
-                  : 'Xác nhận bàn giao thực tế'}
-              </span>
-            </button>
-          )}
+          {/* Non-EXCHANGE: bàn giao trừ tồn ngay */}
+          {!isExchange &&
+            (detail.status === 'APPROVED' || detail.status === 'PARTIALLY_HANDED_OVER') && (
+              <button
+                type="button"
+                className="po-btn po-btn-primary"
+                style={{ height: 34, padding: '0 16px', backgroundColor: '#15803d', display: 'flex', alignItems: 'center', gap: 6 }}
+                onClick={() => setIsHandoverModalOpen(true)}
+              >
+                <Truck size={14} />
+                <span>
+                  {detail.status === 'PARTIALLY_HANDED_OVER'
+                    ? 'Bàn giao tiếp phần còn lại'
+                    : 'Xác nhận bàn giao thực tế'}
+                </span>
+              </button>
+            )}
 
-          {isExchangeResolution(detail.resolutionType) &&
+          {isExchange &&
             Number(detail.storePayableAmount || 0) > Number(detail.storePaidAmount || 0) &&
             detail.settlementStatus !== 'PAID' &&
             detail.settlementStatus !== 'NOT_REQUIRED' && (
@@ -360,25 +443,41 @@ export const SupplierReturnDetailPage: FC = () => {
                 onClick={handlePayCostShare}
               >
                 <CreditCard size={14} />
-                <span>Thanh toán phần CH</span>
+                <span>
+                  Thanh toán phần CH ({fmt(Number(detail.storePayableAmount || 0) - Number(detail.storePaidAmount || 0))}đ)
+                </span>
               </button>
             )}
 
-          {isExchangeResolution(detail.resolutionType) &&
-            (detail.replacementStatus === 'WAITING_PURCHASE_ORDER' ||
-              (Number(detail.totalHandedOverQty || 0) > 0 &&
-                detail.replacementStatus !== 'WAITING_RECEIPT' &&
-                detail.replacementStatus !== 'PARTIALLY_RECEIVED' &&
-                detail.replacementStatus !== 'COMPLETED')) && (
+          {canCreateExchangePo && (
+            <button
+              type="button"
+              className="po-btn po-btn-primary"
+              style={{ height: 34, padding: '0 14px', backgroundColor: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}
+              disabled={isSubmitting}
+              onClick={handleGenerateExchangePo}
+            >
+              <RefreshCw size={14} />
+              <span>Tạo PO đổi hàng</span>
+            </button>
+          )}
+
+          {isExchange &&
+            (detail.replacementStatus === 'WAITING_RECEIPT' ||
+              detail.replacementStatus === 'PARTIALLY_RECEIVED') &&
+            relatedPos[0] && (
               <button
                 type="button"
                 className="po-btn po-btn-primary"
-                style={{ height: 34, padding: '0 14px', backgroundColor: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}
-                disabled={isSubmitting}
-                onClick={handleGenerateExchangePo}
+                style={{ height: 34, padding: '0 14px', backgroundColor: '#0f766e', display: 'flex', alignItems: 'center', gap: 6 }}
+                onClick={() =>
+                  navigate(
+                    `/store-owner/goods-receipts/create?po=${encodeURIComponent(relatedPos[0].id)}&poCode=${encodeURIComponent(relatedPos[0].code)}`
+                  )
+                }
               >
-                <RefreshCw size={14} />
-                <span>Tạo PO đổi hàng</span>
+                <Truck size={14} />
+                <span>Nhập hàng đổi (GRN)</span>
               </button>
             )}
 
@@ -397,70 +496,19 @@ export const SupplierReturnDetailPage: FC = () => {
         </div>
       </div>
 
-      {isExchangeResolution(detail.resolutionType) && (
+      {errorMsg && (
         <div
           style={{
-            background: '#f0f9ff',
-            border: '1px solid #bae6fd',
+            marginBottom: 12,
+            padding: '10px 14px',
             borderRadius: 8,
-            padding: '14px 16px',
-            marginBottom: 14,
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#b91c1c',
+            fontSize: 13,
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#0c4a6e' }}>Luồng đổi hàng NCC</div>
-              <div style={{ fontSize: 12, color: '#075985', marginTop: 4 }}>
-                Bàn giao (− tồn) → thanh toán phần CH (nếu có) → tạo PO đổi hàng → nhập GRN đến khi đủ OrderedQty.
-              </div>
-            </div>
-            <div style={{ fontSize: 12, color: '#0f172a', textAlign: 'right' }}>
-              <div>
-                Đổi hàng: <strong>{replacementStatusLabel(detail.replacementStatus)}</strong>
-              </div>
-              <div>
-                Chi phí: CH {fmt(Number(detail.storeCostSharePercentSnapshot || 0))}% / NCC{' '}
-                {fmt(Number(detail.supplierCostSharePercentSnapshot || 0))}%
-              </div>
-              <div>
-                CH phải trả: {fmt(Number(detail.storePayableAmount || 0))}đ · đã trả{' '}
-                {fmt(Number(detail.storePaidAmount || 0))}đ
-              </div>
-            </div>
-          </div>
-
-          {relatedPos.length > 0 && (
-            <div style={{ marginTop: 12, borderTop: '1px dashed #7dd3fc', paddingTop: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#0369a1', marginBottom: 6 }}>
-                PO đổi hàng liên quan
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {relatedPos.map((po) => (
-                  <button
-                    key={po.id}
-                    type="button"
-                    onClick={() => navigate(`/store-owner/purchase-orders/list?keyword=${encodeURIComponent(po.code)}`)}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                      background: '#fff',
-                      border: '1px solid #e0f2fe',
-                      borderRadius: 6,
-                      padding: '8px 10px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0284c7' }}>{po.code}</span>
-                    <span style={{ fontSize: 12, color: '#475569' }}>
-                      {po.status} · {fmt(Number(po.totalQty))} SP · {fmt(Number(po.totalAmount))}đ
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {errorMsg}
         </div>
       )}
 
@@ -617,11 +665,6 @@ export const SupplierReturnDetailPage: FC = () => {
               Ghi chú: {detail.reasonNotes}
             </div>
           )}
-          {detail.supplierResponseNote && (
-            <div style={{ fontSize: 12, color: '#15803d', marginTop: 4, fontWeight: 600 }}>
-              NCC phản hồi: {detail.supplierResponseNote}
-            </div>
-          )}
         </div>
 
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 14 }}>
@@ -641,6 +684,55 @@ export const SupplierReturnDetailPage: FC = () => {
           {detail.handedOverBy && (
             <div style={{ fontSize: 12, color: '#0f766e', marginTop: 2, fontWeight: 700 }}>
               Thực hiện bởi: {detail.handedOverBy}
+            </div>
+          )}
+        </div>
+
+        {/* Luôn hiện — kể cả 0đ */}
+        <div
+          style={{
+            background: '#faf5ff',
+            border: '1px solid #e9d5ff',
+            borderRadius: 8,
+            padding: 14,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#7c3aed',
+              textTransform: 'uppercase',
+            }}
+          >
+            <CreditCard size={14} />
+            <span>Số tiền cần bù cho NCC</span>
+          </div>
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 22,
+              fontWeight: 800,
+              color: '#6b21a8',
+              fontFamily: 'monospace',
+            }}
+          >
+            {fmt(Number(detail.storePayableAmount ?? 0))}đ
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+            {Number(detail.storePayableAmount ?? 0) <= 0
+              ? 'Theo chính sách: cửa hàng không phải bù (0đ).'
+              : `Đã trả ${fmt(Number(detail.storePaidAmount ?? 0))}đ · còn lại ${fmt(Math.max(0, Number(detail.storePayableAmount ?? 0) - Number(detail.storePaidAmount ?? 0)))}đ`}
+          </div>
+          {detail.resolutionType && (
+            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+              Hình thức: {detail.resolutionType}
+              {isExchangeResolution(detail.resolutionType)
+                ? ' · tính theo chia sẻ chi phí đổi hàng'
+                : ' · không áp dụng chia sẻ đổi hàng → 0đ'}
             </div>
           )}
         </div>
@@ -673,7 +765,6 @@ export const SupplierReturnDetailPage: FC = () => {
           </div>
           <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
             <div>Tổng SL yêu cầu: <strong style={{ color: '#0f766e' }}>{fmt(detail.totalRequestedQty)}</strong></div>
-            <div>Tổng SL duyệt: <strong style={{ color: '#16a34a' }}>{fmt(detail.totalApprovedQty)}</strong></div>
             <div>Tổng SL đã giao: <strong style={{ color: '#0284c7' }}>{fmt(detail.totalHandedOverQty)}</strong></div>
             <div>Tổng giá trị: <strong style={{ color: '#b45309', fontSize: 14 }}>{fmt(detail.totalEstimatedAmount)} đ</strong></div>
           </div>
@@ -683,13 +774,11 @@ export const SupplierReturnDetailPage: FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569' }}>
-                <th style={{ padding: '8px 10px', textAlign: 'center', width: 40 }}>#</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center', width: 40 }}>STT</th>
                 <th style={{ padding: '8px 10px', textAlign: 'left' }}>Mã SKU / Sản phẩm</th>
                 <th style={{ padding: '8px 10px', textAlign: 'left' }}>Lô / Hạn sử dụng</th>
                 <th style={{ padding: '8px 10px', textAlign: 'center' }}>ĐVT</th>
                 <th style={{ padding: '8px 10px', textAlign: 'right' }}>SL yêu cầu</th>
-                <th style={{ padding: '8px 10px', textAlign: 'right', color: '#15803d' }}>SL NCC duyệt</th>
-                <th style={{ padding: '8px 10px', textAlign: 'right', color: '#dc2626' }}>SL từ chối</th>
                 <th style={{ padding: '8px 10px', textAlign: 'right', color: '#0284c7' }}>SL đã bàn giao</th>
                 <th style={{ padding: '8px 10px', textAlign: 'right' }}>Đơn giá vốn</th>
                 <th style={{ padding: '8px 10px', textAlign: 'right' }}>Thành tiền</th>
@@ -722,16 +811,8 @@ export const SupplierReturnDetailPage: FC = () => {
                   <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700 }}>
                     {fmt(line.requestedQty)}
                   </td>
-                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: line.approvedQty > 0 ? '#15803d' : '#94a3b8' }}>
-                    {detail.status === 'DRAFT' || detail.status === 'PENDING_SUPPLIER' ? '—' : fmt(line.approvedQty)}
-                  </td>
-                  <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: line.rejectedQty > 0 ? '#dc2626' : '#94a3b8' }}>
-                    {detail.status === 'DRAFT' || detail.status === 'PENDING_SUPPLIER' ? '—' : fmt(line.rejectedQty)}
-                  </td>
                   <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: line.handedOverQty > 0 ? '#0284c7' : '#94a3b8' }}>
-                    {detail.status === 'COMPLETED' || detail.status === 'PARTIALLY_HANDED_OVER'
-                      ? fmt(line.handedOverQty)
-                      : '—'}
+                    {fmt(line.handedOverQty || 0)}
                   </td>
                   <td style={{ padding: '8px 10px', textAlign: 'right', color: '#475569' }}>
                     {fmt(line.unitCost)}
@@ -740,7 +821,7 @@ export const SupplierReturnDetailPage: FC = () => {
                     {fmt(line.lineTotal)}
                   </td>
                   <td style={{ padding: '8px 10px', color: '#64748b', fontSize: 12 }}>
-                    {line.notes || line.rejectionReason || '—'}
+                    {line.notes || '—'}
                   </td>
                 </tr>
               ))}

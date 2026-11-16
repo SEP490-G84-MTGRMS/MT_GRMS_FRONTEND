@@ -31,6 +31,8 @@ export interface AllowanceItem {
 export interface SalaryConfig {
   salaryType: SalaryType;
   baseSalary: number; // Mức lương chính (tháng hoặc giờ)
+  hasLaborContract?: boolean; // Có hợp đồng lao động đóng bảo hiểm (chỉ áp dụng lương tháng)
+  insuranceBaseSalary?: number; // Mức lương căn cứ đóng BHXH/BHYT/BHTN
   otWeekday: string;  // e.g. "150%"
   otSunday: string;   // e.g. "200%"
   otDayOff: string;   // e.g. "200%"
@@ -224,12 +226,14 @@ export interface PayslipDetailedRecord {
   employeeId: string;
   employeeCode: string; // NV001
   employeeName: string; // Dung Phạm
+  branchId?: string;
   branchName: string; // Chi nhánh trung tâm
   periodMonth: string; // 2026-10
 
   // Thông số công & Cấu hình lương
   salaryType?: 'MONTHLY' | 'HOURLY' | 'SHIFT';
   baseRate?: number;
+  insuranceBaseSalary?: number; // Mức lương căn cứ đóng bảo hiểm tại thời điểm chốt công
   standardDays: number; // 26
   standardDayHours?: number; // 8.0
   workedDays: number; // 24.5
@@ -274,6 +278,7 @@ export interface PayslipDetailedRecord {
   paidBy?: string; // Người chi trả
   cashbookVoucherCode?: string; // Mã phiếu chi sổ quỹ (PC-xxxx)
   approvedBy?: string; // Người duyệt
+  approvedAt?: string; // Thời điểm chốt lương
   note?: string; // Ghi chú phiếu lương
   bankName?: string;
   bankAccountNumber?: string;

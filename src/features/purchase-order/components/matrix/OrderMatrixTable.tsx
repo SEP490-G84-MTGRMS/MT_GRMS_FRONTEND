@@ -144,7 +144,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
     return acc + rowQty * p.price;
   }, 0);
 
-  // Number of fixed metadata columns: Tên SP + (NCC nếu flat) + ĐVT + MOQ + Giá nhập + (SOH)
+  // Number of fixed metadata columns: Tên SP + (NCC nếu flat) + DVN + MOQ + Giá nhập + (SOH)
   const metaExtra = flatByPrice ? 1 : 0; // cột NCC khi flat
   const fixedColCount = 4 + metaExtra + (showSoh ? 2 : 0);
   const totalColSpan = fixedColCount + days.length + 2;
@@ -242,7 +242,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
             <tr>
               <th className="po-th-left po-th-product">Tên Sản Phẩm</th>
               {flatByPrice && <th className="po-th-left">Nhà Cung Cấp</th>}
-              <th>ĐVT</th>
+              <th>DVN</th>
               <th>MOQ</th>
               <th
                 style={{ cursor: flatByPrice ? 'pointer' : undefined, userSelect: 'none' }}
@@ -490,6 +490,14 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                 const rowQty = days.reduce((rSum, d) => rSum + (getCell(item, d.dateKey).finalQty || 0), 0);
                 return sum + rowQty * item.price;
               }, 0);
+              const orderMoq = Math.max(
+                0,
+                Number(
+                  supplierConfigs?.find(
+                    (sc) => String(sc.supplierId).toLowerCase() === String(group.supplierId).toLowerCase()
+                  )?.minOrderQuantity ?? 0
+                ) || 0
+              );
 
               return (
                 <React.Fragment key={group.supplierId}>
@@ -831,12 +839,32 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                   <tr className="po-row-subtotal">
                     <td colSpan={fixedColCount}>
                       Tổng nhóm NCC — {group.supplierName}
+                      {orderMoq > 0 ? (
+                        <span
+                          style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}
+                          title="Số lượng đặt tối thiểu trên một đơn hàng (cấu hình NCC)"
+                        >
+                          {' — '}
+                          {orderMoq}
+                        </span>
+                      ) : null}
                     </td>
-                    {subDayQty.map((val, idx) => (
-                      <td key={idx} style={{ textAlign: 'center' }}>
-                        {val > 0 ? val : 0}
-                      </td>
-                    ))}
+                    {subDayQty.map((val, idx) => {
+                      const belowOrderMoq = orderMoq > 0 && val > 0 && val < orderMoq;
+                      return (
+                        <td
+                          key={idx}
+                          style={{
+                            textAlign: 'center',
+                            color: belowOrderMoq ? '#b91c1c' : undefined,
+                            fontWeight: belowOrderMoq ? 800 : undefined,
+                            background: belowOrderMoq ? '#fef2f2' : undefined,
+                          }}
+                        >
+                          {val > 0 ? val : 0}
+                        </td>
+                      );
+                    })}
                     <td style={{ textAlign: 'center' }}>{subTotalQty}</td>
                     <td style={{ textAlign: 'right', color: 'var(--blue-dark)' }}>{fmt(subTotalAmt)} đ</td>
                   </tr>

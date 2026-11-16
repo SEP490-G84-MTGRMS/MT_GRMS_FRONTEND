@@ -35,13 +35,16 @@ export class BranchStockDTO {
  * Quản lý lô hàng theo nguyên tắc FEFO (First Expired, First Out)
  */
 export class FefoBatchDTO {
-  batchId: string = '';             // Mã Lô (LOT2026-09A)
+  batchId: string = '';             // UUID dòng BranchStock (hoặc mã lô với mock)
+  batchCode?: string = '';          // Mã Lô hiển thị (LOT2026-09A)
   productId: string = '';
   productName: string = '';
   supplierName: string = '';        // Nhà cung cấp
   mfgDate: string = '';             // Ngày sản xuất (DD/MM/YYYY)
   expDate: string = '';             // Hạn sử dụng (DD/MM/YYYY)
-  daysRemaining: number = 0;        // Số ngày còn lại tới date
+  daysRemaining: number | null = 0; // Số ngày còn lại tới date (null = không giới hạn)
+  quantityOnHand?: number = 0;      // Tồn kho thực tế trong lô
+  reservedQty?: number = 0;         // Số lượng đang giữ đơn của lô
   availableQty: number = 0;         // Số lượng khả dụng của lô này
   unitName: string = 'Hộp';
   fefoPriorityRank: number = 1;     // Thứ hạng FEFO: 1, 2, 3...
@@ -242,6 +245,8 @@ export class PreOrderDTO {
   fulfilledByCashierName?: string;  // Người giao hàng & hoàn tất
   fulfilledAt?: string;             // Thời gian giao hàng
   pickupAppointment: string = '';   // Thời gian hẹn đến quầy lấy hàng
+  fulfillmentNote?: string | null = null; // Ghi chú xuất hàng / bàn giao
+  notes?: string | null = null;     // Ghi chú đơn hàng khác
   customerName: string = '';
   customerPhone: string = '';
   

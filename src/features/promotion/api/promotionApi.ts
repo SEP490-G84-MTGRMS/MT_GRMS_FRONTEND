@@ -184,6 +184,21 @@ export interface LoyaltyConfigDto {
   allowPointsWithPromotions: boolean;
 }
 
+export interface LoyaltyLedgerDto {
+  id: string;
+  transactionCode: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  type: 'EARN_PURCHASE' | 'REDEEM_PURCHASE' | 'MANUAL_ADJUST_ADD' | 'MANUAL_ADJUST_SUB' | 'EXPIRED';
+  pointsChanged: number;
+  balanceAfter: number;
+  orderCode?: string;
+  reason: string;
+  createdAt: string;
+  createdBy: string;
+}
+
 export const promotionApi = {
   // 1. Promotions
   async getPromotions(query?: PromotionFilterQuery) {
@@ -252,14 +267,31 @@ export const promotionApi = {
     return res.data?.data;
   },
 
+  async deleteVoucherBatch(batchId: string) {
+    const res = await httpClient.delete<{ success: boolean; data: boolean }>(`/vouchers/${batchId}`);
+    return res.data?.data;
+  },
+
+  async toggleVoucherBatchStatus(batchId: string) {
+    const res = await httpClient.patch<{ success: boolean; data: boolean }>(`/vouchers/${batchId}/status`);
+    return res.data?.data;
+  },
+
   async validateVoucher(code: string, cartTotal: number, customerId?: string, hasOtherPromotions?: boolean) {
-    const res = await httpClient.post<{ success: boolean; data: ValidateVoucherResponse }>('/vouchers/validate', {
+    const res = await httpClient.post<{ success: boolean; message?: string; data?: ValidateVoucherResponse }>('/vouchers/validate', {
       code,
       cartTotal,
       customerId,
       hasOtherPromotions,
     });
-    return res.data?.data;
+    if (res.data?.data) {
+      return res.data.data;
+    }
+    return {
+      isValid: false,
+      message: res.data?.message || 'Mã voucher không tồn tại',
+      discountAmount: 0,
+    };
   },
 
   async redeemVoucher(data: { code: string; orderId: string; orderCode: string; customerId?: string; customerName?: string; customerPhone?: string }) {
@@ -275,6 +307,16 @@ export const promotionApi = {
 
   async updateLoyaltyConfig(data: LoyaltyConfigDto) {
     const res = await httpClient.put<{ success: boolean; data: LoyaltyConfigDto }>('/loyalty-config', data);
+    return res.data?.data;
+  },
+
+  async getLoyaltyLedger() {
+    const res = await httpClient.get<{ success: boolean; data: LoyaltyLedgerDto[] }>('/loyalty-config/ledger');
+    return res.data?.data ?? [];
+  },
+
+  async adjustLoyaltyPoints(data: { customerPhone: string; adjustmentType: 'ADD' | 'SUB'; points: number; reason: string }) {
+    const res = await httpClient.post<{ success: boolean; data: LoyaltyLedgerDto }>('/loyalty-config/adjustments', data);
     return res.data?.data;
   },
 };

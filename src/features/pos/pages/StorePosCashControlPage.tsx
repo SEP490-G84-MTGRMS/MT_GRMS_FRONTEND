@@ -15,6 +15,7 @@ import {
   Sliders,
   AlertTriangle,
   Info,
+  Building2,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
 import type { ShiftCashMovementDto } from '../types/posShift.types';
@@ -24,8 +25,9 @@ export const StorePosCashControlPage: FC = () => {
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
 
-  // Chi nhánh đang chọn
+  // Chi nhánh đang chọn đồng bộ từ TopNav
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
+  const [selectedBranchName, setSelectedBranchName] = useState<string>('Toàn hệ thống');
 
   // Cấu hình hạn mức
   const [threshold, setThreshold] = useState<number>(200000);
@@ -48,8 +50,9 @@ export const StorePosCashControlPage: FC = () => {
     const handleGlobalBranchChange = (e: Event) => {
       const customEvent = e as CustomEvent;
       const branch = customEvent.detail;
-      if (branch?.id) {
-        setSelectedBranchId(branch.id);
+      if (branch) {
+        setSelectedBranchId(branch.id || 'ALL');
+        setSelectedBranchName(branch.name || 'Toàn hệ thống');
       }
     };
 
@@ -57,8 +60,9 @@ export const StorePosCashControlPage: FC = () => {
       const stored = localStorage.getItem('mtgrms_active_branch');
       if (stored) {
         const branch = JSON.parse(stored);
-        if (branch?.id) {
-          setSelectedBranchId(branch.id);
+        if (branch) {
+          setSelectedBranchId(branch.id || 'ALL');
+          setSelectedBranchName(branch.name || 'Toàn hệ thống');
         }
       }
     } catch {
@@ -188,7 +192,7 @@ export const StorePosCashControlPage: FC = () => {
   };
 
   return (
-    <div style={{ width: '100%', maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20, padding: '4px 0 24px' }}>
       {/* 1. Header Bar */}
       <div
         style={{
@@ -217,16 +221,35 @@ export const StorePosCashControlPage: FC = () => {
             </div>
             <div>
               <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Hạn Mức & Duyệt Chi Két POS
+                Hạn Mức &amp; Duyệt Chi Két POS
               </h1>
               <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>
-                Kiểm soát rủi ro tiền mặt quầy thu ngân &bull; Phê duyệt phiếu chi vặt &bull; Xác nhận tiền rút két nộp quỹ
+                Cấu hình hạn mức, duyệt phiếu chi và xác nhận tiền rút két.
               </p>
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: '#f0fdfa',
+              border: '1px solid #ccfbf1',
+              color: '#0f766e',
+              padding: '6px 12px',
+              borderRadius: 8,
+              fontSize: 12.5,
+              fontWeight: 600,
+            }}
+            title="Đang đồng bộ tự động theo chi nhánh được chọn trên thanh Topbar"
+          >
+            <Building2 size={15} />
+            <span>Phiếu đang xem: <b>{selectedBranchName}</b></span>
+          </div>
+
           <button
             type="button"
             onClick={loadData}
@@ -235,7 +258,7 @@ export const StorePosCashControlPage: FC = () => {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              height: 38,
+              height: 36,
               padding: '0 14px',
               borderRadius: 8,
               border: '1px solid #cbd5e1',
@@ -377,7 +400,7 @@ export const StorePosCashControlPage: FC = () => {
               {threshold === 0 ? '0 đ (Duyệt tất cả)' : `${threshold.toLocaleString('vi-VN')} đ`}
             </div>
             <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              Mỗi phiếu chi vặt dưới mức này
+              Áp dụng cho tất cả chi nhánh
             </div>
           </div>
           <div
@@ -410,12 +433,12 @@ export const StorePosCashControlPage: FC = () => {
           }}
         >
           <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Trần tổng chi / ca</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Trần tổng chi / ca (chưa áp dụng)</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginTop: 4 }}>
               {shiftTotalLimit === 0 ? 'Không giới hạn' : `${shiftTotalLimit.toLocaleString('vi-VN')} đ`}
             </div>
             <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              Hạn mức lũy kế tối đa trong 1 ca
+              Hệ thống chưa kiểm tra trần này
             </div>
           </div>
           <div
@@ -439,7 +462,7 @@ export const StorePosCashControlPage: FC = () => {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(380px, 440px) 1fr',
+          gridTemplateColumns: 'minmax(360px, 460px) 1fr',
           gap: 20,
           alignItems: 'start',
         }}
@@ -468,7 +491,7 @@ export const StorePosCashControlPage: FC = () => {
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, backgroundColor: '#f0fdfa', borderRadius: 8, border: '1px solid #ccfbf1' }}>
             <Info size={18} className="text-teal-700 flex-shrink-0" style={{ marginTop: 2 }} />
             <span style={{ fontSize: 12.5, color: '#0f766e', lineHeight: 1.5 }}>
-              Kiểm soát tự động dòng tiền mặt tại quầy thu ngân. Hạn chế tối đa rủi ro thất thoát hoặc nhân viên tự ý rút tiền chi tiêu mà không có sự đồng ý của Chủ cửa hàng.
+              Hạn mức áp dụng cho tất cả chi nhánh. Danh sách phiếu bên phải theo chi nhánh đang chọn.
             </span>
           </div>
 
@@ -492,7 +515,6 @@ export const StorePosCashControlPage: FC = () => {
                   border: '1.5px solid #cbd5e1',
                   fontSize: 15,
                   fontWeight: 700,
-                  fontFamily: 'monospace',
                   color: '#0f172a',
                 }}
               />
@@ -522,14 +544,14 @@ export const StorePosCashControlPage: FC = () => {
               ))}
             </div>
             <p style={{ fontSize: 12, color: '#64748b', marginTop: 6, lineHeight: 1.4 }}>
-              Phiếu chi dưới mức này được xuất tiền ngay. Chi bằng hoặc lớn hơn mức này bắt buộc Chủ cửa hàng duyệt.
+              Phiếu chi không vượt mức được ghi nhận ngay; vượt mức cần chủ cửa hàng duyệt.
             </p>
           </div>
 
           {/* Trường 2: Hạn mức tổng chi / ca */}
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-              Hạn mức tổng chi vặt tối đa trong 1 ca làm việc:
+              Trần tổng chi vặt mỗi ca (chưa áp dụng):
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <input
@@ -546,7 +568,6 @@ export const StorePosCashControlPage: FC = () => {
                   border: '1.5px solid #cbd5e1',
                   fontSize: 15,
                   fontWeight: 700,
-                  fontFamily: 'monospace',
                   color: '#0f172a',
                 }}
               />
@@ -576,7 +597,7 @@ export const StorePosCashControlPage: FC = () => {
               ))}
             </div>
             <p style={{ fontSize: 12, color: '#64748b', marginTop: 6, lineHeight: 1.4 }}>
-              Tổng các khoản chi vặt tích lũy trong ca không được vượt quá mức này. Đặt 0 nếu không giới hạn.
+              Giá trị này hiện chỉ được lưu; hệ thống chưa kiểm tra tổng chi theo ca.
             </p>
           </div>
 

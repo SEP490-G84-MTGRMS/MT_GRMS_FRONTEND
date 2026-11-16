@@ -140,11 +140,6 @@ export const AppTopNav: FC = () => {
     navigate('/login');
   };
 
-  const isScheduleActive =
-    location.pathname === '/employee/schedule' ||
-    location.pathname === '/employees/schedule' ||
-    location.pathname.startsWith('/employee/schedule');
-
   const isAttendanceActive =
     location.pathname === '/employee/attendance' ||
     location.pathname === '/employees/attendance' ||
@@ -187,7 +182,7 @@ export const AppTopNav: FC = () => {
         >
           {/* Brand Logo & Name */}
           <Link
-            to="/employee/schedule"
+            to="/employee/attendance"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -246,43 +241,7 @@ export const AppTopNav: FC = () => {
               flex: 1,
             }}
           >
-            {/* 1. Xem lịch làm việc */}
-            <NavLink
-              to="/employee/schedule"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '0 16px',
-                height: '100%',
-                textDecoration: 'none',
-                fontSize: 13.5,
-                fontWeight: isScheduleActive ? 700 : 500,
-                color: '#ffffff',
-                backgroundColor: isScheduleActive
-                  ? 'rgba(0, 0, 0, 0.2)'
-                  : 'transparent',
-                borderBottom: isScheduleActive
-                  ? '3px solid #FCD34D' // Highlight vàng nổi bật
-                  : '3px solid transparent',
-                transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap',
-                boxSizing: 'border-box',
-              }}
-              onMouseEnter={(e) => {
-                if (!isScheduleActive)
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
-              }}
-              onMouseLeave={(e) => {
-                if (!isScheduleActive)
-                  e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-            >
-              <Calendar size={17} color="currentColor" />
-              <span>Xem lịch làm việc</span>
-            </NavLink>
-
-            {/* 2. Bảng chấm công & điểm danh */}
+            {/* 1. Bảng chấm công & điểm danh */}
             <NavLink
               to="/employee/attendance"
               style={{
@@ -693,7 +652,7 @@ export const AppTopNav: FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        navigate('/employee/schedule');
+                        navigate('/employee/attendance');
                         setAccountMenuOpen(false);
                       }}
                       style={{

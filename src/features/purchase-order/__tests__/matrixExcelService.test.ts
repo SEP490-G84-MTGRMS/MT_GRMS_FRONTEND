@@ -140,7 +140,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
         'Mã vạch',
         'Mã sản phẩm',
         'Tên sản phẩm',
-        'ĐVT',
+        'DVN',
         'MOQ',
         'Bội số',
         'Đơn giá (VNĐ)',
@@ -184,7 +184,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       [`Chi nhánh: Chi nhánh Quận 7 | Mã hệ thống: ${foreignBranchId}`],
       [`Nhà cung cấp: ${mockSupplier.name} | Mã NCC: ${mockSupplier.id}`],
       [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'DVN', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
       [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 15],
     ];
 
@@ -215,7 +215,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       [`Chi nhánh: ${mockBranch.name} | Mã hệ thống: ${mockBranch.id}`],
       [`Nhà cung cấp: TH True Milk | Mã NCC: ${foreignSupplierId}`],
       [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'DVN', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
       [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 15],
     ];
 
@@ -245,7 +245,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       [`Mã CN: ${mockBranch.id}`],
       [`Mã NCC: ${mockSupplier.id}`],
       [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'DVN', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
       [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 15],
     ];
 
@@ -273,7 +273,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       [`Mã CN: ${mockBranch.id}`],
       [`Mã NCC: ${mockSupplier.id}`],
       [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]', 'T5 05/11 [2026-11-05]'],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'DVN', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]', 'T5 05/11 [2026-11-05]'],
       [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 15, 25], // 25 != 20 in locked cell
     ];
 
@@ -300,7 +300,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       [`Mã CN: ${mockBranch.id}`],
       [`Mã NCC: ${mockSupplier.id}`],
       [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'DVN', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
       [1, 'Bánh kẹo', '893999', 'SP_FOREIGN_999', 'Bánh ngoại lai', 'Hộp', 1, 1, 50000, 20],
     ];
 
@@ -328,7 +328,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       [`Mã CN: ${mockBranch.id}`],
       [`Mã NCC: ${mockSupplier.id}`],
       [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'DVN', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
       [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, -5], // Negative!
     ];
 
@@ -349,13 +349,13 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     expect(negErr).toBeDefined();
   });
 
-  it('Scenario 8: SL < MOQ -> WARNING; vẫn Apply được nếu không ERROR', async () => {
+  it('Scenario 8: SL < MOQ -> ERROR; không Apply được', async () => {
     const wsData = [
       ['Header info'],
       [`Mã CN: ${mockBranch.id}`],
       [`Mã NCC: ${mockSupplier.id}`],
       [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'DVN', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
       [1, 'Sữa tươi', '893123', 'SP001', 'Sữa tươi 1L', 'Hộp', 10, 1, 32000, 5], // 5 < MOQ (10)
     ];
 
@@ -371,15 +371,12 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       isCellEditable,
     });
 
-    // Per user rules: MOQ is a WARNING, not an ERROR. Result is valid and can be applied!
-    expect(result.valid).toBe(true);
-    expect(result.summary.errorCount).toBe(0);
-    expect(result.summary.warningCount).toBe(1);
-    const moqWarn = result.warnings.find((w) => w.code === 'MOQ_NOT_MET');
-    expect(moqWarn).toBeDefined();
-    expect(moqWarn?.inputValue).toBe(5);
-    expect(result.summary.validCells).toBe(1);
-    expect(result.cellsToApply[0].quantity).toBe(5);
+    expect(result.valid).toBe(false);
+    expect(result.summary.errorCount).toBeGreaterThanOrEqual(1);
+    const moqErr = result.errors.find((e) => e.code === 'MOQ_NOT_MET');
+    expect(moqErr).toBeDefined();
+    expect(moqErr?.inputValue).toBe(5);
+    expect(result.cellsToApply.length).toBe(0);
   });
 
   it('Scenario 9: Bội số đặt hàng không khớp -> WARNING (ORDER_MULTIPLE_INVALID)', async () => {
@@ -389,7 +386,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       [`Mã CN: ${mockBranch.id}`],
       [`Mã NCC: ${mockSupplier.id}`],
       [],
-      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'ĐVT', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
+      ['STT', 'Ngành hàng', 'Mã vạch', 'Mã sản phẩm', 'Tên sản phẩm', 'DVN', 'MOQ', 'Bội số', 'Đơn giá', 'T4 04/11 [2026-11-04]'],
       [1, 'Sữa chua', '893456', 'SP002', 'Sữa chua nha đam', 'Lốc', 6, 4, 28000, 10],
     ];
 
@@ -493,7 +490,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
         'Mã vạch',
         'Mã sản phẩm (SKU)',
         'Tên sản phẩm',
-        'ĐVT',
+        'DVN',
         'MOQ',
         'Bội số',
         'Đơn giá (VNĐ)',

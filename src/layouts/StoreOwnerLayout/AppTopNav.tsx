@@ -11,7 +11,6 @@ import {
 import {
   Gift,
   MessageCircle,
-  SquarePen,
   Settings,
   User,
   Store,
@@ -120,24 +119,18 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Danh mục hàng hóa",
             to: "/store-owner/products",
-            badge: "",
           },
           {
             label: "Nhóm hàng",
             to: "/store-owner/categories",
-            badge: "",
           },
           {
             label: "Sản phẩm theo NCC",
             to: "/store-owner/suppliers/products",
-            badge: "",
-            badgeType: "blue",
           },
           {
             label: "Sản phẩm theo Cửa hàng",
             to: "/store-owner/stores/products",
-            badge: "Mới",
-            badgeType: "blue",
           },
         ],
       },
@@ -147,26 +140,18 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Tồn kho cửa hàng",
             to: "/store-owner/inventory",
-            badge: "FE-04",
-            badgeType: "blue",
           },
           {
             label: "Chi tiết lô & Hạn sử dụng",
             to: "/store-owner/batches",
-            badge: "FEFO",
-            badgeType: "blue",
           },
           {
             label: "Kiểm kê hàng hóa",
             to: "/store-owner/stocktakes",
-            badge: "KK",
-            badgeType: "blue",
           },
           {
             label: "Chuyển hàng liên kho",
             to: "/store-owner/transfers",
-            badge: "",
-            badgeType: "blue",
           },
         ],
       },
@@ -197,8 +182,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Hóa đơn đầu vào",
             to: "/store-owner/suppliers?view=invoices",
-            badge: "Mới",
-            badgeType: "red",
           },
         ],
       },
@@ -243,8 +226,12 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
           { label: "Sổ quỹ", to: "/store-owner/cashbook" },
           {
-            label: "Ca & két (duyệt chi, rút két)",
-            to: "/store-owner/cash-control",
+            label: "Hạn mức & duyệt chi két POS",
+            to: "/store-owner/pos-cash-control",
+          },
+          {
+            label: "Lịch sử giao ca bán hàng",
+            to: "/store-owner/shifts",
           },
           {
             label: "Chi phí & hóa đơn phải trả",
@@ -274,14 +261,24 @@ const NAV_GROUPS: NavGroup[] = [
     icon: UsersIcon,
     sections: [
       {
-        title: "Nhân sự & Hồ sơ",
+        title: "Nhân sự & Lương",
         items: [
-          { label: "Danh sách nhân viên", to: "/store-owner/employees" }
+          { label: "Danh sách nhân viên", to: "/store-owner/employees" },
+          {
+            label: "Bảng tính lương tháng",
+            to: "/store-owner/employees/payroll",
+          }
+
         ],
+
       },
       {
         title: "Lịch & Chấm công",
         items: [
+          {
+            label: "Cấu hình ca làm việc",
+            to: "/store-owner/employees/shifts"
+          },
           {
             label: "Lịch làm việc chi nhánh",
             to: "/store-owner/employees/schedule"
@@ -293,22 +290,9 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Duyệt đơn yêu cầu",
             to: "/store-owner/employees/approval-requests"
-          },
-          {
-            label: "Cấu hình ca làm việc",
-            to: "/store-owner/employees/shifts"
-          },
-        ],
-      },
-      {
-        title: "Lương & Đãi ngộ",
-        items: [
-          {
-            label: "Bảng tính lương tháng",
-            to: "/store-owner/employees/payroll",
           }
         ],
-      },
+      }
     ],
   },
   {
@@ -322,8 +306,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Chương trình khuyến mãi",
             to: "/store-owner/promotions",
-            badge: "Mới",
-            badgeType: "red",
           },
         ],
       },
@@ -333,8 +315,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Danh sách Voucher & Coupon",
             to: "/store-owner/vouchers",
-            badge: "Hot",
-            badgeType: "blue",
           },
         ],
       },
@@ -344,8 +324,6 @@ const NAV_GROUPS: NavGroup[] = [
           {
             label: "Thiết lập tích điểm",
             to: "/store-owner/loyalty-config",
-            badge: "Xu",
-            badgeType: "blue",
           },
         ],
       },
@@ -955,7 +933,7 @@ export const AppTopNav: FC = () => {
           setIs2FAActive(res.enabled);
           useAuthStore.getState().updateUser({ isTwoFactorEnabled: res.enabled });
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [accountMenuOpen]);
 
@@ -973,7 +951,7 @@ export const AppTopNav: FC = () => {
           ...g,
           badge: pendingCashApprovalCount > 0 ? pendingCashApprovalCount : undefined,
           children: g.children?.map((c) => {
-            if (c.to === "/store-owner/cash-control") {
+            if (c.to === "/store-owner/pos-cash-control" || c.to === "/store-owner/cash-control") {
               return {
                 ...c,
                 badge:
@@ -1519,42 +1497,7 @@ export const AppTopNav: FC = () => {
               <span>Hỗ trợ</span>
             </button>
 
-            {/* 2. Góp ý */}
-            <button
-              type="button"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: "none",
-                border: "none",
-                color: "#ffffff",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                padding: "6px 8px",
-                borderRadius: "var(--radius-pill)",
-                transition: "background-color 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "rgba(255, 255, 255, 0.14)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-              onClick={() =>
-                alert(
-                  "Cảm ơn bạn! Mọi ý kiến đóng góp xin gửi về: hotro@mt-grms.vn",
-                )
-              }
-              title="Gửi ý kiến đóng góp tính năng"
-            >
-              <SquarePen size={15} strokeWidth={2} />
-              <span>Góp ý</span>
-            </button>
-
-            {/* 3. Divider */}
+            {/* 2. Divider */}
             <div
               style={{
                 width: 1,
@@ -1738,18 +1681,6 @@ export const AppTopNav: FC = () => {
                             >
                               Tài khoản & Két quỹ
                             </span>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                backgroundColor: "#10b981",
-                                color: "#ffffff",
-                                padding: "1px 6px",
-                                borderRadius: 10,
-                              }}
-                            >
-                              Mới
-                            </span>
                           </div>
                           <div
                             style={{
@@ -1773,7 +1704,7 @@ export const AppTopNav: FC = () => {
 
                       {/* Mục 2: Hạn Mức & Duyệt Chi Két POS */}
                       <Link
-                        to="/store-owner/cash-control"
+                        to="/store-owner/pos-cash-control"
                         onClick={() => setSettingsMenuOpen(false)}
                         style={{
                           display: "flex",

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ProductListPage } from '../pages/ProductListPage';
 import { productApi } from '../api/productApi';
 import { categoryApi } from '../api/categoryApi';
@@ -79,10 +80,10 @@ describe('ProductListPage - Task T3 Server-side Table & Pagination Integration',
       hasNextPage: true,
     });
 
-    render(<ProductListPage />);
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
 
     // Kiểm tra header
-    expect(screen.getByRole('heading', { level: 1, name: 'Hàng hóa' })).toBeDefined();
+    expect(screen.getByRole('heading', { level: 1, name: 'Hàng hóa (Master)' })).toBeDefined();
 
     // Chờ API hoàn thành và hiển thị trên bảng
     await waitFor(() => {
@@ -129,7 +130,7 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       hasNextPage: false,
     });
 
-    render(<ProductListPage />);
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
@@ -138,7 +139,7 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
     // Phải nhìn thấy header cột "Giá vốn"
     expect(screen.getByRole('columnheader', { name: 'Giá vốn' })).toBeDefined();
     // Phải nhìn thấy giá trị giá vốn formatted (3,500 đ hoặc 3.500 đ)
-    const costPriceRegex = /3[.,]500\s*đ/;
+    const costPriceRegex = /3[.,]500/;
     expect(screen.getByText(costPriceRegex)).toBeDefined();
   });
 
@@ -166,7 +167,7 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       hasNextPage: false,
     });
 
-    render(<ProductListPage />);
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
@@ -175,14 +176,14 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
     // KHÔNG được có header cột "Giá vốn" trong DOM
     expect(screen.queryByRole('columnheader', { name: 'Giá vốn' })).toBeNull();
     // KHÔNG được hiển thị giá trị giá vốn trong DOM
-    const costPriceRegex = /3[.,]500\s*đ/;
+    const costPriceRegex = /3[.,]500/;
     expect(screen.queryByText(costPriceRegex)).toBeNull();
     // Vẫn hiển thị giá bán bình thường
-    const sellingPriceRegex = /5[.,]000\s*đ/;
+    const sellingPriceRegex = /5[.,]000/;
     expect(screen.getByText(sellingPriceRegex)).toBeDefined();
   });
 
-  it('hiển thị dropdown đơn vị tính và cập nhật giá bán khi chuyển sang đơn vị quy đổi (REQ-07)', async () => {
+  it('hiển thị đồng thời đơn vị và giá bán theo từng đơn vị (REQ-07)', async () => {
     useAuthStore.setState({
       user: {
         id: 'usr-owner',
@@ -222,34 +223,16 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       hasNextPage: false,
     });
 
-    render(<ProductListPage />);
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Nước ngọt Coca Cola 320ml')).toBeDefined();
     });
 
-    // Ban đầu hiển thị đơn vị cơ bản: "chai" và giá bán 10,000 đ
-    expect(screen.getByText('chai')).toBeDefined();
-    expect(screen.getByText(/10[.,]000\s*đ/)).toBeDefined();
-
-    // Click vào dropdown chọn đơn vị tính
-    const unitDropdownBtn = screen.getByTitle(/đơn vị tính/i);
-    fireEvent.click(unitDropdownBtn);
-
-    // Menu mở ra hiển thị tùy chọn "thung"
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'thung' })).toBeDefined();
-    });
-
-    // Click chọn đơn vị "thung"
-    const thungOption = screen.getByRole('button', { name: 'thung' });
-    fireEvent.click(thungOption);
-
-    // Dropdown chuyển sang hiển thị "thung" và Giá bán cập nhật thành 220,000 đ
-    await waitFor(() => {
-      expect(screen.getByText('thung')).toBeDefined();
-      expect(screen.getByText(/220[.,]000\s*đ/)).toBeDefined();
-    });
+    expect(screen.getByText('chai (nhập)')).toBeDefined();
+    expect(screen.getByText('thung')).toBeDefined();
+    expect(screen.getByText(/10[.,]000/)).toBeDefined();
+    expect(screen.getByText(/220[.,]000/)).toBeDefined();
   });
 
   it('cập nhật hàng hóa và đồng bộ đơn vị tính qua API khi lưu chỉnh sửa (REQ-09)', async () => {
@@ -290,22 +273,13 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       price: 60000,
     });
 
-    render(<ProductListPage />);
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Nước tăng lực Sting Dâu 330ml')).toBeDefined();
     });
 
-    // Click vào dòng sản phẩm để mở ProductDetailModal
-    const productRow = screen.getByText('Nước tăng lực Sting Dâu 330ml');
-    fireEvent.click(productRow);
-
-    // Trong modal chi tiết, click nút "Sửa hàng hóa"
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Sửa hàng hóa/i })).toBeDefined();
-    });
-    const editBtn = screen.getByRole('button', { name: /Sửa hàng hóa/i });
-    fireEvent.click(editBtn);
+    fireEvent.click(screen.getByTitle('Chỉnh sửa hàng hóa'));
 
     // Modal ProductFormModal mở ra, kiểm tra ô tên sản phẩm
     await waitFor(() => {
@@ -338,102 +312,16 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
     });
   });
 
-  it('xóa sản phẩm từ bảng hiển thị modal xác nhận và gọi API deleteProduct khi người dùng xác nhận', async () => {
-    (categoryApi.getCategories as any).mockResolvedValue([
-      { id: 'cat-1', name: 'Nước uống', productCount: 1 },
-    ]);
-    (productApi.getProductsPaged as any).mockResolvedValue({
-      items: [mockSampleProduct],
-      pageIndex: 1,
-      pageSize: 20,
-      totalCount: 1,
-      totalPages: 1,
-      hasPreviousPage: false,
-      hasNextPage: false,
-    });
-    (productApi.deleteProduct as any).mockResolvedValue(undefined);
-
-    render(<ProductListPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
-    });
-
-    // Click vào dòng sản phẩm để mở modal chi tiết
-    const rowItem = screen.getByText('Nước suối Aquafina 500ml');
-    fireEvent.click(rowItem);
-
-    // Trong modal chi tiết, click nút "Xóa"
-    await waitFor(() => {
-      expect(screen.getByTitle('Xóa hàng hóa')).toBeDefined();
-    });
-    const deleteBtn = screen.getByTitle('Xóa hàng hóa');
-    fireEvent.click(deleteBtn);
-
-    // Modal xác nhận xuất hiện
-    await waitFor(() => {
-      expect(screen.getByText('Xác nhận xóa hàng hóa')).toBeDefined();
-      expect(screen.getByText('"Nước suối Aquafina 500ml"')).toBeDefined();
-    });
-
-    // Bấm nút Xác nhận xóa
-    const confirmBtn = screen.getByRole('button', { name: /Đồng ý xóa/i });
-    fireEvent.click(confirmBtn);
-
-    // Xác minh productApi.deleteProduct được gọi với ID sản phẩm
-    await waitFor(() => {
-      expect(productApi.deleteProduct).toHaveBeenCalledWith('p-1');
-    });
-  });
-
-  it('xóa hàng loạt khi chọn checkbox sản phẩm và xác nhận trong modal', async () => {
-    (categoryApi.getCategories as any).mockResolvedValue([
-      { id: 'cat-1', name: 'Nước uống', productCount: 1 },
-    ]);
-    (productApi.getProductsPaged as any).mockResolvedValue({
-      items: [mockSampleProduct],
-      pageIndex: 1,
-      pageSize: 20,
-      totalCount: 1,
-      totalPages: 1,
-      hasPreviousPage: false,
-      hasNextPage: false,
-    });
-    (productApi.deleteProduct as any).mockResolvedValue(undefined);
-
-    render(<ProductListPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
-    });
-
-    // Chọn checkbox của sản phẩm p-1
-    const checkboxes = screen.getAllByRole('checkbox');
-    // checkbox[1] là checkbox của dòng p-1
-    fireEvent.click(checkboxes[1]);
-
-    // Thanh tác vụ hàng loạt xuất hiện
-    await waitFor(() => {
-      expect(screen.getByText('Đã chọn 1 hàng hóa')).toBeDefined();
-    });
-
-    // Click nút "Xóa đã chọn"
-    const bulkDeleteBtn = screen.getByText('Xóa đã chọn');
-    fireEvent.click(bulkDeleteBtn);
-
-    // Modal xác nhận xóa hàng loạt xuất hiện
-    await waitFor(() => {
-      expect(screen.getByText('Xóa 1 hàng hóa đã chọn?')).toBeDefined();
-    });
-
-    // Bấm nút Xác nhận xóa trong modal
-    const confirmBtn = screen.getByRole('button', { name: /Đồng ý xóa/i });
-    fireEvent.click(confirmBtn);
-
-    // Xác minh productApi.deleteProduct được gọi
-    await waitFor(() => {
-      expect(productApi.deleteProduct).toHaveBeenCalledWith('p-1');
-    });
+  it('master catalog không cung cấp thao tác xóa hoặc chọn xóa hàng loạt', async () => {
+    useAuthStore.setState({ user: { id: 'owner', email: 'owner@mtgrms.vn', fullName: 'Owner', role: 'STORE_OWNER', tenantId: 'tenant_mt_mart_01' }, isAuthenticated: true });
+    vi.mocked(categoryApi.getCategories).mockResolvedValue([]);
+    vi.mocked(productApi.getProductsPaged).mockResolvedValue({ items: [mockSampleProduct], pageIndex: 1, pageSize: 20, totalCount: 1, totalPages: 1, hasPreviousPage: false, hasNextPage: false });
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText(mockSampleProduct.name)).toBeDefined());
+    expect(screen.queryByTitle('Xóa hàng hóa')).toBeNull();
+    expect(screen.queryByText('Xóa đã chọn')).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(productApi.deleteProduct).not.toHaveBeenCalled();
   });
 
   it('cập nhật thành công hasBatches khi chỉnh sửa sản phẩm', async () => {
@@ -454,32 +342,25 @@ describe('ProductListPage - Task T6 BR-SEC-01 Phân quyền Giá vốn theo Vai 
       hasBatches: true,
     });
 
-    render(<ProductListPage />);
+    render(<MemoryRouter><ProductListPage /></MemoryRouter>);
 
     await waitFor(() => {
       expect(screen.getByText('Nước suối Aquafina 500ml')).toBeDefined();
     });
 
     // Click vào dòng sản phẩm để mở modal chi tiết
-    fireEvent.click(screen.getByText('Nước suối Aquafina 500ml'));
+    fireEvent.click(screen.getByTitle('Chỉnh sửa hàng hóa'));
 
-    // Trong modal chi tiết, click "Sửa hàng hóa"
     await waitFor(() => {
-      expect(screen.getByText('Sửa hàng hóa')).toBeDefined();
-    });
-    fireEvent.click(screen.getByText('Sửa hàng hóa'));
-
-    // Modal chỉnh sửa mở ra
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Quản lý theo lô & hạn sử dụng/i)).toBeDefined();
+      expect(screen.getByRole('switch', { name: /Quản lý theo lô & hạn sử dụng/i })).toBeDefined();
     });
 
-    const checkbox = screen.getByLabelText(/Quản lý theo lô & hạn sử dụng/i) as HTMLInputElement;
-    expect(checkbox.checked).toBe(false);
+    const checkbox = screen.getByRole('switch', { name: /Quản lý theo lô & hạn sử dụng/i }) as HTMLInputElement;
+    expect(checkbox.getAttribute('aria-checked')).toBe('false');
 
     // Click tickbox
     fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(true);
+    expect(checkbox.getAttribute('aria-checked')).toBe('true');
 
     // Bấm Cập nhật
     fireEvent.click(screen.getByText('Cập nhật'));

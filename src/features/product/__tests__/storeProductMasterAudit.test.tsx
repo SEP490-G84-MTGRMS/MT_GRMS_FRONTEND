@@ -20,6 +20,14 @@ vi.mock('../api/storeProductApi', () => ({
   },
 }));
 
+vi.mock('../components/PriceHistoryModal', () => ({
+  PriceHistoryModal: ({ productId, branchId }: { productId: string; branchId?: string }) => (
+    <div data-testid="price-history-modal">
+      {productId}:{branchId}
+    </div>
+  ),
+}));
+
 // Test Fixtures
 const mockStores: StoreSummary[] = [
   {
@@ -489,10 +497,31 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       expect(screen.getByDisplayValue('NCC-001')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Công ty Lương thực Miền Nam')).toBeInTheDocument();
 
-      // Group D - Editable fields
-      expect(screen.getByLabelText(/Giá bán lẻ niêm yết/i)).toHaveValue(210000);
-      expect(screen.getByLabelText(/Số lượng đặt hàng tối thiểu/i)).toHaveValue(5);
-      expect(screen.getByLabelText(/Đang kinh doanh/i)).toBeChecked();
+      // Group D - Editable fields (giá theo ĐVT; không so sánh với giá vốn thùng)
+      expect(screen.getByLabelText(/Giá Túi/i)).toHaveValue(210000);
+      expect(screen.getByLabelText(/^MOQ$/i)).toHaveValue(5);
+      expect(screen.getByLabelText(/Đang KD/i)).toBeChecked();
+      expect(screen.queryByText(/Lãi gộp/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Bán dưới giá vốn/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Lịch sử giá/i })).toBeInTheDocument();
+    });
+
+    it('TC-EDIT-001A: Opens price history for the selected product and branch', () => {
+      render(
+        <EditStoreProductModal
+          isOpen={true}
+          onClose={vi.fn()}
+          product={mockItemStore1}
+          stores={mockStores}
+          onSave={vi.fn()}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Lịch sử giá/i }));
+
+      expect(screen.getByTestId('price-history-modal')).toHaveTextContent(
+        `${mockItemStore1.productId}:${mockItemStore1.storeId}`
+      );
     });
 
     it('TC-EDIT-002: Read-only fields cannot be edited and maintain readOnly attribute', () => {
@@ -517,7 +546,7 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       expect(supplierInput.readOnly).toBe(true);
     });
 
-    it('TC-EDIT-003: Updates retail price and dynamically calculates gross profit margin', async () => {
+    it('TC-EDIT-003: Updates unit selling price without comparing against case cost', async () => {
       const handleSave = vi.fn().mockResolvedValue(undefined);
       render(
         <EditStoreProductModal
@@ -529,21 +558,14 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         />
       );
 
-      const priceInput = screen.getByLabelText(/Giá bán lẻ niêm yết/i);
+      const priceInput = screen.getByLabelText(/Giá Túi/i);
 
-      // Initial price: 210,000; cost: 170,000 -> profit: +40,000 đ, margin: 19.0%
-      expect(screen.getByText(/Lãi gộp ước tính:/i)).toBeInTheDocument();
-      expect(screen.getByText(/\+40\.000 đ/i)).toBeInTheDocument();
-
-      // Change price to 200,000 -> profit: +30,000 đ
-      fireEvent.change(priceInput, { target: { value: '200000' } });
-      expect(screen.getByText(/\+30\.000 đ/i)).toBeInTheDocument();
-
-      // Enter price below cost (e.g. 150,000) -> warning displayed
+      // Giá vốn là theo thùng — không hiện lãi/lỗ so với giá bán ĐVT
+      expect(screen.queryByText(/Lãi gộp/i)).not.toBeInTheDocument();
       fireEvent.change(priceInput, { target: { value: '150000' } });
-      expect(screen.getByText(/Bán dưới giá vốn! Lỗ gộp: -20\.000 đ/i)).toBeInTheDocument();
+      expect(screen.queryByText(/Bán dưới giá vốn/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Cảnh báo giá bán/i)).not.toBeInTheDocument();
 
-      // Re-enter valid price and submit
       fireEvent.change(priceInput, { target: { value: '220000' } });
       fireEvent.click(document.getElementById('btnSaveEditProduct')!);
 
@@ -551,6 +573,9 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         expect(handleSave).toHaveBeenCalledWith('store-01', 'prod-01', {
           retailPrice: 220000,
           status: 'Active',
+          unitPrices: [
+            { unitName: 'Túi', conversionRate: 1, price: 220000, isBaseUnit: true },
+          ],
         });
       });
     });
@@ -567,7 +592,7 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         />
       );
 
-      const moqInput = screen.getByLabelText(/Số lượng đặt hàng tối thiểu/i) as HTMLInputElement;
+      const moqInput = screen.getByLabelText(/^MOQ$/i) as HTMLInputElement;
       expect(moqInput.readOnly).toBe(true);
       fireEvent.change(moqInput, { target: { value: '99' } });
       expect(moqInput.value).toBe('5');
@@ -577,6 +602,9 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         expect(handleSave).toHaveBeenCalledWith('store-01', 'prod-01', {
           retailPrice: 210000,
           status: 'Active',
+          unitPrices: [
+            { unitName: 'Túi', conversionRate: 1, price: 210000, isBaseUnit: true },
+          ],
         });
       });
     });
@@ -593,9 +621,8 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         />
       );
 
-      // Change status to Inactive (Tạm ngừng bán)
-      fireEvent.click(screen.getByLabelText(/Tạm ngừng bán/i));
-      expect(screen.getByLabelText(/Tạm ngừng bán/i)).toBeChecked();
+      fireEvent.click(screen.getByLabelText(/Tạm ngừng/i));
+      expect(screen.getByLabelText(/Tạm ngừng/i)).toBeChecked();
 
       fireEvent.click(document.getElementById('btnSaveEditProduct')!);
 
@@ -603,6 +630,9 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         expect(handleSave).toHaveBeenCalledWith('store-01', 'prod-01', {
           retailPrice: 210000,
           status: 'Inactive',
+          unitPrices: [
+            { unitName: 'Túi', conversionRate: 1, price: 210000, isBaseUnit: true },
+          ],
         });
       });
     });
@@ -640,7 +670,7 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       );
 
       // Modify price (making form dirty)
-      const priceInput = screen.getByLabelText(/Giá bán lẻ niêm yết/i);
+      const priceInput = screen.getByLabelText(/Giá Túi/i);
       fireEvent.change(priceInput, { target: { value: '250000' } });
 
       // Click close (X button)
@@ -683,7 +713,7 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         />
       );
 
-      const priceInput = screen.getByLabelText(/Giá bán lẻ niêm yết/i);
+      const priceInput = screen.getByLabelText(/Giá Túi/i);
       fireEvent.change(priceInput, { target: { value: '230000' } });
 
       fireEvent.click(document.getElementById('btnSaveEditProduct')!);
@@ -739,7 +769,7 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
       );
 
       // Edit Store 1 price to 105,000
-      const priceInput = screen.getByLabelText(/Giá bán lẻ niêm yết/i);
+      const priceInput = screen.getByLabelText(/Giá Túi/i);
       fireEvent.change(priceInput, { target: { value: '105000' } });
       fireEvent.click(document.getElementById('btnSaveEditProduct')!);
 

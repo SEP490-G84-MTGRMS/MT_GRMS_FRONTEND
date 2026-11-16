@@ -21,7 +21,6 @@ import { BatchFilterBar } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
 import { BatchDiscountModal } from '../components/BatchDiscountModal';
-import { BatchRepackModal } from '../components/BatchRepackModal';
 import {
   BatchExpiryAlertModal,
   type BatchAlertMode,
@@ -65,7 +64,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [discountBatch, setDiscountBatch] = useState<BatchItem | null>(null);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
-  const [repackBatch, setRepackBatch] = useState<BatchItem | null>(null);
   const [kpi, setKpi] = useState<BatchKpiSummary | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [alertMode, setAlertMode] = useState<BatchAlertMode>('near_expiry');
@@ -215,8 +213,16 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     setIsDiscountModalOpen(true);
   };
 
-  const handleApplyDiscount = (_batchId: string, _discountPercent: number) => {
-    showToast('Chưa có API giảm giá FEFO — thay đổi chưa được lưu.', 'warning');
+  const handleApplyDiscount = async (batchId: string, discountPercent: number) => {
+    try {
+      await batchApi.applyFefoDiscount(batchId, discountPercent);
+      setIsDiscountModalOpen(false);
+      setDiscountBatch(null);
+      showToast(`Đã lưu giảm giá FEFO ${discountPercent}% cho lô hàng.`, 'success');
+      await loadBatches();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể lưu giảm giá FEFO.', 'error');
+    }
   };
 
   const handleWriteOff = (batch: BatchItem) => {
@@ -351,7 +357,10 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         pageIndex={pageIndex}
         pageSize={pageSize}
         onQuickStocktake={(b) => handleCreateStocktake(b)}
-        onProcessBatch={(b) => setRepackBatch(b)}
+        onProcessBatch={(b) => {
+          const base = role === 'employee' ? '/employee/batches' : '/store-owner/batches';
+          navigate(`${base}/${b.id}/packages`);
+        }}
         onPageChange={(p) => setPageIndex(p)}
         onPageSizeChange={(s) => {
           setPageSize(s);
@@ -362,18 +371,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         onWriteOffClick={handleWriteOff}
         onResetFilters={handleReset}
       />
-
-      {repackBatch && (
-        <BatchRepackModal
-          batch={repackBatch}
-          onClose={() => setRepackBatch(null)}
-          onDone={() => {
-            setRepackBatch(null);
-            setToast({ id: Date.now().toString(), type: 'success', message: 'Chế biến khay thành công.' });
-            void loadBatches();
-          }}
-        />
-      )}
 
       <BatchDetailDrawer
         isOpen={isDrawerOpen}
@@ -412,14 +409,17 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         onClose={() => setIsAlertOpen(false)}
         onCreated={(codes) => {
           setIsAlertOpen(false);
-          showToast(
+          const msg =
             codes.length === 1
-              ? `Đã tạo phiếu trả hàng nháp ${codes[0]} — gửi Store Owner xem trên Phiếu trả NCC.`
-              : `Đã tạo ${codes.length} phiếu trả hàng nháp: ${codes.join(', ')}.`,
-            'success'
-          );
+              ? `Đã tạo phiếu trả hàng nháp ${codes[0]} — xem tại Phiếu trả NCC.`
+              : `Đã tạo ${codes.length} phiếu trả hàng nháp: ${codes.join(', ')}.`;
           if (role !== 'employee') {
-            navigate('/store-owner/supplier-returns');
+            // Toast gắn vào trang đích — navigate ngay sẽ unmount toast của trang lô.
+            navigate('/store-owner/supplier-returns', {
+              state: { toastMessage: msg },
+            });
+          } else {
+            showToast(msg, 'success');
           }
         }}
         onCreateStocktake={(items) => {

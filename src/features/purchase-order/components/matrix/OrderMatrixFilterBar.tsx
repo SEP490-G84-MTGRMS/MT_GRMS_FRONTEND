@@ -56,7 +56,6 @@ interface OrderMatrixFilterBarProps {
   onCopyPrevWeek: () => void;
   onAutoSuggest?: () => void;
   onExcelDownload: () => void;
-  onExcelTemplateDownload?: () => void;
   onExcelUpload: (file: File) => void;
 }
 
@@ -496,7 +495,6 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
   onCopyPrevWeek,
   onAutoSuggest,
   onExcelDownload,
-  onExcelTemplateDownload,
   onExcelUpload,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -888,23 +886,11 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             type="button"
             className="po-icon-btn"
             onClick={onExcelDownload}
-            title="Xuất bảng ma trận Excel theo bộ lọc hiện tại"
+            title="Xuất / tải mẫu Excel ma trận theo bộ lọc hiện tại"
             style={{ padding: '0 8px', height: CTRL_H, fontSize: 11, fontWeight: 600 }}
           >
             <span>Xuất Excel</span>
           </button>
-
-          {onExcelTemplateDownload && (
-            <button
-              type="button"
-              className="po-icon-btn"
-              onClick={onExcelTemplateDownload}
-              title="Tải mẫu Excel (ô editable trống) theo bộ lọc hiện tại"
-              style={{ padding: '0 8px', height: CTRL_H, fontSize: 11, fontWeight: 600 }}
-            >
-              <span>Tải mẫu</span>
-            </button>
-          )}
 
           <button
             type="button"

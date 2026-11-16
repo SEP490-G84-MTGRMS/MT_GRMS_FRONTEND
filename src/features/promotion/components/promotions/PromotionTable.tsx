@@ -31,7 +31,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
 
   const paginatedPromotions = promotions.slice(
     (currentPage - 1) * pageSize,
@@ -45,13 +45,13 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   const renderStatusBadge = (status: PromotionStatus) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="badge-status badge-active">● Đang chạy</span>;
+        return <span className="badge-status badge-active" style={{ whiteSpace: 'nowrap' }}>● Đang chạy</span>;
       case 'UPCOMING':
-        return <span className="badge-status badge-upcoming">● Sắp diễn ra</span>;
+        return <span className="badge-status badge-upcoming" style={{ whiteSpace: 'nowrap' }}>● Sắp diễn ra</span>;
       case 'PAUSED':
-        return <span className="badge-status badge-paused">⏸ Tạm dừng</span>;
+        return <span className="badge-status badge-paused" style={{ whiteSpace: 'nowrap' }}>⏸ Tạm dừng</span>;
       case 'EXPIRED':
-        return <span className="badge-status badge-expired">✕ Đã kết thúc</span>;
+        return <span className="badge-status badge-expired" style={{ whiteSpace: 'nowrap' }}>✕ Đã kết thúc</span>;
     }
   };
 
@@ -81,32 +81,48 @@ export const PromotionTable: FC<PromotionTableProps> = ({
     }
   };
 
+  const thStyle: React.CSSProperties = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    backgroundColor: '#f8fafc',
+    padding: '8px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+    boxSizing: 'border-box',
+  };
+
   return (
-    <div className="promotion-card">
-      <div className="table-responsive">
-        <table className="promotion-table" style={{ width: '100%', minWidth: 1200, tableLayout: 'fixed' }}>
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+      <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1390, width: '100%', tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '3%' }} />
-            <col style={{ width: '13%' }} />
-            <col style={{ width: '22%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '11%' }} />
-            <col style={{ width: '8%' }} />
-            <col style={{ width: '6%' }} />
+            <col style={{ width: 44 }} />
+            <col style={{ width: 110 }} />
+            <col style={{ width: 220 }} />
+            <col style={{ width: 135 }} />
+            <col style={{ width: 185 }} />
+            <col style={{ width: 195 }} />
+            <col style={{ width: 180 }} />
+            <col style={{ width: 160 }} />
+            <col style={{ width: 100 }} />
           </colgroup>
-          <thead>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
-              <th></th>
-              <th>Mã CTKM</th>
-              <th>Tên chương trình</th>
-              <th>Hình thức</th>
-              <th>Thời gian hiệu lực</th>
-              <th>Chi nhánh áp dụng</th>
-              <th>Lượt & Ngân sách</th>
-              <th>Trạng thái</th>
-              <th style={{ textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
+              <th style={{ ...thStyle, width: 110 }}>Mã CTKM</th>
+              <th style={{ ...thStyle, width: 220 }}>Tên chương trình</th>
+              <th style={{ ...thStyle, width: 135 }}>Hình thức</th>
+              <th style={{ ...thStyle, width: 185 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 195 }}>Chi nhánh áp dụng</th>
+              <th style={{ ...thStyle, width: 180 }}>Lượt &amp; Ngân sách</th>
+              <th style={{ ...thStyle, width: 160 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -121,8 +137,20 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                 const isExpanded = expandedId === item.id;
                 return (
                   <Fragment key={item.id}>
-                    <tr className={isExpanded ? 'row-expanded' : ''}>
-                      <td>
+                    <tr
+                      className={`so-list-row ${isExpanded ? 'row-expanded' : ''}`}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        backgroundColor: isExpanded ? '#f0fdfa' : '#ffffff',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isExpanded) e.currentTarget.style.backgroundColor = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isExpanded) e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
+                    >
+                      <td className="so-list-td" style={{ textAlign: 'center' }}>
                         <button
                           onClick={() => toggleExpand(item.id)}
                           className="btn-table-icon"
@@ -135,55 +163,73 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           )}
                         </button>
                       </td>
-                      <td>
-                        <span className="promo-code-text">{item.code}</span>
+                      <td className="so-list-td">
+                        <span className="so-list-code">{item.code}</span>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-title-box">
-                          <span className="promo-title-main">{item.name}</span>
+                          <span className="promo-title-main so-list-name">{item.name}</span>
                           {item.description && (
                             <span className="promo-title-sub">{item.description}</span>
                           )}
                         </div>
                       </td>
-                      <td>{renderTypeBadge(item.type)}</td>
-                      <td>
-                        <div className="promo-date-badge">
-                          <Calendar size={13} />
-                          <span className="promo-date-text">{item.startDate}</span>
-                          <span className="promo-date-arrow">→</span>
-                          <span className="promo-date-text">{item.endDate}</span>
+                      <td className="so-list-td">{renderTypeBadge(item.type)}</td>
+                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
+                            <Calendar size={12} style={{ color: '#0f766e', flexShrink: 0 }} />
+                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Từ:</span>
+                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{item.startDate}</span>
+                          </div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
+                            <span style={{ width: 12, display: 'inline-block', flexShrink: 0 }} />
+                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Đến:</span>
+                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{item.endDate}</span>
+                          </div>
                         </div>
                       </td>
-                      <td>
+                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         {(() => {
                           const displayBranches = item.branches.map((b) => branchMap?.get(b) || b);
                           const isAll = item.branches.includes('ALL') || item.branches.length === 0;
                           return (
                             <div
-                              className="promo-branch-cell"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 6,
+                                fontSize: 12,
+                                whiteSpace: 'normal',
+                                wordBreak: 'break-word',
+                                lineHeight: 1.35,
+                              }}
                               title={
                                 isAll
                                   ? 'Áp dụng trên toàn bộ chuỗi cửa hàng'
                                   : displayBranches.join(', ')
                               }
                             >
-                              <MapPin size={13} className="promo-branch-icon" />
+                              <MapPin size={13} style={{ color: '#0f766e', marginTop: 2, flexShrink: 0 }} />
                               {isAll ? (
                                 <span className="promo-branch-all">Toàn hệ thống</span>
-                              ) : displayBranches.length === 1 ? (
-                                <span className="promo-branch-single">{displayBranches[0]}</span>
                               ) : (
-                                <div className="promo-branch-multi">
-                                  <span className="promo-branch-first">{displayBranches[0]}</span>
-                                  <span className="promo-branch-count">+{displayBranches.length - 1}</span>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                  <span style={{ color: '#334155', fontWeight: 600, wordBreak: 'break-word' }}>
+                                    {displayBranches[0]}
+                                  </span>
+                                  {displayBranches.length > 1 && (
+                                    <span style={{ fontSize: 11, color: '#0f766e', fontWeight: 700 }}>
+                                      +{displayBranches.length - 1} chi nhánh
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
                           );
                         })()}
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-usage-cell" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                             <span className="promo-usage-count" style={{ fontWeight: 700, color: '#0f172a' }}>
@@ -200,14 +246,14 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                     (item.totalDiscountGiven / item.budgetLimit) >= 1
                                       ? '#fef2f2'
                                       : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
-                                      ? '#fffbeb'
-                                      : '#f0fdf4',
+                                        ? '#fffbeb'
+                                        : '#f0fdf4',
                                   color:
                                     (item.totalDiscountGiven / item.budgetLimit) >= 1
                                       ? '#b91c1c'
                                       : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
-                                      ? '#b45309'
-                                      : '#15803d',
+                                        ? '#b45309'
+                                        : '#15803d',
                                 }}
                               >
                                 {Math.min(100, Math.round((item.totalDiscountGiven / item.budgetLimit) * 100))}%
@@ -247,8 +293,8 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                       (item.totalDiscountGiven / item.budgetLimit) >= 1
                                         ? '#ef4444'
                                         : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
-                                        ? '#f59e0b'
-                                        : '#10b981',
+                                          ? '#f59e0b'
+                                          : '#10b981',
                                     borderRadius: 3,
                                     transition: 'width 0.3s ease',
                                   }}
@@ -264,7 +310,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td>
+                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         <div className="promo-status-cell">
                           <div
                             className="switch-container"
@@ -278,7 +324,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           {renderStatusBadge(item.status)}
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden' }}>
                         <div className="table-actions">
                           <button
                             onClick={() => onEdit(item)}
@@ -290,7 +336,8 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           <button
                             onClick={() => onDelete(item.id)}
                             className="btn-table-icon btn-danger-icon"
-                            title="Xóa chương trình"
+                            disabled={item.status === 'ACTIVE'}
+                            title={item.status === 'ACTIVE' ? 'Hãy tạm ngưng chương trình trước khi xóa' : 'Xóa chương trình'}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -394,8 +441,8 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                           {item.type === 'BUY_X_GET_Y'
                                             ? `Mua đủ ${tier.requiredQty || 1} ${tier.buyUnit ? `${tier.buyUnit} ` : ''}${tier.buyProductName || 'sản phẩm bất kỳ'} tặng ngay ${tier.giftQty || 1} ${tier.giftUnit || ''} ${tier.giftProductName || 'quà tặng'} (0 đ)`
                                             : tier.discountType === 'PERCENT'
-                                            ? `Giảm ${tier.discountValue}% trên tổng tiền hàng${tier.maxDiscount ? ` (tối đa ${tier.maxDiscount.toLocaleString('vi-VN')} đ)` : ''}`
-                                            : `Trừ trực tiếp ${tier.discountValue.toLocaleString('vi-VN')} đ vào hóa đơn`}
+                                              ? `Giảm ${tier.discountValue}% trên tổng tiền hàng${tier.maxDiscount ? ` (tối đa ${tier.maxDiscount.toLocaleString('vi-VN')} đ)` : ''}`
+                                              : `Trừ trực tiếp ${tier.discountValue.toLocaleString('vi-VN')} đ vào hóa đơn`}
                                           {item.type !== 'BUY_X_GET_Y' && tier.giftProductName && ` kèm quà tặng ${tier.giftProductName}`}
                                         </td>
                                       </tr>
@@ -416,12 +463,12 @@ export const PromotionTable: FC<PromotionTableProps> = ({
         </table>
       </div>
 
-      {/* Shared Enterprise Pagination */}
+      {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
       <TablePagination
         currentPage={currentPage}
         pageSize={pageSize}
         totalItems={promotions.length}
-        pageSizeOptions={[5, 10, 20]}
+        pageSizeOptions={[15, 24, 36, 48]}
         itemLabel="chương trình"
         onPageChange={setCurrentPage}
         onPageSizeChange={(newSize) => {

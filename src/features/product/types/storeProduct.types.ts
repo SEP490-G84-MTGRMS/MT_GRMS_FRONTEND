@@ -16,6 +16,7 @@ export interface StoreProductItem {
   sku: string;
   barcode: string;
   category: string;
+  /** Đơn vị nhập (DeliveryUoM / IsPurchaseUnit / BaseUnit) — không phải ĐVT bán lẻ. */
   unit: string;
   imageUrl?: string;
   retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
@@ -36,6 +37,10 @@ export interface StoreProductItem {
   shelfLocation?: string;
   assignedDate: string;
   unitPrices?: StoreProductUnitPrice[];
+  /** Master AllowRepack — có giá đóng khay (PROCESSED đ/kg). */
+  allowRepack?: boolean;
+  /** Giá đ/kg khi đóng khay. Null/≤0 → dùng retailPrice (RAW). */
+  processedSellingPricePerKg?: number | null;
 }
 
 export interface StoreSummary {

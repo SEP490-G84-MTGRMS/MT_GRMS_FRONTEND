@@ -383,7 +383,7 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
             <thead>
               <tr>
                 <th className="so-list-th" style={{ width: 45, textAlign: 'center' }}>
-                  #
+                  STT
                 </th>
                 <th className="so-list-th">Mã phiếu kiểm kê</th>
                 <th className="so-list-th">Chi nhánh</th>
@@ -472,7 +472,9 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                             textAlign: 'left',
                           }}
                         >
-                          <span className="so-list-code">{item.code}</span>
+                          <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>
+                            {item.code}
+                          </span>
                         </button>
                       </td>
                       <td className="so-list-td">

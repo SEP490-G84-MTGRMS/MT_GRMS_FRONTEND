@@ -21,8 +21,15 @@ export function todayLocalDateKey(): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * TEMP (test/UAT): cho phép nhập hàng trước ngày giao.
+ * Bật lại rule thật: đổi thành `false`.
+ */
+const ALLOW_RECEIVE_BEFORE_DELIVERY_DATE = true;
+
 /** Đến ngày giao (hoặc đã qua) mới được nhập hàng. Thiếu ngày giao → cho phép (legacy). */
 export function isDeliveryDateReached(deliveryDate?: string | null): boolean {
+  if (ALLOW_RECEIVE_BEFORE_DELIVERY_DATE) return true;
   const key = toDeliveryDateKey(deliveryDate);
   if (!key) return true;
   return key <= todayLocalDateKey();

@@ -36,6 +36,7 @@ describe('BranchSelectorDropdown Component', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem('mtgrms_active_branch', JSON.stringify(initialBranches[0]));
     vi.restoreAllMocks();
     vi.spyOn(branchManagementApi, 'getBranches').mockResolvedValue({
       success: true,
@@ -51,6 +52,13 @@ describe('BranchSelectorDropdown Component', () => {
 
   afterEach(() => {
     localStorage.clear();
+  });
+
+  it('defaults to all branches when no branch is saved for a multi-branch store', async () => {
+    localStorage.removeItem('mtgrms_active_branch');
+    render(<MemoryRouter><BranchSelectorDropdown /></MemoryRouter>);
+    await waitFor(() => expect(branchManagementApi.getBranches).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Toàn hệ thống' })).toBeInTheDocument();
   });
 
   it('renders initial branch on topbar and loads backend branches', async () => {

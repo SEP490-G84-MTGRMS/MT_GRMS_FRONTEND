@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   Search,
   Plus,
@@ -797,6 +797,10 @@ export const WorkSchedulePage: React.FC = () => {
     );
   };
 
+  if (!isStoreOwnerOrAdmin) {
+    return <Navigate to="/employee/attendance" replace />;
+  }
+
   return (
     <div className="emp-page-container">
       {/* ─── HEADER BAR ─── */}
@@ -804,9 +808,6 @@ export const WorkSchedulePage: React.FC = () => {
         <div>
           <h2 className="emp-header-title" style={{ margin: 0 }}>
             <span>Lịch làm việc</span>
-            <span className="count-badge">
-              {viewMode === 'by_employee' ? filteredEmployees.length : filteredShifts.length}
-            </span>
           </h2>
         </div>
 

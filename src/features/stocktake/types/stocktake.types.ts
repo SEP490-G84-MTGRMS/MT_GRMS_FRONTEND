@@ -23,6 +23,15 @@ export type NearExpiryAction =
   | 'RETURN_SUPPLIER'
   | 'HOLD_MONITOR';
 
+/** Hướng xử lý hàng hư hỏng / hết hạn khi Owner duyệt. */
+export type StockDispositionAction = 'WRITE_OFF' | 'RETURN_SUPPLIER';
+
+export interface StocktakeCountUnitOption {
+  name: string;
+  /** 1 đơn vị này = bao nhiêu đơn vị tồn (base). */
+  toStockRate: number;
+}
+
 export interface StocktakeLine {
   id: string;
   branchStockId?: string | null;
@@ -50,6 +59,10 @@ export interface StocktakeLine {
   defectiveReasonCode?: DefectiveReasonCode | string | null;
   defectiveReasonDetail?: string | null;
   nearExpiryAction?: NearExpiryAction | string | null;
+  /** WRITE_OFF (mặc định) | RETURN_SUPPLIER */
+  damagedAction?: StockDispositionAction | string | null;
+  /** WRITE_OFF (mặc định) | RETURN_SUPPLIER */
+  expiredAction?: StockDispositionAction | string | null;
   discountPercent?: number | null;
   returnedQty: number;
   returnableQty: number;
@@ -108,7 +121,16 @@ export interface UpsertStocktakeLineInput {
   productId: string;
   sku: string;
   productName: string;
+  /** Nhãn ĐVT đang chọn để nhập (có thể là thùng / chai…). */
   unit: string;
+  /** ĐVT tồn kho (base) — luôn lưu số liệu theo đơn vị này khi gửi BE. */
+  stockUnit?: string;
+  purchaseUnit?: string;
+  purchaseToStockRate?: number;
+  /** ĐVT đang dùng để nhập số trên form. */
+  countUnit?: string;
+  countToStockRate?: number;
+  countUnitOptions?: StocktakeCountUnitOption[];
   batchCode?: string | null;
   expiryDate?: string | null;
   shelfLocation?: string | null;
@@ -127,6 +149,8 @@ export interface UpsertStocktakeLineInput {
   defectiveReasonCode?: string | null;
   defectiveReasonDetail?: string | null;
   nearExpiryAction?: string | null;
+  damagedAction?: StockDispositionAction | string | null;
+  expiredAction?: StockDispositionAction | string | null;
   discountPercent?: number | null;
   evidenceUrl?: string | null;
   note?: string | null;
@@ -138,6 +162,7 @@ export interface CreateStocktakePayload {
   scopeReference?: string | null;
   note?: string | null;
   submitImmediately: boolean;
+  createdByName?: string | null;
   lines: UpsertStocktakeLineInput[];
 }
 
@@ -146,6 +171,12 @@ export interface ReviewStocktakePayload {
   note?: string | null;
   /** RULE-03: bắt buộc khi có hàng thừa (variance &gt; 0) */
   confirmSurplusFound?: boolean;
+  /** Quyết định xử lý hư hỏng / hết hạn theo từng dòng trước khi duyệt. */
+  lineActions?: Array<{
+    stocktakeLineId: string;
+    damagedAction?: StockDispositionAction | string | null;
+    expiredAction?: StockDispositionAction | string | null;
+  }>;
 }
 
 export interface CreateReturnFromStocktakePayload {

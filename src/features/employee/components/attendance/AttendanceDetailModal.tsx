@@ -95,7 +95,6 @@ interface StaffAttendanceDetailViewProps {
 const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
   record,
   onClose,
-  onRequestIncident,
 }) => {
   const [scheduleDetail, setScheduleDetail] = useState<ScheduleResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -619,67 +618,6 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                   <FileText size={16} color="#64748B" style={{ flexShrink: 0, marginTop: 2 }} />
                   <div>
                     <b>Ghi chú:</b> {scheduleDetail?.approvalReason || record.note}
-                  </div>
-                </div>
-              )}
-
-              {/* Box Hỗ Trợ Gửi Khiếu Nại / Báo Sự Cố Chấm Công */}
-              {onRequestIncident && (
-                <div
-                  style={{
-                    marginTop: 4,
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    backgroundColor: '#F8FAFC',
-                    border: '1px dashed #CBD5E1',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ fontSize: 12, color: '#475569' }}>
-                    Giờ công hoặc điểm danh có sai sót?
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onRequestIncident(record, ScheduleRequestType.CheckInIncident);
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        border: '1px solid #0F766E',
-                        backgroundColor: '#FFFFFF',
-                        color: '#0F766E',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Báo sự cố vào/ra ca
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        onRequestIncident(record, ScheduleRequestType.Overtime);
-                      }}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: 6,
-                        border: '1px solid #E2E8F0',
-                        backgroundColor: '#FFFFFF',
-                        color: '#334155',
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Xin duyệt OT
-                    </button>
                   </div>
                 </div>
               )}

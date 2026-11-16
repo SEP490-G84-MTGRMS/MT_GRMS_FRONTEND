@@ -101,15 +101,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
     items.filter((it) => groupKey(it) === groupKey(row)).length > 1;
 
   return (
-    <div
-      style={{
-        backgroundColor: '#ffffff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 10,
-        padding: '16px 20px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
-      }}
-    >
+    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
       {/* Table Header Section */}
       <div
         style={{
@@ -118,7 +110,8 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: 12,
-          marginBottom: 14,
+          marginBottom: 10,
+          flexShrink: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -227,11 +220,14 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
         </div>
       )}
 
-      {/* Table Container with Horizontal Scroll */}
+      {/* Table: fixed height + sticky header */}
       <div
         style={{
           width: '100%',
-          overflowX: 'auto',
+          flex: 1,
+          minHeight: 360,
+          maxHeight: 'min(68vh, 640px)',
+          overflow: 'auto',
           border: '1px solid #e2e8f0',
           borderRadius: 8,
         }}
@@ -259,25 +255,25 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                 whiteSpace: 'nowrap',
               }}
             >
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 34 }}>STT</th>
-              <th style={{ padding: '9px 10px', width: 90 }}>MÃ SKU</th>
-              <th style={{ padding: '9px 10px', width: 300, minWidth: 300, maxWidth: 300 }}>
+              <th style={{ padding: '9px 8px', textAlign: 'center', width: 34, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>STT</th>
+              <th style={{ padding: '9px 10px', width: 90, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>MÃ SKU</th>
+              <th style={{ padding: '9px 10px', width: 300, minWidth: 300, maxWidth: 300, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
                 TÊN SẢN PHẨM
               </th>
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 55 }}>ĐVT</th>
-              <th style={{ padding: '9px 8px', textAlign: 'right', width: 65 }}>SL ĐẶT</th>
-              <th style={{ padding: '9px 8px', textAlign: 'right', width: 80 }}>THỰC NHẬN</th>
-              <th style={{ padding: '9px 8px', textAlign: 'right', width: 75 }}>THIẾU</th>
-              <th style={{ padding: '9px 10px', width: 180 }}>LÝ DO THIẾU / TỪ CHỐI</th>
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 70 }}>LỆCH PO</th>
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 88 }}>QL BATCH</th>
-              <th style={{ padding: '9px 10px', width: 180, minWidth: 180 }}>MÃ LÔ</th>
-              <th style={{ padding: '9px 10px', width: 120 }}>NGÀY SX</th>
-              <th style={{ padding: '9px 10px', width: 125 }}>HẠN SD</th>
-              <th style={{ padding: '9px 10px', textAlign: 'right', width: 90 }}>ĐƠN GIÁ</th>
-              <th style={{ padding: '9px 12px', textAlign: 'right', width: 105 }}>THÀNH TIỀN</th>
+              <th style={{ padding: '9px 8px', textAlign: 'center', width: 72, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }} title="Đơn vị nhập">ĐVT nhập</th>
+              <th style={{ padding: '9px 8px', textAlign: 'right', width: 65, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>SL ĐẶT</th>
+              <th style={{ padding: '9px 8px', textAlign: 'right', width: 80, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THỰC NHẬN</th>
+              <th style={{ padding: '9px 8px', textAlign: 'right', width: 75, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THIẾU</th>
+              <th style={{ padding: '9px 10px', width: 180, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>LÝ DO THIẾU / TỪ CHỐI</th>
+              <th style={{ padding: '9px 8px', textAlign: 'center', width: 70, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>LỆCH PO</th>
+              <th style={{ padding: '9px 8px', textAlign: 'center', width: 88, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>QL BATCH</th>
+              <th style={{ padding: '9px 10px', width: 180, minWidth: 180, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>MÃ LÔ</th>
+              <th style={{ padding: '9px 10px', width: 120, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>NGÀY SX</th>
+              <th style={{ padding: '9px 10px', width: 125, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>HẠN SD</th>
+              <th style={{ padding: '9px 10px', textAlign: 'right', width: 90, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>ĐƠN GIÁ</th>
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 105, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THÀNH TIỀN</th>
               {!readOnly && (
-                <th style={{ padding: '9px 8px', textAlign: 'center', width: 72 }}>THAO TÁC</th>
+                <th style={{ padding: '9px 8px', textAlign: 'center', width: 72, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THAO TÁC</th>
               )}
             </tr>
           </thead>
@@ -532,6 +528,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                           type="date"
                           value={row.manufactureDate || ''}
                           disabled={readOnly}
+                          max={row.expiryDate || undefined}
                           onChange={(e) => onItemChange(row.id, 'manufactureDate', e.target.value)}
                           style={{
                             width: '100%',
@@ -561,7 +558,13 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                         <input
                           type="date"
                           value={row.expiryDate || ''}
-                          disabled={readOnly}
+                          disabled={readOnly || !row.manufactureDate}
+                          min={row.manufactureDate || undefined}
+                          title={
+                            !row.manufactureDate
+                              ? 'Nhập ngày sản xuất trước khi chọn hạn sử dụng'
+                              : `Hạn sử dụng phải từ ${row.manufactureDate} trở đi`
+                          }
                           onChange={(e) => onItemChange(row.id, 'expiryDate', e.target.value)}
                           style={{
                             width: '100%',
@@ -574,10 +577,11 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                               ? '1.5px solid #f59e0b'
                               : '1px solid #cbd5e1',
                             fontSize: 11,
-                            color: readOnly ? '#475569' : '#0f172a',
-                            backgroundColor: readOnly ? '#f1f5f9' : '#ffffff',
-                            cursor: readOnly ? 'not-allowed' : 'text',
+                            color: readOnly || !row.manufactureDate ? '#475569' : '#0f172a',
+                            backgroundColor: readOnly || !row.manufactureDate ? '#f1f5f9' : '#ffffff',
+                            cursor: readOnly || !row.manufactureDate ? 'not-allowed' : 'text',
                             boxSizing: 'border-box',
+                            opacity: !row.manufactureDate && !readOnly ? 0.75 : 1,
                           }}
                         />
                       )}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { InvoiceDTO } from '../../types/inventory.types';
 import type { Product } from '../../types/pos.types';
+import { PosProductSearchInput } from '../PosProductSearchInput';
 import { ArrowLeftRight, RotateCcw, Plus, Trash2, AlertTriangle, AlertCircle, PackageCheck, Gift } from 'lucide-react';
 
 interface Props {
@@ -64,9 +65,6 @@ export const ReturnExchangeModal: React.FC<Props> = ({
       unitId?: string;
     }>
   >([]);
-  const [selectedNewProductId, setSelectedNewProductId] = useState<string>('');
-  const [selectedNewUnitName, setSelectedNewUnitName] = useState<string>('');
-  const [selectedNewQty, setSelectedNewQty] = useState<number>(1);
 
   // 3. Phương thức thanh toán bù / hoàn & Lý do đổi trả
   const [settlementMethod, setSettlementMethod] = useState<string>('CASH');
@@ -86,18 +84,12 @@ export const ReturnExchangeModal: React.FC<Props> = ({
     ];
   };
 
-  const selectedProductObj = availableProducts.find((p) => p.id === selectedNewProductId);
-  const selectedProductUnits = selectedProductObj ? getEffectiveUnitPrices(selectedProductObj) : [];
-
   // Reset state khi mở modal với invoice mới
   React.useEffect(() => {
     if (isOpen && invoice) {
       setReturnQtys({});
       setReturnConditions({});
       setNewItems([]);
-      setSelectedNewProductId('');
-      setSelectedNewUnitName('');
-      setSelectedNewQty(1);
       setSettlementMethod('CASH');
       setReturnReason('DEFECTIVE');
       setNote('');
@@ -161,23 +153,18 @@ export const ReturnExchangeModal: React.FC<Props> = ({
     }
   };
 
-  const handleAddNewItem = () => {
-    if (!selectedNewProductId) return;
-    const prod = availableProducts.find((p) => p.id === selectedNewProductId);
-    if (!prod) return;
-
+  const handleSelectNewProduct = (prod: Product) => {
     const units = getEffectiveUnitPrices(prod);
-    const chosenUnit = units.find((u) => u.unitName === selectedNewUnitName) || units[0];
+    const chosenUnit = units.find((u) => u.isBaseUnit) || units[0];
     const unitName = chosenUnit?.unitName || prod.baseUnit || 'Cái';
-    const unitPrice = chosenUnit?.price || prod.basePrice;
-    const qtyToAdd = selectedNewQty > 0 ? selectedNewQty : 1;
+    const unitPrice = chosenUnit?.price ?? prod.basePrice;
 
     setNewItems((prev) => {
       const existing = prev.find((i) => i.product.id === prod.id && i.selectedUnitName === unitName);
       if (existing) {
         return prev.map((i) =>
           i.product.id === prod.id && i.selectedUnitName === unitName
-            ? { ...i, quantity: i.quantity + qtyToAdd }
+            ? { ...i, quantity: i.quantity + 1 }
             : i
         );
       }
@@ -185,16 +172,13 @@ export const ReturnExchangeModal: React.FC<Props> = ({
         ...prev,
         {
           product: { ...prod, unitPrices: units },
-          quantity: qtyToAdd,
+          quantity: 1,
           selectedUnitName: unitName,
-          unitPrice: unitPrice,
+          unitPrice,
           unitId: chosenUnit?.unitId,
         },
       ];
     });
-    setSelectedNewProductId('');
-    setSelectedNewUnitName('');
-    setSelectedNewQty(1);
   };
 
   const handleRemoveNewItem = (productId: string, unitName: string) => {
@@ -229,6 +213,15 @@ export const ReturnExchangeModal: React.FC<Props> = ({
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+    if (note.trim().length > 500) { alert('Ghi chú tối đa 500 ký tự.'); return; }
+    if (invoice.items.some((item, index) => {
+      const quantity = returnQtys[getLineKey(item, index)] ?? 0;
+      return !Number.isFinite(quantity) || quantity < 0 || quantity > item.quantity;
+    }) || newItems.some(item => !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0)) {
+      alert('Số lượng đổi/trả hoặc đơn giá không hợp lệ; số lượng trả không được vượt quá hóa đơn gốc.');
+      return;
+    }
     const returnedItemsList = (invoice.items || [])
       .map((originalItem, idx) => {
         const key = getLineKey(originalItem, idx);
@@ -505,85 +498,20 @@ export const ReturnExchangeModal: React.FC<Props> = ({
               </span>
             </div>
 
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-              <select
-                value={selectedNewProductId}
-                onChange={(e) => {
-                  const pid = e.target.value;
-                  setSelectedNewProductId(pid);
-                  const prod = availableProducts.find((p) => p.id === pid);
-                  const units = prod ? getEffectiveUnitPrices(prod) : [];
-                  const defaultUnit = units[0]?.unitName || prod?.baseUnit || 'Cái';
-                  setSelectedNewUnitName(defaultUnit);
-                  setSelectedNewQty(1);
-                }}
-                style={{ flex: 2, minWidth: 260, padding: '7px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}
-              >
-                <option value="">-- Tìm chọn sản phẩm đổi mới từ danh mục --</option>
-                {availableProducts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {p.basePrice.toLocaleString('vi-VN')} đ (Tồn: {p.quantityOnHand} {p.baseUnit || ''})
-                  </option>
-                ))}
-              </select>
-
-              {/* Chọn đơn vị tính của sản phẩm đổi */}
-              {selectedProductObj && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: '#047857' }}>Đơn vị:</label>
-                  <select
-                    value={selectedNewUnitName}
-                    onChange={(e) => setSelectedNewUnitName(e.target.value)}
-                    style={{
-                      padding: '7px 10px',
-                      borderRadius: 6,
-                      border: '1.5px solid #059669',
-                      fontSize: 13,
-                      backgroundColor: '#f0fdf4',
-                      color: '#166534',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {selectedProductUnits.map((u) => (
-                      <option key={u.unitName} value={u.unitName}>
-                        {u.unitName} {u.conversionRate > 1 ? `(x${u.conversionRate})` : ''} — {u.price.toLocaleString('vi-VN')} đ
-                      </option>
-                    ))}
-                  </select>
+            <div style={{ marginBottom: 12 }}>
+              <PosProductSearchInput
+                products={availableProducts}
+                onSelectProduct={handleSelectNewProduct}
+                placeholder="Quét Barcode, SKU hoặc tìm tên sản phẩm đổi mới..."
+                ariaLabel="Quét Barcode hoặc tìm sản phẩm đổi mới"
+                buttonLabel="Thêm / Tìm"
+                resetTrigger={isOpen ? invoice.invoiceId : false}
+              />
+              {newItems.length === 0 && (
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
+                  Quét mã vạch (nhấn Enter) hoặc chọn sản phẩm từ gợi ý tìm kiếm để thêm ngay; chỉnh đơn vị và số lượng trực tiếp trong bảng bên dưới.
                 </div>
               )}
-
-              {/* Chọn số lượng */}
-              {selectedProductObj && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: '#047857' }}>SL:</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={selectedNewQty}
-                    onChange={(e) => setSelectedNewQty(Math.max(1, parseInt(e.target.value) || 1))}
-                    style={{
-                      width: 60,
-                      padding: '7px 8px',
-                      borderRadius: 6,
-                      border: '1.5px solid #059669',
-                      fontSize: 13,
-                      textAlign: 'center',
-                      fontWeight: 700,
-                    }}
-                  />
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={handleAddNewItem}
-                disabled={!selectedNewProductId}
-                className="pos-btn-primary"
-                style={{ padding: '7px 16px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}
-              >
-                <Plus size={15} /> Thêm món
-              </button>
             </div>
 
             {newItems.length > 0 && (

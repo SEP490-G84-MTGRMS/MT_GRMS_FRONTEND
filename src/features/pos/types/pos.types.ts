@@ -19,12 +19,14 @@ export class ProductDTO {
   imageUrl?: string;
   spec?: string;
   category: string = '';
+  categoryName?: string;
   baseUnit: string = '';
   basePrice: number = 0;
   costPrice: number = 0;
   quantityOnHand: number = 0;
   allocatedQty?: number;
   batchCode?: string;
+    batchId?: string;
   expiryDate?: string;
   shelfLocation?: string;
   unitPrices?: Array<{
@@ -58,6 +60,8 @@ export class CartItemDTO {
   totalAmount: number = 0;
   isBelowCostApproved?: boolean;
   batchCode?: string;
+  batchId?: string;
+  fefoDiscountPercent?: number;
   expiryDate?: string;
 
   constructor(init?: Partial<CartItemDTO>) {
