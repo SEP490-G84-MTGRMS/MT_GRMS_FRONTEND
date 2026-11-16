@@ -49,8 +49,7 @@ export const TaxSnapshotPage: FC = () => {
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const auxiliaryDialogRef = useRef<HTMLElement>(null);
   const { user } = useAuthStore();
-  const userRole = (user?.role || '').toUpperCase();
-  const isEmployee = userRole === 'EMPLOYEE' || userRole === 'CASHIER' || userRole === 'STAFF';
+  const canManageTax = user?.role === 'STORE_OWNER';
 
   const {
     summary,
@@ -374,16 +373,16 @@ export const TaxSnapshotPage: FC = () => {
                       <BarChart3 size={16} /> Phân tích doanh thu &amp; thuế
                     </button>
                     <div className="tax-actions-menu-separator" />
-                    {!isEmployee && <button type="button" role="menuitem" onClick={() => { setIsRateConfigOpen(true); setIsActionMenuOpen(false); }}><SlidersHorizontal size={16} /> Cấu hình thuế</button>}
-                    {!isEmployee && <button type="button" role="menuitem" onClick={() => { setPinModalInitialTab('change'); setIsPinModalOpen(true); setIsActionMenuOpen(false); }}><KeyRound size={16} /> Mã PIN bảo mật</button>}
+                    {canManageTax && <button type="button" role="menuitem" onClick={() => { setIsRateConfigOpen(true); setIsActionMenuOpen(false); }}><SlidersHorizontal size={16} /> Cấu hình thuế</button>}
+                    {canManageTax && <button type="button" role="menuitem" onClick={() => { setPinModalInitialTab('change'); setIsPinModalOpen(true); setIsActionMenuOpen(false); }}><KeyRound size={16} /> Mã PIN bảo mật</button>}
                     <button type="button" role="menuitem" disabled={isSummaryLoading} onClick={() => { void refetchSummary(); setIsActionMenuOpen(false); }}><RotateCcw size={16} /> Làm mới số liệu</button>
-                    {!isEmployee && <button type="button" role="menuitem" disabled={isExportingExcel || isSummaryLoading} onClick={() => { void handleExportExcel(); setIsActionMenuOpen(false); }}><Download size={16} /> {isExportingExcel ? 'Đang xuất…' : 'Xuất báo cáo Excel'}</button>}
+                    {canManageTax && <button type="button" role="menuitem" disabled={isExportingExcel || isSummaryLoading} onClick={() => { void handleExportExcel(); setIsActionMenuOpen(false); }}><Download size={16} /> {isExportingExcel ? 'Đang xuất…' : 'Xuất báo cáo Excel'}</button>}
                   </div>
                 )}
               </div>
 
               {/* Finalize Button (Ẩn đối với Employee) */}
-              {!isEmployee && (
+              {canManageTax && (
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(true)}

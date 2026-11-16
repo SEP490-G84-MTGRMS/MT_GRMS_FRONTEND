@@ -210,21 +210,21 @@ describe('Phase 1: Cashbook Page UI/UX Standardization Suite', () => {
       expect(screen.getByText(/Lập phiếu thu/i)).toBeDefined();
     });
     // Close modal
-    fireEvent.click(screen.getByRole('button', { name: /Hủy bỏ/i }));
+    fireEvent.click(document.querySelector('.cb-btn-outline')!);
 
     // 2. Open Payment Modal
     fireEvent.click(screen.getByRole('button', { name: /Chi tiền/i }));
     await waitFor(() => {
       expect(screen.getByText(/Lập phiếu chi/i)).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Hủy bỏ/i }));
+    fireEvent.click(document.querySelector('.cb-btn-outline')!);
 
     // 3. Open Transfer Modal
     fireEvent.click(screen.getByRole('button', { name: /Chuyển quỹ nội bộ/i }));
     await waitFor(() => {
       expect(screen.getByText(/Chuyển tiền nội bộ/i)).toBeDefined();
     });
-    fireEvent.click(screen.getByRole('button', { name: /Hủy bỏ/i }));
+    fireEvent.click(document.querySelector('.cb-btn-outline')!);
 
     // 4. Open Blind Cash Audit Modal
     fireEvent.click(screen.getByRole('button', { name: /Kiểm kê két/i }));

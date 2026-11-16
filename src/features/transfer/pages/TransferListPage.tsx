@@ -40,7 +40,7 @@ export const TransferListPage: React.FC = () => {
 
   // User role & current branch context (BR-SEC-02 simulation)
   const user = useAuthStore((state) => state.user);
-  const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
+  const isStoreOwner = user?.role === 'STORE_OWNER';
   const transferBasePath = isStoreOwner ? '/store-owner/transfers' : '/employee/transfers';
 
   // Filters
@@ -297,7 +297,7 @@ export const TransferListPage: React.FC = () => {
         'Chi nhánh gửi',
         'Chi nhánh nhận',
         'Trạng thái',
-        'Tổng tiền',
+        ...(isStoreOwner ? ['Tổng tiền'] : []),
       ]);
       filteredTransfers.forEach((transfer) =>
         sheet.addRow([
@@ -306,7 +306,7 @@ export const TransferListPage: React.FC = () => {
           transfer.fromBranchName,
           transfer.toBranchName,
           transfer.status,
-          transfer.totalAmount,
+          ...(isStoreOwner ? [transfer.totalAmount] : []),
         ])
       );
       sheet.getRow(1).font = { bold: true };
@@ -430,7 +430,7 @@ export const TransferListPage: React.FC = () => {
       <col style={{ width: 140 }} />
       <col style={{ width: 190 }} />
       <col style={{ width: 190 }} />
-      <col style={{ width: 140 }} />
+      {isStoreOwner && <col style={{ width: 140 }} />}
       <col style={{ width: 120 }} />
     </colgroup>
   );
@@ -472,7 +472,7 @@ export const TransferListPage: React.FC = () => {
         </div>
 
         <div className="so-list-header-actions">
-          <span
+          {isStoreOwner && <span
             className="so-list-filter-badge"
             style={{
               backgroundColor: '#F0FDFA',
@@ -485,7 +485,7 @@ export const TransferListPage: React.FC = () => {
           >
             Tổng giá trị:{' '}
             <strong style={{ marginLeft: 4 }}>{totalTransferValue.toLocaleString()} đ</strong>
-          </span>
+          </span>}
           <button
             type="button"
             className="po-btn po-btn-secondary"
@@ -749,9 +749,9 @@ export const TransferListPage: React.FC = () => {
                 <th className="so-list-th">Ngày Nhận</th>
                 <th className="so-list-th">Kho Gửi</th>
                 <th className="so-list-th">Kho Nhận</th>
-                <th className="so-list-th" style={{ textAlign: 'right' }}>
+                {isStoreOwner && <th className="so-list-th" style={{ textAlign: 'right' }}>
                   Giá Trị Chuyển
-                </th>
+                </th>}
                 <th className="so-list-th" style={{ textAlign: 'center' }}>
                   Trạng Thái
                 </th>
@@ -874,7 +874,7 @@ export const TransferListPage: React.FC = () => {
                     </td>
 
                     {/* Giá trị chuyển */}
-                    <td
+                    {isStoreOwner && <td
                       className="so-list-td"
                       style={{
                         textAlign: 'right',
@@ -884,7 +884,7 @@ export const TransferListPage: React.FC = () => {
                       }}
                     >
                       {t.totalAmount.toLocaleString()} đ
-                    </td>
+                    </td>}
 
                     {/* Trạng thái */}
                     <td className="so-list-td" style={{ textAlign: 'center' }}>
@@ -896,7 +896,7 @@ export const TransferListPage: React.FC = () => {
 
               {isLoading && (
                 <tr>
-                  <td colSpan={9} style={{ padding: 28, textAlign: 'center' }}>
+                  <td colSpan={isStoreOwner ? 9 : 8} style={{ padding: 28, textAlign: 'center' }}>
                     <Loader2
                       size={24}
                       className="animate-spin"
@@ -912,7 +912,7 @@ export const TransferListPage: React.FC = () => {
               {!isLoading && filteredTransfers.length === 0 && (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={isStoreOwner ? 9 : 8}
                     style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
                   >
                     <FileText size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />

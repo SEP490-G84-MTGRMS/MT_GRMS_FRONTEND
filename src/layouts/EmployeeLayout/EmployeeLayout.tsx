@@ -10,6 +10,12 @@ export const EmployeeLayout: FC = () => {
   if (!isAuthenticated || !user) {
     return <Navigate to="/auth/login" replace />;
   }
+  if (user.role === 'ADMIN') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  if (user.role !== 'STAFF') {
+    return <Navigate to="/store-owner/dashboard" replace />;
+  }
   return (
     <div
       style={{
@@ -40,7 +46,7 @@ export const EmployeeLayout: FC = () => {
           minHeight: 0,
         }}
       >
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['STAFF']}>
           <Outlet />
         </ProtectedRoute>
       </main>

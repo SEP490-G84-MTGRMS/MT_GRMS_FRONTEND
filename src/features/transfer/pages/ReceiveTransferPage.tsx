@@ -11,11 +11,13 @@ import {
 import type { TransferOrder, TransferItem } from '../types';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { transferService } from '../services/transferService';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import '../transfer.css';
 
 export const ReceiveTransferPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const canViewFinancials = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   const [transfer, setTransfer] = useState<TransferOrder | null>(null);
@@ -316,8 +318,8 @@ export const ReceiveTransferPage: React.FC = () => {
                   <th style={{ width: 95, textAlign: 'center', backgroundColor: '#e0f2fe' }}>SL nhận tốt</th>
                   <th style={{ width: 95, textAlign: 'center', backgroundColor: '#fee2e2' }}>Hỏng</th>
                   <th style={{ minWidth: 190 }}>Lý do hỏng/chênh lệch</th>
-                  <th style={{ width: 100, textAlign: 'right' }}>Giá chuyển</th>
-                  <th style={{ width: 120, textAlign: 'right' }}>Thành tiền</th>
+                  {canViewFinancials && <th style={{ width: 100, textAlign: 'right' }}>Giá chuyển</th>}
+                  {canViewFinancials && <th style={{ width: 120, textAlign: 'right' }}>Thành tiền</th>}
                 </tr>
               </thead>
               <tbody>
@@ -425,10 +427,10 @@ export const ReceiveTransferPage: React.FC = () => {
                         />
                       </td>
 
-                      <td style={{ textAlign: 'right' }}>{it.unitPrice.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
+                      {canViewFinancials && <td style={{ textAlign: 'right' }}>{it.unitPrice.toLocaleString()}</td>}
+                      {canViewFinancials && <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
                         {(recvQty * it.unitPrice).toLocaleString()}
-                      </td>
+                      </td>}
                     </tr>
                   );
                 })}
@@ -444,10 +446,10 @@ export const ReceiveTransferPage: React.FC = () => {
                   </td>
                   <td style={{ textAlign: 'center', color: totalDamaged > 0 ? '#dc2626' : '#64748b' }}>{totalDamaged}</td>
                   <td />
-                  <td />
-                  <td style={{ textAlign: 'right', color: '#0F766E', fontSize: 14 }}>
+                  {canViewFinancials && <td />}
+                  {canViewFinancials && <td style={{ textAlign: 'right', color: '#0F766E', fontSize: 14 }}>
                     {totalAmountReceived.toLocaleString()} đ
-                  </td>
+                  </td>}
                 </tr>
               </tbody>
             </table>

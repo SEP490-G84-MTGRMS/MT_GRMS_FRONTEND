@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TaxSnapshotDetailDrawer } from '../components/TaxSnapshotDetailDrawer';
 import { HouseholdTaxGroup, TaxCalculationMethod, TaxPeriodType, type TaxSnapshot } from '../types/taxSnapshot';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 const mockSnapshot: TaxSnapshot = {
   id: 'snap-2026-q1',
@@ -29,6 +30,18 @@ const mockSnapshot: TaxSnapshot = {
 };
 
 describe('TaxSnapshotDetailDrawer - BF-03 & BF-04', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: {
+        id: 'owner-1', email: 'owner@example.test', fullName: 'Store Owner',
+        role: 'STORE_OWNER', tenantId: 'tenant-1',
+      },
+      token: null,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+  });
+
   it('displays professional explanatory message when opening Invoices tab', () => {
     render(
       <TaxSnapshotDetailDrawer

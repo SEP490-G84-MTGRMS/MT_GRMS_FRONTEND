@@ -35,8 +35,7 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
 }) => {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const normalizedRole = user?.role?.toUpperCase() ?? '';
-  const isOwner = normalizedRole === 'STORE_OWNER' || normalizedRole === 'ADMIN' || normalizedRole === 'SYSTEMADMIN';
+  const isOwner = user?.role === 'STORE_OWNER';
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
   const [currentTransfer, setCurrentTransfer] = useState<TransferOrder | null>(initialTransfer);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -114,9 +113,13 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
     sheet.addRow(['Chi nhánh nhận', currentTransfer.toBranchName]);
     sheet.addRow(['Ngày chuyển', currentTransfer.transferDate]);
     sheet.addRow([]);
-    sheet.addRow(['Mã SP', 'Tên sản phẩm', 'Lô', 'Số lượng gửi', 'Số lượng nhận', 'Đơn giá', 'Thành tiền']);
+    sheet.addRow([
+      'Mã SP', 'Tên sản phẩm', 'Lô', 'Số lượng gửi', 'Số lượng nhận',
+      ...(isOwner ? ['Đơn giá', 'Thành tiền'] : []),
+    ]);
     currentTransfer.items.forEach((item) => sheet.addRow([
-      item.productCode, item.productName, item.batchNumber ?? '', item.sentQty, item.receivedQty ?? 0, item.unitPrice, item.amount,
+      item.productCode, item.productName, item.batchNumber ?? '', item.sentQty, item.receivedQty ?? 0,
+      ...(isOwner ? [item.unitPrice, item.amount] : []),
     ]));
     sheet.getRow(6).font = { bold: true };
     sheet.columns.forEach((column) => { column.width = 22; });
@@ -250,9 +253,9 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
               <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1e293b' }}>
                 {currentTransfer.toBranchName}
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
+              {isOwner && <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
                 {currentTransfer.totalAmount.toLocaleString()} đ
-              </span>
+              </span>}
               {renderStatus(currentTransfer.status)}
             </div>
 
@@ -392,8 +395,8 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
                     <th style={{ width: 140 }}>Mã hàng</th>
                     <th>Tên hàng</th>
                     <th style={{ width: 140, textAlign: 'center' }}>Số lượng chuyển</th>
-                    <th style={{ width: 150, textAlign: 'right' }}>Giá chuyển/nhận</th>
-                    <th style={{ width: 160, textAlign: 'right' }}>Thành tiền chuyển</th>
+                    {isOwner && <th style={{ width: 150, textAlign: 'right' }}>Giá chuyển/nhận</th>}
+                    {isOwner && <th style={{ width: 160, textAlign: 'right' }}>Thành tiền chuyển</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -413,18 +416,18 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
                       <td style={{ textAlign: 'center', fontWeight: 700, fontSize: 14 }}>
                         {it.sentQty}
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      {isOwner && <td style={{ textAlign: 'right' }}>
                         {it.unitPrice.toLocaleString()} đ
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
+                      </td>}
+                      {isOwner && <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
                         {it.amount.toLocaleString()} đ
-                      </td>
+                      </td>}
                     </tr>
                   ))}
 
                   {filteredItems.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>
+                      <td colSpan={isOwner ? 5 : 3} style={{ padding: 24, textAlign: 'center', color: '#94a3b8' }}>
                         <FileText size={28} style={{ margin: '0 auto 6px auto', opacity: 0.4 }} />
                         Không tìm thấy hàng hóa phù hợp.
                       </td>
@@ -480,12 +483,12 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
                 <div>
                   Tổng SL chuyển: <b style={{ fontSize: 15 }}>{totalQty}</b>
                 </div>
-                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, marginTop: 4 }}>
+                {isOwner && <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, marginTop: 4 }}>
                   Tổng giá trị chuyển:&nbsp;
                   <b style={{ fontSize: 17, color: '#0F766E' }}>
                     {currentTransfer.totalAmount.toLocaleString()} đ
                   </b>
-                </div>
+                </div>}
               </div>
             </div>
           </div>

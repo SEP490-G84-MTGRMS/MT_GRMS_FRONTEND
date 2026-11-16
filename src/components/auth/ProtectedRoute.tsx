@@ -35,18 +35,15 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = ({ children, allowedRoles
   const [subscriptionCheck, setSubscriptionCheck] = useState<{ path: string; mode: SubscriptionGateMode } | null>(null);
   const [runtimeLock, setRuntimeLock] = useState<{ path: string; message?: string | null } | null>(null);
 
-  const rawRole = (user?.role || '').toUpperCase();
+  const rawRole = user?.role || '';
   const hasRoleAccess =
     !allowedRoles ||
     allowedRoles.length === 0 ||
-    allowedRoles
-      .map((r) => r.toUpperCase())
-      .some((r) => r === rawRole || (Boolean(user?.isAdmin) && r === 'ADMIN'));
+    allowedRoles.some((role) => role === rawRole);
 
-  const isSuperAdmin = rawRole === 'SUPER_ADMIN' || rawRole === 'SUPERADMIN';
   const isTenantDefault = user?.tenantId === 'DEFAULT';
-  const isOwnerRole = !isSuperAdmin && !isTenantDefault && ['STORE_OWNER', 'STOREOWNER', 'ADMIN'].includes(rawRole);
-  const isEmployeeRole = !isSuperAdmin && !isTenantDefault && ['EMPLOYEE', 'CASHIER', 'STAFF'].includes(rawRole);
+  const isOwnerRole = !isTenantDefault && rawRole === 'STORE_OWNER';
+  const isEmployeeRole = !isTenantDefault && rawRole === 'STAFF';
 
   const isSubscriptionGuardedArea = !location.pathname.startsWith('/admin');
   const isSubscriptionAllowedPath =
@@ -118,8 +115,11 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = ({ children, allowedRoles
   }
 
   if (!hasRoleAccess) {
-    if (rawRole === 'EMPLOYEE' || rawRole === 'CASHIER' || rawRole === 'STAFF') {
+    if (rawRole === 'STAFF') {
       return <Navigate to="/employee/pos" replace />;
+    }
+    if (rawRole === 'ADMIN') {
+      return <Navigate to="/admin/dashboard" replace />;
     }
     return <Navigate to="/store-owner/dashboard" replace />;
   }

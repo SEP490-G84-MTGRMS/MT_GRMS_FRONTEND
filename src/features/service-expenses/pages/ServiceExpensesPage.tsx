@@ -54,10 +54,7 @@ const getInitialActiveBranchId = (userBranchId?: string): string => {
 export const ServiceExpensesPage: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
-  const isEmployee =
-    user?.role === 'STAFF' ||
-    (user?.role as unknown as string) === 'EMPLOYEE' ||
-    (user?.role as unknown as string) === 'CASHIER';
+  const canManageExpenses = user?.role === 'STORE_OWNER';
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const initialRange = calculatePeriodRange('this-month');
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
@@ -458,7 +455,7 @@ export const ServiceExpensesPage: FC = () => {
         onPay={(item) => setPayingItem(item)}
         onApprove={handleApproveClick}
         onCancel={handleCancelClick}
-        canManageExpenses={!isEmployee}
+        canManageExpenses={canManageExpenses}
       />
 
       {/* ── 4. Create Modal ── */}

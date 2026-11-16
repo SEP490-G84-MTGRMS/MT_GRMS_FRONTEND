@@ -201,14 +201,14 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
       );
 
       // Move to Step 2
-      const step2Btn = screen.getByText('Tiếp tục: Nhập PIN bảo mật →');
+      const step2Btn = screen.getByRole('button', { name: /^Tiếp tục/i });
       fireEvent.click(step2Btn);
 
       // The on-screen numeric keypad 'Xóa' button should NOT exist
       expect(screen.queryByText('Xóa')).not.toBeInTheDocument();
 
       // Native computer keyboard input box should be present
-      const pinInput = screen.getByPlaceholderText('Nhập 4-6 số PIN');
+      const pinInput = screen.getByLabelText('Mã PIN bảo mật');
       expect(pinInput).toBeInTheDocument();
       expect(pinInput).toHaveAttribute('inputMode', 'numeric');
     });
@@ -246,9 +246,9 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
         />
       );
 
-      expect(screen.getByText('Kỳ tính thuế này đã có bản chốt sổ trước đó!')).toBeInTheDocument();
+      expect(screen.getByText(/Kỳ này đã được chốt\. Bản mới sẽ thay thế/i)).toBeInTheDocument();
       expect(
-        screen.getByText('Tôi xác nhận chốt lại và thay thế bản chốt cũ của kỳ này')
+        screen.getByText('Tôi hiểu và đồng ý tạo bản chốt thay thế')
       ).toBeInTheDocument();
     });
 
@@ -296,16 +296,16 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
       );
 
       // Step 1: Step 2 button is disabled until checkbox and reason are provided
-      const nextStepBtn = screen.getByText('Tiếp tục: Nhập PIN bảo mật →');
+      const nextStepBtn = screen.getByRole('button', { name: /^Tiếp tục/i });
       expect(nextStepBtn).toBeDisabled();
 
       // Check "Tôi xác nhận chốt lại và thay thế bản chốt cũ của kỳ này"
-      const checkbox = screen.getByRole('checkbox');
+      const checkbox = screen.getByRole('checkbox', { name: /Tôi hiểu và đồng ý tạo bản chốt thay thế/i });
       fireEvent.click(checkbox);
       expect(nextStepBtn).toBeDisabled(); // Still disabled because reason is empty
 
       // Enter rectification reason
-      const reasonInput = screen.getByPlaceholderText(/Điều chỉnh doanh thu kê khai bổ sung/i);
+      const reasonInput = screen.getByPlaceholderText(/Nhập lý do điều chỉnh/i);
       fireEvent.change(reasonInput, { target: { value: 'BBĐC-01/2026: Điều chỉnh theo quyết định thanh tra' } });
       expect(nextStepBtn).not.toBeDisabled();
 
@@ -313,14 +313,14 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
       fireEvent.click(nextStepBtn);
 
       // Step 2: Enter PIN
-      const pinInput = screen.getByPlaceholderText('Nhập 4-6 số PIN');
+      const pinInput = screen.getByLabelText('Mã PIN bảo mật');
       fireEvent.change(pinInput, { target: { value: '1234' } });
 
-      const toStep3Btn = screen.getByText('Tiếp tục: Ký niêm phong HMAC →');
+      const toStep3Btn = screen.getByRole('button', { name: /^Tiếp tục/i });
       fireEvent.click(toStep3Btn);
 
       // Step 3: Seal with HMAC
-      const sealBtn = screen.getByText('🔐 Ký niêm phong HMAC ngay');
+      const sealBtn = screen.getByRole('button', { name: /Chốt kỳ sổ/i });
       fireEvent.click(sealBtn);
 
       await waitFor(() => {

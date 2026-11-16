@@ -82,14 +82,14 @@ describe('Finance overview unified contract', () => {
     expect(screen.getByTestId('location').textContent).toBe('/store-owner/finance?tab=overview');
     expect(getSpy).toHaveBeenCalledTimes(1);
     expect(getSpy.mock.calls[0][0]).toBe('/finance/overview');
-    expect(screen.getByText('Chi nhánh trung tâm')).toBeDefined();
-    expect(screen.getByText('Chi nhánh Thủ Đức')).toBeDefined();
+    expect(screen.getAllByText('Chi nhánh trung tâm').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Chi nhánh Thủ Đức').length).toBeGreaterThan(0);
   });
 
   it('does not include cash in transit in available cash', async () => {
     renderPage();
     await screen.findByText('Tiền có thể sử dụng tại cuối kỳ');
-    expect(screen.getByText('330.000.000đ')).toBeDefined();
+    expect(screen.getAllByText('330.000.000đ').length).toBeGreaterThan(0);
     expect(screen.getAllByText('5.000.000đ').length).toBeGreaterThan(0);
     expect(screen.queryByText('335.000.000đ')).toBeNull();
   });

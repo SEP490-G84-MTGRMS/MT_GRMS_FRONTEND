@@ -595,7 +595,7 @@ export const SecurityPinModal: React.FC<SecurityPinModalProps> = ({
             <form onSubmit={handleResetPinSubmit}>
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                  Mật khẩu tài khoản đăng nhập (Chủ shop / Admin):
+                  Mật khẩu tài khoản STORE_OWNER đang đăng nhập:
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input

@@ -42,8 +42,7 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
   const [orderPageSize, setOrderPageSize] = useState<number>(5);
 
   const { user } = useAuthStore();
-  const rawRole = (user?.role || '').toUpperCase();
-  const isEmployee = rawRole === 'EMPLOYEE' || rawRole === 'CASHIER' || rawRole === 'STAFF';
+  const canManageTax = user?.role === 'STORE_OWNER';
 
   if (!isOpen || !snapshot) return null;
 
@@ -393,8 +392,8 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
           )}
         </div>
 
-        {/* Footer Actions (Chỉ dành cho StoreOwner & Admin) */}
-        {!isEmployee && (
+        {/* Footer Actions dành riêng cho STORE_OWNER */}
+        {canManageTax && (
           <div className="tax-drawer-footer">
             <button
               onClick={() => handleExport(snapshot)}
