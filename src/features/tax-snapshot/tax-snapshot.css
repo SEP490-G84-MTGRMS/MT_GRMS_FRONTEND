@@ -74,6 +74,10 @@
 
 /* ── More actions menu ── */
 .tax-actions-menu-wrap { position: relative; }
+.tax-refresh-button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tax-refresh-button:disabled { opacity: .65; cursor: wait; }
+.tax-refresh-icon.spinning { animation: tax-refresh-spin .8s linear infinite; }
+@keyframes tax-refresh-spin { to { transform: rotate(360deg); } }
 .tax-actions-menu-trigger { width: 38px; justify-content: center; padding: 0; }
 .tax-actions-menu { position: absolute; z-index: 100; right: 0; top: 43px; width: 270px; padding: 7px; background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 14px 36px rgba(15, 23, 42, .16); }
 .tax-actions-menu button { width: 100%; border: 0; background: transparent; border-radius: 8px; display: flex; align-items: center; gap: 9px; padding: 10px; color: #334155; font: 600 .79rem inherit; cursor: pointer; text-align: left; }

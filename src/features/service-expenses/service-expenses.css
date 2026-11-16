@@ -1,4 +1,4 @@
-/* ==========================================================================
+/* ========================================================================== 
    FE-07 Service Expenses — Dedicated Design System Stylesheet
    Chuẩn KiotViet Design System: Deep Teal (#0F766E) | Bo tròn Pill & 24px | Be Vietnam Pro
    Đồng bộ 100% với StoreOwnerLayout và phong cách của team
@@ -796,5 +796,56 @@
 @keyframes expense-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+.expense-responsive-table {
+  width: 100%;
+  min-width: 1040px;
+  table-layout: fixed;
+}
+
+.expense-responsive-table .so-list-th,
+.expense-responsive-table .so-list-td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.expense-responsive-table .so-list-td > div {
+  max-width: 100%;
+}
+
+.expense-responsive-table .so-list-td:last-child > div {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1100px) {
+  .expense-responsive-table {
+    min-width: 980px;
+  }
+}
+
+.expense-responsive-table {
+  width: 100%;
+  min-width: 1040px;
+  table-layout: fixed;
+}
+
+.expense-responsive-table .so-list-th,
+.expense-responsive-table .so-list-td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.expense-responsive-table .so-list-td > div {
+  max-width: 100%;
+}
+
+.expense-responsive-table .so-list-td:last-child > div {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1100px) {
+  .expense-responsive-table {
+    min-width: 980px;
   }
 }

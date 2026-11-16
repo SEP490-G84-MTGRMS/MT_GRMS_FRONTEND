@@ -356,6 +356,16 @@ export const TaxSnapshotPage: FC = () => {
               <div ref={actionMenuRef} className="tax-actions-menu-wrap">
                 <button
                   type="button"
+                  className="btn-secondary-pill tax-refresh-button"
+                  disabled={isSummaryLoading || isSummaryRefetching}
+                  onClick={() => { void refetchSummary(); }}
+                  title="Cập nhật số liệu từ máy chủ"
+                >
+                  <RotateCcw size={14} className={isSummaryRefetching ? 'tax-refresh-icon spinning' : 'tax-refresh-icon'} />
+                  <span>{isSummaryRefetching ? 'Đang cập nhật' : 'Cập nhật'}</span>
+                </button>
+                <button
+                  type="button"
                   className="btn-secondary-pill tax-actions-menu-trigger"
                   aria-label="Thao tác khác"
                   aria-haspopup="menu"
@@ -375,7 +385,6 @@ export const TaxSnapshotPage: FC = () => {
                     <div className="tax-actions-menu-separator" />
                     {canManageTax && <button type="button" role="menuitem" onClick={() => { setIsRateConfigOpen(true); setIsActionMenuOpen(false); }}><SlidersHorizontal size={16} /> Cấu hình thuế</button>}
                     {canManageTax && <button type="button" role="menuitem" onClick={() => { setPinModalInitialTab('change'); setIsPinModalOpen(true); setIsActionMenuOpen(false); }}><KeyRound size={16} /> Mã PIN bảo mật</button>}
-                    <button type="button" role="menuitem" disabled={isSummaryLoading} onClick={() => { void refetchSummary(); setIsActionMenuOpen(false); }}><RotateCcw size={16} /> Làm mới số liệu</button>
                     {canManageTax && <button type="button" role="menuitem" disabled={isExportingExcel || isSummaryLoading} onClick={() => { void handleExportExcel(); setIsActionMenuOpen(false); }}><Download size={16} /> {isExportingExcel ? 'Đang xuất…' : 'Xuất báo cáo Excel'}</button>}
                   </div>
                 )}

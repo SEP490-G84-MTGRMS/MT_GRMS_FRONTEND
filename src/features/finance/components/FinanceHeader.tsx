@@ -7,8 +7,6 @@ interface FinanceHeaderProps {
   todayLabel: string;
   activeTab: FinanceTabKey;
   onTabChange: (tab: FinanceTabKey) => void;
-  accountingMode: boolean;
-  onToggleAccountingMode: () => void;
   isRefreshing: boolean;
   onRefreshAll: () => void;
   onNavigateCashbook: () => void;
@@ -23,8 +21,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
   todayLabel,
   activeTab,
   onTabChange,
-  accountingMode,
-  onToggleAccountingMode,
   isRefreshing,
   onRefreshAll,
   onNavigateCashbook,
@@ -41,19 +37,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
         </div>
 
         <div className="finance-overview-actions">
-          <label className="finance-accounting-toggle-pill" title="Bật hoặc tắt phần trình bày chi tiết kế toán">
-            <span className="finance-accounting-toggle-text">Chi tiết kế toán</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={accountingMode}
-              className={`finance-switch-control ${accountingMode ? 'on' : ''}`}
-              onClick={onToggleAccountingMode}
-            >
-              <span className="finance-switch-thumb" />
-            </button>
-          </label>
-
           {/* Refresh Action */}
           <button
             type="button"
@@ -66,16 +49,18 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
             <span>Cập nhật</span>
           </button>
 
-          {/* Navigate to Pending Shifts & Safes */}
-          <button
-            type="button"
-            onClick={onNavigateCashControl}
-            className="finance-btn-secondary"
-            title="Xem Ca & Két chờ duyệt"
-          >
-            <Clock size={15} />
-            <span>Ca & Két chờ duyệt</span>
-          </button>
+          {/* Pending shifts remain accessible from the cash health overview. */}
+          {activeTab === 'overview' && (
+            <button
+              type="button"
+              onClick={onNavigateCashControl}
+              className="finance-btn-secondary"
+              title="Xem Ca & Két chờ duyệt"
+            >
+              <Clock size={15} />
+              <span>Ca & Két chờ duyệt</span>
+            </button>
+          )}
 
           {/* Navigate to Cashbook */}
           <button

@@ -1,6 +1,6 @@
 import { type FC, useState, useRef, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Receipt, Plus, FileSpreadsheet, AlertTriangle, Loader2 } from 'lucide-react';
+import { Receipt, FileSpreadsheet, AlertTriangle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { employeeApi } from '../../employee/api/employeeApi';
 import {
@@ -8,7 +8,6 @@ import {
   type ToastState,
 } from '../../admin/components';
 import { BillPreviewModal } from '../components/BillPreviewModal';
-import { CreateExpenseModal } from '../components/CreateExpenseModal';
 import { ConfirmModal } from '../../../components/common';
 import { ExpenseFilterBar } from '../components/ExpenseFilterBar';
 import { ExpenseTable } from '../components/ExpenseTable';
@@ -16,14 +15,12 @@ import { PayExpenseModal } from '../components/PayExpenseModal';
 import {
   useApproveExpense,
   useCancelExpense,
-  useCreateExpense,
   useExpenseSummary,
   usePayExpense,
   useServiceExpenses,
 } from '../hooks/useServiceExpenses';
 import {
   EXPENSE_CATEGORY_LABELS,
-  type CreateExpenseRequest,
   type ExpenseFilterParams,
   type PayExpenseRequest,
   type ServiceExpenseDto,
@@ -121,7 +118,6 @@ export const ServiceExpensesPage: FC = () => {
   }, [urlSearch]);
 
   // Modals state
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [payingItem, setPayingItem] = useState<ServiceExpenseDto | null>(null);
   const [cancelingItem, setCancelingItem] = useState<ServiceExpenseDto | null>(null);
   const [previewBill, setPreviewBill] = useState<{
@@ -156,7 +152,6 @@ export const ServiceExpensesPage: FC = () => {
     filters.toDate
   );
 
-  const createExpenseMutation = useCreateExpense();
   const payExpenseMutation = usePayExpense();
   const cancelExpenseMutation = useCancelExpense();
   const approveExpenseMutation = useApproveExpense();
@@ -220,11 +215,6 @@ export const ServiceExpensesPage: FC = () => {
       fromDate: range.fromDate,
       toDate: range.toDate,
     });
-  };
-
-  const handleCreateSubmit = async (data: CreateExpenseRequest) => {
-    await createExpenseMutation.mutateAsync(data);
-    showToast('Đã ghi nhận chi phí vận hành mới thành công!', 'success');
   };
 
   const handlePaySubmit = async (
@@ -418,15 +408,6 @@ export const ServiceExpensesPage: FC = () => {
             <span>Xuất Excel</span>
           </button>
 
-          <button
-            type="button"
-            className="po-btn po-btn-primary"
-            onClick={() => setIsCreateOpen(true)}
-            title="Lập phiếu chi phí mới"
-          >
-            <Plus size={14} />
-            <span>+ Lập phiếu chi phí</span>
-          </button>
         </div>
       </div>
 
@@ -456,16 +437,6 @@ export const ServiceExpensesPage: FC = () => {
         onApprove={handleApproveClick}
         onCancel={handleCancelClick}
         canManageExpenses={canManageExpenses}
-      />
-
-      {/* ── 4. Create Modal ── */}
-      <CreateExpenseModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreateSubmit}
-        isSubmitting={createExpenseMutation.isPending}
-        branches={branches}
-        defaultBranchId={filters.branchId || branches[0]?.id || ''}
       />
 
       {/* ── 5. Pay Modal ── */}
