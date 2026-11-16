@@ -118,6 +118,7 @@ describe('transferService', () => {
         onHandReceiver: 0,
         sentQty: 10,
         receivedQty: 10,
+        damagedQty: 0,
         unitPrice: 150000,
         amount: 1500000,
         batchNumber: 'LOT-2026-A',
@@ -687,6 +688,7 @@ describe('transferService', () => {
         onHandReceiver: 10,
         sentQty: 10,
         receivedQty: 9,
+        damagedQty: 1,
         unitPrice: 35000,
         amount: 315000,
         note: 'Thiếu 1 chai do vỡ khi vận chuyển',
@@ -736,7 +738,7 @@ describe('transferService', () => {
           {
             detailId: 'detail-line-1',
             receivedQuantity: 9,
-            damagedQuantity: 0,
+            damagedQuantity: 1,
             discrepancyReason: 'Thiếu 1 chai do vỡ khi vận chuyển',
           },
         ],
@@ -744,6 +746,7 @@ describe('transferService', () => {
 
       expect(result.status).toBe('Completed');
       expect(result.items[0].receivedQty).toBe(9);
+      expect(result.items[0].damagedQty).toBe(1);
       expect(result.items[0].note).toBe('Thiếu 1 chai do vỡ khi vận chuyển');
     });
 
@@ -794,6 +797,32 @@ describe('transferService', () => {
             discrepancyReason: undefined,
           },
         ],
+      });
+    });
+
+    it('dùng ghi chú chung làm lý do dự phòng khi dòng hàng hỏng chưa có lý do riêng', async () => {
+      vi.mocked(httpClient.put).mockResolvedValueOnce({
+        data: { data: {
+          id: 'trf-001', transferCode: 'TRF001', fromBranchId: 'b1', fromBranchName: 'Kho A',
+          toBranchId: 'b2', toBranchName: 'Kho B', createdBy: 'Staff', createdAt: '2026-11-15T17:30:00Z',
+          status: 'Completed', totalAmount: 315000, items: [],
+        } },
+      });
+      const damagedWithoutLineReason: TransferItem[] = [{
+        ...receiveItems[0],
+        note: undefined,
+        receivedQty: 9,
+        damagedQty: 1,
+      }];
+
+      await transferService.receive('trf-001', damagedWithoutLineReason, 'Móp khi vận chuyển');
+
+      expect(httpClient.put).toHaveBeenCalledWith('/transfers/trf-001/receive', {
+        note: 'Móp khi vận chuyển',
+        items: [expect.objectContaining({
+          damagedQuantity: 1,
+          discrepancyReason: 'Móp khi vận chuyển',
+        })],
       });
     });
 

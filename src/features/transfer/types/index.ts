@@ -29,6 +29,7 @@ export interface TransferItem {
   onHandReceiver: number;
   sentQty: number;
   receivedQty?: number;
+  damagedQty?: number;
   unitPrice: number;
   amount: number;
   batchNumber?: string;

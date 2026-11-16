@@ -123,6 +123,7 @@ export const mapTransfer = (dto: ApiTransfer): TransferOrder => ({
     onHandReceiver: 0,
     sentQty: line.sentQuantity,
     receivedQty: line.receivedQuantity,
+    damagedQty: line.damagedQuantity,
     unitPrice: line.unitPrice,
     amount: line.amount,
     batchNumber: line.batchCode,
@@ -272,8 +273,8 @@ export const transferService = {
       items: items.map((item) => ({
         detailId: item.id,
         receivedQuantity: item.receivedQty ?? item.sentQty,
-        damagedQuantity: 0,
-        discrepancyReason: item.note,
+        damagedQuantity: item.damagedQty ?? 0,
+        discrepancyReason: item.note?.trim() || ((item.damagedQty ?? 0) > 0 ? note?.trim() : undefined),
       })),
     });
     return mapTransfer(unwrap(response.data));

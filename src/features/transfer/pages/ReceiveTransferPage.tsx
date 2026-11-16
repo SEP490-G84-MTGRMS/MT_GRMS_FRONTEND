@@ -25,7 +25,7 @@ export const ReceiveTransferPage: React.FC = () => {
   // Tab filter: 'all' | 'match' | 'mismatch' | 'unreceived'
   const [activeTab, setActiveTab] = useState<'all' | 'match' | 'mismatch' | 'unreceived'>('all');
   const [searchKw, setSearchKw] = useState('');
-  const [receiveNote, setReceiveNote] = useState('Thiếu 1 bình hoa decor');
+  const [receiveNote, setReceiveNote] = useState('');
   const [receiveTime] = useState('15/10/2025 12:09');
 
   // Toast
@@ -40,7 +40,7 @@ export const ReceiveTransferPage: React.FC = () => {
     if (!id) return;
     transferService.get(id).then((result) => {
       setTransfer(result);
-      setItems(result.items.map((item) => ({ ...item, receivedQty: item.sentQty })));
+      setItems(result.items.map((item) => ({ ...item, receivedQty: item.sentQty, damagedQty: 0, note: '' })));
     }).catch(() => showToast('Không tải được phiếu nhận hàng.', 'warning'));
   }, [id]);
 
@@ -50,7 +50,8 @@ export const ReceiveTransferPage: React.FC = () => {
     setItems(
       items.map((it) => {
         if (it.id === itemId) {
-          const validQty = Math.max(0, Math.min(it.sentQty, qty));
+          const maxAllowed = it.sentQty - (it.damagedQty ?? 0);
+          const validQty = Math.max(0, Math.min(maxAllowed, qty));
           return {
             ...it,
             receivedQty: validQty,
@@ -62,6 +63,26 @@ export const ReceiveTransferPage: React.FC = () => {
     );
   };
 
+  const handleUpdateDamagedQty = (itemId: string, qty: number) => {
+    setItems(
+      items.map((it) => {
+        if (it.id === itemId) {
+          const maxAllowed = it.sentQty - (it.receivedQty ?? 0);
+          const validDamaged = Math.max(0, Math.min(maxAllowed, qty));
+          return {
+            ...it,
+            damagedQty: validDamaged,
+          };
+        }
+        return it;
+      })
+    );
+  };
+
+  const handleUpdateReason = (itemId: string, reason: string) => {
+    setItems((current) => current.map((item) => item.id === itemId ? { ...item, note: reason } : item));
+  };
+
   // Filtered rows
   const filteredItems = items.filter((it) => {
     if (searchKw.trim()) {
@@ -71,27 +92,37 @@ export const ReceiveTransferPage: React.FC = () => {
     }
 
     const recv = it.receivedQty ?? it.sentQty;
-    if (activeTab === 'match') return recv === it.sentQty;
-    if (activeTab === 'mismatch') return recv < it.sentQty;
-    if (activeTab === 'unreceived') return recv === 0;
+    const damaged = it.damagedQty ?? 0;
+    if (activeTab === 'match') return recv === it.sentQty && damaged === 0;
+    if (activeTab === 'mismatch') return damaged > 0 || recv + damaged < it.sentQty;
+    if (activeTab === 'unreceived') return recv + damaged === 0;
     return true;
   });
 
   const totalSent = items.reduce((sum, it) => sum + it.sentQty, 0);
   const totalReceived = items.reduce((sum, it) => sum + (it.receivedQty ?? it.sentQty), 0);
-  const totalDifference = totalSent - totalReceived;
+  const totalDamaged = items.reduce((sum, it) => sum + (it.damagedQty ?? 0), 0);
+  const totalDifference = totalSent - totalReceived - totalDamaged;
   const totalAmountReceived = items.reduce(
     (sum, it) => sum + (it.receivedQty ?? it.sentQty) * it.unitPrice,
     0
   );
 
-  const countMatch = items.filter((it) => (it.receivedQty ?? it.sentQty) === it.sentQty).length;
-  const countMismatch = items.filter((it) => (it.receivedQty ?? it.sentQty) < it.sentQty).length;
-  const countUnreceived = items.filter((it) => (it.receivedQty ?? it.sentQty) === 0).length;
+  const countMatch = items.filter((it) => (it.receivedQty ?? it.sentQty) === it.sentQty && (it.damagedQty ?? 0) === 0).length;
+  const countMismatch = items.filter((it) => (it.damagedQty ?? 0) > 0 || (it.receivedQty ?? it.sentQty) + (it.damagedQty ?? 0) < it.sentQty).length;
+  const countUnreceived = items.filter((it) => (it.receivedQty ?? it.sentQty) + (it.damagedQty ?? 0) === 0).length;
 
   const handleConfirm = async () => {
     if (!transfer || !id) return;
-    if (totalDifference > 0 && !receiveNote.trim()) {
+    const hasDamaged = items.some((it) => (it.damagedQty ?? 0) > 0);
+    const hasMissingReason = items.some(
+      (it) => (it.damagedQty ?? 0) > 0 && !it.note?.trim() && !receiveNote.trim()
+    );
+    if (hasDamaged && hasMissingReason) {
+      showToast('Không thể xác nhận hàng hỏng nếu để trống lý do.', 'warning');
+      return;
+    }
+    if (totalDifference > 0 && !receiveNote.trim() && !items.some((it) => it.note?.trim())) {
       showToast('Bắt buộc nhập lý do chênh lệch nhận hàng vào ô "Ghi chú nhận"!', 'warning');
       return;
     }
@@ -282,7 +313,9 @@ export const ReceiveTransferPage: React.FC = () => {
                   <th style={{ width: 60, textAlign: 'center' }}>ĐVT</th>
                   <th style={{ width: 70, textAlign: 'right' }}>Tồn kho</th>
                   <th style={{ width: 80, textAlign: 'center' }}>SL chuyển</th>
-                  <th style={{ width: 100, textAlign: 'center', backgroundColor: '#e0f2fe' }}>SL nhận</th>
+                  <th style={{ width: 95, textAlign: 'center', backgroundColor: '#e0f2fe' }}>SL nhận tốt</th>
+                  <th style={{ width: 95, textAlign: 'center', backgroundColor: '#fee2e2' }}>Hỏng</th>
+                  <th style={{ minWidth: 190 }}>Lý do hỏng/chênh lệch</th>
                   <th style={{ width: 100, textAlign: 'right' }}>Giá chuyển</th>
                   <th style={{ width: 120, textAlign: 'right' }}>Thành tiền</th>
                 </tr>
@@ -290,8 +323,9 @@ export const ReceiveTransferPage: React.FC = () => {
               <tbody>
                 {filteredItems.map((it, idx) => {
                   const recvQty = it.receivedQty ?? it.sentQty;
-                  const diff = it.sentQty - recvQty;
-                  const isDiff = diff > 0;
+                  const damagedQty = it.damagedQty ?? 0;
+                  const diff = it.sentQty - recvQty - damagedQty;
+                  const isDiff = diff > 0 || damagedQty > 0;
 
                   return (
                     <tr
@@ -314,9 +348,10 @@ export const ReceiveTransferPage: React.FC = () => {
                       <td style={{ textAlign: 'right', color: '#64748b' }}>{it.onHandReceiver}</td>
                       <td style={{ textAlign: 'center', fontWeight: 600 }}>{it.sentQty}</td>
 
-                      {/* Ô nhập SL nhận kèm badge Lệch nếu có */}
+                      {/* Ô nhập SL nhận tốt */}
                       <td style={{ textAlign: 'center', backgroundColor: isDiff ? '#fef3c7' : '#f0f9ff' }}>
                         <input
+                          aria-label={`SL nhận ${it.productName}`}
                           type="number"
                           className="filter-input"
                           style={{
@@ -330,7 +365,7 @@ export const ReceiveTransferPage: React.FC = () => {
                           value={recvQty}
                           onChange={(e) => handleUpdateReceivedQty(it.id, Number(e.target.value))}
                           min={0}
-                          max={it.sentQty}
+                          max={it.sentQty - (it.damagedQty ?? 0)}
                         />
                         {isDiff && (
                           <div
@@ -341,9 +376,53 @@ export const ReceiveTransferPage: React.FC = () => {
                               marginTop: 2,
                             }}
                           >
-                            Lệch -{diff}
+                            {diff > 0 && `Thiếu ${diff}`}{diff > 0 && damagedQty > 0 && ' · '}{damagedQty > 0 && `Hỏng ${damagedQty}`}
                           </div>
                         )}
+                      </td>
+
+                      {/* Ô nhập Hỏng */}
+                      <td style={{ textAlign: 'center', backgroundColor: (it.damagedQty ?? 0) > 0 ? '#fee2e2' : undefined }}>
+                        <input
+                          aria-label={`SL hỏng ${it.productName}`}
+                          type="number"
+                          className="filter-input"
+                          style={{
+                            width: 55,
+                            textAlign: 'center',
+                            padding: '4px',
+                            borderRadius: 6,
+                            borderColor: (it.damagedQty ?? 0) > 0 ? '#ef4444' : '#cbd5e1',
+                            fontWeight: 700,
+                          }}
+                          value={it.damagedQty ?? 0}
+                          onChange={(e) => handleUpdateDamagedQty(it.id, Number(e.target.value))}
+                          min={0}
+                          max={it.sentQty - recvQty}
+                        />
+                        {(it.damagedQty ?? 0) > 0 && (
+                          <div
+                            style={{
+                              fontSize: 10.5,
+                              color: '#dc2626',
+                              fontWeight: 700,
+                              marginTop: 2,
+                            }}
+                          >
+                            Hỏng: {it.damagedQty}
+                          </div>
+                        )}
+                      </td>
+
+                      <td>
+                        <input
+                          aria-label={`Lý do chênh lệch ${it.productName}`}
+                          className="filter-input"
+                          value={it.note ?? ''}
+                          onChange={(event) => handleUpdateReason(it.id, event.target.value)}
+                          placeholder={isDiff ? 'Nhập lý do của dòng hàng' : 'Không có chênh lệch'}
+                          disabled={!isDiff}
+                        />
                       </td>
 
                       <td style={{ textAlign: 'right' }}>{it.unitPrice.toLocaleString()}</td>
@@ -363,6 +442,8 @@ export const ReceiveTransferPage: React.FC = () => {
                   <td style={{ textAlign: 'center', color: '#0F766E', fontSize: 14 }}>
                     {totalReceived}
                   </td>
+                  <td style={{ textAlign: 'center', color: totalDamaged > 0 ? '#dc2626' : '#64748b' }}>{totalDamaged}</td>
+                  <td />
                   <td />
                   <td style={{ textAlign: 'right', color: '#0F766E', fontSize: 14 }}>
                     {totalAmountReceived.toLocaleString()} đ
@@ -388,8 +469,9 @@ export const ReceiveTransferPage: React.FC = () => {
               Hướng dẫn xác nhận nhận hàng
             </div>
             <div>&bull; <b>SL nhận:</b> Hệ thống mặc định điền đủ số lượng chuyển. Hãy kiểm đếm và sửa lại số lượng thực tế nhận được.</div>
-            <div>&bull; <b>Trường hợp có chênh lệch:</b> Bắt buộc phải điền rõ lý do hư hỏng, thất lạc hoặc giao thiếu vào ô "Ghi chú nhận" bên cột phải.</div>
-            <div>&bull; <b>Cập nhật kho tự động:</b> Sau khi nhấn "Nhận hàng", hệ thống sẽ tự động ghi tăng tồn kho tại chi nhánh nhận và kết thúc phiếu chuyển.</div>
+            <div>&bull; <b>SL hỏng:</b> Tổng nhận tốt và hỏng không được vượt số lượng chuyển.</div>
+            <div>&bull; <b>Trường hợp có chênh lệch:</b> Ưu tiên nhập nguyên nhân tại đúng dòng hàng; ghi chú nhận chung được dùng làm lý do dự phòng.</div>
+            <div>&bull; <b>Cập nhật kho tự động:</b> Hàng tốt tăng tồn khả dụng, hàng hỏng được tăng tồn và đưa vào cách ly.</div>
           </div>
         </div>
 

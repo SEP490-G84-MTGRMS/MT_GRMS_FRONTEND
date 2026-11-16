@@ -293,6 +293,20 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
 
       expect(screen.getByText('TRF-20261114-001')).toBeInTheDocument();
       expect(screen.getByText('Bia Heineken Sleek')).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('SL nhận Bia Heineken Sleek'), { target: { value: '29' } });
+      fireEvent.change(screen.getByLabelText('SL hỏng Bia Heineken Sleek'), { target: { value: '1' } });
+      fireEvent.change(screen.getByLabelText('Lý do chênh lệch Bia Heineken Sleek'), { target: { value: 'Móp khi vận chuyển' } });
+      fireEvent.change(screen.getByPlaceholderText('Nhập lý do chênh lệch nhận hàng...'), { target: { value: 'Kiểm nhận có 1 lon hỏng' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Nhận hàng' }));
+
+      await waitFor(() => {
+        expect(transferService.receive).toHaveBeenCalledWith(
+          'trf-001',
+          [expect.objectContaining({ receivedQty: 29, damagedQty: 1, note: 'Móp khi vận chuyển' })],
+          'Kiểm nhận có 1 lon hỏng'
+        );
+      });
     });
   });
 });
