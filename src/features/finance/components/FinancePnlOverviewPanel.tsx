@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, ChevronDown } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import type {
   BranchOption,
   PnlFilterParams,
@@ -19,8 +19,6 @@ interface Props {
   isLoading: boolean;
   isFetching: boolean;
   errorMessage?: string | null;
-  accountingMode: boolean;
-  onToggleAccountingMode: () => void;
 }
 
 const PERIODS: Array<{ value: PresetPeriod; label: string }> = [
@@ -94,8 +92,6 @@ export const FinancePnlOverviewPanel: React.FC<Props> = ({
   isLoading,
   isFetching,
   errorMessage,
-  accountingMode,
-  onToggleAccountingMode,
 }) => {
   const selectPeriod = (preset: PresetPeriod) => {
     if (preset === 'CUSTOM') {
@@ -151,9 +147,6 @@ export const FinancePnlOverviewPanel: React.FC<Props> = ({
           <strong>Hiệu quả kinh doanh · {formatDisplayDate(filter.startDate)} – {formatDisplayDate(filter.endDate)}</strong>
           <span>Cơ sở: Theo dữ liệu bán hàng và chi phí phát sinh · các giá trị chi tiết thể hiện trực tiếp trong biểu đồ</span>
         </div>
-        <button type="button" onClick={onToggleAccountingMode} aria-pressed={accountingMode}>
-          {accountingMode ? 'Đang xem chi tiết kế toán' : 'Dành cho kế toán'} <ChevronDown size={14} />
-        </button>
       </div>
 
       <div className={`finance-pnl-waterfall-card ${isLoading ? 'loading' : ''}`}>

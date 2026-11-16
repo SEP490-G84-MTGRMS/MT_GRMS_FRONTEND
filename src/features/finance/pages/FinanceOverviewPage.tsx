@@ -87,7 +87,6 @@ export const FinanceOverviewPage: React.FC = () => {
   const activeTab: FinanceTabKey = searchParams.get('tab') === 'pnl' ? 'pnl' : 'overview';
   const [overviewFilter, setOverviewFilter] = useState<FinanceOverviewFilter>(createInitialOverviewFilter);
   const [pnlFilter, setPnlFilter] = useState<PnlFilterParams>(createInitialPnlFilter);
-  const [accountingMode, setAccountingMode] = useState(false);
   const { toast, showToast, dismissToast } = useOverviewToast();
 
   useEffect(() => {
@@ -160,8 +159,6 @@ export const FinanceOverviewPage: React.FC = () => {
           todayLabel={todayLabel}
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          accountingMode={accountingMode}
-          onToggleAccountingMode={() => setAccountingMode((value) => !value)}
           isRefreshing={isRefreshing}
           onRefreshAll={handleRefresh}
           onNavigateCashbook={() => navigate('/store-owner/cashbook')}
@@ -191,8 +188,6 @@ export const FinanceOverviewPage: React.FC = () => {
               isLoading={pnlReportQuery.isLoading}
               isFetching={pnlReportQuery.isFetching}
               errorMessage={pnlReportQuery.isError ? 'Không thể tải dữ liệu báo cáo Lãi lỗ.' : null}
-              accountingMode={accountingMode}
-              onToggleAccountingMode={() => setAccountingMode((value) => !value)}
             />
           </div>
         )}

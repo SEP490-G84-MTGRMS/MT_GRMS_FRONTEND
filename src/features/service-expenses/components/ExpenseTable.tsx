@@ -62,8 +62,8 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
     };
   }, [openMenuId]);
 
-  const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   const [hasScrollY, setHasScrollY] = useState(false);
 
   useEffect(() => {
@@ -93,14 +93,14 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: 130 }} />
-      <col style={{ width: 230 }} />
-      <col style={{ width: 140 }} />
-      <col style={{ width: 240 }} />
-      <col style={{ width: 120 }} />
-      <col style={{ width: 140 }} />
-      <col style={{ width: 130 }} />
-      <col style={{ width: 180 }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '16%' }} />
+      <col style={{ width: '12%' }} />
+      <col style={{ width: '20%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '8%' }} />
     </colgroup>
   );
 
@@ -112,7 +112,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: 1310, tableLayout: 'fixed' }}>
+        <table className="so-list-table expense-responsive-table">
           {tableColGroup}
           <thead>
             <tr>
@@ -168,11 +168,11 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
               Không có khoản phải trả nào
             </h4>
             <p style={{ fontSize: '0.82rem', color: '#64748b', margin: 0 }}>
-              Bấm "+ Lập phiếu chi phí" để thêm hóa đơn chi phí vận hành mới.
+              Chưa có khoản chi nào phù hợp với bộ lọc hiện tại.
             </p>
           </div>
         ) : (
-          <table className="so-list-table" style={{ minWidth: 1310, tableLayout: 'fixed' }}>
+          <table className="so-list-table expense-responsive-table">
             {tableColGroup}
             <tbody>
               {data.map((item) => (
