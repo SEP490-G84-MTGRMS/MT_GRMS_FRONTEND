@@ -1,5 +1,10 @@
 .tenant-detail { width: 100%; max-width: 1500px; min-width: 0; margin: 0 auto; padding-bottom: 28px; color: #14253e; }
 .tenant-detail * { box-sizing: border-box; }
+.tenant-records-state { padding: 32px 22px; text-align: center; color: #64748b; font-size: 13px; }
+.tenant-records-secondary { display: block; margin-top: 6px; color: #64748b; font-size: 11px; line-height: 1.6; }
+.tenant-records-money { font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+.tenant-records-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 15px 22px; color: #64748b; font-size: 12px; }
+.tenant-records-pagination > div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .tenant-detail-back { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 18px; color: #0f766e; font-size: 13px; font-weight: 600; text-decoration: none; }
 .tenant-detail-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; padding: 25px; border: 1px solid #e1e9ef; border-radius: 24px; background: #fff; }
 .tenant-detail-identity { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 360px; }

@@ -3,8 +3,9 @@ import type { FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Building2, CalendarPlus, LockKeyhole, RefreshCw, UnlockKeyhole, X } from 'lucide-react';
 import { tenantApi } from '../../features/admin/api';
-import type { BackendTenantDetailDto, BackendTenantSummaryDto } from '../../features/admin/api';
+import type { BackendTenantDetailDto } from '../../features/admin/api';
 import './tenantDetail.css';
+import { TenantRecords } from '../../features/admin/components/TenantRecords';
 
 type Action = 'lock' | 'unlock' | 'grace';
 
@@ -35,7 +36,6 @@ const statusLabels: Record<string, string> = {
 export const TenantDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const [tenant, setTenant] = useState<BackendTenantDetailDto | null>(null);
-  const [owner, setOwner] = useState<BackendTenantSummaryDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [notFound, setNotFound] = useState(false);
@@ -62,7 +62,7 @@ export const TenantDetailPage = () => {
     setLoadError('');
     setNotFound(false);
     setTenant(null);
-    setOwner(null);
+
     try {
       if (!id) {
         setNotFound(true);
@@ -75,16 +75,6 @@ export const TenantDetailPage = () => {
       }
       const detail = response.data;
       setTenant(detail);
-      // The detail endpoint does not yet include owner contact fields.
-      try {
-        const summary = await tenantApi.getTenants({ keyword: detail.subdomain, pageSize: 100 });
-        if (version !== requestVersion.current) return;
-        if (summary.success) {
-          setOwner(summary.data?.items.find((item) => item.id === detail.id) ?? null);
-        }
-      } catch {
-        // Missing contact data is displayed as an empty field.
-      }
     } catch (error) {
       if (version !== requestVersion.current) return;
       if ((error as { response?: { status?: number } })?.response?.status === 404) {
@@ -181,9 +171,6 @@ export const TenantDetailPage = () => {
               <h2>Thông tin khách hàng</h2>
               <dl className="tenant-detail-fields">
                 <div><dt>Tên cửa hàng / chuỗi</dt><dd>{tenant.name || '—'}</dd></div>
-                <div><dt>Chủ sở hữu</dt><dd>{owner?.ownerName || '—'}</dd></div>
-                <div><dt>Email liên hệ</dt><dd>{owner?.ownerEmail || '—'}</dd></div>
-                <div><dt>Số điện thoại chủ sở hữu</dt><dd>{owner?.ownerPhone || '—'}</dd></div>
                 <div><dt>Hotline cửa hàng</dt><dd>{tenant.hotline || '—'}</dd></div>
                 <div><dt>Mã số thuế</dt><dd>{tenant.taxCode || '—'}</dd></div>
                 <div><dt>Địa chỉ</dt><dd>{tenant.address || '—'}</dd></div>
@@ -211,25 +198,7 @@ export const TenantDetailPage = () => {
             </section>
           </div>
 
-          <section className="tenant-detail-card tenant-detail-branches">
-            <div className="tenant-detail-section-heading"><h2>Danh sách chi nhánh</h2><span>{tenant.branches?.length ?? 0} chi nhánh</span></div>
-            <div className="tenant-detail-table-scroll">
-              <table>
-                <thead><tr><th>Mã chi nhánh</th><th>Tên chi nhánh</th><th>Địa chỉ</th><th>Số điện thoại</th><th>Trạng thái</th></tr></thead>
-                <tbody>
-                  {tenant.branches?.length ? tenant.branches.map((branch) => (
-                    <tr key={branch.id}>
-                      <td className="tenant-detail-branch-code">{branch.branchCode || '—'}</td>
-                      <td><strong>{branch.name || '—'}</strong></td>
-                      <td>{branch.address || '—'}</td>
-                      <td>{branch.phone || '—'}</td>
-                      <td><span className={`tenant-detail-status ${branch.isActive ? 'status-active' : ''}`}>{branch.isActive ? 'Hoạt động' : 'Ngừng hoạt động'}</span></td>
-                    </tr>
-                  )) : <tr><td colSpan={5} className="tenant-detail-empty">Chưa có chi nhánh.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <TenantRecords key={tenant.id} tenantId={tenant.id} />
         </>
       )}
       {action && tenant && (

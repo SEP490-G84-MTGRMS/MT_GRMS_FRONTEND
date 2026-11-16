@@ -78,3 +78,10 @@
 @media (max-width: 1200px) { .admin-dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .admin-dash-operations-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .admin-dash-primary-grid { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .admin-dash-header { padding: 20px; } .admin-dash-controls { width: 100%; } .admin-dash-controls label { flex: 1; } .admin-dash-controls select { width: 100%; } .admin-dash-operations-grid { grid-template-columns: 1fr; } .admin-dash-meta { align-items: start; } }
 @media (max-width: 480px) { .admin-dash-kpis { grid-template-columns: 1fr; } }
+
+.admin-purchase-chart { display:flex; align-items:end; gap:6px; height:230px; overflow-x:auto; padding-top:20px; }
+.admin-purchase-column { flex:1 0 30px; height:100%; display:flex; flex-direction:column; justify-content:end; align-items:center; gap:8px; }
+.admin-purchase-column small { font-size:10px; color:#64748b; }
+.admin-purchase-bar { background:#0f766e; width:100%; max-width:28px; border-radius:4px 4px 0 0; }
+.admin-alert-table { width:100%; border-collapse:collapse; text-align:left; font-size:13px; }
+.admin-alert-table th,.admin-alert-table td { padding:14px 12px; border-bottom:1px solid #e8eef5; }

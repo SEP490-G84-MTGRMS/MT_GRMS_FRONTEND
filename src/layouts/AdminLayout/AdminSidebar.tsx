@@ -3,7 +3,6 @@ import type { FC } from "react";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import {
   Layers,
-  Receipt,
   ExternalLink,
   LogOut,
   ChevronUp,
@@ -193,16 +192,6 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({
           <span className="admin-nav-label">Gói dịch vụ SaaS</span>
         </NavLink>
 
-        <NavLink
-          to="/admin/billing"
-          title="Lịch sử giao dịch & Hóa đơn SaaS"
-          className={({ isActive }) =>
-            `admin-nav-item ${isActive ? "active" : ""}`
-          }
-        >
-          <Receipt size={19} />
-          <span className="admin-nav-label">Giao dịch & Hóa đơn</span>
-        </NavLink>
 
         <NavLink
           to="/admin/audit-logs"

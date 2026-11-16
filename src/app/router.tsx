@@ -102,7 +102,6 @@ import { SubscriptionPlanDetailPage } from '../pages/admin/SubscriptionPlanDetai
 import { SubscriptionPlanCreatePage } from '../pages/admin/SubscriptionPlanCreatePage';
 import { SubscriptionPlanEditPage } from '../pages/admin/SubscriptionPlanEditPage';
 import { TenantDetailPage } from '../pages/admin/TenantDetailPage';
-import { AdminBillingPage } from '../pages/admin/AdminBillingPage';
 import { AuditLogPage } from '../pages/admin/AuditLogPage';
 import { AdminSettingsPage } from '../pages/admin/AdminSettingsPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
@@ -198,7 +197,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'billing',
-        element: <AdminBillingPage />,
+        element: <Navigate to="/admin/tenants" replace />,
       },
       {
         path: 'audit-logs',
@@ -214,7 +213,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'invoices',
-        element: <Navigate to="/admin/billing" replace />,
+        element: <Navigate to="/admin/tenants" replace />,
       },
       {
         path: 'plans',

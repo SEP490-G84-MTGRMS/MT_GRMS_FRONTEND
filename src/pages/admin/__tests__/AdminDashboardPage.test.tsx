@@ -2,11 +2,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminDashboardPage } from '../AdminDashboardPage';
+import { httpClient } from '../../../api/httpClient';
 import { dashboardApi } from '../../../features/admin/api';
 
 vi.mock('../../../features/admin/api', () => ({
   dashboardApi: {
     getKpis: vi.fn(),
+    getPlanDistribution: vi.fn(),
     getMonthlyAnalytics: vi.fn(),
     getUrgentAlerts: vi.fn(),
   },
@@ -34,6 +36,8 @@ vi.mock('../../../features/admin/components', () => ({
   RefreshIcon: () => <span aria-hidden="true">refresh</span>,
 }));
 
+vi.mock('../../../api/httpClient', () => ({ httpClient: { get: vi.fn().mockResolvedValue({ data: { success: true, data: { activeTenants: 0, totalBranches: 0, newBranches: 0, averageBranches: 0, activePercentage: 0, purchaseAmount: 0, purchaseCount: 0, points: [] } } }) } }));
+
 const mockedDashboardApi = vi.mocked(dashboardApi);
 
 const renderPage = () => render(
@@ -45,6 +49,7 @@ const renderPage = () => render(
 describe('AdminDashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedDashboardApi.getPlanDistribution.mockResolvedValue({ success: true, data: [] });
     mockedDashboardApi.getMonthlyAnalytics.mockResolvedValue({ success: true, data: [] });
     mockedDashboardApi.getUrgentAlerts.mockResolvedValue({ success: true, data: [] });
   });
@@ -78,10 +83,10 @@ describe('AdminDashboardPage', () => {
 
     renderPage();
 
-    expect((await screen.findByRole('alert')).textContent).toContain('Không thể tải số liệu vận hành SaaS');
+    expect((await screen.findByRole('alert')).textContent).toContain('Không tải được KPI');
     expect(screen.queryByTestId('kpi-mrr')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tải lại' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Làm mới dữ liệu' }));
 
     await waitFor(() => expect(screen.getByTestId('kpi-mrr').textContent).toContain('0'));
     expect(mockedDashboardApi.getKpis).toHaveBeenCalledTimes(2);
@@ -94,4 +99,12 @@ describe('AdminDashboardPage', () => {
 
     expect(await screen.findByText('Chưa có dữ liệu thống kê.')).toBeDefined();
   });
+  it('sends the selected period to the backend', async () => {
+    mockedDashboardApi.getKpis.mockResolvedValue({ success: true, data: [] });
+    renderPage();
+    await screen.findByText('Chưa có dữ liệu thống kê.');
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'lastMonth' } });
+    await waitFor(() => expect(httpClient.get).toHaveBeenLastCalledWith('/admin/dashboard/overview', { params: { period: 'lastMonth' } }));
+  });
+
 });
