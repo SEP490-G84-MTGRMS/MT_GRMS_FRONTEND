@@ -196,6 +196,16 @@ const renderSourceBadge = (source?: SourceModuleName, isAutomated?: boolean) => 
   }
 };
 
+const TAX_TREATMENT_LABELS: Record<string, string> = {
+  TaxableRevenue: 'Chịu thuế',
+  NonTaxableReceipt: 'Không tính thuế',
+  DeductibleExpense: 'Chi phí được trừ',
+  NonDeductibleExpense: 'Không được trừ',
+  TaxPayment: 'Nộp thuế',
+  InternalTransfer: 'Nội bộ',
+  ReviewRequired: 'Cần phân loại',
+};
+
 export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
   transactions,
   totalItems,
@@ -308,9 +318,9 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '10%' }} />
       <col style={{ width: '11%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '12%' }} />
       <col style={{ width: '8%' }} />
       <col style={{ width: '16%' }} />
       <col style={{ width: '9%' }} />
@@ -347,7 +357,7 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
           {tableColGroup}
           <thead>
             <tr>
-              <th style={thStyle}>Mã chứng từ / Quỹ</th>
+              <th style={thStyle}>Chứng từ</th>
               <th style={thStyle}>Thời gian</th>
               <th style={thStyle}>Tài khoản</th>
               <th style={thStyle}>Loại bút toán</th>
@@ -404,67 +414,22 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                       opacity: isVoided ? 0.65 : 1,
                     }}
                   >
-                    {/* 1. Mã chứng từ / quỹ */}
+                    {/* Chỉ hiển thị một mã chính; mã nguồn nằm trong tooltip để tránh lặp dữ liệu. */}
                     <td className="so-list-td">
-                      {tx.referenceDocId && tx.referenceDocId !== tx.transactionCode ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <button
-                            type="button"
-                            onClick={() => handleNavigateToDoc(tx)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              background: 'none',
-                              border: 'none',
-                              padding: 0,
-                              color: '#0F766E',
-                              fontWeight: 700,
-                              fontSize: '12px',
-                              cursor: isDeepLinkable(tx) ? 'pointer' : 'default',
-                              textDecoration: isVoided ? 'line-through' : 'none',
-                              textAlign: 'left',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={isDeepLinkable(tx) ? `Bấm để ${getDeepLinkLabel(tx)} (${tx.referenceDocId})` : undefined}
-                          >
-                            <span>{tx.referenceDocId}</span>
-                            {isDeepLinkable(tx) && <ExternalLink size={11} style={{ opacity: 0.75, flexShrink: 0 }} />}
-                          </button>
-                          <span
-                            className="so-list-code"
-                            style={{
-                              fontSize: '11px',
-                              textDecoration: isVoided ? 'line-through' : 'none',
-                            }}
-                            title="Mã giao dịch phát sinh dòng tiền nội bộ trong Sổ quỹ"
-                          >
-                            {tx.transactionCode}
-                          </span>
-                        </div>
-                      ) : (
-                        <span
-                          className="so-list-code"
-                          style={{
-                            textDecoration: isVoided ? 'line-through' : 'none',
-                          }}
-                        >
-                          {tx.transactionCode}
-                        </span>
-                      )}
-                      {tx.linkedTransactionId && (
-                        <div
-                          style={{
-                            fontSize: '10.5px',
-                            color: '#6366F1',
-                            fontFamily: 'var(--font-mono, monospace)',
-                            marginTop: 2,
-                          }}
-                          title="Mã bút toán đối ứng nội bộ"
-                        >
-                          ⇄ {tx.linkedTransactionId}
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        className="cb-voucher-link"
+                        onClick={() => isDeepLinkable(tx) && handleNavigateToDoc(tx)}
+                        disabled={!isDeepLinkable(tx)}
+                        title={tx.referenceDocId && tx.referenceDocId !== tx.transactionCode
+                          ? `${getDeepLinkLabel(tx)} · Mã nguồn: ${tx.referenceDocId}`
+                          : tx.linkedTransactionId
+                            ? `Bút toán đối ứng: ${tx.linkedTransactionId}`
+                            : undefined}
+                      >
+                        <span style={{ textDecoration: isVoided ? 'line-through' : 'none' }}>{tx.transactionCode}</span>
+                        {isDeepLinkable(tx) && <ExternalLink size={12} aria-hidden="true" />}
+                      </button>
                     </td>
 
                     {/* 2. Thời gian */}
@@ -482,9 +447,6 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                     <td className="so-list-td">
                       <div style={{ fontWeight: 700, color: '#1E293B', fontSize: '12.5px' }}>
                         {tx.accountName}
-                      </div>
-                      <div style={{ fontSize: '11.5px', color: '#64748B' }}>
-                        {tx.category}
                       </div>
                     </td>
 
@@ -557,14 +519,7 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                           ? 'Khách nợ'
                           : (tx.counterpartyName || 'Nội bộ')}
                       </div>
-                      <div
-                        style={{
-                          fontSize: '11.5px',
-                          color: '#64748B',
-                          marginTop: 2,
-                          lineHeight: 1.3,
-                        }}
-                      >
+                      <div className="cb-ledger-description" title={tx.description || undefined}>
                         {tx.description}
                       </div>
                       {isVoided && tx.voidReason && (
@@ -654,6 +609,11 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                           </span>
                         ) : (
                           renderSourceBadge(tx.sourceModuleName, tx.isAutomated)
+                        )}
+                        {!isVoided && tx.taxTreatment && (
+                          <span className={`cb-tax-badge cb-tax-badge--${tx.taxTreatment}`} title={tx.taxTreatmentReason}>
+                            {TAX_TREATMENT_LABELS[tx.taxTreatment] || 'Cần phân loại'}
+                          </span>
                         )}
                       </div>
                     </td>

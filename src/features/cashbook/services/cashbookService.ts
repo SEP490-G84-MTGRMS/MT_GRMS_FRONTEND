@@ -30,6 +30,10 @@ export interface BackendCashbookEntryResponse {
   auditHash: string;
   description: string;
   occurredAtUtc: string;
+  categoryCode?: string;
+  financialNature?: string;
+  taxTreatment?: LedgerTransaction['taxTreatment'];
+  taxTreatmentReason?: string | null;
 }
 
 export interface BackendCashAccountResponse {
@@ -311,13 +315,26 @@ function mapBackendEntryToLedgerTransaction(
     entry.sourceType === 'DEBT_REPAYMENT' ||
     Boolean(entry.description?.includes('Thu nợ'));
   const isPos = entry.sourceType === 'POS' || entry.sourceType === 'POS_SALE';
+  const isTaxPayment = entry.sourceType === 'TAX_PAYMENT';
   const isInternalTransfer =
     entry.sourceType === 'CASH_DROP' ||
     entry.sourceType === 'BANK_DEPOSIT' ||
     entry.sourceType === 'INTERNAL_TRANSFER';
 
+  const categoryLabels: Record<string, string> = {
+    OWNER_DEPOSIT: 'Chủ nạp thêm vốn',
+    OFF_POS_SALE: 'Thu bán hàng ngoài POS',
+    INTERNAL_REIMBURSEMENT: 'Hoàn ứng nội bộ',
+    BANK_INTEREST: 'Thu lãi tiền gửi ngân hàng',
+    OTHER_INCOME: 'Thu nhập khác',
+    OWNER_DRAW: 'Rút vốn chủ',
+    TAX_PAYMENT: 'Nộp thuế nhà nước',
+    ASSET_PURCHASE: 'Mua sắm trang thiết bị / Tài sản',
+    OTHER_PAYMENT: 'Chi khác ngoài hóa đơn',
+  };
   const defaultCategory =
-    isPos
+    (entry.categoryCode && categoryLabels[entry.categoryCode]) ||
+    (isPos
       ? 'Doanh thu bán hàng POS'
       : isExpense
       ? 'Chi phí vận hành'
@@ -331,7 +348,7 @@ function mapBackendEntryToLedgerTransaction(
       ? 'Kiểm kê chênh lệch két'
       : isCompensating
       ? 'Bút toán đảo hủy giao dịch'
-      : 'Giao dịch thu chi';
+      : 'Giao dịch thu chi');
 
   const counterpartyType =
     isPos || isDebt
@@ -354,6 +371,8 @@ function mapBackendEntryToLedgerTransaction(
     ? 'SERVICE_OPEX'
     : isDebt
     ? 'CRM_DEBT'
+    : isTaxPayment
+    ? 'TAX_SNAPSHOT'
     : isInternalTransfer
     ? 'INTERNAL_TRANSFER'
     : 'MANUAL';
@@ -364,6 +383,8 @@ function mapBackendEntryToLedgerTransaction(
     ? 'SERVICE_EXPENSE'
     : isDebt
     ? 'DEBT_PAYMENT'
+    : isTaxPayment
+    ? 'TAX_PAYMENT'
     : isInternalTransfer
     ? 'INTERNAL_TRANSFER'
     : isAdjustment
@@ -388,6 +409,10 @@ function mapBackendEntryToLedgerTransaction(
     sourceId: entry.sourceId,
     sourceModuleName,
     sourceType: entry.sourceType,
+    categoryCode: entry.categoryCode,
+    financialNature: entry.financialNature,
+    taxTreatment: entry.taxTreatment,
+    taxTreatmentReason: entry.taxTreatmentReason || undefined,
     isAutomated: entry.sourceType !== 'MANUAL',
     isCompensating,
     originalEntryId: isCompensating ? entry.sourceId || undefined : undefined,
@@ -501,6 +526,8 @@ export const cashbookService = {
         counterpartyType: 'INTERNAL',
         counterpartyName: transit.fromAccountName,
         description: `[ĐÃ NHẬN ĐỦ KÉT SẮT] Bởi ${performedBy} từ ${transit.fromAccountName} (Mã chuyển: ${transit.transferCode})`,
+        categoryCode: 'INTERNAL_REIMBURSEMENT',
+        taxTreatment: 'NonTaxableReceipt',
         referenceDocType: 'CASH_TRANSIT',
         referenceDocId: transit.id,
         sourceModuleName: 'INTERNAL_TRANSFER',
@@ -718,6 +745,9 @@ export const cashbookService = {
           accountId: dto.accountId,
           amount: dto.amount,
           category: dto.category,
+          categoryCode: dto.categoryCode,
+          taxTreatment: dto.taxTreatment,
+          taxTreatmentReason: dto.taxTreatmentReason,
           description: dto.description,
           referenceCode: dto.referenceDocId,
         },
@@ -753,6 +783,9 @@ export const cashbookService = {
       branchId: targetAccount.branchId,
       transactionType: 'RECEIPT',
       category: dto.category,
+      categoryCode: dto.categoryCode,
+      taxTreatment: dto.taxTreatment,
+      taxTreatmentReason: dto.taxTreatmentReason,
       amount: dto.amount,
       balanceAfter: newBalance,
       counterpartyType: dto.counterpartyType,
@@ -783,12 +816,34 @@ export const cashbookService = {
 
     if (!isMockMode()) {
       const idempotencyKey = generateUuidV7();
+      if (dto.categoryCode === 'TAX_PAYMENT') {
+        if (!dto.referenceDocId?.trim()) {
+          throw new Error('Nộp thuế bắt buộc có số giấy nộp tiền hoặc mã giao dịch ngân hàng');
+        }
+        const taxRes = await financeHttpClient.post<{ data: { entry: BackendCashbookEntryResponse } }>(
+          '/cashbook/tax-payments',
+          {
+            sourceAccountId: dto.accountId,
+            amount: dto.amount,
+            beneficiaryName: dto.counterpartyName,
+            paymentReference: dto.referenceDocId.trim(),
+            evidenceAttachmentUrl: null,
+            householdTaxSnapshotId: null,
+            note: dto.description,
+          },
+          { headers: { 'Idempotency-Key': idempotencyKey } }
+        );
+        return mapBackendEntryToLedgerTransaction(taxRes.data.data.entry);
+      }
       const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
         '/cashbook/payments',
         {
           accountId: dto.accountId,
           amount: dto.amount,
           category: dto.category,
+          categoryCode: dto.categoryCode,
+          taxTreatment: dto.taxTreatment,
+          taxTreatmentReason: dto.taxTreatmentReason,
           description: dto.description,
           referenceCode: dto.referenceDocId,
         },
@@ -832,6 +887,9 @@ export const cashbookService = {
       branchId: targetAccount.branchId,
       transactionType: 'PAYMENT',
       category: dto.category,
+      categoryCode: dto.categoryCode,
+      taxTreatment: dto.taxTreatment,
+      taxTreatmentReason: dto.taxTreatmentReason,
       amount: dto.amount,
       balanceAfter: newBalance,
       counterpartyType: dto.counterpartyType,
