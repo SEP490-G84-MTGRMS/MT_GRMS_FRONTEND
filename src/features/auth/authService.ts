@@ -34,9 +34,10 @@ type BackendLoginUser = {
 
 function mapRole(roleName?: string): UserRole {
   const role = (roleName || '').trim().toUpperCase();
-  if (role === 'ADMIN' || role === 'SUPER_ADMIN') return UserRoleEnum.ADMIN;
-  if (role === 'STORE_OWNER' || role === 'TENANT_ADMIN' || role === 'OWNER') return UserRoleEnum.STORE_OWNER;
-  return UserRoleEnum.STAFF;
+  if (role === 'ADMIN') return UserRoleEnum.ADMIN;
+  if (role === 'STORE_OWNER') return UserRoleEnum.STORE_OWNER;
+  if (role === 'STAFF') return UserRoleEnum.STAFF;
+  throw new ApiError(403, 'Vai trò tài khoản không hợp lệ. Vui lòng đăng nhập lại.', 'INVALID_ROLE');
 }
 
 function mapLoginUser(user: BackendLoginUser): UserProfile {

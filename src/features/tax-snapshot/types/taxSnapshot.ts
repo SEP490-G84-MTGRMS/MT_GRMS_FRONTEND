@@ -49,14 +49,20 @@ export type AccountingBookType = (typeof AccountingBookType)[keyof typeof Accoun
 export type TaxSnapshotStatus =
   | 'draft'
   | 'finalized'
+  | 'superseded'
   | 'submitted'
   | 'paid'
   | 'locked'
   | 'cancelled'
   | 'Draft'
   | 'Finalized'
+  | 'Superseded'
   | 'Submitted'
-  | 'Paid';
+  | 'Paid'
+  | 0
+  | 1
+  | 2
+  | number;
 
 /**
  * Chi tiết phân rã thuế GTGT theo từng nhóm thuế suất
@@ -113,6 +119,8 @@ export interface HouseholdTaxSummaryDto {
   periodNumber: number;
   branchId?: string;
   branchName: string;
+  filingDeadlineLocal?: string;
+  filingDeadlineNote?: string;
 
   annualAccumulatedRevenue: number;
   priorPeriodsAccumulatedRevenue: number;
@@ -197,6 +205,61 @@ export interface HouseholdTaxSummaryDto {
   finalizedBy?: string;
 }
 
+export interface HouseholdTaxpayerProfileDto {
+  taxpayerName: string;
+  taxCode: string;
+  businessLocation: string;
+  phoneNumber: string;
+  taxAuthorityName: string;
+}
+
+export interface TaxDeclarationLineDto {
+  sequence: number;
+  businessSector: string;
+  taxCode: string;
+  totalRevenue: number;
+  vatNonTaxableRevenue: number;
+  vatTaxableRevenue: number;
+  vatZeroRateRevenue: number;
+  vatRate: number;
+  vatAmount: number;
+  pitTaxableRevenue: number;
+  pitRevenueDeduction: number;
+  pitRate: number;
+  pitAmount: number;
+}
+
+export interface HouseholdTaxDeclarationPreviewDto {
+  formCode: string;
+  formTitle: string;
+  legalBasis: string;
+  isFinalized: boolean;
+  snapshotId?: string;
+  revisionNumber: number;
+  generatedAtUtc: string;
+  year: number;
+  periodType: TaxPeriodType;
+  periodNumber: number;
+  periodLabel: string;
+  filingDeadlineLocal: string;
+  isFirstDeclaration: boolean;
+  isSupplementaryDeclaration: boolean;
+  taxpayer: HouseholdTaxpayerProfileDto;
+  lines: TaxDeclarationLineDto[];
+  totalVatAmount: number;
+  totalPitAmount: number;
+  totalTaxAmount: number;
+  requiresBusinessActivityAppendix: boolean;
+  appendixCode: string;
+  appendixRevenue: number;
+  appendixCogs: number;
+  appendixOpex: number;
+  appendixTaxableIncome: number;
+  isProfileComplete: boolean;
+  missingProfileFields: string[];
+  dataNotice: string;
+}
+
 /**
  * Single Entry in Accounting Books
  */
@@ -244,6 +307,24 @@ export interface CreateTaxSnapshotRequest {
   estimatedCogsConfirmationStatement?: string;
   pin: string;
   notes?: string;
+  allowSupersedeExisting?: boolean;
+  rectificationReason?: string;
+}
+
+/**
+ * Request DTOs for PIN Management
+ */
+export interface ChangeSecurityPinRequest {
+  currentPin?: string;
+  password?: string;
+  newPin: string;
+  confirmNewPin: string;
+}
+
+export interface ResetSecurityPinRequest {
+  password: string;
+  newPin: string;
+  confirmNewPin: string;
 }
 
 /**
@@ -279,6 +360,9 @@ export interface HouseholdTaxSnapshotDto {
   finalizedAtUtc: string;
   notes?: string;
   pinHashAudit?: string;
+  revisionNumber?: number;
+  supersededSnapshotId?: string | null;
+  rectificationReason?: string | null;
 
   // Compatibility aliases
   status?: TaxSnapshotStatus;

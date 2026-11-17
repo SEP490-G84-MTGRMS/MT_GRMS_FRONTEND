@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import { useRef, type FC } from 'react';
 import { Printer, X } from 'lucide-react';
 import {
   AccountingBookType,
@@ -6,6 +6,7 @@ import {
   type AccountingBookEntryDto,
 } from '../types/taxSnapshot';
 import { formatMoney } from '../../finance/utils/formatters';
+import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
 
 export interface BookTabMetadata {
   type: AccountingBookType;
@@ -63,6 +64,8 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
   year,
   onPrint,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocusTrap(isOpen, dialogRef, onClose);
   if (!isOpen) return null;
 
   const cashEntries = entries.filter(
@@ -88,9 +91,13 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
   );
 
   return (
-    <div className="tax-modal-backdrop no-print-backdrop">
+    <div className="tax-modal-backdrop no-print-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div
+        ref={dialogRef}
         className="tax-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Xem bản in ${activeTabMetadata.templateCode}`}
         style={{
           maxWidth: 960,
           width: '95vw',

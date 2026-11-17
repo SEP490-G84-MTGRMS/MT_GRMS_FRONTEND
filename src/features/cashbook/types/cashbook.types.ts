@@ -8,6 +8,14 @@ export type CashAccountType = 'CASH' | 'BANK';
 export type TransactionType = 'RECEIPT' | 'PAYMENT' | 'ADJUSTMENT';
 
 export type CounterpartyType = 'CUSTOMER' | 'SUPPLIER' | 'EMPLOYEE' | 'TAX_AUTHORITY' | 'INTERNAL' | 'OTHER';
+export type CashbookTaxTreatment =
+  | 'ReviewRequired'
+  | 'TaxableRevenue'
+  | 'NonTaxableReceipt'
+  | 'DeductibleExpense'
+  | 'NonDeductibleExpense'
+  | 'TaxPayment'
+  | 'InternalTransfer';
 
 export type ReferenceDocType =
   | 'POS_ORDER'
@@ -67,6 +75,10 @@ export interface LedgerTransaction {
   sourceId?: string | null;
   sourceModuleName?: SourceModuleName;
   sourceType?: string;
+  categoryCode?: string;
+  financialNature?: string;
+  taxTreatment?: CashbookTaxTreatment;
+  taxTreatmentReason?: string;
   linkedTransactionId?: string;
   isAutomated: boolean;
   createdBy: string;
@@ -102,6 +114,8 @@ export interface CashbookFilterParams {
   startDate?: string;
   endDate?: string;
   searchQuery?: string;
+  counterpartyQuery?: string;
+  status?: 'ALL' | 'ACTIVE' | 'VOIDED' | 'COMPENSATING';
 }
 
 export interface CreateReceiptDTO {
@@ -111,6 +125,9 @@ export interface CreateReceiptDTO {
   counterpartyType: CounterpartyType;
   counterpartyName: string;
   description: string;
+  categoryCode: string;
+  taxTreatment?: CashbookTaxTreatment;
+  taxTreatmentReason?: string;
   referenceDocType?: ReferenceDocType;
   referenceDocId?: string;
   sourceModuleName?: SourceModuleName;
@@ -124,6 +141,9 @@ export interface CreatePaymentDTO {
   counterpartyType: CounterpartyType;
   counterpartyName: string;
   description: string;
+  categoryCode: string;
+  taxTreatment?: CashbookTaxTreatment;
+  taxTreatmentReason?: string;
   referenceDocType?: ReferenceDocType;
   referenceDocId?: string;
   sourceModuleName?: SourceModuleName;

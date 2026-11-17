@@ -312,9 +312,10 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
 
   const updateRowPrice = (productId: string, raw: string) => {
     const digits = raw.replace(/[^\d]/g, '');
+    const formatted = digits ? formatCurrency(parseInt(digits, 10)) : '';
     setProductTerms((prev) => ({
       ...prev,
-      [productId]: { ...ensureTerms(productId), price: digits },
+      [productId]: { ...ensureTerms(productId), price: formatted },
     }));
     setFieldErrors((prev) => {
       const copy = { ...prev };
@@ -377,7 +378,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
 
       const moq = parseInt(terms.moq, 10);
       if (!terms.moq || Number.isNaN(moq) || moq < 1) {
-        errors[`moq_${id}`] = 'MOQ phải > 0.';
+        errors[`moq_${id}`] = 'Tối thiểu đặt phải > 0.';
       }
 
       const shortage = parseInt(terms.shortage || '0', 10);
@@ -462,7 +463,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
 
   if (!isOpen) return null;
 
-  const gridColumns = '40px 48px 100px 1.2fr 64px 88px 110px 80px 130px 80px';
+  const gridColumns = '36px 48px 84px minmax(200px, 1.7fr) 56px 92px 100px 108px 100px 88px';
 
   return (
     <div
@@ -586,38 +587,17 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
 
             {/* Supplier selection */}
             <div>
-              <div
+              <label
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                  color: '#334155',
+                  display: 'block',
                   marginBottom: 6,
                 }}
               >
-                <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
-                  Nhà cung cấp <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                {selectedSupplier && (
-                  <button
-                    type="button"
-                    onClick={handleClearSupplier}
-                    disabled={isSubmitting}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#0f766e',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                    }}
-                  >
-                    <RotateCcw size={12} /> Đổi NCC
-                  </button>
-                )}
-              </div>
+                Nhà cung cấp <span style={{ color: '#ef4444' }}>*</span>
+              </label>
 
               {!selectedSupplier ? (
                 <div ref={supplierDropdownRef} style={{ position: 'relative' }}>
@@ -639,7 +619,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Building2 size={16} style={{ color: '#0f766e' }} />
-                      <span>Tìm theo tên, mã NCC hoặc SĐT...</span>
+                      <span>Tìm theo tên hoặc mã NCC...</span>
                     </div>
                     <ChevronDown size={16} style={{ color: '#94a3b8' }} />
                   </div>
@@ -676,7 +656,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                           />
                           <input
                             type="text"
-                            placeholder="Gõ mã, tên hoặc SĐT nhà cung cấp..."
+                            placeholder="Gõ mã hoặc tên nhà cung cấp..."
                             value={supplierSearch}
                             onChange={(e) => setSupplierSearch(e.target.value)}
                             autoFocus
@@ -742,30 +722,33 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                                 e.currentTarget.style.backgroundColor = '#ffffff';
                               }}
                             >
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0f172a' }}>
-                                    {s.name}
-                                  </span>
-                                  <span
-                                    style={{
-                                      fontFamily: 'monospace',
-                                      fontSize: '0.74rem',
-                                      color: '#0f766e',
-                                      backgroundColor: '#f0fdfa',
-                                      padding: '1px 6px',
-                                      borderRadius: 4,
-                                      border: '1px solid #ccfbf1',
-                                    }}
-                                  >
-                                    {s.code}
-                                  </span>
-                                </div>
-                                {s.phone && (
-                                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
-                                    SĐT: {s.phone}
-                                  </div>
-                                )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    fontSize: '0.88rem',
+                                    color: '#0f172a',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {s.name}
+                                </span>
+                                <span
+                                  style={{
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.74rem',
+                                    color: '#0f766e',
+                                    backgroundColor: '#f0fdfa',
+                                    padding: '1px 6px',
+                                    borderRadius: 4,
+                                    border: '1px solid #ccfbf1',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {s.code}
+                                </span>
                               </div>
                               <span
                                 style={{
@@ -775,6 +758,7 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                                   backgroundColor: '#ecfdf5',
                                   color: '#059669',
                                   fontWeight: 600,
+                                  flexShrink: 0,
                                 }}
                               >
                                 Hoạt động
@@ -796,36 +780,60 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    gap: 12,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <Building2 size={18} style={{ color: '#0f766e' }} />
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0f172a' }}>
-                          {selectedSupplier.name}
-                        </span>
-                        <span
-                          style={{
-                            fontFamily: 'monospace',
-                            fontSize: '0.74rem',
-                            color: '#0f766e',
-                            backgroundColor: '#ffffff',
-                            padding: '1px 6px',
-                            borderRadius: 4,
-                            border: '1px solid #cbd5e1',
-                          }}
-                        >
-                          {selectedSupplier.code}
-                        </span>
-                      </div>
-                      {selectedSupplier.phone && (
-                        <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
-                          SĐT: {selectedSupplier.phone}
-                        </div>
-                      )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                    <Building2 size={18} style={{ color: '#0f766e', flexShrink: 0 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.9rem',
+                          color: '#0f172a',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {selectedSupplier.name}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.74rem',
+                          color: '#0f766e',
+                          backgroundColor: '#ffffff',
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                          border: '1px solid #cbd5e1',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {selectedSupplier.code}
+                      </span>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleClearSupplier}
+                    disabled={isSubmitting}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#0f766e',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      flexShrink: 0,
+                      padding: 0,
+                    }}
+                  >
+                    <RotateCcw size={12} /> Đổi NCC
+                  </button>
                 </div>
               )}
 
@@ -994,8 +1002,10 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                     <div style={{ padding: '8px 8px', textAlign: 'center' }}>ĐVT</div>
                     <div style={{ padding: '8px 8px', textAlign: 'center' }}>Trạng thái</div>
                     <div style={{ padding: '8px 8px', textAlign: 'right' }}>Giá nhập</div>
-                    <div style={{ padding: '8px 8px', textAlign: 'right' }}>MOQ</div>
-                    <div style={{ padding: '8px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <div style={{ padding: '8px 6px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      Tối thiểu đặt
+                    </div>
+                    <div style={{ padding: '8px 6px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                       Thiếu cho phép
                     </div>
                     <div style={{ padding: '8px 8px', textAlign: 'center' }}>Thao tác</div>
@@ -1183,10 +1193,10 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                                     disabled={isSubmitting}
                                     placeholder={
                                       p.defaultWholesalePrice > 0
-                                        ? `Master ${formatCurrency(p.defaultWholesalePrice)}`
-                                        : 'Trống = Master'
+                                        ? formatCurrency(p.defaultWholesalePrice)
+                                        : 'Nhập giá'
                                     }
-                                    title="Để trống = chưa thỏa thuận (dùng giá Master khi đặt hàng)"
+                                    title="Để trống = dùng giá vốn hàng hóa khi đặt hàng"
                                     style={{
                                       width: '100%',
                                       height: 30,
@@ -1218,39 +1228,27 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
                                     fontWeight: 600,
                                   }}
                                 >
-                                  {assigned.moq} {p.baseUoM || 'Cái'}
+                                  {assigned.moq}
                                 </div>
                               ) : isSelected ? (
                                 <div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={terms.moq}
-                                      onChange={(e) => updateRowMoq(p.id, e.target.value)}
-                                      disabled={isSubmitting}
-                                      style={{
-                                        width: '100%',
-                                        height: 30,
-                                        padding: '0 8px',
-                                        borderRadius: 6,
-                                        border: moqError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
-                                        textAlign: 'right',
-                                        fontSize: '0.78rem',
-                                        boxSizing: 'border-box',
-                                      }}
-                                    />
-                                    <span
-                                      style={{
-                                        fontSize: '0.7rem',
-                                        color: '#64748b',
-                                        whiteSpace: 'nowrap',
-                                        minWidth: 28,
-                                      }}
-                                    >
-                                      {p.baseUoM || 'Cái'}
-                                    </span>
-                                  </div>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={terms.moq}
+                                    onChange={(e) => updateRowMoq(p.id, e.target.value)}
+                                    disabled={isSubmitting}
+                                    style={{
+                                      width: '100%',
+                                      height: 30,
+                                      padding: '0 8px',
+                                      borderRadius: 6,
+                                      border: moqError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                                      textAlign: 'right',
+                                      fontSize: '0.78rem',
+                                      boxSizing: 'border-box',
+                                    }}
+                                  />
                                   {moqError && (
                                     <div style={{ fontSize: '0.68rem', color: '#dc2626', marginTop: 2 }}>
                                       {moqError}

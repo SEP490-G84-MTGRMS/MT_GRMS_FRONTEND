@@ -67,7 +67,7 @@ describe('posOrderApi Live Integration Tests', () => {
       expect(result).toEqual(mockResponse);
     });
 
-    it('should send Credit Sale with managerBypassCode when requested', async () => {
+    it('should send a credit sale for the store owner', async () => {
       const mockResponse = {
         id: 'ord-credit-456',
         orderCode: 'HD-CREDIT-002',
@@ -79,12 +79,6 @@ describe('posOrderApi Live Integration Tests', () => {
         status: 'Completed',
         orderDate: '2026-11-02T12:00:00Z',
         items: [],
-        debtInvoice: {
-          id: 'deb-inv-1',
-          totalDebtAmount: 500000,
-          remainingDebtAmount: 500000,
-          status: 'Unpaid',
-        },
       };
 
       vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
@@ -118,7 +112,6 @@ describe('posOrderApi Live Integration Tests', () => {
       );
 
       expect(result.paymentStatus).toBe('DEBT');
-      expect(result.debtInvoice?.status).toBe('Unpaid');
     });
 
     it('should throw error when server returns failure', async () => {

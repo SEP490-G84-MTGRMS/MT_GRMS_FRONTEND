@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Grid, Zap, Layers, Loader2 } from 'lucide-react';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import { branchApi } from '../api/branchApi';
@@ -8,7 +8,7 @@ import { supplierApi } from '../../supplier/api/supplierApi';
 import type { PurchaseOrderListItem, PoListFilterState, PurchaseOrderStatus } from '../types/po-list.types';
 import { PoListFilterBar } from '../components/po-list/PoListFilterBar';
 import { PoListTable } from '../components/po-list/PoListTable';
-import { PoDetailDrawer } from '../components/po-list/PoDetailDrawer';
+import { downloadPoInvoicePdf } from '../lib/poInvoicePdf';
 import { AdminToast, type ToastState } from '../../admin/components';
 import {
   formatDeliveryDateGateMessage,
@@ -96,9 +96,10 @@ const mapFilterStatusToBackend = (status: PoListFilterState['status']): string |
 
 export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const supplierIdFromUrl = searchParams.get('supplierId') || searchParams.get('supplier') || '';
-  const codeFromUrl = searchParams.get('code') || '';
+  const codeFromUrl = searchParams.get('code') || searchParams.get('keyword') || '';
 
   const [orders, setOrders] = useState<PurchaseOrderListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -120,13 +121,21 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrderListItem | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
   };
+
+  useEffect(() => {
+    const state = location.state as { toastMessage?: string } | null;
+    if (!state?.toastMessage) return;
+    showToast(state.toastMessage, 'success');
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ đọc toast khi vào trang
+  }, [location.state]);
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
@@ -245,12 +254,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     }));
     setPageIndex(1);
   }, [supplierIdFromUrl, codeFromUrl]);
-
-  useEffect(() => {
-    if (!codeFromUrl || orders.length === 0) return;
-    const found = orders.find((o) => o.poCode.toLowerCase() === codeFromUrl.toLowerCase());
-    if (found) setSelectedOrder(found);
-  }, [codeFromUrl, orders]);
 
   const handleSearch = () => {
     setAppliedFilters(filterInputs);
@@ -375,7 +378,18 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           setPageSize(size);
           setPageIndex(1);
         }}
-        onViewDetail={(order) => setSelectedOrder(order)}
+        onPrintOrder={async (order) => {
+          if (isPrinting) return;
+          setIsPrinting(true);
+          try {
+            const fileName = await downloadPoInvoicePdf(order);
+            showToast(`Đã tải hóa đơn ${fileName}.`, 'success');
+          } catch (err: any) {
+            showToast(err?.message || 'Không thể tạo file PDF hóa đơn PO.', 'error');
+          } finally {
+            setIsPrinting(false);
+          }
+        }}
         onEditOrder={(order) => {
           // Sửa SL trên matrix trước cutoff → chốt lại ở dispatch-hub để amend PO
           const params = new URLSearchParams();
@@ -388,13 +402,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           navigate(`/store-owner/purchase-orders/create-matrix?${params.toString()}`);
         }}
         onReceiveOrder={handleReceiveOrder}
-      />
-
-      <PoDetailDrawer
-        order={selectedOrder}
-        isOpen={Boolean(selectedOrder)}
-        onClose={() => setSelectedOrder(null)}
-        onReceiveNow={handleReceiveOrder}
       />
     </div>
   );

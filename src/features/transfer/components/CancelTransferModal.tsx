@@ -76,7 +76,7 @@ export const CancelTransferModal: React.FC<CancelTransferModalProps> = ({
                 lineHeight: 1.5,
               }}
             >
-              💡 <b>Lưu ý quan trọng:</b> Tồn kho hàng hóa và số lô sẽ được tự động <b>hoàn tác 100% về kho gửi</b> (Rollback) đối với phiếu đang ở trạng thái <i>Đang chuyển (In-Transit)</i> theo quy tắc BR-TRF-05.
+              💡 <b>Lưu ý quan trọng:</b> Chỉ phiếu chưa xuất hàng mới được hủy. Hàng đang vận chuyển phải được xử lý bằng quy trình hoàn trả thực tế, không được cộng tồn kho ảo.
             </div>
 
             <div>

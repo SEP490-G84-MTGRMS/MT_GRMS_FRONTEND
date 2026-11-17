@@ -28,6 +28,14 @@ export interface SupplierReturnLine {
   lineTotal: number;
   rejectionReason?: string;
   notes?: string;
+  categoryId?: string | null;
+  categoryName?: string | null;
+  storeCostSharePercentSnapshot?: number | null;
+  supplierCostSharePercentSnapshot?: number | null;
+  lineReplacementValue?: number;
+  storePayableAmount?: number;
+  supplierBearAmount?: number;
+  replacementUnitPrice?: number;
 }
 
 export interface SupplierReturnListItem {

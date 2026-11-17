@@ -2,7 +2,6 @@ import { useState, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import {
   Eye,
-  CheckCircle2,
   Printer,
   RotateCcw,
   ArrowUpDown,
@@ -19,7 +18,6 @@ interface Props {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onViewDetail: (item: SupplierReturnListItem) => void;
-  onQuickHandover?: (item: SupplierReturnListItem) => void;
   onPrint?: (item: SupplierReturnListItem) => void;
 }
 
@@ -29,7 +27,6 @@ type SortField =
   | 'supplierName'
   | 'branchName'
   | 'totalRequestedQty'
-  | 'totalApprovedQty'
   | 'totalHandedOverQty'
   | 'totalEstimatedAmount'
   | 'status'
@@ -44,9 +41,9 @@ export const returnStatusBadge = (status: SupplierReturnStatus) => {
     case 'DRAFT':
       return { label: 'Bản nháp', bg: '#f1f5f9', color: '#475569', border: '#cbd5e1' };
     case 'PENDING_SUPPLIER':
-      return { label: 'Chờ NCC duyệt', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' };
+      return { label: 'Chờ NCC duyệt (cũ)', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' };
     case 'APPROVED':
-      return { label: 'Đã duyệt (Chờ giao)', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
+      return { label: 'Đã xác nhận', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
     case 'PARTIALLY_HANDED_OVER':
       return { label: 'Đã giao một phần', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
     case 'REJECTED':
@@ -68,7 +65,6 @@ export const SupplierReturnTable: FC<Props> = ({
   onPageChange,
   onPageSizeChange,
   onViewDetail,
-  onQuickHandover,
   onPrint,
 }) => {
   const [sortField, setSortField] = useState<SortField | null>(null);
@@ -125,10 +121,6 @@ export const SupplierReturnTable: FC<Props> = ({
           valA = a.totalRequestedQty;
           valB = b.totalRequestedQty;
           break;
-        case 'totalApprovedQty':
-          valA = a.totalApprovedQty;
-          valB = b.totalApprovedQty;
-          break;
         case 'totalHandedOverQty':
           valA = a.totalHandedOverQty;
           valB = b.totalHandedOverQty;
@@ -156,15 +148,14 @@ export const SupplierReturnTable: FC<Props> = ({
   const colGroup = (
     <colgroup>
       <col style={{ width: '4%' }} />
+      <col style={{ width: '13%' }} />
       <col style={{ width: '12%' }} />
+      <col style={{ width: '18%' }} />
+      <col style={{ width: '13%' }} />
       <col style={{ width: '12%' }} />
-      <col style={{ width: '17%' }} />
-      <col style={{ width: '12%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
       <col style={{ width: '11%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '10%' }} />
       <col style={{ width: '10%' }} />
       <col style={{ width: '9%' }} />
     </colgroup>
@@ -174,12 +165,12 @@ export const SupplierReturnTable: FC<Props> = ({
     <div className="so-list-table-card">
       {/* ── Table Sticky Header ── */}
       <div ref={headRef} className="so-list-table-head">
-        <table className="so-list-table" style={{ minWidth: 1280 }}>
+        <table className="so-list-table" style={{ minWidth: 1180 }}>
           {colGroup}
           <thead>
             <tr>
               <th className="so-list-th" style={{ textAlign: 'center' }}>
-                #
+                STT
               </th>
 
               <th
@@ -234,19 +225,8 @@ export const SupplierReturnTable: FC<Props> = ({
                 style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                  <span>SL Y/C</span>
+                  <span>SL yêu cầu</span>
                   <ArrowUpDown size={12} color={sortField === 'totalRequestedQty' ? '#0f766e' : '#94a3b8'} />
-                </div>
-              </th>
-
-              <th
-                className="so-list-th"
-                onClick={() => handleSort('totalApprovedQty')}
-                style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, color: '#15803d' }}>
-                  <span>SL Duyệt</span>
-                  <ArrowUpDown size={12} color={sortField === 'totalApprovedQty' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
 
@@ -256,7 +236,7 @@ export const SupplierReturnTable: FC<Props> = ({
                 style={{ textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, color: '#0369a1' }}>
-                  <span>SL Đã giao</span>
+                  <span>SL đã giao</span>
                   <ArrowUpDown size={12} color={sortField === 'totalHandedOverQty' ? '#0f766e' : '#94a3b8'} />
                 </div>
               </th>
@@ -297,14 +277,12 @@ export const SupplierReturnTable: FC<Props> = ({
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
       >
-        <table className="so-list-table" style={{ minWidth: 1280 }}>
+        <table className="so-list-table" style={{ minWidth: 1180 }}>
           {colGroup}
           <tbody>
             {sortedItems.length > 0 ? (
               sortedItems.map((item, idx) => {
                 const st = returnStatusBadge(item.status);
-                const isApprovedWaitingHandover =
-                  item.status === 'APPROVED' || item.status === 'PARTIALLY_HANDED_OVER';
 
                 return (
                   <tr key={item.id} className="so-list-row">
@@ -324,11 +302,13 @@ export const SupplierReturnTable: FC<Props> = ({
                           padding: 0,
                           cursor: 'pointer',
                           textAlign: 'left',
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          color: '#0f172a',
                         }}
                       >
-                        <span className="so-list-code" style={{ cursor: 'pointer' }}>
-                          {item.code}
-                        </span>
+                        {item.code}
                       </button>
                     </td>
 
@@ -406,17 +386,12 @@ export const SupplierReturnTable: FC<Props> = ({
                       )}
                     </td>
 
-                    {/* SL Y/C */}
+                    {/* SL yêu cầu */}
                     <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 600 }}>
                       {fmt(item.totalRequestedQty)}
                     </td>
 
-                    {/* SL Duyệt */}
-                    <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 700, color: '#15803d' }}>
-                      {fmt(item.totalApprovedQty)}
-                    </td>
-
-                    {/* SL Đã giao */}
+                    {/* SL đã giao */}
                     <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 700, color: '#0369a1' }}>
                       {fmt(item.totalHandedOverQty)}
                     </td>
@@ -457,18 +432,6 @@ export const SupplierReturnTable: FC<Props> = ({
                           <Eye size={13} />
                         </button>
 
-                        {isApprovedWaitingHandover && onQuickHandover && (
-                          <button
-                            type="button"
-                            className="so-list-action-btn so-list-action-btn--success"
-                            onClick={() => onQuickHandover(item)}
-                            title="Xác nhận bàn giao hàng thực tế cho NCC"
-                          >
-                            <CheckCircle2 size={13} />
-                            <span>Bàn giao</span>
-                          </button>
-                        )}
-
                         {onPrint && (
                           <button
                             type="button"
@@ -487,7 +450,7 @@ export const SupplierReturnTable: FC<Props> = ({
             ) : (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={11}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',

@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { RotateCcw, Truck, Plus, Loader2, ClipboardList } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierReturnListItem,
-  SupplierReturnDetail,
   SupplierReturnFilterState,
 } from '../types/supplierReturn.types';
 import { supplierReturnApi } from '../api/supplierReturnApi';
@@ -13,7 +12,7 @@ import { branchApi } from '../../purchase-order/api/branchApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
 import { SupplierReturnFilterBar } from '../components/SupplierReturnFilterBar';
 import { SupplierReturnTable } from '../components/SupplierReturnTable';
-import { CompleteHandoverModal } from '../components/CompleteHandoverModal';
+import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
 import '../../../styles/so-list-page.css';
 
@@ -28,6 +27,7 @@ const DEFAULT_FILTERS: SupplierReturnFilterState = {
 
 export const SupplierReturnListPage: FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const role = useAuthStore((s) => s.user?.role);
   const userBranchId = useAuthStore((s) => s.user?.branchId);
   const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
@@ -46,7 +46,16 @@ export const SupplierReturnListPage: FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [quickHandoverItem, setQuickHandoverItem] = useState<SupplierReturnDetail | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  useEffect(() => {
+    const state = location.state as { toastMessage?: string } | null;
+    if (!state?.toastMessage) return;
+    setToast({ id: Date.now().toString(), message: state.toastMessage, type: 'success' });
+    const t = window.setTimeout(() => setToast(null), 4000);
+    navigate(location.pathname, { replace: true, state: {} });
+    return () => window.clearTimeout(t);
+  }, [location.state, location.pathname, navigate]);
 
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([
     { id: 'BR-01', name: 'BR-01 Main Store' },
@@ -101,15 +110,6 @@ export const SupplierReturnListPage: FC = () => {
     loadData();
   }, [loadData]);
 
-  const handleQuickHandover = async (item: SupplierReturnListItem) => {
-    try {
-      const detail = await supplierReturnApi.getById(item.id);
-      setQuickHandoverItem(detail);
-    } catch {
-      navigate(`/store-owner/supplier-returns/${item.id}`);
-    }
-  };
-
   const handlePrint = (item: SupplierReturnListItem) => {
     navigate(`/store-owner/supplier-returns/${item.id}?print=true`);
   };
@@ -127,6 +127,8 @@ export const SupplierReturnListPage: FC = () => {
         overflow: 'hidden',
       }}
     >
+      <AdminToast toast={toast} onClose={() => setToast(null)} />
+
       {/* Top Header */}
       <div className="so-list-header">
         <div>
@@ -218,22 +220,8 @@ export const SupplierReturnListPage: FC = () => {
         onPageChange={(page) => setApplied((prev) => ({ ...prev, pageIndex: page }))}
         onPageSizeChange={(size) => setApplied((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }))}
         onViewDetail={(item) => navigate(`/store-owner/supplier-returns/${item.id}`)}
-        onQuickHandover={handleQuickHandover}
         onPrint={handlePrint}
       />
-
-      {/* Handover Modal */}
-      {quickHandoverItem && (
-        <CompleteHandoverModal
-          isOpen={Boolean(quickHandoverItem)}
-          onClose={() => setQuickHandoverItem(null)}
-          returnDetail={quickHandoverItem}
-          onSubmit={async (payload) => {
-            await supplierReturnApi.completeHandover(quickHandoverItem.id, payload);
-            await loadData();
-          }}
-        />
-      )}
     </div>
   );
 };

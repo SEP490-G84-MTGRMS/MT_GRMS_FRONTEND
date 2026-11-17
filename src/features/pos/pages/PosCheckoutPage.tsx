@@ -1384,6 +1384,10 @@ export const PosCheckoutPage: FC = () => {
     }
 
     if (currentTab.paymentMethod === 'debt') {
+      if (!isStoreOwner) {
+        alert('Chỉ chủ cửa hàng mới được phép thực hiện bán nợ!');
+        return;
+      }
       if (!currentTab.customer?.id) {
         alert('Vui lòng tìm và chọn khách hàng định danh trước khi thực hiện bán nợ!');
         return;

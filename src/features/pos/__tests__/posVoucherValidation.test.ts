@@ -52,4 +52,3 @@ describe('POS voucher validation API', () => {
     expect(result.message).toBe('Mã voucher không tồn tại');
   });
 });
-

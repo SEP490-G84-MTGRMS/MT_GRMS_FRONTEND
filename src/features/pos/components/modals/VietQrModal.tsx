@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../../../stores/useAuthStore';
 import { httpClient } from '../../../../api/httpClient';
+import { financeAccountsApi } from '../../../finance-accounts/api/financeAccountsApi';
 
 interface Props {
   isOpen: boolean;
@@ -32,7 +33,7 @@ export const VietQrModal: FC<Props> = ({
   onConfirmAndPrint,
 }) => {
   const { user } = useAuthStore();
-  const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
+  const currentTenantId = user?.tenantId;
 
   const [countdown, setCountdown] = useState(300);
   const [isChecking, setIsChecking] = useState(false);
@@ -63,9 +64,27 @@ export const VietQrModal: FC<Props> = ({
     setCustomTenantPrefix('');
     let cancelled = false;
 
+    if (!currentTenantId || !branchId) {
+      setConfigError('Không xác định được cửa hàng hoặc chi nhánh nhận tiền. Vui lòng đăng nhập lại.');
+      setIsConfigLoading(false);
+      return;
+    }
+
     // Đồng bộ cấu hình QR công khai từ Backend (An toàn cho mọi nhân viên thu ngân, không lộ API Key)
     httpClient
       .get('/payments/public-qr-config', { params: { tenantId: currentTenantId, branchId } })
+      .catch(async (error) => {
+        if (error?.response?.status !== 404) throw error;
+        const account = await financeAccountsApi.getVietQrDefault(branchId);
+        const cleanTenantId = currentTenantId.replace(/[^a-z0-9]/gi, '').toUpperCase();
+        const tenantPrefix = currentTenantId.includes('an_nhien_02') ? 'AN02'
+          : currentTenantId.includes('an_nhien_01') ? 'AN01'
+          : currentTenantId.includes('cau_giay') ? 'CG01'
+          : cleanTenantId.length >= 4 ? cleanTenantId.slice(-4) : 'MT01';
+        return { data: { paymentAccountId: account.id, bankCode: account.bankCode,
+          bankAccountNumber: account.accountNumber, bankAccountName: account.accountHolderName,
+          bankName: account.bankName, tenantPrefix, isActive: true } };
+      })
       .then((res) => {
         if (cancelled) return;
         const data = res.data;
@@ -121,6 +140,8 @@ export const VietQrModal: FC<Props> = ({
   }, [isOpen, isSuccessPaid]);
 
   if (!isOpen) return null;
+
+  if (configError) return <div className="pos-modal-overlay" role="dialog" aria-modal="true"><div className="pos-modal-dialog" style={{ maxWidth: 460, padding: 24, textAlign: 'center' }}><ShieldCheck size={38} color="#b86712"/><h3>Chưa thể nhận VietQR</h3><p style={{ color: '#64748b', fontSize: 13 }}>{configError}</p><button type="button" onClick={onClose} style={{ marginTop: 8, padding: '9px 18px', border: 0, borderRadius: 8, background: '#0f766e', color: '#fff', fontWeight: 700 }}>Đóng</button></div></div>;
 
   const minutes = Math.floor(countdown / 60);
   const seconds = countdown % 60;

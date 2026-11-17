@@ -26,6 +26,8 @@ export interface PayslipSummaryDto {
   paidAt?: string | null;
   paymentMethod?: string | null;
   cashbookVoucherCode?: string | null;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 }
 
 export interface PayslipResponse {
@@ -57,6 +59,7 @@ export interface PayslipResponse {
   advanceDeduction: number;
   remainingDebt: number;
   socialInsurance: number;
+  insuranceBaseSalary?: number;
   bhxhAmount: number;
   bhytAmount: number;
   bhtnAmount: number;
@@ -69,7 +72,7 @@ export interface PayslipResponse {
   bankAccountNumber?: string | null;
   bankName?: string | null;
   bankAccountHolder?: string | null;
-  cashbookTransactionId?: string | null;
+  cashbookEntryId?: string | null;
   cashbookVoucherCode?: string | null;
   note?: string | null;
   approvedBy?: string | null;
@@ -90,12 +93,23 @@ export interface PayPayslipRequest {
   paymentMethod: string;
   note?: string;
   cashbookAccountId?: string;
+  paidAt?: string;
+}
+
+export interface SalaryAdvanceRequest {
+  amount: number;
+  paymentMethod: string;
+  note?: string;
+  cashbookAccountId?: string;
+  paidAt?: string;
 }
 
 export interface BatchPayPayslipsRequest {
   payslipIds: string[];
   paymentMethod: string;
   note?: string;
+  cashbookAccountId?: string;
+  paidAt?: string;
 }
 
 export interface BatchPayResultDto {
@@ -122,17 +136,21 @@ export function extractErrorMessage(error: any, fallbackMessage: string): string
   if (error?.response?.data) {
     const data = error.response.data;
     if (typeof data === 'string') return data;
+    if (data.errors && typeof data.errors === 'object') {
+      const messages: string[] = [];
+      for (const key of Object.keys(data.errors)) {
+        const val = data.errors[key];
+        if (Array.isArray(val)) {
+          messages.push(...val.filter((item): item is string => typeof item === 'string' && item.trim().length > 0));
+        } else if (typeof val === 'string' && val.trim().length > 0) {
+          messages.push(val);
+        }
+      }
+      if (messages.length > 0) return messages.join(' ');
+    }
     if (data.message) return data.message;
     if (data.detail) return data.detail;
     if (data.title) return data.title;
-    if (data.errors && typeof data.errors === 'object') {
-      const errorKeys = Object.keys(data.errors);
-      if (errorKeys.length > 0) {
-        const firstErr = data.errors[errorKeys[0]];
-        if (Array.isArray(firstErr) && firstErr.length > 0) return firstErr[0];
-        if (typeof firstErr === 'string') return firstErr;
-      }
-    }
   }
   if (error?.message) return error.message;
   return fallbackMessage;
@@ -157,6 +175,7 @@ export function mapBackendSummaryToDetailedRecord(dto: PayslipSummaryDto): Paysl
     employeeId: dto.employeeId,
     employeeCode: dto.employeeCode,
     employeeName: dto.employeeName,
+    branchId: dto.branchId,
     branchName: dto.branchName,
     periodMonth: dto.periodMonth,
     salaryType: normalizeSalaryType(dto.salaryType),
@@ -184,6 +203,8 @@ export function mapBackendSummaryToDetailedRecord(dto: PayslipSummaryDto): Paysl
     paidAt: dto.paidAt ? dto.paidAt.replace('T', ' ').substring(0, 16) : undefined,
     paymentMethod: dto.paymentMethod ? (dto.paymentMethod.toUpperCase() as any) : undefined,
     cashbookVoucherCode: dto.cashbookVoucherCode || undefined,
+    approvedAt: dto.approvedAt ? dto.approvedAt.replace('T', ' ').substring(0, 16) : undefined,
+    approvedBy: dto.approvedBy || undefined,
   };
 }
 
@@ -199,9 +220,11 @@ export function mapBackendDetailToDetailedRecord(dto: PayslipResponse): PayslipD
 
   return {
     id: dto.id,
+    payslipCode: dto.payslipCode,
     employeeId: dto.employeeId,
     employeeCode: dto.employeeCode,
     employeeName: dto.employeeName,
+    branchId: dto.branchId,
     branchName: dto.branchName,
     periodMonth: dto.periodMonth,
     salaryType: normalizeSalaryType(dto.salaryType),
@@ -220,6 +243,7 @@ export function mapBackendDetailToDetailedRecord(dto: PayslipResponse): PayslipD
     otRateSunday: dto.otSunday || '200%',
     otRatePercent: dto.otWeekday ? `${dto.otWeekday} (Thường) / ${dto.otSunday || '200%'} (CN)` : '150% (Thường) / 200% (CN)',
     contractBaseSalary: dto.baseRate,
+    insuranceBaseSalary: dto.insuranceBaseSalary,
     baseSalaryEarned: dto.baseSalaryEarned,
     overtimePay: dto.overtimePay,
     totalAllowance: dto.totalAllowance,
@@ -242,6 +266,7 @@ export function mapBackendDetailToDetailedRecord(dto: PayslipResponse): PayslipD
     paidBy: dto.paidBy || undefined,
     cashbookVoucherCode: dto.cashbookVoucherCode || undefined,
     approvedBy: dto.approvedBy || undefined,
+    approvedAt: dto.approvedAt ? dto.approvedAt.replace('T', ' ').substring(0, 16) : undefined,
     note: dto.note || undefined,
     bankName: dto.bankName || undefined,
     bankAccountNumber: dto.bankAccountNumber || undefined,
@@ -397,6 +422,14 @@ export const payslipApi = {
       return res.data.data;
     }
 
-    throw new Error(res.data?.message || 'Không thể thực hiện chi trả hàng loạt.');
+    throw new Error(res.data?.message || 'Không thể chi trả hàng loạt phiếu lương.');
+  },
+
+  async advanceSalary(id: string, data: SalaryAdvanceRequest): Promise<PayslipResponse> {
+    const res = await httpClient.post<ApiResponse<PayslipResponse>>(`/payslips/${id}/advance`, data);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể tạo khoản tạm ứng lương.');
   },
 };

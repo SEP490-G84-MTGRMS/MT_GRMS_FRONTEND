@@ -34,16 +34,29 @@ export async function uploadImageToCloudinary(
   formData.append('file', file);
   formData.append('folder', folder);
 
-  const res = await httpClient.post<ApiResponse<ImageUploadResponse>>('/media/upload', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  try {
+    const res = await httpClient.post<ApiResponse<ImageUploadResponse>>('/media/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
 
-  if (res.data?.success && res.data.data?.url) {
-    return res.data.data.url;
+    if (res.data?.success && res.data.data?.url) {
+      return res.data.data.url;
+    }
+
+    throw new Error(res.data?.message || 'Không thể tải ảnh lên máy chủ.');
+  } catch (err: unknown) {
+    const e = err as {
+      response?: { data?: { message?: string; error?: string } };
+      message?: string;
+    };
+    const apiMsg = e.response?.data?.message || e.response?.data?.error;
+    if (apiMsg) throw new Error(apiMsg);
+    if (err instanceof Error && !/^Request failed with status code \d+$/i.test(err.message)) {
+      throw err;
+    }
+    throw new Error('Không thể tải ảnh minh chứng lên máy chủ. Vui lòng thử lại với ảnh nhỏ hơn.');
   }
-
-  throw new Error(res.data?.message || 'Không thể tải ảnh lên máy chủ.');
 }
 

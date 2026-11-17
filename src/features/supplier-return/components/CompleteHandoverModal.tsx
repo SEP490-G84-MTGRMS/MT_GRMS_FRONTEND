@@ -192,7 +192,7 @@ export const CompleteHandoverModal: FC<Props> = ({
                 <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <tr>
                     <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: '#475569' }}>Sản phẩm / Lô</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>SL NCC duyệt</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#475569' }}>SL yêu cầu</th>
                     <th style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: '#0f766e' }}>SL thực bàn giao</th>
                   </tr>
                 </thead>

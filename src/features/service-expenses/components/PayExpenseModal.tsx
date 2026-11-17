@@ -108,6 +108,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
         paymentDate,
         note: note.trim() || undefined,
         approvalNote: item.isFlaggedAsSuspiciousSplit ? approvalReason.trim() : (note.trim() || undefined),
+        currentStatus: item.approvalStatus,
       });
       onClose();
     } catch (err: unknown) {

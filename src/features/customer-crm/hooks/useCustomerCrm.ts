@@ -15,7 +15,7 @@ export const CUSTOMER_KPIS_QUERY_KEY = ['customer-kpis'];
 /**
  * Hook to manage Customer CRM state and TanStack Query mutations
  */
-export function useCustomerCrm() {
+export function useCustomerCrm(defaultPageSize = 15) {
   const queryClient = useQueryClient();
 
   // Search and filter states
@@ -25,7 +25,7 @@ export function useCustomerCrm() {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(defaultPageSize);
 
   const handleSearchChange = (term: string) => {
     setSearchTerm(term);

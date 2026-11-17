@@ -246,6 +246,8 @@ export const goodsReceiptApi = {
     branchCode: string;
     branchName: string;
     deliveryDate?: string | null;
+    sourceType?: string | null;
+    sourceSupplierReturnId?: string | null;
     items: Array<{
       purchaseOrderDetailId: string;
       productId: string;

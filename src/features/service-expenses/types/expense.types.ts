@@ -180,4 +180,5 @@ export interface PayExpenseRequest {
   paymentDate: string;
   note?: string;
   approvalNote?: string;
+  currentStatus?: string;
 }

@@ -23,6 +23,52 @@ const formatCurrency = (val: number): string => {
   return new Intl.NumberFormat('vi-VN').format(val) + ' đ';
 };
 
+const fmtQty = (n: number) =>
+  n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+
+/** qty* trên BatchItem lưu theo ĐVT tồn (base). */
+const getUnitMeta = (batch: BatchItem) => {
+  const stockUnit = (batch.stockUnit || batch.unit || 'Cái').trim() || 'Cái';
+  const purchaseUnit = (batch.unit || stockUnit).trim() || stockUnit;
+  const rate = Number(batch.purchaseToStockRate) > 0 ? Number(batch.purchaseToStockRate) : 1;
+  const sameUnit = rate === 1 || purchaseUnit.toLowerCase() === stockUnit.toLowerCase();
+  return { stockUnit, purchaseUnit, rate, sameUnit };
+};
+
+const toPurchaseQty = (stockQty: number, rate: number) => {
+  const r = rate > 0 ? rate : 1;
+  return Math.round((stockQty / r) * 1000) / 1000;
+};
+
+const QtyWithUnit: FC<{ stockQty: number; batch: BatchItem; emphasize?: boolean }> = ({
+  stockQty,
+  batch,
+  emphasize,
+}) => {
+  const { stockUnit, purchaseUnit, rate, sameUnit } = getUnitMeta(batch);
+  const purchaseQty = toPurchaseQty(stockQty, rate);
+  return (
+    <span
+      style={{
+        fontWeight: emphasize ? 800 : 600,
+        color: emphasize ? '#0d9488' : '#0f172a',
+        fontSize: emphasize ? 13.5 : undefined,
+        textAlign: 'right',
+      }}
+      title={
+        sameUnit ? undefined : `1 ${purchaseUnit} = ${rate} ${stockUnit}`
+      }
+    >
+      {fmtQty(stockQty)} {stockUnit}
+      {!sameUnit && (
+        <span style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#94a3b8' }}>
+          ≈ {fmtQty(purchaseQty)} {purchaseUnit}
+        </span>
+      )}
+    </span>
+  );
+};
+
 export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
   isOpen,
   batch,
@@ -234,25 +280,59 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
                 <span>Tồn kho & Vị trí quầy kệ</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                   <span style={{ color: '#64748b' }}>Số lượng nhập gốc:</span>
-                  <span style={{ fontWeight: 600, color: '#0f172a' }}>{batch.qtyInitial} {batch.unit}</span>
+                  <QtyWithUnit stockQty={Number(batch.qtyInitial) || 0} batch={batch} />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                   <span style={{ color: '#64748b' }}>Tồn kho thực tế:</span>
-                  <span style={{ fontWeight: 800, color: '#0d9488', fontSize: 13.5 }}>
-                    {batch.qtyCurrent} {batch.unit}
-                  </span>
+                  <QtyWithUnit stockQty={Number(batch.qtyCurrent) || 0} batch={batch} emphasize />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                   <span style={{ color: '#64748b' }}>Khả dụng / Cách ly / Giữ trả:</span>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 12 }}>
-                    <span style={{ color: '#15803d' }}>{batch.qtyAvailable}</span>
-                    {' / '}
-                    <span style={{ color: '#d97706' }}>{batch.qtyQuarantined || 0}</span>
-                    {' / '}
-                    <span style={{ color: '#2563eb' }}>{batch.qtyReserved || 0}</span>
-                  </span>
+                  {(() => {
+                    const { stockUnit, purchaseUnit, rate, sameUnit } = getUnitMeta(batch);
+                    const avail = Number(batch.qtyAvailable ?? batch.qtyCurrent) || 0;
+                    const quarantined = Number(batch.qtyQuarantined) || 0;
+                    const reserved = Number(batch.qtyReserved) || 0;
+                    return (
+                      <span
+                        style={{
+                          fontFamily: 'monospace',
+                          fontWeight: 700,
+                          fontSize: 12,
+                          textAlign: 'right',
+                        }}
+                        title={
+                          sameUnit
+                            ? undefined
+                            : `Theo ĐVT tồn (${stockUnit}). 1 ${purchaseUnit} = ${rate} ${stockUnit}`
+                        }
+                      >
+                        <span style={{ color: '#15803d' }}>{fmtQty(avail)}</span>
+                        {' / '}
+                        <span style={{ color: '#d97706' }}>{fmtQty(quarantined)}</span>
+                        {' / '}
+                        <span style={{ color: '#2563eb' }}>{fmtQty(reserved)}</span>
+                        <span style={{ color: '#64748b', fontWeight: 600 }}> {stockUnit}</span>
+                        {!sameUnit && (
+                          <span
+                            style={{
+                              display: 'block',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#94a3b8',
+                              marginTop: 2,
+                            }}
+                          >
+                            ≈ {fmtQty(toPurchaseQty(avail, rate))} /{' '}
+                            {fmtQty(toPurchaseQty(quarantined, rate))} /{' '}
+                            {fmtQty(toPurchaseQty(reserved, rate))} {purchaseUnit}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748b' }}>Đơn giá vốn:</span>

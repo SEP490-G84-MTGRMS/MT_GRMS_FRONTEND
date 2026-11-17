@@ -439,7 +439,6 @@ export const ShiftConfigPage: React.FC = () => {
       <div className="emp-page-header">
         <h2 className="emp-header-title">
           <span>Cấu hình ca làm việc</span>
-          <span className="count-badge">{totalItems}</span>
         </h2>
       </div>
 

@@ -20,6 +20,7 @@ import '../transfer.css';
 
 export const CreateTransferPage: React.FC = () => {
   const navigate = useNavigate();
+  const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   // Branch Selection
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -144,7 +145,7 @@ export const CreateTransferPage: React.FC = () => {
   const totalQty = items.reduce((sum, it) => sum + it.sentQty, 0);
   const totalAmount = items.reduce((sum, it) => sum + it.amount, 0);
 
-  const handleSubmit = async (status: 'Draft' | 'In-Transit') => {
+  const handleSubmit = async (status: 'Draft' | 'Pending') => {
     if (items.length === 0) {
       showToast('Vui lòng thêm ít nhất một mặt hàng để tạo phiếu chuyển!', 'warning');
       return;
@@ -154,25 +155,12 @@ export const CreateTransferPage: React.FC = () => {
       return;
     }
 
-    if (status === 'In-Transit') {
-      const itemMissingBatch = items.find(
-        (item) => (item.hasBatchManagement || (item.batches && item.batches.length > 0)) && (!item.batchNumber?.trim() || !item.expiryDate?.trim())
-      );
-      if (itemMissingBatch) {
-        if (itemMissingBatch.batches?.length) setBatchModalItem(itemMissingBatch);
-        showToast(
-          `Vui lòng chọn lô hàng và hạn sử dụng chính xác cho "${itemMissingBatch.productName}" trước khi hoàn thành phiếu.`,
-          'warning',
-        );
-        return;
-      }
-    }
-
     setIsSaving(true);
     try {
-      await transferService.create({ fromBranchId, toBranchId, dispatchNow: status === 'In-Transit', note, items });
-      showToast(status === 'Draft' ? 'Đã lưu phiếu nháp.' : 'Đã xuất chuyển phiếu thành công.');
-      setTimeout(() => navigate('/store-owner/transfers'), 500);
+      const created = await transferService.create({ fromBranchId, toBranchId, note, items });
+      if (status === 'Pending') await transferService.submit(created.id);
+      showToast(status === 'Draft' ? 'Đã lưu phiếu nháp.' : 'Đã gửi phiếu đến chi nhánh nguồn.');
+      setTimeout(() => navigate(transferBasePath), 500);
     } catch (error) {
       showToast(getTransferErrorMessage(error), 'warning');
     } finally {
@@ -203,7 +191,7 @@ export const CreateTransferPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, maxWidth: 750 }}>
           <button
             type="button"
-            onClick={() => navigate('/store-owner/transfers')}
+            onClick={() => navigate(transferBasePath)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -591,7 +579,7 @@ export const CreateTransferPage: React.FC = () => {
             </span>
           </div>
 
-          {/* Hàng nút bấm Lưu tạm & Hoàn thành */}
+          {/* Hàng nút bấm Lưu tạm & Gửi phiếu */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
             <button
               type="button"
@@ -607,10 +595,10 @@ export const CreateTransferPage: React.FC = () => {
               type="button"
               className="btn-primary-teal"
               disabled={isSaving}
-              onClick={() => handleSubmit('In-Transit')}
+              onClick={() => handleSubmit('Pending')}
               style={{ justifyContent: 'center' }}
             >
-              <Check size={15} /> Hoàn thành
+              <Check size={15} /> Gửi phiếu
             </button>
           </div>
         </div>

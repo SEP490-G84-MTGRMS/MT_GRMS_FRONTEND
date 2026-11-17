@@ -14,8 +14,9 @@ import { StoreProductFilterBar } from '../components/StoreProductFilterBar';
 import { StoreProductTable } from '../components/StoreProductTable';
 import { AssignStoreProductModal } from '../components/AssignStoreProductModal';
 import { EditStoreProductModal } from '../components/EditStoreProductModal';
+import { StoreProductImportResultModal } from '../components/StoreProductImportResultModal';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { storeProductApi } from '../api/storeProductApi';
+import { storeProductApi, type StoreProductExcelImportResult } from '../api/storeProductApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
 import { Building2, Loader2, Package } from 'lucide-react';
 import '../../purchase-order/purchase-order.css';
@@ -210,77 +211,62 @@ export const StoreProductManagementPage: FC = () => {
   };
 
 
-  const [isExporting, setIsExporting] = useState(false);
+  const [importResult, setImportResult] = useState<StoreProductExcelImportResult | null>(null);
+  const [isImportResultOpen, setIsImportResultOpen] = useState(false);
+  const [excelBusy, setExcelBusy] = useState(false);
 
-  const handleExportExcel = async () => {
-    if (isExporting) return;
-    setIsExporting(true);
-    showToast('Đang kết xuất danh mục sản phẩm theo bộ lọc ra tệp Excel (.csv)...', 'info');
-
+  const handleExportExcel = async (storeId: string) => {
+    if (!storeId || storeId === 'ALL') {
+      showToast('Vui lòng chọn một cửa hàng cụ thể để xuất Excel.', 'error');
+      return;
+    }
+    setExcelBusy(true);
     try {
-      const res = await storeProductApi.getStoreProducts({
-        ...appliedFilters,
-        pageIndex: 1,
-        pageSize: 1000,
-      });
-
-      const exportItems = res.items;
-      if (!exportItems.length) {
-        showToast('Không có dữ liệu sản phẩm nào để xuất theo bộ lọc hiện tại.', 'warning');
-        return;
-      }
-
-      const headers = [
-        'Mã Cửa Hàng',
-        'Tên Cửa Hàng',
-        'Mã SKU',
-        'Tên Sản Phẩm',
-        'Mã Nhà Cung Cấp',
-        'Tên Nhà Cung Cấp',
-        'Giá Vốn (đ)',
-        'Giá Bán Lẻ (đ)',
-        'SL Đặt Tối Thiểu',
-        'ĐVT',
-        'Trạng Thái',
-      ];
-
-      const csvRows = [headers.join(',')];
-
-      for (const item of exportItems) {
-        const row = [
-          `"${(item.storeCode || '').replace(/"/g, '""')}"`,
-          `"${(item.storeName || '').replace(/"/g, '""')}"`,
-          `"${(item.sku || '').replace(/"/g, '""')}"`,
-          `"${(item.name || '').replace(/"/g, '""')}"`,
-          `"${(item.primarySupplierCode || '').replace(/"/g, '""')}"`,
-          `"${(item.primarySupplierName || '').replace(/"/g, '""')}"`,
-          item.costPrice,
-          item.retailPrice,
-          item.minOrderQuantity ?? 10,
-          `"${(item.unit || '').replace(/"/g, '""')}"`,
-          `"${item.status === 'Active' ? 'Đang bán' : 'Tạm ngừng'}"`,
-        ];
-        csvRows.push(row.join(','));
-      }
-
-      const csvContent = '\uFEFF' + csvRows.join('\r\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-      link.href = url;
-      link.setAttribute('download', `SanPham_ChiNhanh_${dateStr}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      showToast(`Đã xuất thành công ${exportItems.length} sản phẩm ra tệp Excel (.csv).`);
+      await storeProductApi.exportUnitPriceExcel(storeId);
+      showToast('Đã tải file Excel giá bán theo ĐVT.', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Lỗi khi xuất file Excel.', 'error');
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Không thể xuất Excel. Kiểm tra cửa hàng có SP đã gán.';
+      showToast(msg, 'error');
     } finally {
-      setIsExporting(false);
+      setExcelBusy(false);
+    }
+  };
+
+  const handleImportExcel = async (storeId: string, file: File) => {
+    if (!storeId || storeId === 'ALL') {
+      showToast('Vui lòng chọn một cửa hàng cụ thể để nhập Excel.', 'error');
+      return;
+    }
+    setExcelBusy(true);
+    try {
+      const result = await storeProductApi.importUnitPriceExcel(storeId, file);
+      setImportResult(result);
+      setIsImportResultOpen(true);
+      if (result.summary.successCount > 0) {
+        await fetchProducts();
+      }
+      if (result.summary.failedCount === 0) {
+        showToast(
+          `Import thành công ${result.summary.successCount}/${result.summary.totalRows} dòng.`,
+          'success'
+        );
+      } else {
+        showToast(
+          `Import xong: ${result.summary.successCount} OK, ${result.summary.failedCount} lỗi.`,
+          'info'
+        );
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Import Excel thất bại.';
+      showToast(msg, 'error');
+    } finally {
+      setExcelBusy(false);
     }
   };
 
@@ -335,16 +321,6 @@ export const StoreProductManagementPage: FC = () => {
           </Link>
           <button
             type="button"
-            className="po-btn po-btn-secondary"
-            disabled={isExporting}
-            onClick={handleExportExcel}
-            title="Xuất danh sách sản phẩm theo bộ lọc hiện tại ra tệp Excel"
-          >
-            {isExporting ? <Loader2 size={14} className="animate-spin" /> : null}
-            <span>Xuất Excel</span>
-          </button>
-          <button
-            type="button"
             id="btnOpenAssignProductModal"
             className="po-btn po-btn-primary"
             onClick={() => setIsAssignModalOpen(true)}
@@ -379,6 +355,9 @@ export const StoreProductManagementPage: FC = () => {
           filteredCount={products.length}
           onSearch={handleApplySearch}
           onReset={handleResetFilters}
+          onExportExcel={handleExportExcel}
+          onImportExcel={handleImportExcel}
+          excelBusy={excelBusy}
         />
       </div>
 
@@ -413,6 +392,15 @@ export const StoreProductManagementPage: FC = () => {
         stores={stores}
         onSave={handleUpdateProduct}
         onToggleStatus={handleToggleStatus}
+      />
+
+      <StoreProductImportResultModal
+        isOpen={isImportResultOpen}
+        result={importResult}
+        onClose={() => {
+          setIsImportResultOpen(false);
+          setImportResult(null);
+        }}
       />
     </div>
   );

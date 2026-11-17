@@ -2383,12 +2383,18 @@
   font-weight: 600;
   padding: 8px 10px;
   border-bottom: 1px solid #e2e8f0;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pos-shift-table td {
   padding: 9px 10px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .pos-shift-table tbody tr:hover {

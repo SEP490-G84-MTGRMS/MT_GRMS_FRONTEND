@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect, type CSSProperties, type FC } from 'react';
 import {
   Truck,
-  Eye,
+  Printer,
   Edit3,
   ArrowUpDown,
   FileText,
@@ -21,7 +21,7 @@ interface PoListTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
-  onViewDetail: (order: PurchaseOrderListItem) => void;
+  onPrintOrder: (order: PurchaseOrderListItem) => void;
   onEditOrder?: (order: PurchaseOrderListItem) => void;
   onReceiveOrder?: (order: PurchaseOrderListItem) => void;
 }
@@ -142,7 +142,7 @@ export const PoListTable: FC<PoListTableProps> = ({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  onViewDetail,
+  onPrintOrder,
   onEditOrder,
   onReceiveOrder,
 }) => {
@@ -471,8 +471,6 @@ export const PoListTable: FC<PoListTableProps> = ({
                   <tr
                     key={order.id}
                     className="so-list-row"
-                    onClick={() => onViewDetail(order)}
-                    style={{ cursor: 'pointer' }}
                   >
                     <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.poCode}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
@@ -489,18 +487,7 @@ export const PoListTable: FC<PoListTableProps> = ({
                         </span>
                         {String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN' && (
                           <span
-                            style={{
-                              display: 'inline-flex',
-                              alignSelf: 'flex-start',
-                              marginTop: 2,
-                              padding: '1px 6px',
-                              borderRadius: 999,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: '#0369a1',
-                              background: '#e0f2fe',
-                              border: '1px solid #7dd3fc',
-                            }}
+                            style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}
                             title={
                               order.sourceSupplierReturnId
                                 ? `PO đổi hàng từ phiếu trả ${order.sourceSupplierReturnId}`
@@ -632,7 +619,7 @@ export const PoListTable: FC<PoListTableProps> = ({
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
                         <button
                           type="button"
-                          onClick={() => onViewDetail(order)}
+                          onClick={() => onPrintOrder(order)}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -642,12 +629,12 @@ export const PoListTable: FC<PoListTableProps> = ({
                             borderRadius: 6,
                             backgroundColor: '#ffffff',
                             border: '1px solid #cbd5e1',
-                            color: '#334155',
+                            color: '#0f766e',
                             cursor: 'pointer',
                           }}
-                          title="Xem chi tiết đơn mua hàng"
+                          title="In hóa đơn PO"
                         >
-                          <Eye size={12} />
+                          <Printer size={12} />
                         </button>
 
                         {(order.status === 'SENT' ||

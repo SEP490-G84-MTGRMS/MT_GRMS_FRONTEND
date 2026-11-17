@@ -25,17 +25,6 @@ export function sanitizeCustomerText(text?: string | null, fallback = ''): strin
 }
 
 /**
- * Ensures customer debt limit is always a non-negative finite number.
- * @param limit - Raw debtLimit value.
- * @returns Non-negative debt limit (>= 0).
- */
-export function normalizeDebtLimit(limit?: number | null): number {
-  const num = Number(limit);
-  if (!Number.isFinite(num) || num < 0) return 0;
-  return num;
-}
-
-/**
  * Checks whether a customer text field contains forbidden HTML tags or angle brackets.
  * @param text - Input string to validate.
  * @returns True if safe (no HTML tags), false if contains HTML/script tags.
@@ -58,15 +47,6 @@ export function validateVietnamesePhone(phone: string): boolean {
   const cleanPhone = phone.trim();
   const phoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
   return phoneRegex.test(cleanPhone);
-}
-
-/**
- * Validates customer debt limit input.
- * @param limit - Debt limit number.
- * @returns True if non-negative finite number, false otherwise.
- */
-export function validateDebtLimit(limit: number): boolean {
-  return Number.isFinite(limit) && limit >= 0;
 }
 
 /**

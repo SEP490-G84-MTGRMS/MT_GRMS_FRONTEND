@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TaxSnapshotDetailDrawer } from '../components/TaxSnapshotDetailDrawer';
 import { HouseholdTaxGroup, TaxCalculationMethod, TaxPeriodType, type TaxSnapshot } from '../types/taxSnapshot';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 const mockSnapshot: TaxSnapshot = {
   id: 'snap-2026-q1',
@@ -29,6 +30,18 @@ const mockSnapshot: TaxSnapshot = {
 };
 
 describe('TaxSnapshotDetailDrawer - BF-03 & BF-04', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: {
+        id: 'owner-1', email: 'owner@example.test', fullName: 'Store Owner',
+        role: 'STORE_OWNER', tenantId: 'tenant-1',
+      },
+      token: null,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+  });
+
   it('displays professional explanatory message when opening Invoices tab', () => {
     render(
       <TaxSnapshotDetailDrawer
@@ -45,7 +58,7 @@ describe('TaxSnapshotDetailDrawer - BF-03 & BF-04', () => {
     // Expect the professional explanatory message
     expect(
       screen.getAllByText(
-        /Dữ liệu bảng kê chi tiết từng hóa đơn được lưu trữ an toàn trong tệp sao lưu điện tử của kỳ chốt thuế\. Bạn có thể bấm nút 'Xuất tờ khai Form 01' ở dưới để trích xuất đầy đủ file XML\/Excel theo chuẩn Thông tư 152\./i
+        /File XML Mẫu 01\/CNKD chỉ do máy chủ tạo từ bản chốt hợp lệ; cần đối chiếu XSD của cổng thuế trước khi nộp\./i
       ).length
     ).toBeGreaterThan(0);
   });
