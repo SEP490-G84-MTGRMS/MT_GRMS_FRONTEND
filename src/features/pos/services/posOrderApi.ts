@@ -34,18 +34,6 @@ export interface OrderItemResponse {
   vatAmount: number;
 }
 
-export interface CustomerDebtInvoiceDto {
-  id: string;
-  customerId: string;
-  orderId: string;
-  orderCode: string;
-  totalDebtAmount: number;
-  remainingDebtAmount: number;
-  dueDate: string;
-  status: string;
-  isOverdue: boolean;
-}
-
 export interface OrderResponse {
   id: string;
   orderCode: string;
@@ -60,7 +48,6 @@ export interface OrderResponse {
   status: string;
   orderDate: string;
   items: OrderItemResponse[];
-  debtInvoice?: CustomerDebtInvoiceDto;
 }
 
 export const posOrderApi = {

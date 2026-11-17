@@ -9,6 +9,7 @@ interface Props {
   invoice: InvoiceDTO | null;
   availableProducts: Product[];
   currentDrawerCash?: number;
+  isStoreOwner?: boolean;
   onClose: () => void;
   onConfirm: (data: {
     returnedItems: Array<{
@@ -48,6 +49,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
   invoice,
   availableProducts,
   currentDrawerCash,
+  isStoreOwner = false,
   onClose,
   onConfirm,
 }) => {
@@ -664,7 +666,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                   />
                   VietQR
                 </label>
-                {invoice.customerName && invoice.customerName !== 'Khách lẻ' && (
+                {isStoreOwner && invoice.customerName && invoice.customerName !== 'Khách lẻ' && (
                   <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 13 }}>
                     <input
                       type="radio"

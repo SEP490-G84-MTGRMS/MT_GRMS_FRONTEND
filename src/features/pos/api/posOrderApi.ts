@@ -234,10 +234,8 @@ export const posOrderApi = {
       group: c.membershipTier || 'Khách hàng',
       loyaltyPoints: c.loyaltyPoints ?? c.rewardPoints ?? 0,
       membershipTier: c.membershipTier || 'Standard',
-      debtLimit: c.debtLimit || 0,
       currentDebt: c.currentDebtAR ?? c.currentDebt ?? c.totalDebt ?? 0,
-      allowDebt: Boolean(c.allowDebt),
-      note: c.isBlockedForDebt ? 'Đang bị khóa nợ' : '',
+      note: c.note || '',
     }));
   },
 

@@ -72,7 +72,7 @@ export interface PayslipResponse {
   bankAccountNumber?: string | null;
   bankName?: string | null;
   bankAccountHolder?: string | null;
-  cashbookTransactionId?: string | null;
+  cashbookEntryId?: string | null;
   cashbookVoucherCode?: string | null;
   note?: string | null;
   approvedBy?: string | null;

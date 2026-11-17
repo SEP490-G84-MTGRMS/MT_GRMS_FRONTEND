@@ -260,11 +260,11 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                           borderRadius: '9999px',
                           fontSize: '0.7rem',
                           fontWeight: 600,
-                          background: inv.status === 'Paid' ? '#ECFDF5' : '#FEF3C7',
-                          color: inv.status === 'Paid' ? '#059669' : '#B45309',
+                          background: '#FEF3C7',
+                          color: '#B45309',
                         }}
                       >
-                        {inv.status === 'Paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                        Bán nợ
                       </span>
                     </div>
                   </div>

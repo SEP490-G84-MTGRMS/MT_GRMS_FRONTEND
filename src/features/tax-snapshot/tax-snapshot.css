@@ -185,10 +185,20 @@
   flex-wrap: wrap;
 }
 
+.tax-hero-grid .tax-topbar-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .tax-period-selector {
   flex: 0 1 auto;
   min-width: 0;
 }
+
+.tax-hero-grid .tax-period-selector { width: 100%; }
 
 .tax-hero-grid .tax-topbar-title-group {
   align-items: flex-start;
@@ -220,6 +230,7 @@
     flex-direction: row;
     align-items: center;
   }
+  .tax-hero-grid .tax-topbar-actions { grid-template-columns: minmax(0, 1fr) auto auto auto; }
 }
 
 @media (max-width: 760px) {
@@ -227,8 +238,9 @@
   .tax-hero-grid { margin-top: 8px; gap: 10px; }
   .tax-hero-grid .tax-topbar-container { flex-direction: column; align-items: stretch; }
   .tax-topbar-actions { align-items: stretch; }
+  .tax-hero-grid .tax-topbar-actions { grid-template-columns: minmax(0, 1fr) auto; }
   .tax-period-selector { width: 100%; justify-content: space-between; }
-  .tax-topbar-actions > .btn-primary-pill { flex: 1 1 100%; justify-content: center; }
+  .tax-hero-grid .tax-topbar-actions > .btn-primary-pill { grid-column: 1 / -1; justify-content: center; }
 }
 
 .tax-topbar-title-group {

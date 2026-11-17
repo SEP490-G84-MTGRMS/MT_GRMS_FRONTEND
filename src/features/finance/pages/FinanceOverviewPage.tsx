@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { AdminToast, type ToastState } from '../../admin/components';
 import {
   formatLocalYmd,
@@ -82,7 +82,6 @@ const OverviewErrorBanner: React.FC<{ onRetry: () => void }> = ({ onRetry }) => 
 );
 
 export const FinanceOverviewPage: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab: FinanceTabKey = searchParams.get('tab') === 'pnl' ? 'pnl' : 'overview';
   const [overviewFilter, setOverviewFilter] = useState<FinanceOverviewFilter>(createInitialOverviewFilter);
@@ -161,8 +160,6 @@ export const FinanceOverviewPage: React.FC = () => {
           onTabChange={handleTabChange}
           isRefreshing={isRefreshing}
           onRefreshAll={handleRefresh}
-          onNavigateCashbook={() => navigate('/store-owner/cashbook')}
-          onNavigateCashControl={() => navigate('/store-owner/cash-control?tab=pending')}
         />
 
         {activeTab === 'overview' && (
