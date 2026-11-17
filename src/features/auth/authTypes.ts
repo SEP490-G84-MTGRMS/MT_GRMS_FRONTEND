@@ -9,7 +9,7 @@ export const SystemRoles = UserRoleEnum;
 
 export type UserRoleType = (typeof UserRoleEnum)[keyof typeof UserRoleEnum];
 export type SystemRole = UserRoleType;
-export type UserRole = UserRoleType | 'MANAGER' | 'CASHIER' | 'EMPLOYEE';
+export type UserRole = UserRoleType;
 
 export interface UserProfile {
   id: string;

@@ -24,7 +24,6 @@ describe('customerApi Live Neon Integration Tests', () => {
           fullName: 'Nguyễn Văn An',
           phoneNumber: '0901234567',
           currentDebtAR: 3000000,
-          debtLimit: 20000000,
           membershipTier: 'Gold',
         },
       ];
@@ -36,14 +35,14 @@ describe('customerApi Live Neon Integration Tests', () => {
       const result = await customerApi.getCustomers({
         search: 'Nguyễn',
         tier: 'Gold',
-        debtStatus: 'IN_LIMIT',
+        debtStatus: 'DEBT',
       });
 
       expect(financeHttpClient.get).toHaveBeenCalledWith('/customers', {
         params: {
           search: 'Nguyễn',
           tier: 'Gold',
-          debtStatus: 'IN_LIMIT',
+          debtStatus: undefined,
         },
       });
       expect(result).toEqual(mockList);
@@ -84,7 +83,6 @@ describe('customerApi Live Neon Integration Tests', () => {
         fullName: 'Trương Hoàng',
         phoneNumber: '0988776655',
         currentDebtAR: 0,
-        debtLimit: 5000000,
         membershipTier: 'Standard',
       };
 
@@ -95,7 +93,6 @@ describe('customerApi Live Neon Integration Tests', () => {
       const res = await customerApi.createCustomer({
         fullName: 'Trương Hoàng',
         phoneNumber: '0988776655',
-        debtLimit: 5000000,
       });
 
       expect(financeHttpClient.post).toHaveBeenCalledWith('/customers', {
@@ -103,9 +100,7 @@ describe('customerApi Live Neon Integration Tests', () => {
         phoneNumber: '0988776655',
         email: null,
         address: null,
-        debtLimit: 5000000,
         membershipTier: 'Standard',
-        allowDebt: true,
       });
       expect(res).toEqual(newCust);
     });
@@ -284,7 +279,6 @@ describe('customerApi Live Neon Integration Tests', () => {
           entryType: 'DebtRepayment',
           amount: 5000000,
           balanceAfter: 3000000,
-          prepaymentAfter: 0,
           referenceCode: 'REC-001',
           description: 'Thu nợ',
           occurredAtUtc: '2026-11-02T12:00:00Z',
@@ -296,7 +290,6 @@ describe('customerApi Live Neon Integration Tests', () => {
           entryType: 'DebtIncurred',
           amount: 8000000,
           balanceAfter: 8000000,
-          prepaymentAfter: 0,
           referenceCode: 'ORD-001',
           description: 'Bán nợ',
           occurredAtUtc: '2026-11-01T10:00:00Z',
@@ -325,7 +318,6 @@ describe('customerApi Live Neon Integration Tests', () => {
           fullName: 'Test User',
           membershipTier: 'Standard',
           currentDebtAR: 500000,
-          debtLimit: 1000000,
           totalSpending: 0,
           status: 'Active',
           loyaltyPoints: 0,
@@ -346,7 +338,7 @@ describe('customerApi Live Neon Integration Tests', () => {
       const mockSummary = {
         totalCustomers: 45,
         totalDebtAR: 82700000,
-        overLimitCount: 3,
+        debtorCount: 3,
         totalLoyaltyPoints: 12500,
       };
 

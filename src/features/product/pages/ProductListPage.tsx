@@ -1,18 +1,13 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { productApi } from '../api/productApi';
 import {
   Plus,
-  SlidersHorizontal,
-  Download,
-  Upload,
-  Search,
-  Printer,
   Package,
-  ChevronDown,
-  Trash2,
   Folder,
-  Calendar,
-  X,
+  Layers,
+  Store,
+  Loader2,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { categoryApi } from '../api/categoryApi';
@@ -20,10 +15,25 @@ import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { ProductDeleteConfirmModal } from '../components/ProductDeleteConfirmModal';
-import { TablePagination, NotificationModal } from '../../../components/common';
+import {
+  MasterProductFilterBar,
+  type MasterProductFilterValues,
+} from '../components/MasterProductFilterBar';
+import { MasterProductTable } from '../components/MasterProductTable';
+import { NotificationModal } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { AdminToast, type ToastState } from '../../admin/components';
+import '../../purchase-order/purchase-order.css';
+import '../../supplier/supplier.css';
 import '../product.css';
+
+const DEFAULT_PRODUCT_FILTERS: MasterProductFilterValues = {
+  skus: [],
+  names: [],
+  barcodes: [],
+  categoryId: 'ALL',
+  statusFilter: 'ALL',
+};
 
 // Hàm chuẩn hóa tiếng Việt loại bỏ dấu thanh & ký tự đặc biệt phục vụ tìm kiếm thông minh
 const removeVietnameseTones = (str?: string | null): string => {
@@ -64,123 +74,9 @@ export const ProductListPage: React.FC = () => {
     }
   }, [currentUser?.role]);
 
-  // Filter state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
-  const [createdTime, setCreatedTime] = useState<'all' | 'custom'>('all');
-  const [customDate, setCustomDate] = useState<string>('');
-
-  // Dropdown Tùy chọn Thao tác (Import, Xuất file, In mã vạch)
-  const [isOptionMenuOpen, setIsOptionMenuOpen] = useState(false);
-  const optionMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOptionMenuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (optionMenuRef.current && !optionMenuRef.current.contains(e.target as Node)) {
-        setIsOptionMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOptionMenuOpen]);
-
-  // Searchable Multi-Select Category Dropdown (Dựa vào base EmployeeFormModal - Các chi nhánh làm việc)
-  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-  const [categorySearchKeyword, setCategorySearchKeyword] = useState('');
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        categoryDropdownRef.current &&
-        !categoryDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsCategoryDropdownOpen(false);
-      }
-    };
-
-    if (isCategoryDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isCategoryDropdownOpen]);
-
-  const filteredCategoriesList = useMemo(() => {
-    if (!categorySearchKeyword.trim()) return categories;
-    const kw = categorySearchKeyword.trim().toLowerCase();
-    return categories.filter((c) =>
-      c.name.toLowerCase().includes(kw) || (c.code && c.code.toLowerCase().includes(kw))
-    );
-  }, [categories, categorySearchKeyword]);
-
-  const handleCategoryToggle = (catId: string) => {
-    if (selectedCategoryIds.includes(catId)) {
-      setSelectedCategoryIds(selectedCategoryIds.filter((id) => id !== catId));
-    } else {
-      setSelectedCategoryIds([...selectedCategoryIds, catId]);
-    }
-    setPageIndex(1);
-  };
-
-  const handleSelectAllCategories = () => {
-    setSelectedCategoryIds(categories.map((c) => c.id));
-    setPageIndex(1);
-  };
-
-  const handleClearAllCategories = () => {
-    setSelectedCategoryIds([]);
-    setPageIndex(1);
-  };
-
-  const handleRemoveCategoryTag = (e: React.MouseEvent, catId: string) => {
-    e.stopPropagation();
-    setSelectedCategoryIds(selectedCategoryIds.filter((id) => id !== catId));
-    setPageIndex(1);
-  };
-
-  // Dropdown đơn vị tính theo dòng sản phẩm (Ảnh 2 - REQ-07)
-  const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
-  const [activeUnitDropdownId, setActiveUnitDropdownId] = useState<string | null>(null);
-  const [unitDropdownPos, setUnitDropdownPos] = useState<{
-    top?: number;
-    bottom?: number;
-    left: number;
-  } | null>(null);
-
-  // Đóng popover chọn đơn vị khi click ra ngoài hoặc cuộn trang
-  useEffect(() => {
-    if (!activeUnitDropdownId) return;
-    const handleDocumentClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.unit-dropdown-container')) {
-        setActiveUnitDropdownId(null);
-      }
-    };
-    const handleScrollOrResize = () => {
-      setActiveUnitDropdownId(null);
-    };
-    document.addEventListener('mousedown', handleDocumentClick);
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
-    return () => {
-      document.removeEventListener('mousedown', handleDocumentClick);
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
-    };
-  }, [activeUnitDropdownId]);
-
-  // Debounce tìm kiếm 300ms (REQ-02)
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-      setPageIndex(1);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [searchTerm]);
+  // Filter state (chip-token — layout giống Sản phẩm theo NCC)
+  const [appliedFilters, setAppliedFilters] =
+    useState<MasterProductFilterValues>(DEFAULT_PRODUCT_FILTERS);
 
   // 1. Tải danh mục thực tế từ backend
   const fetchCategories = useCallback(async () => {
@@ -208,12 +104,19 @@ export const ProductListPage: React.FC = () => {
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
+      const searchBits = [
+        ...appliedFilters.skus,
+        ...appliedFilters.names,
+        ...appliedFilters.barcodes,
+      ].filter(Boolean);
       const res = await productApi.getProductsPaged({
         pageIndex,
         pageSize,
-        searchTerm: debouncedSearchTerm.trim() || undefined,
-        categoryId: selectedCategoryIds.length === 1 ? selectedCategoryIds[0] : undefined,
-        categoryIds: selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined,
+        searchTerm: searchBits[0] || undefined,
+        categoryId:
+          appliedFilters.categoryId !== 'ALL' ? appliedFilters.categoryId : undefined,
+        categoryIds:
+          appliedFilters.categoryId !== 'ALL' ? [appliedFilters.categoryId] : undefined,
       });
       if (res && res.items) {
         const mapped: ProductItem[] = await Promise.all(
@@ -275,6 +178,8 @@ export const ProductListPage: React.FC = () => {
               isFavorite: Boolean(p.isFavorite),
               hasBatches: Boolean(p.hasBatches),
               allowRepack: Boolean((p as { allowRepack?: boolean }).allowRepack),
+              processedSellingPricePerKg:
+                (p as { processedSellingPricePerKg?: number | null }).processedSellingPricePerKg ?? null,
               eligibleForVatReduction: Boolean((p as any).eligibleForVatReduction),
               isBaseUnitPurchaseUnit,
               purchaseUnit,
@@ -295,7 +200,7 @@ export const ProductListPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [pageIndex, pageSize, debouncedSearchTerm, selectedCategoryIds]);
+  }, [pageIndex, pageSize, appliedFilters]);
 
   useEffect(() => {
     fetchProducts();
@@ -398,7 +303,7 @@ export const ProductListPage: React.FC = () => {
     try {
       await categoryApi.deleteCategory(id);
       setCategories((prev) => prev.filter((c) => c.id !== id));
-      setSelectedCategoryIds((prev) => prev.filter((cid) => cid !== id));
+      setAppliedFilters((prev) => (prev.categoryId === id ? { ...prev, categoryId: 'ALL' } : prev));
       showToast(`Đã xóa nhóm hàng: ${cat.name}`);
       await fetchCategories();
       fetchProducts();
@@ -433,6 +338,10 @@ export const ProductListPage: React.FC = () => {
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
           hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(productToEdit.hasBatches),
           allowRepack: data.allowRepack !== undefined ? data.allowRepack : Boolean(productToEdit.allowRepack),
+          processedSellingPricePerKg:
+            data.processedSellingPricePerKg !== undefined
+              ? data.processedSellingPricePerKg
+              : productToEdit.processedSellingPricePerKg ?? null,
           eligibleForVatReduction: data.eligibleForVatReduction ?? productToEdit.eligibleForVatReduction ?? false,
           isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit,
         });
@@ -484,13 +393,6 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Cập nhật hàng hóa "${data.productName}" thành công.`);
-        setNotificationModal({
-          isOpen: true,
-          type: 'success',
-          title: 'Cập nhật hàng hóa thành công',
-          message: `Thông tin hàng hóa "${data.productName}" đã được cập nhật thành công vào hệ thống.`,
-          itemCode: data.productCode,
-        });
         setProducts((prev) =>
           prev.map((p) =>
             p.id === productToEdit.id
@@ -525,8 +427,10 @@ export const ProductListPage: React.FC = () => {
           description: data.description,
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? false,
+          status: data.status || 'Active',
           hasBatches: data.hasBatches ?? false,
           allowRepack: data.allowRepack ?? false,
+          processedSellingPricePerKg: data.processedSellingPricePerKg ?? null,
           isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit ?? true,
         });
 
@@ -551,13 +455,6 @@ export const ProductListPage: React.FC = () => {
         }
 
         showToast(`Tạo mới hàng hóa "${created.name || data.productName}" thành công.`);
-        setNotificationModal({
-          isOpen: true,
-          type: 'success',
-          title: 'Tạo mới hàng hóa thành công',
-          message: `Hàng hóa "${created.name || data.productName}" đã được thêm mới thành công vào danh mục.`,
-          itemCode: created.productCode || data.productCode,
-        });
       }
 
       // Làm mới danh mục và danh sách sản phẩm từ backend
@@ -712,91 +609,41 @@ export const ProductListPage: React.FC = () => {
     setIsDetailModalOpen(false);
   };
 
-  const handleToggleFavorite = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setProducts(
-      products.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p))
-    );
-  };
-
-  // Filtered products calculation
+  // Lọc client theo multi-token / status (API đã lọc 1 keyword + category)
   const filteredProducts = useMemo(() => {
-    return products.filter((item) => {
-      // Search thông minh tiếng Việt (cả có dấu chuẩn hóa NFC lẫn không dấu)
-      if (searchTerm.trim()) {
-        const rawKw = searchTerm.trim().toLowerCase();
-        const kwNfc = rawKw.normalize('NFC');
-        const kwNoTone = removeVietnameseTones(rawKw);
+    const skuTokens = appliedFilters.skus.map((s) => s.toLowerCase());
+    const nameTokens = appliedFilters.names.map((s) => removeVietnameseTones(s));
+    const barcodeTokens = appliedFilters.barcodes.map((s) => s.toLowerCase());
 
-        const name = (item.productName || '').toLowerCase();
-        const nameNfc = name.normalize('NFC');
-        const nameNoTone = removeVietnameseTones(name);
-
-        const code = (item.productCode || '').toLowerCase();
-        const barcode = (item.barcode || '').toLowerCase();
-
-        // 1. Khớp theo mã hàng (SKU) hoặc mã vạch (Barcode)
-        const matchCode = code.includes(rawKw);
-        const matchBarcode = barcode.includes(rawKw);
-
-        // 2. Khớp theo tên hàng hóa (có dấu hoặc không dấu)
-        const matchName = nameNfc.includes(kwNfc) || nameNoTone.includes(kwNoTone);
-
-        // 3. Khớp theo nhóm hàng
-        const catName = (item.categoryName || '').toLowerCase();
-        const matchCategory =
-          catName.normalize('NFC').includes(kwNfc) ||
-          removeVietnameseTones(catName).includes(kwNoTone);
-
-        // 4. Khớp theo đơn vị quy đổi (tên đơn vị hoặc mã vạch riêng của đơn vị)
-        const matchUnits = item.uomConversions?.some((u) => {
-          const uName = (u.unitName || '').toLowerCase();
-          const uBarcode = (u.barcode || '').toLowerCase();
-          return (
-            uName.normalize('NFC').includes(kwNfc) ||
-            removeVietnameseTones(uName).includes(kwNoTone) ||
-            uBarcode.includes(rawKw)
-          );
-        });
-
-        if (!matchCode && !matchBarcode && !matchName && !matchCategory && !matchUnits) return false;
-      }
-
-      // Categories
-      if (selectedCategoryIds.length > 0) {
-        const itemCatId = (item.categoryId || '').toLowerCase();
-        if (!selectedCategoryIds.some((cid) => cid.toLowerCase() === itemCatId)) return false;
-      }
-
-
-      // Filter theo Thời gian tạo (Toàn thời gian vs Tùy chỉnh ngày)
-      if (createdTime === 'custom' && customDate) {
-        if (!item.createdAt) return false;
-        // Chuẩn hóa item.createdAt (đã format vi-VN dd/mm/yyyy hoặc ISO yyyy-mm-dd)
-        let itemDateStr = '';
-        if (item.createdAt.includes('/')) {
-          const parts = item.createdAt.split('/');
-          if (parts.length === 3) {
-            // dd/mm/yyyy -> yyyy-mm-dd
-            itemDateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-          }
-        } else if (item.createdAt.includes('-')) {
-          itemDateStr = item.createdAt.split('T')[0];
-        }
-
-        if (itemDateStr && itemDateStr !== customDate) {
+    return products
+      .filter((item) => {
+        if (appliedFilters.statusFilter !== 'ALL' && item.status !== appliedFilters.statusFilter) {
           return false;
         }
-      }
-
-      return true;
-    }).sort((a, b) => {
-      const timeA = a.rawCreatedAt ? new Date(a.rawCreatedAt).getTime() : 0;
-      const timeB = b.rawCreatedAt ? new Date(b.rawCreatedAt).getTime() : 0;
-      if (timeB !== timeA) return timeB - timeA;
-      return (b.id || '').localeCompare(a.id || '');
-    });
-  }, [products, searchTerm, selectedCategoryIds, createdTime, customDate]);
+        if (skuTokens.length > 0) {
+          const code = (item.productCode || '').toLowerCase();
+          if (!skuTokens.some((t) => code.includes(t))) return false;
+        }
+        if (nameTokens.length > 0) {
+          const name = removeVietnameseTones(item.productName || '');
+          if (!nameTokens.some((t) => name.includes(t))) return false;
+        }
+        if (barcodeTokens.length > 0) {
+          const barcode = (item.barcode || '').toLowerCase();
+          const unitHit = item.uomConversions?.some((u) =>
+            barcodeTokens.some((t) => (u.barcode || '').toLowerCase().includes(t))
+          );
+          if (!barcodeTokens.some((t) => barcode.includes(t)) && !unitHit) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const timeA = a.rawCreatedAt ? new Date(a.rawCreatedAt).getTime() : 0;
+        const timeB = b.rawCreatedAt ? new Date(b.rawCreatedAt).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return (b.id || '').localeCompare(a.id || '');
+      });
+  }, [products, appliedFilters]);
 
 
 
@@ -816,1037 +663,113 @@ export const ProductListPage: React.FC = () => {
   };
 
   return (
-    <div className="product-management-container">
-      {/* Toast */}
-      {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
-      <div className="product-title-area">
-        <Package size={28} color="#0F766E" />
-        <h1>Hàng hóa</h1>
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            padding: '3px 10px',
-            borderRadius: 9999,
-            backgroundColor: '#ccfbf1',
-            color: '#0f766e',
-          }}
-        >
-          {filteredProducts.length} sản phẩm
-        </span>
-      </div>
-      {/* 1. Header Toolbar */}
-      <div className="product-header-toolbar">
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
+      <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-
-        {/* Bộ lọc: Tìm kiếm + Nhóm hàng + Thời gian tạo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1, minWidth: 280 }}>
-          {/* Ô tìm kiếm nhanh */}
-          <div style={{ position: 'relative', minWidth: 220, maxWidth: 300, flex: 1 }}>
-            <input
-              type="text"
-              className="filter-input"
-              style={{ paddingLeft: 34, borderRadius: 9999, width: '100%', height: 38 }}
-              placeholder="Theo mã SKU, tên hàng, barcode..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Search size={16} style={{ position: 'absolute', left: 12, top: 11, color: '#94a3b8' }} />
-          </div>
-
-          {/* Lọc Nhóm hàng - Searchable Multi-Select Dropdown theo base EmployeeFormModal */}
-          <div ref={categoryDropdownRef} style={{ position: 'relative' }}>
-            <div
-              onClick={() => setIsCategoryDropdownOpen((prev) => !prev)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: '#FFFFFF',
-                border: isCategoryDropdownOpen ? '1.5px solid #0F766E' : '1px solid #cbd5e1',
-                borderRadius: 9999,
-                padding: '0 14px',
-                height: 38,
-                maxHeight: 38,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                boxShadow: isCategoryDropdownOpen ? '0 0 0 3px rgba(15, 118, 110, 0.12)' : 'none',
-                boxSizing: 'border-box',
-                flexWrap: 'nowrap',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                userSelect: 'none',
-              }}
-            >
-              <Folder size={15} color="#0F766E" style={{ flexShrink: 0 }} />
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  flexWrap: 'nowrap',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  maxWidth: 240,
-                }}
-              >
-                {selectedCategoryIds.length === 0 || selectedCategoryIds.length === categories.length ? (
-                  <span style={{ fontSize: 13, color: '#1E293B', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                    Tất cả nhóm hàng ({categories.length})
-                  </span>
-                ) : (
-                  <>
-                    {(() => {
-                      const firstCat = categories.find((c) => selectedCategoryIds.includes(c.id));
-                      if (!firstCat) return null;
-                      return (
-                        <span
-                          key={firstCat.id}
-                          title={firstCat.name}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '2px 8px',
-                            borderRadius: 12,
-                            fontSize: 12,
-                            fontWeight: 500,
-                            background: '#F0FDFA',
-                            color: '#0F766E',
-                            border: '1px solid #99F6E4',
-                            whiteSpace: 'nowrap',
-                            maxWidth: selectedCategoryIds.length > 1 ? 140 : 180,
-                          }}
-                        >
-                          <span
-                            style={{
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {firstCat.name.length > 22 ? `${firstCat.name.slice(0, 22)}...` : firstCat.name}
-                          </span>
-                          <span
-                            onClick={(e) => handleRemoveCategoryTag(e, firstCat.id)}
-                            title="Bỏ nhóm hàng này"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              borderRadius: '50%',
-                              width: 14,
-                              height: 14,
-                              color: '#0F766E',
-                              fontWeight: 700,
-                              flexShrink: 0,
-                            }}
-                          >
-                            <X size={11} />
-                          </span>
-                        </span>
-                      );
-                    })()}
-
-                    {selectedCategoryIds.length > 1 && (
-                      <span
-                        style={{
-                          padding: '2px 8px',
-                          borderRadius: 12,
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          background: '#E0F2FE',
-                          color: '#0369A1',
-                          border: '1px solid #BAE6FD',
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                        }}
-                        title={`Đã chọn thêm ${selectedCategoryIds.length - 1} nhóm hàng khác`}
-                      >
-                        +{selectedCategoryIds.length - 1}
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <ChevronDown
-                size={15}
-                color="#64748B"
-                style={{
-                  transform: isCategoryDropdownOpen ? 'rotate(180deg)' : 'none',
-                  transition: 'transform 0.2s ease',
-                  flexShrink: 0,
-                }}
-              />
-
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCategoryToEdit(null);
-                  setIsCategoryModalOpen(true);
-                }}
-                title="Quản lý / Thêm nhóm hàng"
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  color: '#0F766E',
-                  cursor: 'pointer',
-                  padding: '2px 4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  borderRadius: 4,
-                  marginLeft: 2,
-                  flexShrink: 0,
-                }}
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-
-            {/* Dropdown Panel */}
-            {isCategoryDropdownOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  marginTop: 6,
-                  width: 320,
-                  background: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: 12,
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                  zIndex: 1050,
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Search Input Bar */}
-                <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      background: '#FFFFFF',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: 6,
-                      padding: '5px 10px',
-                    }}
-                  >
-                    <Search size={14} color="#94A3B8" />
-                    <input
-                      type="text"
-                      value={categorySearchKeyword}
-                      onChange={(e) => setCategorySearchKeyword(e.target.value)}
-                      placeholder="Tìm kiếm nhóm hàng theo tên..."
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        outline: 'none',
-                        width: '100%',
-                        fontSize: 13,
-                        color: '#1E293B',
-                      }}
-                      autoFocus
-                    />
-                    {categorySearchKeyword && (
-                      <button
-                        type="button"
-                        onClick={() => setCategorySearchKeyword('')}
-                        style={{
-                          border: 'none',
-                          background: 'transparent',
-                          cursor: 'pointer',
-                          color: '#94A3B8',
-                          padding: 0,
-                          display: 'flex',
-                        }}
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Quick Selection Actions */}
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '6px 12px',
-                    background: '#F8FAFC',
-                    borderBottom: '1px solid #F1F5F9',
-                    fontSize: 12,
-                  }}
-                >
-                  <span style={{ color: '#64748B' }}>
-                    Tìm thấy {filteredCategoriesList.length} nhóm hàng
-                  </span>
-                  <div style={{ display: 'flex', gap: 12 }}>
-                    <button
-                      type="button"
-                      onClick={handleSelectAllCategories}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: '#0F766E',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: 12,
-                      }}
-                    >
-                      Chọn tất cả ({categories.length})
-                    </button>
-                    <span style={{ color: '#CBD5E1' }}>|</span>
-                    <button
-                      type="button"
-                      onClick={handleClearAllCategories}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: '#64748B',
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        padding: 0,
-                        fontSize: 12,
-                      }}
-                    >
-                      Bỏ chọn (Tất cả)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Categories List */}
-                <div style={{ maxHeight: 220, overflowY: 'auto', padding: '4px 0' }}>
-                  {filteredCategoriesList.length ? (
-                    filteredCategoriesList.map((c) => {
-                      const isChecked = selectedCategoryIds.includes(c.id);
-                      return (
-                        <div
-                          key={c.id}
-                          onClick={() => handleCategoryToggle(c.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            background: isChecked ? '#F0FDFA' : 'transparent',
-                            transition: 'background 0.12s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isChecked) e.currentTarget.style.background = '#F8FAFC';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isChecked) e.currentTarget.style.background = 'transparent';
-                          }}
-                        >
-                          <label
-                            title={c.name}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 10,
-                              cursor: 'pointer',
-                              fontSize: 13,
-                              flex: 1,
-                              minWidth: 0,
-                              marginRight: 8,
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => { }} // Handled at row click
-                              style={{ accentColor: '#0F766E', width: 16, height: 16, flexShrink: 0 }}
-                            />
-                            <span
-                              style={{
-                                fontWeight: isChecked ? 600 : 400,
-                                color: isChecked ? '#134E4A' : '#1E293B',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {c.name.length > 26 ? `${c.name.slice(0, 26)}...` : c.name}
-                            </span>
-                          </label>
-                          {c.productCount !== undefined && (
-                            <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
-                              {c.productCount} SP
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div style={{ padding: '20px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
-                      Không tìm thấy nhóm hàng phù hợp
-                    </div>
-                  )}
-                </div>
-
-                {/* Dropdown Footer */}
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    borderTop: '1px solid #F1F5F9',
-                    background: '#FAFAFA',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsCategoryDropdownOpen(false);
-                      setCategoryToEdit(null);
-                      setIsCategoryModalOpen(true);
-                    }}
-                    style={{
-                      border: 'none',
-                      background: 'none',
-                      color: '#0F766E',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: 0,
-                    }}
-                  >
-                    <Plus size={13} /> Thêm nhóm hàng
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-primary-teal"
-                    style={{ height: 28, padding: '0 14px', fontSize: 12 }}
-                    onClick={() => setIsCategoryDropdownOpen(false)}
-                  >
-                    Xong {selectedCategoryIds.length > 0 ? `(${selectedCategoryIds.length})` : '(Tất cả)'}
-                  </button>
-                </div>
-              </div>
+      <div className="so-list-header">
+        <div>
+          <h1 className="so-list-title">
+            <Layers size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Hàng hóa (Master)</span>
+            {isLoading && (
+              <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
             )}
-          </div>
-
-          {/* Lọc Thời gian tạo */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              background: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              borderRadius: 9999,
-              padding: '4px 12px',
-              minHeight: 38,
-            }}
-          >
-            <Calendar size={15} color="#0F766E" />
-            <select
-              value={createdTime}
-              onChange={(e) => {
-                const val = e.target.value as 'all' | 'custom';
-                setCreatedTime(val);
-                if (val === 'all') setCustomDate('');
-              }}
-              style={{
-                border: 'none',
-                background: 'transparent',
-                fontSize: 13,
-                color: '#1E293B',
-                fontWeight: 600,
-                outline: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              <option value="all">Thời gian: Toàn bộ</option>
-              <option value="custom">Thời gian: Tùy chỉnh</option>
-            </select>
-            {createdTime === 'custom' && (
-              <input
-                type="date"
-                value={customDate}
-                onChange={(e) => setCustomDate(e.target.value)}
-                style={{
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 6,
-                  padding: '2px 6px',
-                  fontSize: 12,
-                  outline: 'none',
-                  backgroundColor: '#ffffff',
-                }}
-              />
-            )}
-          </div>
+          </h1>
         </div>
 
-        {/* Actions buttons */}
-        <div className="product-header-actions">
-
-
+        <div className="so-list-header-actions">
+          <Link
+            to="/store-owner/categories"
+            className="po-btn po-btn-secondary"
+            title="Quản lý nhóm hàng"
+          >
+            <Folder size={14} />
+            <span>Nhóm hàng</span>
+          </Link>
+          <Link
+            to="/store-owner/stores/products"
+            className="po-btn po-btn-secondary"
+            title="Sản phẩm theo cửa hàng"
+          >
+            <Store size={14} />
+            <span>Sản phẩm theo Cửa hàng</span>
+          </Link>
+          <Link
+            to="/store-owner/suppliers/products"
+            className="po-btn po-btn-secondary"
+            title="Sản phẩm theo nhà cung cấp"
+          >
+            <Package size={14} />
+            <span>SP theo NCC</span>
+          </Link>
           <button
             type="button"
-            className="btn-primary-teal"
+            className="po-btn po-btn-primary"
             onClick={() => {
               setProductToEdit(null);
               setIsProductFormOpen(true);
             }}
           >
-            <Plus size={16} /> Thêm hàng hóa
+            <Plus size={14} />
+            <span>Thêm hàng hóa</span>
           </button>
-
-          {/* Button option cho: Import, Xuất file, In mã vạch */}
-          <div ref={optionMenuRef} style={{ position: 'relative' }}>
-            <button
-              type="button"
-              className="btn-pill-outline"
-              onClick={() => setIsOptionMenuOpen(!isOptionMenuOpen)}
-              title="Tùy chọn thao tác"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                height: 38,
-                background: isOptionMenuOpen ? '#F0FDFA' : '#FFFFFF',
-                borderColor: isOptionMenuOpen ? '#0F766E' : '#CBD5E1',
-              }}
-            >
-              <SlidersHorizontal size={15} color="#0F766E" />
-              <span>Thao tác</span>
-              <ChevronDown
-                size={14}
-                color="#64748B"
-                style={{
-                  transform: isOptionMenuOpen ? 'rotate(180deg)' : 'none',
-                  transition: 'transform 0.2s ease',
-                }}
-              />
-            </button>
-
-            {isOptionMenuOpen && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  marginTop: 6,
-                  background: '#FFFFFF',
-                  borderRadius: 12,
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                  border: '1px solid #E2E8F0',
-                  minWidth: 170,
-                  zIndex: 1050,
-                  padding: '6px 0',
-                  overflow: 'hidden',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOptionMenuOpen(false);
-                    handleImport();
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '9px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    background: 'none',
-                    border: 'none',
-                    textAlign: 'left',
-                    fontSize: 13.5,
-                    color: '#334155',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Upload size={16} color="#0F766E" />
-                  <span>Import</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOptionMenuOpen(false);
-                    handleExport();
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '9px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    background: 'none',
-                    border: 'none',
-                    textAlign: 'left',
-                    fontSize: 13.5,
-                    color: '#334155',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Download size={16} color="#0F766E" />
-                  <span>Xuất file</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOptionMenuOpen(false);
-                    handlePrintBarcode();
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '9px 16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    background: 'none',
-                    border: 'none',
-                    textAlign: 'left',
-                    fontSize: 13.5,
-                    color: '#334155',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <Printer size={16} color="#0F766E" />
-                  <span>In mã vạch</span>
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* 2. Main Body: Full-width Table */}
-      <div className="product-table-wrapper" style={{ width: '100%' }}>
-        {/* Summary bar */}
-        <div className="product-table-summary-bar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div>
-              Đang hiển thị <b>{filteredProducts.length}</b> mặt hàng
-            </div>
-            {selectedProductIds.length > 0 && (
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '3px 10px',
-                  backgroundColor: '#FEF2F2',
-                  border: '1px solid #FECACA',
-                  borderRadius: 6,
-                }}
-              >
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: '#991B1B' }}>
-                  Đã chọn {selectedProductIds.length} hàng hóa
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsBulkDeleteOpen(true)}
-                  style={{
-                    padding: '2px 8px',
-                    fontSize: 12,
-                    borderRadius: 4,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    backgroundColor: '#EF4444',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                >
-                  <Trash2 size={13} />
-                  Xóa đã chọn
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedProductIds([])}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#64748B',
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                    padding: '0 4px',
-                  }}
-                >
-                  Bỏ chọn
-                </button>
-              </div>
-            )}
-          </div>
-
-        </div>
-
-        {/* Table */}
-        <div className="product-table-scroll supplier-table-scroll-container">
-          <table className="product-main-table">
-            <thead>
-              <tr>
-                <th style={{ width: 36, textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={
-                      filteredProducts.length > 0 &&
-                      selectedProductIds.length === filteredProducts.length
-                    }
-                    onChange={() => {
-                      if (selectedProductIds.length === filteredProducts.length) {
-                        setSelectedProductIds([]);
-                      } else {
-                        setSelectedProductIds(filteredProducts.map((p) => p.id));
-                      }
-                    }}
-                  />
-                </th>
-                <th style={{ width: 36, textAlign: 'center' }}>★</th>
-                <th style={{ width: 180, minWidth: 150 }}>Mã hàng</th>
-                <th>Tên hàng hóa</th>
-                <th style={{ width: 110 }}>Đơn vị tính</th>
-                <th style={{ textAlign: 'right', width: 120 }}>Giá bán</th>
-                {userRole === 'StoreOwner' && (
-                  <th style={{ textAlign: 'right', width: 120 }}>Giá vốn</th>
-                )}
-                <th style={{ textAlign: 'center', width: 130 }}>Trạng thái</th>
-                <th style={{ width: 130 }}>Thời gian tạo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((p, rowIndex) => {
-                const isChecked = selectedProductIds.includes(p.id);
-                const isSelected = selectedProduct?.id === p.id && isDetailModalOpen;
-
-                // Tính toán đơn vị tính đang chọn và giá tương ứng (Ảnh 2 - REQ-07)
-                const allUnits = [
-                  { unitName: p.baseUnit || 'Cái', price: p.sellingPrice ?? 0, barcode: p.barcode, productCode: p.productCode },
-                  ...(p.uomConversions || []),
-                ];
-                const currentUnitName = selectedUnits[p.id] || p.baseUnit || 'Cái';
-                const currentUom = p.uomConversions?.find((u) => u.unitName === currentUnitName);
-                const displayPrice = currentUom ? currentUom.price : (p.sellingPrice ?? 0);
-                const displayCode = currentUom?.productCode || p.productCode;
-                const otherUnits = allUnits.filter((u) => u.unitName !== currentUnitName);
-
-                return (
-                  <tr
-                    key={p.id}
-                    onClick={() => {
-                      setSelectedProduct(p);
-                      setIsDetailModalOpen(true);
-                    }}
-                    style={{
-                      cursor: 'pointer',
-                      backgroundColor: isSelected
-                        ? '#f0fdfa'
-                        : p.status === 'Discontinued'
-                          ? '#f8fafc'
-                          : undefined,
-                      opacity: p.status === 'Discontinued' ? 0.75 : 1,
-                    }}
-                  >
-                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          if (isChecked) {
-                            setSelectedProductIds(selectedProductIds.filter((id) => id !== p.id));
-                          } else {
-                            setSelectedProductIds([...selectedProductIds, p.id]);
-                          }
-                        }}
-                      />
-                    </td>
-                    <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className={`favorite-star-btn ${p.isFavorite ? 'active' : ''}`}
-                        onClick={(e) => handleToggleFavorite(p.id, e)}
-                        title="Đánh dấu yêu thích"
-                      >
-                        {p.isFavorite ? '★' : '☆'}
-                      </button>
-                    </td>
-                    <td style={{ minWidth: 180, width: 220 }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                        {p.imageUrl ? (
-                          <img
-                            src={p.imageUrl}
-                            alt=""
-                            style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 6,
-                              border: '1px dashed #cbd5e1',
-                              backgroundColor: '#f8fafc',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: 10,
-                              color: '#94a3b8',
-                              flexShrink: 0,
-                            }}
-                          >
-                            N/A
-                          </div>
-                        )}
-                        <span className="product-code-link">
-                          {displayCode}
-                        </span>
-                      </div>
-                    </td>
-                    {/* Tên hàng hóa */}
-                    <td>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontWeight: 600, color: '#1e293b' }}>
-                          {p.productName}
-                        </span>
-                        {p.hasBatches && (
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color: '#1d4ed8',
-                              background: '#eff6ff',
-                              border: '1px solid #bfdbfe',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            Lô & HSD
-                          </span>
-                        )}
-                        {p.isCombo && <span className="badge-combo">Combo</span>}
-                        {p.status === 'Discontinued' && (
-                          <span
-                            style={{
-                              marginLeft: 6,
-                              fontSize: 11,
-                              color: '#dc2626',
-                              background: '#fee2e2',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            Ngừng kinh doanh
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    {/* Đơn vị tính (chứa option chuyển đổi ĐVT) */}
-                    <td>
-                      {p.uomConversions && p.uomConversions.length > 0 ? (
-                        <div className="unit-dropdown-container" style={{ position: 'relative', display: 'inline-block' }}>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (activeUnitDropdownId === p.id) {
-                                setActiveUnitDropdownId(null);
-                                setUnitDropdownPos(null);
-                              } else {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const estimatedMenuHeight = Math.max(allUnits.length * 34 + 12, 90);
-                                const isLastRows =
-                                  filteredProducts.length > 1 && rowIndex >= filteredProducts.length - 2;
-                                const openUpward =
-                                  (isLastRows || window.innerHeight - rect.bottom < estimatedMenuHeight + 24) &&
-                                  rect.top > estimatedMenuHeight;
-                                setUnitDropdownPos(
-                                  openUpward
-                                    ? { bottom: window.innerHeight - rect.top + 4, left: rect.left }
-                                    : { top: rect.bottom + 4, left: rect.left }
-                                );
-                                setActiveUnitDropdownId(p.id);
-                              }
-                            }}
-                            style={{
-                              background: '#F0FDFA',
-                              border: '1px solid #CCFBF1',
-                              color: '#0F766E',
-                              fontWeight: 700,
-                              fontSize: 13,
-                              cursor: 'pointer',
-                              padding: '3px 8px',
-                              borderRadius: 6,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              transition: 'all 0.15s ease',
-                            }}
-                            title="Bấm để chuyển đổi đơn vị tính"
-                          >
-                            <span>{currentUnitName}</span>
-                            <ChevronDown
-                              size={13}
-                              style={{
-                                transform: activeUnitDropdownId === p.id ? 'rotate(180deg)' : 'none',
-                                transition: 'transform 0.15s ease',
-                              }}
-                            />
-                          </button>
-
-                          {activeUnitDropdownId === p.id && otherUnits.length > 0 && unitDropdownPos && (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                position: 'fixed',
-                                top: unitDropdownPos.top,
-                                bottom: unitDropdownPos.bottom,
-                                left: unitDropdownPos.left,
-                                zIndex: 9999,
-                                minWidth: 110,
-                                background: '#ffffff',
-                                borderRadius: 8,
-                                boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.18), 0 8px 10px -6px rgba(15, 23, 42, 0.1)',
-                                border: '1px solid #E2E8F0',
-                                padding: '4px 0',
-                              }}
-                            >
-                              {allUnits.map((u) => {
-                                const isSelected = u.unitName === currentUnitName;
-                                return (
-                                  <button
-                                    key={u.unitName}
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedUnits((prev) => ({ ...prev, [p.id]: u.unitName }));
-                                      setActiveUnitDropdownId(null);
-                                    }}
-                                    style={{
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      width: '100%',
-                                      padding: '6px 12px',
-                                      fontSize: 12.5,
-                                      background: isSelected ? '#F0FDFA' : 'transparent',
-                                      color: isSelected ? '#0F766E' : '#334155',
-                                      fontWeight: isSelected ? 700 : 500,
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      whiteSpace: 'nowrap',
-                                      textAlign: 'left',
-                                      gap: 8,
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent';
-                                    }}
-                                  >
-                                    <span>{u.unitName}</span>
-                                    {u.unitName === (p.baseUnit || 'Cái') ? (
-                                      <span style={{ fontSize: 10, color: '#0F766E', background: '#CCFBF1', padding: '1px 4px', borderRadius: 4 }}>
-                                        Cơ bản
-                                      </span>
-                                    ) : null}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{ fontWeight: 600, color: '#0F766E' }}>
-                          {p.baseUnit || 'Cái'}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                      {(displayPrice ?? 0).toLocaleString('vi-VN')} đ
-                    </td>
-                    {userRole === 'StoreOwner' && (
-                      <td style={{ textAlign: 'right', color: '#64748b' }}>
-                        {p.costPrice != null ? `${Number(p.costPrice).toLocaleString('vi-VN')} đ` : '—'}
-                      </td>
-                    )}
-                    <td style={{ textAlign: 'center' }}>
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          padding: '3px 10px',
-                          borderRadius: 9999,
-                          backgroundColor: p.status === 'Active' ? '#f0fdf4' : '#f8fafc',
-                          color: p.status === 'Active' ? '#15803d' : '#64748b',
-                          border: p.status === 'Active' ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {p.status === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: 12.5, color: '#64748b' }}>{p.createdAt}</td>
-                  </tr>
-                );
-              })}
-
-              {filteredProducts.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={userRole === 'StoreOwner' ? 9 : 8}
-                    style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
-                  >
-                    <Package size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
-                    <div style={{ fontSize: 15, fontWeight: 600 }}>Không tìm thấy sản phẩm nào</div>
-                    <div style={{ fontSize: 13, marginTop: 4 }}>
-                      Vui lòng thử tìm với từ khóa khác hoặc đặt lại bộ lọc.
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Enterprise Standard TablePagination */}
-        <TablePagination
-          currentPage={pageIndex}
-          pageSize={pageSize}
-          totalItems={totalCount}
-          pageSizeOptions={[10, 20, 50]}
-          onPageChange={(page) => setPageIndex(page)}
-          onPageSizeChange={(newSize) => {
-            setPageSize(newSize);
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <MasterProductFilterBar
+          initialValues={appliedFilters}
+          products={products}
+          categories={categories}
+          onSearch={(values) => {
+            setAppliedFilters(values);
             setPageIndex(1);
           }}
-          itemLabel="hàng hóa"
-          isLoading={isLoading}
+          onReset={() => {
+            setAppliedFilters(DEFAULT_PRODUCT_FILTERS);
+            setPageIndex(1);
+          }}
+          onExport={handleExport}
+          onImport={handleImport}
+          onPrintBarcode={handlePrintBarcode}
         />
       </div>
+
+      {/* 2. Table — cùng cấu trúc header/body/footer với SP theo NCC */}
+      <MasterProductTable
+        products={filteredProducts}
+        totalCount={totalCount}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        userRole={userRole}
+        isLoading={isLoading}
+        onPageChange={(page) => setPageIndex(page)}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setPageIndex(1);
+        }}
+        onEdit={(prod) => {
+          setProductToEdit(prod);
+          setIsDetailModalOpen(false);
+          setIsProductFormOpen(true);
+        }}
+        onOpenCreate={() => {
+          setProductToEdit(null);
+          setIsProductFormOpen(true);
+        }}
+      />
 
       {/* 3. Product Form Modal (Add / Edit Standard Product) */}
       <ProductFormModal
@@ -1859,7 +782,6 @@ export const ProductListPage: React.FC = () => {
           setCategoryToEdit(null);
           setIsCategoryModalOpen(true);
         }}
-        onDelete={handleDeleteProduct}
         userRole={userRole}
       />
 

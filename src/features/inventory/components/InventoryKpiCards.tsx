@@ -27,7 +27,7 @@ export const InventoryKpiCards: FC<Props> = ({ summary }) => {
     },
     {
       title: 'Đang nhập (On-order)',
-      value: `${fmt(summary.onOrderUnits)} ĐVT`,
+      value: `${fmt(summary.onOrderUnits)} DVN`,
       sub: 'Chờ nhận từ phiếu PO',
       border: '#bae6fd',
       bg: '#f0f9ff',

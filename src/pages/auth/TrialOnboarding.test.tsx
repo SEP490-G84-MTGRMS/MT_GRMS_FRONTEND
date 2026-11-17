@@ -83,6 +83,7 @@ describe('homepage trial onboarding UI & flows', () => {
     fireEvent.change(screen.getByLabelText(/Email nhận mã OTP/i), { target: { value: 'test@gmail.com' } });
     fireEvent.change(screen.getByLabelText(/^Mật khẩu$/i), { target: { value: 'Password@123' } });
     fireEvent.change(screen.getByLabelText(/Xác nhận lại mật khẩu/i), { target: { value: 'Password@123' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Tôi đồng ý với/i }));
 
     fireEvent.click(screen.getByRole('button', { name: /ĐĂNG KÝ MỞ CỬA HÀNG NGAY/i }));
 
@@ -159,6 +160,7 @@ describe('homepage trial onboarding UI & flows', () => {
     fireEvent.change(screen.getByLabelText(/Email nhận mã OTP/i), { target: { value: 'noplan@gmail.com' } });
     fireEvent.change(screen.getByLabelText(/^Mật khẩu$/i), { target: { value: 'Password@123' } });
     fireEvent.change(screen.getByLabelText(/Xác nhận lại mật khẩu/i), { target: { value: 'Password@123' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Tôi đồng ý với/i }));
 
     fireEvent.click(screen.getByRole('button', { name: /ĐĂNG KÝ MỞ CỬA HÀNG NGAY/i }));
     await waitFor(() => expect(sendOtpSpy).toHaveBeenCalledWith(expect.objectContaining({ startTrial: false })));
@@ -242,7 +244,7 @@ describe('homepage trial onboarding UI & flows', () => {
     });
     expect(screen.getByText(/Cần mua gói để sử dụng dịch vụ/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Chọn \/ Mua gói dịch vụ/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Mua gói dịch vụ/i }));
     await waitFor(() => {
       expect(screen.getByTestId('subs-page')).toBeInTheDocument();
     });
@@ -362,14 +364,14 @@ describe('homepage trial onboarding UI & flows', () => {
     expect(screen.queryByTestId('subscription-lock-overlay')).not.toBeInTheDocument();
   });
 
-  it('ProtectedRoute cho phép CASHIER vào /employee/pos khi EXPIRED nhưng phủ khóa nhắc liên hệ Chủ cửa hàng (không có nút thanh toán)', async () => {
+  it('ProtectedRoute cho phép STAFF vào /employee/pos khi EXPIRED nhưng phủ khóa nhắc liên hệ Chủ cửa hàng (không có nút thanh toán)', async () => {
     useAuthStore.setState({
       isAuthenticated: true,
       user: {
         id: 'usr-staff-exp',
         fullName: 'Cashier Expired',
         email: 'cashier-exp@test.vn',
-        role: 'CASHIER',
+        role: 'STAFF',
         tenantId: 't-exp-1',
         isAdmin: false,
       },
@@ -387,7 +389,7 @@ describe('homepage trial onboarding UI & flows', () => {
           <Route
             path="/employee/pos"
             element={
-              <ProtectedRoute allowedRoles={['CASHIER', 'STAFF', 'STORE_OWNER']}>
+              <ProtectedRoute allowedRoles={['STAFF', 'STORE_OWNER']}>
                 <div data-testid="pos-content">POS Content</div>
               </ProtectedRoute>
             }

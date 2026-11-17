@@ -1,30 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import {
   Calculator,
   History,
   BarChart3,
   BookOpen,
-  Plus,
   RotateCcw,
   AlertCircle,
   Calendar,
   Scale,
   Download,
   SlidersHorizontal,
+  KeyRound,
+  MoreHorizontal,
+  X,
 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { useTaxSnapshots } from '../hooks/useTaxSnapshots';
-import { TaxKPICards } from '../components/TaxKPICards';
 import { TaxSnapshotsHistoryView } from '../components/TaxSnapshotsHistoryView';
 import { CreateTaxSnapshotModal } from '../components/CreateTaxSnapshotModal';
+import { SecurityPinModal } from '../components/SecurityPinModal';
 import { TaxRateConfigModal } from '../components/TaxRateConfigModal';
 import { TaxSnapshotDetailDrawer } from '../components/TaxSnapshotDetailDrawer';
 import { TaxExportModal } from '../components/TaxExportModal';
 import { TaxDeclarationFormView } from '../components/TaxDeclarationFormView';
 import { TaxAnalyticsSection } from '../components/TaxAnalyticsSection';
 import { AccountingBooksView } from '../components/AccountingBooksView';
-import { ThresholdRuler } from '../../../components/common/ThresholdRuler';
+import { TaxOverviewCard } from '../components/TaxOverviewCard';
+import { TaxDeclarationPreviewModal } from '../components/TaxDeclarationPreviewModal';
+import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
 import { isUsingMockData, taxSnapshotApi } from '../api/taxSnapshotApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import {
@@ -34,17 +38,23 @@ import {
 } from '../types/taxSnapshot';
 import '../tax-snapshot.css';
 
-type ActiveTaxTab = 'declaration' | 'books' | 'history' | 'analytics';
+type ActiveTaxTab = 'declaration' | 'books';
+type AuxiliaryView = 'history' | 'analytics' | null;
 
 export const TaxSnapshotPage: FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTaxTab>('declaration');
+  const [auxiliaryView, setAuxiliaryView] = useState<AuxiliaryView>(null);
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const [isDeclarationPreviewOpen, setIsDeclarationPreviewOpen] = useState(false);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
+  const auxiliaryDialogRef = useRef<HTMLElement>(null);
   const { user } = useAuthStore();
-  const userRole = (user?.role || '').toUpperCase();
-  const isEmployee = userRole === 'EMPLOYEE' || userRole === 'CASHIER' || userRole === 'STAFF';
+  const canManageTax = user?.role === 'STORE_OWNER';
 
   const {
     summary,
     isSummaryLoading,
+    isSummaryRefetching,
     summaryError,
     refetchSummary,
     snapshots,
@@ -61,14 +71,47 @@ export const TaxSnapshotPage: FC = () => {
 
   // Modals & Drawers
   const [isRateConfigOpen, setIsRateConfigOpen] = useState<boolean>(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
+  const [pinModalInitialTab, setPinModalInitialTab] = useState<'change' | 'reset'>('change');
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState<HouseholdTaxSnapshotDto | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
 
+  // Snapshot hiện tại đã được chốt hay chưa (chỉ lấy bản đang Active/Finalized, loại bỏ bản đã bị Superseded)
+  const existingFinalizedSnapshot = snapshots.find(
+    (s) =>
+      s.year === filterParams.year &&
+      s.periodType === filterParams.periodType &&
+      s.periodNumber === filterParams.periodNumber &&
+      s.status !== 'superseded' &&
+      s.status !== 'Superseded' &&
+      (s.status as any) !== 2 &&
+      (s.status as any) !== '2' &&
+      (s.status === 'finalized' || s.status === 'Finalized' || (s.status as any) === 1 || (s.status as any) === '1' || Boolean(s.auditSignatureHash))
+  );
+
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
+
+  useDialogFocusTrap(Boolean(auxiliaryView), auxiliaryDialogRef, () => setAuxiliaryView(null));
+
+  useEffect(() => {
+    if (!isActionMenuOpen) return;
+    const closeOnOutside = (event: PointerEvent) => {
+      if (!actionMenuRef.current?.contains(event.target as Node)) setIsActionMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsActionMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isActionMenuOpen]);
 
   const handleExportExcel = async () => {
     try {
@@ -115,6 +158,8 @@ export const TaxSnapshotPage: FC = () => {
       periodNumber: req.periodNumber,
       calculationMethod: req.calculationMethod,
       applyVatReduction2026: req.applyVatReduction2026,
+      allowSupersedeExisting: req.allowSupersedeExisting,
+      rectificationReason: req.rectificationReason,
       pinProvided: Boolean(req.pin),
     });
 
@@ -125,7 +170,7 @@ export const TaxSnapshotPage: FC = () => {
         type: 'success',
         message: `Chốt kỳ tính thuế thành công! Mã tham chiếu: ${result.id}`,
       });
-      setActiveTab('history');
+      setAuxiliaryView('history');
       return result;
     } catch (err: any) {
       setToast({
@@ -172,7 +217,8 @@ export const TaxSnapshotPage: FC = () => {
           </div>
         )}
 
-        {/* Top Header Banner */}
+        {/* Desktop: controls on the left, annual overview on the right. */}
+        <div className="tax-hero-grid">
         <div className="tax-topbar-wrapper">
           <div className="tax-topbar-container">
             <div className="tax-topbar-title-group">
@@ -201,15 +247,13 @@ export const TaxSnapshotPage: FC = () => {
                       : 'Nhóm 2: 1 – 3 tỷ (Sổ S2a)'}
                   </span>
                 </div>
-                <p className="tax-topbar-subtitle">
-                  Kiểm soát ngưỡng 1 tỷ, quản lý kê khai thuế và hệ thống 7 sổ kế toán HKD (Thông tư 152/2025/TT-BTC).
-                </p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div className="tax-topbar-actions">
               {/* Period Selector: Type & Number */}
               <div
+                className="tax-period-selector"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -306,81 +350,58 @@ export const TaxSnapshotPage: FC = () => {
                 </select>
               </div>
 
-              {/* Tax Rate Config Button (Ẩn đối với Employee) */}
-              {!isEmployee && (
-                <button
-                  type="button"
-                  onClick={() => setIsRateConfigOpen(true)}
-                  className="btn-secondary-pill"
-                  title="Cấu hình mức thuế suất GTGT, TNCN và chính sách giảm thuế"
-                  style={{
-                    position: 'relative',
-                    ...(filterParams.customVatRate != null || filterParams.customPitRate != null
-                      ? {
-                          borderColor: '#0F766E',
-                          color: '#0F766E',
-                          background: '#F0FDFA',
-                          fontWeight: 700,
-                        }
-                      : {}),
-                  }}
-                >
-                  <SlidersHorizontal size={15} />
-                  <span>Cấu hình thuế</span>
-                  {(filterParams.customVatRate != null || filterParams.customPitRate != null) && (
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: '#0F766E',
-                        display: 'inline-block',
-                        marginLeft: 2,
-                      }}
-                    />
-                  )}
-                </button>
-              )}
-
-              {/* Refresh Button */}
               <button
                 type="button"
-                onClick={() => refetchSummary()}
-                disabled={isSummaryLoading}
-                className="btn-secondary-pill"
-                title="Cập nhật số liệu mới nhất từ quầy thu ngân"
+                className="btn-secondary-pill tax-refresh-button"
+                disabled={isSummaryLoading || isSummaryRefetching}
+                onClick={() => { void refetchSummary(); }}
+                title="Cập nhật số liệu"
               >
-                <RotateCcw size={15} className={isSummaryLoading ? 'animate-spin' : ''} />
-                <span>Làm mới</span>
+                <RotateCcw size={14} className={isSummaryRefetching ? 'tax-refresh-icon spinning' : 'tax-refresh-icon'} />
+                <span>{isSummaryRefetching ? 'Đang cập nhật' : 'Cập nhật'}</span>
               </button>
-
-              {/* Export Excel Button (Ẩn đối với Employee) */}
-              {!isEmployee && (
+              <div ref={actionMenuRef} className="tax-actions-menu-wrap">
                 <button
                   type="button"
-                  onClick={handleExportExcel}
-                  disabled={isExportingExcel || isSummaryLoading}
-                  className="btn-secondary-pill"
-                  title="Xuất bảng tính Excel 4 sheet phẳng phục vụ đối chiếu"
+                  className="btn-secondary-pill tax-actions-menu-trigger"
+                  aria-label="Thao tác khác"
+                  aria-haspopup="menu"
+                  aria-expanded={isActionMenuOpen}
+                  onClick={() => setIsActionMenuOpen((value) => !value)}
                 >
-                  <Download size={15} />
-                  <span>{isExportingExcel ? 'Đang xuất...' : 'Xuất Excel'}</span>
+                  <MoreHorizontal size={18} />
                 </button>
-              )}
+                {isActionMenuOpen && (
+                  <div className="tax-actions-menu" role="menu">
+                    <button type="button" role="menuitem" onClick={() => { setAuxiliaryView('history'); setIsActionMenuOpen(false); }}>
+                      <History size={16} /> Lịch sử chốt kỳ <span>{snapshots.length}</span>
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => { setAuxiliaryView('analytics'); setIsActionMenuOpen(false); }}>
+                      <BarChart3 size={16} /> Phân tích doanh thu &amp; thuế
+                    </button>
+                    <div className="tax-actions-menu-separator" />
+                    {canManageTax && <button type="button" role="menuitem" onClick={() => { setIsRateConfigOpen(true); setIsActionMenuOpen(false); }}><SlidersHorizontal size={16} /> Cấu hình thuế</button>}
+                    {canManageTax && <button type="button" role="menuitem" onClick={() => { setPinModalInitialTab('change'); setIsPinModalOpen(true); setIsActionMenuOpen(false); }}><KeyRound size={16} /> Mã PIN bảo mật</button>}
+                    {canManageTax && <button type="button" role="menuitem" disabled={isExportingExcel || isSummaryLoading} onClick={() => { void handleExportExcel(); setIsActionMenuOpen(false); }}><Download size={16} /> {isExportingExcel ? 'Đang xuất…' : 'Xuất báo cáo Excel'}</button>}
+                  </div>
+                )}
+              </div>
 
               {/* Finalize Button (Ẩn đối với Employee) */}
-              {!isEmployee && (
+              {canManageTax && (
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(true)}
                   className="btn-primary-pill"
                 >
-                  <Plus size={16} />
-                  <span>🔐 Chốt kỳ sổ {periodLabel} (3 bước)</span>
+                  <span>Chốt kỳ sổ {periodLabel}</span>
                 </button>
               )}
             </div>
           </div>
+        </div>
+
+        <TaxOverviewCard summary={summary} isLoading={isSummaryLoading} />
         </div>
 
         {/* Error Retry Banner */}
@@ -426,60 +447,35 @@ export const TaxSnapshotPage: FC = () => {
           </div>
         )}
 
-        {/* 1. Thước đo ngưỡng 1 tỷ đồng/năm (Threshold Ruler đặt ở đầu trang theo quy định BTC) */}
-        <ThresholdRuler
-          currentYtdRevenue={summary?.annualAccumulatedRevenue ?? 0}
-          threshold={summary?.taxExemptionThreshold ?? 1_000_000_000}
-          year={filterParams.year}
-          periodType={filterParams.periodType}
-          periodNumber={filterParams.periodNumber}
-          householdGroup={summary?.householdGroup}
-        />
-
-        {/* 2. Top 5 KPI Cards */}
-        <TaxKPICards summary={summary} isLoading={isSummaryLoading} />
-
-        {/* 3. 4 Standardized TT152 Segmented Tabs */}
-        <div className="tax-segmented-tabs">
+        <div className="tax-segmented-tabs" role="tablist" aria-label="Khu vực thuế">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'declaration'}
+            aria-controls="tax-panel-declaration"
             className={`tax-segmented-tab-btn ${activeTab === 'declaration' ? 'active' : ''}`}
             onClick={() => setActiveTab('declaration')}
           >
             <Calculator size={16} />
-            <span>Tờ khai 01/CNKD</span>
+            <span>Tờ khai thuế</span>
           </button>
 
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'books'}
+            aria-controls="tax-panel-books"
             className={`tax-segmented-tab-btn ${activeTab === 'books' ? 'active' : ''}`}
             onClick={() => setActiveTab('books')}
           >
             <BookOpen size={16} />
-            <span>7 Sổ kế toán TT152</span>
-          </button>
-
-          <button
-            type="button"
-            className={`tax-segmented-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            <History size={16} />
-            <span>Chốt sổ bất biến (HMAC) ({snapshots.length})</span>
-          </button>
-
-          <button
-            type="button"
-            className={`tax-segmented-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-            onClick={() => setActiveTab('analytics')}
-          >
-            <BarChart3 size={16} />
-            <span>Phân tích 4 Quý</span>
+            <span>Sổ kế toán <small>· 7 mẫu</small></span>
           </button>
         </div>
 
         {/* Tab 1: Declaration & Method View */}
         {activeTab === 'declaration' && (
+          <section id="tax-panel-declaration" role="tabpanel">
           <TaxDeclarationFormView
             summary={summary}
             calculationMethod={filterParams.calculationMethod}
@@ -488,48 +484,56 @@ export const TaxSnapshotPage: FC = () => {
             customVatRate={filterParams.customVatRate}
             customPitRate={filterParams.customPitRate}
             vatReductionPercentage={filterParams.vatReductionPercentage}
-            onOpenRateConfig={() => setIsRateConfigOpen(true)}
+            onPreviewDeclaration={() => setIsDeclarationPreviewOpen(true)}
             onToggleVatReduction={setApplyVatReduction}
             isLoading={isSummaryLoading}
+            isRefreshing={isSummaryRefetching}
           />
+          </section>
         )}
 
         {/* Tab 2: Accounting Books View */}
         {activeTab === 'books' && (
+          <section id="tax-panel-books" role="tabpanel">
           <AccountingBooksView
             summary={summary}
             year={filterParams.year}
             periodType={filterParams.periodType}
             periodNumber={filterParams.periodNumber}
           />
-        )}
-
-        {/* Tab 3: Historical Snapshots Table (Bản chụp chốt sổ bất biến HMAC-SHA256) */}
-        {activeTab === 'history' && (
-          <TaxSnapshotsHistoryView
-            snapshots={snapshots as any}
-            isLoading={isSnapshotsLoading}
-            onOpenSealWizard={() => setIsCreateOpen(true)}
-            onViewDetail={(snap: any) => {
-              setSelectedSnapshot(snap);
-              setIsDrawerOpen(true);
-            }}
-            onExport={(snap: any) => {
-              setSelectedSnapshot(snap);
-              setIsExportOpen(true);
-            }}
-          />
-        )}
-
-        {/* Tab 4: Analytics */}
-        {activeTab === 'analytics' && (
-          <TaxAnalyticsSection
-            snapshots={snapshots as any}
-            year={filterParams.year}
-            periodType={filterParams.periodType}
-          />
+          </section>
         )}
       </div>
+
+      {auxiliaryView && (
+        <div className="tax-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAuxiliaryView(null); }}>
+          <section ref={auxiliaryDialogRef} className="tax-auxiliary-modal" role="dialog" aria-modal="true" aria-labelledby="tax-auxiliary-title">
+            <header className="tax-auxiliary-header">
+              <div><h2 id="tax-auxiliary-title">{auxiliaryView === 'history' ? 'Lịch sử chốt kỳ' : 'Phân tích doanh thu & thuế'}</h2><p>{periodLabel}</p></div>
+              <button type="button" className="tax-drawer-close-btn" aria-label="Đóng" onClick={() => setAuxiliaryView(null)}><X size={18} /></button>
+            </header>
+            <div className="tax-auxiliary-body">
+              {auxiliaryView === 'history' ? (
+                <TaxSnapshotsHistoryView
+                  snapshots={snapshots as any}
+                  isLoading={isSnapshotsLoading}
+                  onOpenSealWizard={() => setIsCreateOpen(true)}
+                  onViewDetail={(snap: any) => { setSelectedSnapshot(snap); setIsDrawerOpen(true); }}
+                  onExport={(snap: any) => { setSelectedSnapshot(snap); setIsExportOpen(true); }}
+                />
+              ) : (
+                <TaxAnalyticsSection snapshots={snapshots as any} year={filterParams.year} periodType={filterParams.periodType} />
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      <TaxDeclarationPreviewModal
+        isOpen={isDeclarationPreviewOpen}
+        filter={filterParams}
+        onClose={() => setIsDeclarationPreviewOpen(false)}
+      />
 
       {/* Finalize Modal */}
       {isCreateOpen && (
@@ -542,9 +546,28 @@ export const TaxSnapshotPage: FC = () => {
           customVatRate={filterParams.customVatRate}
           customPitRate={filterParams.customPitRate}
           vatReductionPercentage={filterParams.vatReductionPercentage}
+          existingFinalizedSnapshot={existingFinalizedSnapshot}
+          onOpenPinModal={(tab) => {
+            setPinModalInitialTab(tab || 'change');
+            setIsPinModalOpen(true);
+          }}
           onSubmit={handleCreateSnapshot}
         />
       )}
+
+      {/* Security PIN Modal */}
+      <SecurityPinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        initialTab={pinModalInitialTab}
+        onSuccess={(msg) => {
+          setToast({
+            id: `toast-${Date.now()}`,
+            type: 'success',
+            message: msg,
+          });
+        }}
+      />
 
       {/* Tax Rate Config Modal */}
       <TaxRateConfigModal

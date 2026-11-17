@@ -85,7 +85,7 @@ export const InventoryListPage: FC = () => {
       'Ngành hàng',
       'Chi nhánh',
       'Vị trí kệ',
-      'ĐVT',
+      'DVN',
       'OnHand',
       'Committed',
       'Available',

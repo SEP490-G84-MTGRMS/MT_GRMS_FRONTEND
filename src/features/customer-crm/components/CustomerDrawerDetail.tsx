@@ -10,11 +10,10 @@ import {
   Building,
   QrCode,
   Edit2,
-  ShieldAlert,
   History,
 } from 'lucide-react';
 import type { CustomerDto } from '../types/customer.types';
-import { sanitizeCustomerText, normalizeDebtLimit } from '../utils/customerValidation';
+import { sanitizeCustomerText } from '../utils/customerValidation';
 
 interface CustomerDrawerDetailProps {
   customer: CustomerDto | null;
@@ -47,14 +46,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
 
   const safeFullName = sanitizeCustomerText(customer.fullName, 'Khách hàng');
   const safeAddress = sanitizeCustomerText(customer.address, 'Chưa cập nhật');
-  const safeDebtLimit = normalizeDebtLimit(customer.debtLimit);
   const safeDebt = Math.max(0, Number(customer.currentDebtAR) || 0);
-
-  const debtPercent =
-    safeDebtLimit > 0
-      ? Math.min(100, Math.round((safeDebt / safeDebtLimit) * 100))
-      : 0;
-  const isOverLimit = safeDebt > safeDebtLimit && safeDebtLimit > 0;
   const hasDebt = safeDebt > 0;
 
   return (
@@ -71,9 +63,6 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                 <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main, #111827)' }}>
                   {safeFullName}
                 </h3>
-                <span className={`tier-badge tier-badge-${customer.membershipTier.toLowerCase()}`}>
-                  {customer.membershipTier}
-                </span>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b', fontFamily: 'var(--font-mono, monospace)' }}>
                 {customer.phoneNumber}
@@ -101,30 +90,12 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                   fontSize: '1.2rem',
                   fontWeight: 800,
                   fontFamily: 'var(--font-mono, monospace)',
-                  color: isOverLimit ? '#DC2626' : hasDebt ? '#D97706' : '#059669',
+                  color: hasDebt ? '#D97706' : '#059669',
                 }}
               >
                 {formatCurrency(customer.currentDebtAR)}
               </p>
               <div style={{ marginTop: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#94a3b8', marginBottom: '4px' }}>
-                  <span>Hạn mức: {formatCurrency(safeDebtLimit)}</span>
-                  <span style={{ fontWeight: isOverLimit ? 700 : 500, color: isOverLimit ? '#DC2626' : 'inherit' }}>
-                    {debtPercent}%
-                  </span>
-                </div>
-                <div className="debt-progress-bar">
-                  <div
-                    className={`debt-progress-fill ${
-                      isOverLimit
-                        ? 'debt-fill-danger'
-                        : debtPercent > 80
-                        ? 'debt-fill-warning'
-                        : 'debt-fill-safe'
-                    }`}
-                    style={{ width: `${debtPercent}%` }}
-                  />
-                </div>
                 {onViewLedger && (
                   <button
                     type="button"
@@ -133,7 +104,6 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                       display: 'inline-flex',
                       alignItems: 'center',
                       gap: '4px',
-                      marginTop: '10px',
                       padding: '4px 10px',
                       borderRadius: '8px',
                       border: '1px solid #0F766E',
@@ -175,29 +145,6 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
               </div>
             </div>
           </div>
-
-          {/* Over-limit Warning Banner */}
-          {isOverLimit && (
-            <div
-              style={{
-                padding: '10px 14px',
-                background: '#FEF2F2',
-                border: '1px solid #FECACA',
-                borderRadius: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.78rem',
-                color: '#DC2626',
-                marginBottom: '10px',
-              }}
-            >
-              <ShieldAlert className="w-4 h-4" style={{ flexShrink: 0 }} />
-              <span>
-                Cảnh báo: Khách hàng đã vượt hạn mức nợ cho phép ({formatCurrency(safeDebtLimit)}). Vui lòng thu hồi nợ trước khi xuất bán thêm.
-              </span>
-            </div>
-          )}
 
           {/* Navigation Tabs */}
           <div className="customer-drawer-tabs" style={{ background: 'transparent', padding: 0 }}>
@@ -313,11 +260,11 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                           borderRadius: '9999px',
                           fontSize: '0.7rem',
                           fontWeight: 600,
-                          background: inv.status === 'Paid' ? '#ECFDF5' : '#FEF3C7',
-                          color: inv.status === 'Paid' ? '#059669' : '#B45309',
+                          background: '#FEF3C7',
+                          color: '#B45309',
                         }}
                       >
-                        {inv.status === 'Paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                        Bán nợ
                       </span>
                     </div>
                   </div>

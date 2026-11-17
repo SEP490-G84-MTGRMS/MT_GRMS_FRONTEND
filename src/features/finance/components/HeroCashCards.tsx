@@ -2,6 +2,7 @@ import React from 'react';
 import { TrendingUp, DollarSign, Lock, Building2, Truck, AlertTriangle, CheckCircle } from 'lucide-react';
 import { formatMoney } from '../utils/formatters';
 import type { CashAccount } from '../../cashbook/types/cashbook.types';
+import type { BackendCashbookSummaryResponse } from '../../cashbook/services/cashbookService';
 
 export interface CashMetrics {
   cashAtRegisters: number;
@@ -19,6 +20,7 @@ interface HeroCashCardsProps {
   isLoading: boolean;
   metrics: CashMetrics;
   accounts?: CashAccount[];
+  cashSummary?: BackendCashbookSummaryResponse;
   onNavigateCashbook?: () => void;
   onNavigateCashControl?: () => void;
 }
@@ -31,6 +33,7 @@ export const HeroCashCards: React.FC<HeroCashCardsProps> = ({
   isLoading,
   metrics,
   accounts = [],
+  cashSummary,
   onNavigateCashbook,
   onNavigateCashControl,
 }) => {
@@ -72,6 +75,37 @@ export const HeroCashCards: React.FC<HeroCashCardsProps> = ({
             <span>Dữ liệu thực từ sổ quỹ &amp; tài khoản ngân hàng</span>
           </div>
         </div>
+
+        {/* Integrated Cashflow Equation Band */}
+        {cashSummary && (
+          <div className="finance-cashflow-equation">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#64748B', fontWeight: 500 }}>Đầu kỳ có:</span>
+              <strong style={{ color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                {formatMoney(cashSummary.totalOpeningBalance || 0)}
+              </strong>
+            </div>
+
+            <span aria-hidden="true">+</span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#64748B', fontWeight: 500 }}>Tiền vào:</span>
+              <strong style={{ color: '#059669', fontVariantNumeric: 'tabular-nums' }}>
+                +{formatMoney(cashSummary.totalReceipts || 0)}
+              </strong>
+            </div>
+
+            <span aria-hidden="true">−</span>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#64748B', fontWeight: 500 }}>Tiền ra:</span>
+              <strong style={{ color: '#E11D48', fontVariantNumeric: 'tabular-nums' }}>
+                −{formatMoney(cashSummary.totalPayments || 0)}
+              </strong>
+            </div>
+
+          </div>
+        )}
       </div>
 
       {/* Hero Cash Cards Strip (Individual Accounts Grid) */}
@@ -174,9 +208,6 @@ export const HeroCashCards: React.FC<HeroCashCardsProps> = ({
                 Đã nhận đủ về két sắt cửa hàng (0 đ đang chuyển)
               </span>
             )}
-          </div>
-          <div className="finance-acc-sub mt-auto pt-2 border-t border-dashed border-slate-200">
-            {`Tổng quỹ sẵn có: ${formatMoney(metrics.totalAssets)}`}
           </div>
         </div>
       </div>

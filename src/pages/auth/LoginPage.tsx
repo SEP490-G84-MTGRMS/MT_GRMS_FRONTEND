@@ -61,7 +61,7 @@ export const LoginPage: FC = () => {
     if (user.isAdmin || user.role === "ADMIN") {
       navigate("/admin/dashboard");
     } else if (user.role === "STAFF") {
-      navigate("/employee/schedule");
+      navigate("/employee/attendance");
     } else if (user.role === "CASHIER" || user.role === "EMPLOYEE") {
       navigate("/pos");
     } else {

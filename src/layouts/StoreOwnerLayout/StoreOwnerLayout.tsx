@@ -12,8 +12,11 @@ export const StoreOwnerLayout: FC = () => {
     return <Navigate to={`/auth/login?redirect=${encodeURIComponent(currentPath)}`} replace />;
   }
 
-  // Role Guard: Nhân viên (STAFF) không được phép truy cập cổng quản trị của Chủ cửa hàng
-  if (user.role === 'STAFF') {
+  if (user.role === 'ADMIN') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+
+  if (user.role !== 'STORE_OWNER') {
     return <Navigate to="/employee/schedule" replace />;
   }
 
@@ -47,7 +50,7 @@ export const StoreOwnerLayout: FC = () => {
           minHeight: 0,
         }}
       >
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['STORE_OWNER']}>
           <Outlet />
         </ProtectedRoute>
       </main>

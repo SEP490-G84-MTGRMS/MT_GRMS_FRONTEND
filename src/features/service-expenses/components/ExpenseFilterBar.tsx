@@ -1,5 +1,5 @@
-import { type FC, useEffect, useState } from 'react';
-import { SearchIcon, RefreshIcon } from '../../admin/components';
+import { type FC, useEffect, useState, type KeyboardEvent } from 'react';
+import { Search, RotateCcw, X } from 'lucide-react';
 import { employeeApi } from '../../employee/api/employeeApi';
 import {
   EXPENSE_CATEGORY_LABELS,
@@ -12,7 +12,7 @@ import {
   type PeriodType,
 } from '../utils/datePeriodUtils';
 
-interface ExpenseFilterBarProps {
+export interface ExpenseFilterBarProps {
   filters: ExpenseFilterParams;
   onFilterChange: (updated: Partial<ExpenseFilterParams>) => void;
   onReset: () => void;
@@ -57,17 +57,6 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
     setSearchInput(filters.keyword || '');
   }, [filters.keyword]);
 
-  // Debounce search input by 300ms
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      if (searchInput !== (filters.keyword || '')) {
-        onFilterChange({ keyword: searchInput });
-      }
-    }, 300);
-
-    return () => clearTimeout(handler);
-  }, [searchInput, filters.keyword, onFilterChange]);
-
   // Apply date range according to selected period
   const applyPeriod = (
     period: PeriodType,
@@ -109,19 +98,15 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
     applyPeriod('custom', undefined, f, t);
   };
 
-  const STATUS_CHIPS: { id: ExpenseQuickStatus; label: string }[] = [
-    { id: 'ALL', label: 'Tất cả' },
-    { id: 'PENDING_APPROVAL', label: 'Chờ duyệt' },
-    { id: 'PENDING_PAYMENT', label: 'Chờ thanh toán' },
-    { id: 'PAID', label: 'Đã thanh toán' },
-    { id: 'SUSPICIOUS', label: 'Bất thường' },
-  ];
+  const handleManualSearch = () => {
+    onFilterChange({ keyword: searchInput });
+  };
 
-  const handleChipClick = (id: ExpenseQuickStatus) => {
-    onFilterChange({
-      quickStatus: id,
-      status: id === 'PAID' ? 'Paid' : id === 'PENDING_PAYMENT' ? 'Pending' : undefined,
-    });
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleManualSearch();
+    }
   };
 
   const handleReset = () => {
@@ -137,110 +122,98 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
     onFilterChange({
       quickStatus: 'ALL',
       status: undefined,
+      keyword: '',
+      category: undefined,
+      branchId: undefined,
+      fromDate: range.fromDate,
+      toDate: range.toDate,
     });
     onReset();
   };
 
+  const isFiltered =
+    Boolean(searchInput) ||
+    Boolean(filters.category) ||
+    Boolean(filters.branchId) ||
+    Boolean(filters.status) ||
+    (filters.quickStatus && filters.quickStatus !== 'ALL') ||
+    selectedPeriod !== 'this-month';
+
   return (
-    <div className="expense-filter-bar">
-      <div className="expense-filter-inputs">
-        {/* Search Bar with Debounce */}
-        <div className="expense-search-wrapper">
-          <div className="expense-search-icon">
-            <SearchIcon size={16} color="#94a3b8" />
+    <div className="so-list-filter" style={{ marginBottom: 8 }}>
+      {/* ── ROW 1: 4 columns CSS Grid (~38px) ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '10px 14px',
+          alignItems: 'center',
+        }}
+      >
+        {/* Col 1: Search voucher code / description / vendor */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Chứng từ:</span>
+          <div style={{ position: 'relative', width: '100%', minWidth: 0 }}>
+            <input
+              type="text"
+              className="so-list-filter-input"
+              style={{ width: '100%', minWidth: 0, paddingLeft: 28, paddingRight: 24 }}
+              placeholder="Mã phiếu, NCC, diễn giải..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+            <Search
+              size={13}
+              style={{
+                position: 'absolute',
+                left: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#94a3b8',
+                pointerEvents: 'none',
+              }}
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  onFilterChange({ keyword: '' });
+                }}
+                title="Xóa ô tìm kiếm"
+                style={{
+                  position: 'absolute',
+                  right: 6,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: 2,
+                  display: 'inline-flex',
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Tìm theo mã chi phí, nhà cung cấp, nội dung..."
-            className="expense-search-input"
-          />
         </div>
 
-        {/* Period Selector (Tháng này, tháng trước, quý này, tùy chỉnh...) */}
-        <div>
+        {/* Col 2: Expense category dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Danh mục:</span>
           <select
-            value={selectedPeriod}
-            onChange={(e) => handlePeriodSelect(e.target.value as PeriodType)}
-            aria-label="Kỳ thời gian"
-            className="expense-filter-select"
-            style={{ fontWeight: 600, color: 'var(--blue-primary, #0F766E)' }}
-          >
-            <option value="this-month">Tháng này ({calculatePeriodRange('this-month').label})</option>
-            <option value="last-month">Tháng trước ({calculatePeriodRange('last-month').label})</option>
-            <option value="this-quarter">Quý này ({calculatePeriodRange('this-quarter').label})</option>
-            <option value="this-year">Năm nay ({calculatePeriodRange('this-year').label})</option>
-            <option value="by-month">Chọn tháng bất kỳ...</option>
-            <option value="custom">Tùy chọn khoảng ngày...</option>
-            <option value="all">Toàn bộ thời gian</option>
-          </select>
-        </div>
-
-        {/* Specific Month Picker when 'by-month' is selected */}
-        {selectedPeriod === 'by-month' && (
-          <div>
-            <input
-              type="month"
-              value={customMonth}
-              onChange={(e) => handleCustomMonthChange(e.target.value)}
-              className="expense-date-input"
-              title="Chọn tháng cụ thể"
-            />
-          </div>
-        )}
-
-        {/* Custom Date Range Picker when 'custom' is selected */}
-        {selectedPeriod === 'custom' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <input
-              type="date"
-              value={customFrom}
-              onChange={(e) => handleCustomDateChange(e.target.value, undefined)}
-              className="expense-date-input"
-              placeholder="Từ ngày"
-              title="Từ ngày"
-            />
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>-</span>
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => handleCustomDateChange(undefined, e.target.value)}
-              className="expense-date-input"
-              placeholder="Đến ngày"
-              title="Đến ngày"
-            />
-          </div>
-        )}
-
-        {/* Branch Selection */}
-        <div>
-          <select
-            value={filters.branchId || ''}
-            onChange={(e) => onFilterChange({ branchId: e.target.value || undefined })}
-            aria-label="Lọc theo chi nhánh"
-            className="expense-filter-select"
-          >
-            <option value="">Tất cả chi nhánh</option>
-            {activeBranches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Category Selection */}
-        <div>
-          <select
+            className={`so-list-filter-select ${filters.category ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
             value={filters.category || ''}
             onChange={(e) =>
               onFilterChange({ category: (e.target.value as ExpenseCategory) || undefined })
             }
-            aria-label="Lọc theo danh mục"
-            className="expense-filter-select"
+            title="Lọc theo danh mục chi phí"
           >
-            <option value="">Tất cả danh mục chi</option>
+            <option value="">-- Tất cả danh mục chi --</option>
             {(Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => (
               <option key={cat} value={cat}>
                 {EXPENSE_CATEGORY_LABELS[cat]}
@@ -249,34 +222,175 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
           </select>
         </div>
 
-        {/* 5 Quick Chips (Pill buttons): Tất cả | Chờ duyệt | Chờ thanh toán | Đã thanh toán | Bất thường */}
-        <div className="expense-quick-chips">
-          {STATUS_CHIPS.map((chip) => {
-            const isActive = (filters.quickStatus || 'ALL') === chip.id;
-            return (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => handleChipClick(chip.id)}
-                className={`expense-pill-btn ${isActive ? 'active' : ''}`}
-              >
-                {chip.label}
-              </button>
-            );
-          })}
+        {/* Col 3: Branch dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Chi nhánh:</span>
+          <select
+            className={`so-list-filter-select ${filters.branchId ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
+            value={filters.branchId || ''}
+            onChange={(e) => onFilterChange({ branchId: e.target.value || undefined })}
+            title="Lọc theo chi nhánh"
+          >
+            <option value="">-- Tất cả chi nhánh --</option>
+            {activeBranches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Col 4: Payment status dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Thanh toán:</span>
+          <select
+            className={`so-list-filter-select ${filters.status ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
+            value={filters.status || ''}
+            onChange={(e) => {
+              const s = (e.target.value as 'Pending' | 'Paid' | 'Cancelled') || undefined;
+              onFilterChange({
+                status: s,
+              });
+            }}
+            title="Lọc theo trạng thái thanh toán"
+          >
+            <option value="">-- Tất cả trạng thái --</option>
+            <option value="Pending">Chờ thanh toán</option>
+            <option value="Paid">Đã thanh toán</option>
+            <option value="Cancelled">Đã hủy</option>
+          </select>
         </div>
       </div>
 
-      {/* Reset Filter Button */}
-      <button
-        type="button"
-        onClick={handleReset}
-        className="btn-secondary-pill"
-        title="Đặt lại bộ lọc về mặc định"
+      {/* ── ROW 2: 4 columns CSS Grid (~38px) ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '10px 14px',
+          alignItems: 'center',
+          paddingTop: 8,
+          borderTop: '1px dashed #f1f5f9',
+        }}
       >
-        <RefreshIcon size={14} color="currentColor" />
-        <span>Đặt lại</span>
-      </button>
+        {/* Col 1: Expense period / date range */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Thời gian:</span>
+          <select
+            className={`so-list-filter-select ${selectedPeriod !== 'this-month' ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
+            value={selectedPeriod}
+            onChange={(e) => handlePeriodSelect(e.target.value as PeriodType)}
+            title="Kỳ thời gian báo cáo"
+          >
+            <option value="this-month">Tháng này</option>
+            <option value="last-month">Tháng trước</option>
+            <option value="this-quarter">Quý này</option>
+            <option value="this-year">Năm nay</option>
+            <option value="by-month">Chọn tháng cụ thể...</option>
+            <option value="custom">Tùy chọn khoảng ngày...</option>
+            <option value="all">Toàn bộ thời gian</option>
+          </select>
+        </div>
+
+        {/* Col 2: Approval status / Anti-Splitting dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Duyệt chi:</span>
+          <select
+            className={`so-list-filter-select ${filters.quickStatus === 'PENDING_APPROVAL' || filters.quickStatus === 'SUSPICIOUS' ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
+            value={
+              filters.quickStatus === 'PENDING_APPROVAL' || filters.quickStatus === 'SUSPICIOUS'
+                ? filters.quickStatus
+                : 'ALL'
+            }
+            onChange={(e) => {
+              const val = e.target.value as ExpenseQuickStatus;
+              onFilterChange({ quickStatus: val });
+            }}
+            title="Lọc trạng thái duyệt chi hoặc dấu hiệu nghi vấn"
+          >
+            <option value="ALL">-- Tất cả duyệt chi --</option>
+            <option value="PENDING_APPROVAL">Chờ duyệt chi</option>
+            <option value="SUSPICIOUS">Nghi vấn chẻ nhỏ (Anti-Splitting)</option>
+          </select>
+        </div>
+
+        {/* Col 3: Custom Month / Date range or Filter Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          {selectedPeriod === 'by-month' ? (
+            <input
+              type="month"
+              value={customMonth}
+              onChange={(e) => handleCustomMonthChange(e.target.value)}
+              className="so-list-filter-input"
+              style={{ width: '100%', minWidth: 0 }}
+              title="Chọn tháng cụ thể"
+            />
+          ) : selectedPeriod === 'custom' ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', minWidth: 0 }}>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => handleCustomDateChange(e.target.value, undefined)}
+                className="so-list-filter-input"
+                style={{ width: '48%', minWidth: 0, height: 28, fontSize: 11 }}
+                title="Từ ngày"
+              />
+              <span style={{ fontSize: 11, color: '#64748b' }}>-</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => handleCustomDateChange(undefined, e.target.value)}
+                className="so-list-filter-input"
+                style={{ width: '48%', minWidth: 0, height: 28, fontSize: 11 }}
+                title="Đến ngày"
+              />
+            </div>
+          ) : isFiltered ? (
+            <span
+              style={{
+                fontSize: 11,
+                color: '#0f766e',
+                fontWeight: 700,
+                backgroundColor: '#ccfbf1',
+                padding: '3px 8px',
+                borderRadius: 999,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Đang lọc
+            </span>
+          ) : null}
+        </div>
+
+        {/* Col 4: Action buttons */}
+        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end', width: '100%', gap: 8 }}>
+          <button
+            type="button"
+            className="so-list-filter-search"
+            onClick={handleManualSearch}
+            title="Tìm kiếm theo điều kiện đã chọn"
+          >
+            <Search size={14} />
+            <span>Tìm kiếm</span>
+          </button>
+          <button
+            type="button"
+            className="so-list-filter-reset"
+            onClick={handleReset}
+            title="Đặt lại toàn bộ bộ lọc"
+          >
+            <RotateCcw size={13} />
+            <span>Đặt lại</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
+
+export default ExpenseFilterBar;
+

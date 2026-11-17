@@ -203,4 +203,3 @@ export const PosProductSearchInput: FC<Props> = ({
     </div>
   );
 };
-

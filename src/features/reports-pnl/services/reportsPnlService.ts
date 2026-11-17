@@ -686,6 +686,9 @@ export const reportsPnlService = {
     } else if (params.presetPeriod === 'THIS_QUARTER') {
       baseGross = 1650000000 * branchMultiplier;
       daysCount = 12;
+    } else if (params.presetPeriod === 'THIS_YEAR') {
+      baseGross = 6200000000 * branchMultiplier;
+      daysCount = 365;
     }
 
     const grossSales = Math.round(baseGross);

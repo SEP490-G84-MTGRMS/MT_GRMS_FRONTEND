@@ -1,4 +1,7 @@
-export type TransferStatus = 'Draft' | 'In-Transit' | 'Received' | 'Cancelled';
+export type TransferStatus = 'Draft' | 'Pending' | 'InTransit' | 'Completed' | 'Cancelled';
+export type TransferCompletionResult = 'Received' | 'ReceivedWithDiscrepancy' | 'Returned' | 'Partial';
+export type TransferOrigin = 'OwnerAllocation' | 'StaffUrgentRequest';
+export type TransferPriority = 'Normal' | 'Urgent';
 
 export interface Branch {
   id: string;
@@ -26,6 +29,7 @@ export interface TransferItem {
   onHandReceiver: number;
   sentQty: number;
   receivedQty?: number;
+  damagedQty?: number;
   unitPrice: number;
   amount: number;
   batchNumber?: string;
@@ -47,12 +51,18 @@ export interface TransferOrder {
   receiveDate?: string;
   expectedDeliveryDate?: string;
   status: TransferStatus;
+  completionResult?: TransferCompletionResult;
+  origin?: TransferOrigin;
+  priority?: TransferPriority;
+  submittedAt?: string;
+  hasDiscrepancy?: boolean;
   totalAmount: number;
   note?: string;
   discrepancyNote?: string;
   cancelReason?: string;
   isFavorite?: boolean;
   items: TransferItem[];
+  history?: Array<{ id: string; fromStatus?: string; toStatus: string; action: string; actorUserId: string; actorBranchId?: string; actorRole: string; reason?: string; createdAt: string }>;
 }
 
 export interface TransferFilterState {

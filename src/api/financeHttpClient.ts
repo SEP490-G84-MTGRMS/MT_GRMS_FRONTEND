@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from 'axios';
 import { mapProblemDetailsToVietnamese } from './problemDetailsMapper';
+import { generateUuidV7 } from '../utils/uuid';
 import { attachSessionRefresh } from './sessionRefresh';
 
 export interface EnhancedAxiosError extends AxiosError {
@@ -41,6 +42,12 @@ financeHttpClient.interceptors.request.use((config) => {
   }
   if (config.headers) {
     config.headers['X-Tenant-Id'] = tenantId;
+    const method = (config.method || '').toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      if (!config.headers['Idempotency-Key']) {
+        config.headers['Idempotency-Key'] = generateUuidV7();
+      }
+    }
   }
 
   return config;

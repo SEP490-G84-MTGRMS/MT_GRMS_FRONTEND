@@ -7,6 +7,7 @@ import { transferService } from '../services/transferService';
 export const TransferDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   const [transfer, setTransfer] = useState<TransferOrder | null>(null);
 
@@ -21,7 +22,7 @@ export const TransferDetailPage: React.FC = () => {
       <TransferDetailModal
         isOpen={true}
         transfer={transfer}
-        onClose={() => navigate('/store-owner/transfers')}
+        onClose={() => navigate(transferBasePath)}
         onUpdateTransfer={(updated) => setTransfer(updated)}
       />
     </div>

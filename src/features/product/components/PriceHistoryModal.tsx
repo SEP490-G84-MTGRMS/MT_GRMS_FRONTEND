@@ -5,12 +5,12 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  ShieldCheck,
   Building2,
   Globe,
 } from 'lucide-react';
 import { productApi } from '../api/productApi';
-import type { ProductPriceHistoryDto } from '../types';
+import type { ProductPriceHistoryDto, ProductUnitResponse } from '../types';
+import { TablePagination } from '../../../components/common';
 
 interface PriceHistoryModalProps {
   isOpen: boolean;
@@ -32,15 +32,42 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
   const [historyList, setHistoryList] = useState<ProductPriceHistoryDto[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [productUnitId, setProductUnitId] = useState('ALL');
+  const [productUnits, setProductUnits] = useState<ProductUnitResponse[]>([]);
+  const [scopeFilter, setScopeFilter] = useState<'ALL' | 'MASTER' | 'BRANCH'>('ALL');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+  const [totalItems, setTotalItems] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen || !productId) return;
+    productApi.getProductUnits(productId).then(setProductUnits);
+  }, [isOpen, productId]);
 
   useEffect(() => {
     if (isOpen && productId) {
+      if (fromDate && toDate && fromDate > toDate) {
+        setError('Ngày bắt đầu không được sau ngày kết thúc.');
+        setHistoryList([]);
+        setTotalItems(0);
+        return;
+      }
       setLoading(true);
       setError(null);
-      productApi
-        .getPriceHistory(productId, branchId)
+      const timer = window.setTimeout(() => productApi
+        .getPriceHistory(productId, branchId, {
+          productUnitId: productUnitId === 'ALL' ? undefined : productUnitId,
+          priceScope: scopeFilter === 'ALL' ? undefined : scopeFilter,
+          fromDate: fromDate ? `${fromDate}T00:00:00` : undefined,
+          toDate: toDate ? `${toDate}T23:59:59.999` : undefined,
+          page,
+          pageSize,
+        })
         .then((data) => {
-          setHistoryList(data);
+          setHistoryList(data.items);
+          setTotalItems(data.totalItems);
         })
         .catch((err) => {
           console.error('Failed to load price history:', err);
@@ -48,11 +75,19 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
         })
         .finally(() => {
           setLoading(false);
-        });
+        }), 250);
+      return () => window.clearTimeout(timer);
     }
-  }, [isOpen, productId, branchId]);
+  }, [isOpen, productId, branchId, productUnitId, scopeFilter, fromDate, toDate, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [productUnitId, scopeFilter, fromDate, toDate, productId, branchId]);
 
   if (!isOpen) return null;
+
+  const filteredHistory = historyList;
+  const hasActiveFilters = Boolean(productUnitId !== 'ALL' || scopeFilter !== 'ALL' || fromDate || toDate);
 
   const formatCurrency = (val: number | null | undefined) => {
     if (val === null || val === undefined) return '0 đ';
@@ -227,6 +262,33 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
             backgroundColor: '#ffffff',
           }}
         >
+          {!error && (totalItems > 0 || hasActiveFilters) && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 10, marginBottom: 14 }}>
+              <select
+                aria-label="Đơn vị tính"
+                value={productUnitId}
+                onChange={(e) => setProductUnitId(e.target.value)}
+                style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }}
+              >
+                <option value="ALL">Tất cả đơn vị tính</option>
+                {productUnits.map((unit) => (
+                  <option key={unit.id} value={unit.id}>{unit.unitName}</option>
+                ))}
+              </select>
+              {branchId && <select
+                aria-label="Nguồn thay đổi"
+                value={scopeFilter}
+                onChange={(e) => setScopeFilter(e.target.value as 'ALL' | 'MASTER' | 'BRANCH')}
+                style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }}
+              >
+                <option value="ALL">Tất cả nguồn</option>
+                <option value="MASTER">Giá chung toàn chuỗi</option>
+                <option value="BRANCH">Giá riêng chi nhánh</option>
+              </select>}
+              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} title="Từ ngày" style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }} />
+              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} title="Đến ngày" style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }} />
+            </div>
+          )}
           {loading ? (
             <div
               style={{
@@ -256,7 +318,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
             >
               {error}
             </div>
-          ) : historyList.length === 0 ? (
+          ) : historyList.length === 0 && !hasActiveFilters ? (
             <div
               style={{
                 display: 'flex',
@@ -292,6 +354,10 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                 Mọi thay đổi giá bán tại danh mục chung hoặc chi nhánh sẽ tự động được lưu vết tại đây.
               </p>
             </div>
+          ) : filteredHistory.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', border: '1px dashed #cbd5e1', borderRadius: 10, color: '#64748b', fontSize: 13 }}>
+              Không tìm thấy lần thay đổi giá phù hợp với điều kiện tra cứu.
+            </div>
           ) : (
             <div
               style={{
@@ -307,12 +373,12 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                     <th style={thStyle}>Phạm vi</th>
                     <th style={thStyle}>Biến động giá</th>
                     <th style={thStyle}>Giá vốn / Cảnh báo</th>
-                    <th style={thStyle}>Người đổi &amp; Duyệt</th>
+                    <th style={thStyle}>Người thay đổi</th>
                     <th style={thStyle}>Lý do</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {historyList.map((item) => {
+                  {filteredHistory.map((item) => {
                     const diff = item.newPrice - item.oldPrice;
                     const diffPercent = item.oldPrice > 0 ? (diff / item.oldPrice) * 100 : 0;
                     const isIncrease = diff > 0;
@@ -358,6 +424,9 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                             >
                               <Building2 size={12} /> {item.branchName || 'Chi nhánh'}
                             </span>
+                          )}
+                          {item.productUnitName && (
+                            <div style={{ marginTop: 5, fontSize: 11, color: '#64748b' }}>ĐVT: {item.productUnitName}</div>
                           )}
                         </td>
                         <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
@@ -445,20 +514,6 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                             <span style={{ fontWeight: 600, color: '#1e293b', fontSize: 12.5 }}>
                               {item.changedByUserName || 'Quản trị viên'}
                             </span>
-                            {item.managerApprovedBy && (
-                              <span
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                  fontSize: 11,
-                                  color: '#047857',
-                                }}
-                              >
-                                <ShieldCheck size={12} color="#059669" />
-                                Duyệt: {item.managerApprovedBy}
-                              </span>
-                            )}
                           </div>
                         </td>
                         <td
@@ -484,6 +539,22 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
           )}
         </div>
 
+        {!error && totalItems > 0 && (
+          <TablePagination
+            currentPage={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            pageSizeOptions={[15, 24, 36, 48]}
+            onPageChange={setPage}
+            onPageSizeChange={(value) => {
+              setPageSize(value);
+              setPage(1);
+            }}
+            itemLabel="lần thay đổi"
+            isLoading={loading}
+          />
+        )}
+
         {/* Footer */}
         <div
           style={{
@@ -498,7 +569,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
           }}
         >
           <span>
-            Tổng số lần điều chỉnh: <strong style={{ color: '#0f172a' }}>{historyList.length}</strong>
+            Kết quả: <strong style={{ color: '#0f172a' }}>{historyList.length}</strong> / {totalItems} lần thay đổi
           </span>
           <button
             type="button"

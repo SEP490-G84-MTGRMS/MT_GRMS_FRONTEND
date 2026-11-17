@@ -11,7 +11,6 @@ const mockCustomer: CustomerDto = {
   fullName: 'Nguyễn Văn Test',
   phoneNumber: '0987654321',
   currentDebtAR: 5000000,
-  debtLimit: 10000000,
   membershipTier: 'Silver',
   loyaltyPoints: 100,
   totalSpending: 20000000,

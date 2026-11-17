@@ -299,7 +299,7 @@ export function exportMatrixToExcel(
     { text: 'Mã sản phẩm', wch: 18 },
     { text: 'Mã NCC', wch: 14 },
     { text: 'Tên sản phẩm', wch: 34 },
-    { text: 'ĐVT', wch: 9 },
+    { text: 'DVN', wch: 9 },
     { text: 'MOQ', wch: 8 },
     { text: 'Bội số', wch: 8 },
     { text: 'Đơn giá (VNĐ)', wch: 14 },

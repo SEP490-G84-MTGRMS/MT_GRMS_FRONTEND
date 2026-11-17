@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, BookOpen, Clock } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 export type FinanceTabKey = 'overview' | 'pnl';
 
@@ -7,12 +7,8 @@ interface FinanceHeaderProps {
   todayLabel: string;
   activeTab: FinanceTabKey;
   onTabChange: (tab: FinanceTabKey) => void;
-  accountingMode: boolean;
-  onToggleAccountingMode: () => void;
   isRefreshing: boolean;
   onRefreshAll: () => void;
-  onNavigateCashbook: () => void;
-  onNavigateCashControl: () => void;
 }
 
 /**
@@ -23,12 +19,8 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
   todayLabel,
   activeTab,
   onTabChange,
-  accountingMode,
-  onToggleAccountingMode,
   isRefreshing,
   onRefreshAll,
-  onNavigateCashbook,
-  onNavigateCashControl,
 }) => {
   return (
     <div className="finance-header-wrapper">
@@ -41,20 +33,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
         </div>
 
         <div className="finance-overview-actions">
-          {/* Accounting Mode Switch */}
-          <label className="finance-accounting-toggle-pill" title="Bật/tắt đối chiếu Kế toán dồn tích vs Thực thu chi">
-            <span className="finance-accounting-toggle-text">Chế độ Kế toán</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={accountingMode}
-              className={`finance-switch-control ${accountingMode ? 'on' : ''}`}
-              onClick={onToggleAccountingMode}
-            >
-              <span className="finance-switch-thumb" />
-            </button>
-          </label>
-
           {/* Refresh Action */}
           <button
             type="button"
@@ -67,28 +45,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
             <span>Cập nhật</span>
           </button>
 
-          {/* Navigate to Pending Shifts & Safes */}
-          <button
-            type="button"
-            onClick={onNavigateCashControl}
-            className="finance-btn-secondary"
-            title="Xem Ca & Két chờ duyệt"
-          >
-            <Clock size={15} />
-            <span>Ca & Két chờ duyệt</span>
-          </button>
-
-          {/* Navigate to Cashbook */}
-          <button
-            type="button"
-            onClick={onNavigateCashbook}
-            className="btn-primary-teal"
-            id="btn-quick-receipt-payment"
-            title="Mở Sổ quỹ chi tiết để quản lý Thu / Chi tiền"
-          >
-            <BookOpen size={15} />
-            <span>Mở Sổ quỹ Thu/Chi</span>
-          </button>
         </div>
       </div>
 

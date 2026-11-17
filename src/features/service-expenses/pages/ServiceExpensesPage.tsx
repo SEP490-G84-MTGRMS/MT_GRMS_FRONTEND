@@ -1,34 +1,33 @@
 import { type FC, useState, useRef, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
+import { Receipt, FileSpreadsheet, AlertTriangle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { employeeApi } from '../../employee/api/employeeApi';
 import {
   AdminToast,
   type ToastState,
-  PlusIcon,
-  RefreshIcon,
 } from '../../admin/components';
 import { BillPreviewModal } from '../components/BillPreviewModal';
-import { CreateExpenseModal } from '../components/CreateExpenseModal';
 import { ConfirmModal } from '../../../components/common';
 import { ExpenseFilterBar } from '../components/ExpenseFilterBar';
-import { ExpenseKpiCards } from '../components/ExpenseKpiCards';
 import { ExpenseTable } from '../components/ExpenseTable';
 import { PayExpenseModal } from '../components/PayExpenseModal';
 import {
+  useApproveExpense,
   useCancelExpense,
-  useCreateExpense,
   useExpenseSummary,
   usePayExpense,
   useServiceExpenses,
 } from '../hooks/useServiceExpenses';
-import type {
-  CreateExpenseRequest,
-  ExpenseFilterParams,
-  PayExpenseRequest,
-  ServiceExpenseDto,
+import {
+  EXPENSE_CATEGORY_LABELS,
+  type ExpenseFilterParams,
+  type PayExpenseRequest,
+  type ServiceExpenseDto,
 } from '../types/expense.types';
 import { calculatePeriodRange } from '../utils/datePeriodUtils';
+import '../../purchase-order/purchase-order.css';
+import '../../../styles/so-list-page.css';
 import '../service-expenses.css';
 
 /**
@@ -50,17 +49,13 @@ const getInitialActiveBranchId = (userBranchId?: string): string => {
 };
 
 export const ServiceExpensesPage: FC = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
-  const isEmployee =
-    user?.role === 'STAFF' ||
-    (user?.role as unknown as string) === 'EMPLOYEE' ||
-    (user?.role as unknown as string) === 'CASHIER';
+  const canManageExpenses = user?.role === 'STORE_OWNER';
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const initialRange = calculatePeriodRange('this-month');
-  const [periodLabel, setPeriodLabel] = useState(urlSearch ? 'Tất cả thời gian' : initialRange.label);
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+  const [isExporting, setIsExporting] = useState(false);
   const [filters, setFilters] = useState<ExpenseFilterParams>(() => {
     return {
       page: 1,
@@ -112,7 +107,6 @@ export const ServiceExpensesPage: FC = () => {
   // Keep filters in sync when navigation query parameters change
   useEffect(() => {
     if (urlSearch) {
-      setPeriodLabel('Tất cả thời gian');
       setFilters((prev) => ({
         ...prev,
         keyword: urlSearch,
@@ -124,7 +118,6 @@ export const ServiceExpensesPage: FC = () => {
   }, [urlSearch]);
 
   // Modals state
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [payingItem, setPayingItem] = useState<ServiceExpenseDto | null>(null);
   const [cancelingItem, setCancelingItem] = useState<ServiceExpenseDto | null>(null);
   const [previewBill, setPreviewBill] = useState<{
@@ -150,19 +143,32 @@ export const ServiceExpensesPage: FC = () => {
   const {
     data: expensesData,
     isLoading: isExpensesLoading,
-    refetch,
     isRefetching,
   } = useServiceExpenses(filters);
 
-  const { data: summaryData, isLoading: isSummaryLoading } = useExpenseSummary(
+  const { data: summaryData } = useExpenseSummary(
     filters.branchId || undefined,
     filters.fromDate,
     filters.toDate
   );
 
-  const createExpenseMutation = useCreateExpense();
   const payExpenseMutation = usePayExpense();
   const cancelExpenseMutation = useCancelExpense();
+  const approveExpenseMutation = useApproveExpense();
+
+  const handleApproveClick = async (item: ServiceExpenseDto) => {
+    try {
+      await approveExpenseMutation.mutateAsync({
+        expenseId: item.expenseId,
+        note: 'Chủ cửa hàng duyệt phiếu chi',
+      });
+      showToast(`Đã phê duyệt phiếu chi ${item.voucherCode || item.expenseId} thành công!`, 'success');
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = errObj?.response?.data?.message || errObj?.message || 'Lỗi khi phê duyệt phiếu chi';
+      showToast(msg, 'error');
+    }
+  };
 
   const handleFilterChange = (updated: Partial<ExpenseFilterParams>) => {
     if (updated.keyword !== undefined) {
@@ -198,7 +204,6 @@ export const ServiceExpensesPage: FC = () => {
       { replace: true }
     );
     const range = calculatePeriodRange('this-month');
-    setPeriodLabel(range.label);
     setFilters({
       page: 1,
       pageSize: 10,
@@ -210,11 +215,6 @@ export const ServiceExpensesPage: FC = () => {
       fromDate: range.fromDate,
       toDate: range.toDate,
     });
-  };
-
-  const handleCreateSubmit = async (data: CreateExpenseRequest) => {
-    await createExpenseMutation.mutateAsync(data);
-    showToast('Đã ghi nhận chi phí vận hành mới thành công!', 'success');
   };
 
   const handlePaySubmit = async (
@@ -256,9 +256,95 @@ export const ServiceExpensesPage: FC = () => {
         (i) => i.status === 'Pending' && Boolean(i.dueDate) && i.dueDate < todayIso
       ).length
     : 0;
+  const overdueCount = summaryData?.overdueCount ?? clientOverdueCount;
+
+  const handleExportExcel = () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    showToast('Đang kết xuất danh sách chi phí vận hành ra tệp Excel (.csv)...', 'info');
+
+    try {
+      const exportItems = expensesData?.items || [];
+      if (!exportItems.length) {
+        showToast('Không có dữ liệu chi phí nào để xuất theo bộ lọc hiện tại.', 'warning');
+        return;
+      }
+
+      const headers = [
+        'Mã Phiếu Chi',
+        'Danh Mục Chi Phí',
+        'Chi Nhánh',
+        'Nhà Cung Cấp / Đối Tác',
+        'Diễn Giải',
+        'Hạn Thanh Toán',
+        'Số Tiền (đ)',
+        'Trạng Thái',
+        'Thuế Hợp Lệ',
+        'Định Kỳ',
+      ];
+
+      const csvRows = [headers.join(',')];
+
+      for (const item of exportItems) {
+        const code = item.voucherCode || item.expenseId;
+        const catLabel = EXPENSE_CATEGORY_LABELS[item.category] || item.category;
+        const statusLabel =
+          item.status === 'Paid'
+            ? 'Đã thanh toán'
+            : item.status === 'Pending'
+            ? 'Chờ thanh toán'
+            : item.status === 'Cancelled'
+            ? 'Đã hủy'
+            : item.status;
+        const row = [
+          `"${code.replace(/"/g, '""')}"`,
+          `"${catLabel.replace(/"/g, '""')}"`,
+          `"${(item.branchName || item.branchId || '').replace(/"/g, '""')}"`,
+          `"${(item.vendorName || '').replace(/"/g, '""')}"`,
+          `"${(item.note || '').replace(/"/g, '""')}"`,
+          `"${item.dueDate || ''}"`,
+          item.amount,
+          `"${statusLabel}"`,
+          `"${item.isTaxDeductible === false ? 'Loại trừ' : 'Hợp lệ'}"`,
+          `"${item.isRecurring ? 'Định kỳ' : 'Không'}"`,
+        ];
+        csvRows.push(row.join(','));
+      }
+
+      const csvContent = '\uFEFF' + csvRows.join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      link.href = url;
+      link.setAttribute('download', `ChiPhi_VanHanh_${dateStr}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast(`Đã xuất thành công ${exportItems.length} khoản chi ra tệp Excel (.csv).`);
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi xuất file Excel.', 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
-    <div className="expense-page">
+    <div
+      className="po-matrix-container"
+      style={{
+        width: '100%',
+        height: '100%',
+        maxHeight: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       {/* Toast Notification (Shared AdminToast) */}
       {toast && (
         <AdminToast
@@ -267,93 +353,73 @@ export const ServiceExpensesPage: FC = () => {
         />
       )}
 
-      {/* Top Header Bar */}
-      <div className="expense-topbar" style={{ marginTop: '16px' }}>
-        <div className="expense-topbar-title">
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 800, margin: 0, color: 'var(--text-main, #0F172A)' }}>
-            Chi phí &amp; hóa đơn phải trả
+      {/* ── 1. Page Header: Fixed Height ~44px Standard Store-Owner Header ── */}
+      <div className="so-list-header" style={{ minHeight: 44 }}>
+        <div>
+          <h1 className="so-list-title">
+            <Receipt size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Chi Phí Vận Hành &amp; Dịch Vụ Ngoài</span>
+            <span className="so-list-filter-badge">{expensesData?.totalItems ?? 0} khoản chi</span>
+            {(isExpensesLoading || isRefetching) && (
+              <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
+            )}
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: '0.84rem', color: '#64748B' }}>
-            Quản lý tiền mặt bằng, điện nước, bảo trì tủ mát, bao bì &amp; giao vận, lương nhân viên (chuẩn Thông tư 152 &amp; Anti-Splitting)
-          </p>
         </div>
 
-        <div className="expense-topbar-actions">
-          <button
-            type="button"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-            title="Làm mới dữ liệu danh sách"
-            className="action-icon-btn"
-          >
-            <RefreshIcon size={16} color="currentColor" />
-          </button>
+        <div className="so-list-header-actions">
+          {overdueCount > 0 && (
+            <button
+              type="button"
+              className="po-btn po-btn-secondary"
+              onClick={() =>
+                handleFilterChange({
+                  status: filters.status === 'Pending' ? undefined : 'Pending',
+                })
+              }
+              style={{
+                borderColor: '#f87171',
+                color: '#be123c',
+                fontWeight: 800,
+                backgroundColor: filters.status === 'Pending' ? '#fef2f2' : undefined,
+              }}
+              title="Lọc nhanh các khoản chi quá hạn / chờ thanh toán"
+            >
+              <AlertTriangle size={14} />
+              <span>{overdueCount} khoản quá hạn</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => navigate('/store-owner/cashbook')}
-            className="btn-secondary-pill"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '9px 16px',
-              borderRadius: '9999px',
-              fontWeight: 600,
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              border: '1px solid #cbd5e1',
-              background: '#ffffff',
-              color: '#334155',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            }}
+          <Link
+            to="/store-owner/cashbook"
+            className="po-btn po-btn-secondary"
+            title="Xem đối chiếu Sổ quỹ Cashbook"
           >
             <span>Đối chiếu Sổ quỹ</span>
-          </button>
+          </Link>
 
           <button
             type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="btn-primary-pill"
-            style={{
-              background: 'var(--brand-700, #115E59)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '10px 18px',
-              borderRadius: '9999px',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '0.85rem',
-              border: 'none',
-              cursor: 'pointer',
-              boxShadow: '0 2px 6px rgba(17,94,89,0.25)',
-            }}
+            className="po-btn po-btn-secondary"
+            onClick={handleExportExcel}
+            disabled={isExporting}
+            title="Xuất danh sách chi phí ra tệp Excel (.csv)"
           >
-            <PlusIcon size={16} color="#ffffff" />
-            <span>Ghi nhận chi phí</span>
+            {isExporting ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+            <span>Xuất Excel</span>
           </button>
+
         </div>
       </div>
 
-      {/* 4 KPI Summary Cards */}
-      <ExpenseKpiCards
-        summary={summaryData}
-        isLoading={isSummaryLoading}
-        periodLabel={periodLabel}
-        overdueCount={clientOverdueCount}
-      />
-
-      {/* Filter Bar */}
+      {/* ── 2. Standardized Filter Bar (CSS Grid 4x2 ~86px) ── */}
       <ExpenseFilterBar
         filters={filters}
         onFilterChange={handleFilterChange}
         onReset={handleResetFilters}
-        onPeriodLabelChange={setPeriodLabel}
         branches={branches}
       />
 
-      {/* Main Expense Table */}
+      {/* ── 3. Standardized Expense Table (.so-list-table-card with pinned pagination) ── */}
       <ExpenseTable
         data={expensesData?.items}
         isLoading={isExpensesLoading}
@@ -368,21 +434,12 @@ export const ServiceExpensesPage: FC = () => {
         }
         onViewBill={(url, title) => setPreviewBill({ url, title })}
         onPay={(item) => setPayingItem(item)}
+        onApprove={handleApproveClick}
         onCancel={handleCancelClick}
-        canManageExpenses={!isEmployee}
+        canManageExpenses={canManageExpenses}
       />
 
-      {/* Create Modal */}
-      <CreateExpenseModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreateSubmit}
-        isSubmitting={createExpenseMutation.isPending}
-        branches={branches}
-        defaultBranchId={filters.branchId || branches[0]?.id || ''}
-      />
-
-      {/* Pay Modal */}
+      {/* ── 5. Pay Modal ── */}
       <PayExpenseModal
         item={payingItem}
         isOpen={Boolean(payingItem)}
@@ -391,7 +448,7 @@ export const ServiceExpensesPage: FC = () => {
         isSubmitting={payExpenseMutation.isPending}
       />
 
-      {/* Bill Preview Modal */}
+      {/* ── 6. Bill Preview Modal ── */}
       <BillPreviewModal
         isOpen={Boolean(previewBill)}
         onClose={() => setPreviewBill(null)}
@@ -399,7 +456,7 @@ export const ServiceExpensesPage: FC = () => {
         title={previewBill?.title || ''}
       />
 
-      {/* Cancel Confirmation Modal */}
+      {/* ── 7. Cancel Confirmation Modal ── */}
       <ConfirmModal
         isOpen={Boolean(cancelingItem)}
         onClose={() => setCancelingItem(null)}
@@ -415,4 +472,6 @@ export const ServiceExpensesPage: FC = () => {
     </div>
   );
 };
+
 export default ServiceExpensesPage;
+

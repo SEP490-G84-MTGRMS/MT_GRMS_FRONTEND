@@ -4,7 +4,6 @@ import { formatMoney } from '../utils/formatters';
 
 export interface PillarsSummaryData {
   totalCustomerDebt: number;
-  overLimitCustomersCount: number;
   totalDebtorsCount: number;
   overduePayablesAmount: number;
   overduePayablesCount: number;

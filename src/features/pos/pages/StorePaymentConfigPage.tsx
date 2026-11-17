@@ -18,6 +18,7 @@ import { useAuthStore } from '../../../stores/useAuthStore';
 import { httpClient } from '../../../api/httpClient';
 import { VIETNAMESE_BANKS } from '../components/modals/PaymentConfigModal';
 import { branchApi } from '../../purchase-order/api/branchApi';
+import { resolveSePayWebhookUrl } from '../utils/sePayWebhookUrl';
 
 interface BranchOption {
   id: string;
@@ -75,8 +76,7 @@ export const StorePaymentConfigPage: FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-
-  const webhookUrl = `${window.location.origin.replace(':5173', ':5000')}/api/payments/sepay-webhook`;
+  const [webhookUrl, setWebhookUrl] = useState(() => resolveSePayWebhookUrl());
 
   useEffect(() => {
     const storageKey = `pos_payment_config_${currentTenantId}`;
@@ -95,6 +95,7 @@ export const StorePaymentConfigPage: FC = () => {
       .then((res) => {
         const data = res.data;
         if (!data) return;
+        setWebhookUrl(resolveSePayWebhookUrl(data.webhookUrl));
         if (data.bankCode) setBankCode(data.bankCode);
         setBankAccountNumber(data.bankAccountNumber || '');
         setBankAccountName(data.bankAccountName || '');
@@ -115,7 +116,7 @@ export const StorePaymentConfigPage: FC = () => {
       .catch(() => {
         setSaveMessage('Không thể tải cấu hình từ máy chủ. Không sử dụng dữ liệu mẫu.');
       });
-  }, [currentTenantId, webhookUrl]);
+  }, [currentTenantId]);
 
   const handleSyncSePayAccounts = async () => {
     if (!isOwnerOrAdmin) return;

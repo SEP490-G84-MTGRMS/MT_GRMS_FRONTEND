@@ -404,12 +404,30 @@ export const supplierApi = {
         requireEvidenceImage: d.requireEvidenceImage ?? true,
         maxReturnDaysAfterReceipt: d.maxReturnDaysAfterReceipt ?? null,
         costShareEnabled: d.costShareEnabled ?? false,
+        costShareByCategoryEnabled: d.costShareByCategoryEnabled ?? false,
         storeCostSharePercent: d.storeCostSharePercent ?? null,
         supplierCostSharePercent: d.supplierCostSharePercent ?? null,
         costShareBase: d.costShareBase || 'REPLACEMENT_VALUE',
         requireStorePaymentBeforeReplacement: d.requireStorePaymentBeforeReplacement ?? true,
         notes: d.notes ?? '',
         isActive: d.isActive ?? true,
+        categoryCostShares: Array.isArray(d.categoryCostShares)
+          ? d.categoryCostShares.map(
+              (c: {
+                id?: string;
+                categoryId: string;
+                categoryName?: string;
+                storeCostSharePercent?: number;
+                supplierCostSharePercent?: number;
+              }) => ({
+                id: c.id,
+                categoryId: c.categoryId,
+                categoryName: c.categoryName || '',
+                storeCostSharePercent: Number(c.storeCostSharePercent) || 0,
+                supplierCostSharePercent: Number(c.supplierCostSharePercent) || 0,
+              })
+            )
+          : [],
       };
     }
     return null;
@@ -428,11 +446,18 @@ export const supplierApi = {
       requireEvidenceImage: policy.requireEvidenceImage,
       maxReturnDaysAfterReceipt: policy.maxReturnDaysAfterReceipt,
       costShareEnabled: policy.costShareEnabled,
+      costShareByCategoryEnabled: policy.costShareByCategoryEnabled,
       storeCostSharePercent: policy.storeCostSharePercent,
       supplierCostSharePercent: policy.supplierCostSharePercent,
       costShareBase: policy.costShareBase,
       requireStorePaymentBeforeReplacement: policy.requireStorePaymentBeforeReplacement,
       notes: policy.notes,
+      categoryCostShares: (policy.categoryCostShares || []).map((c) => ({
+        categoryId: c.categoryId,
+        categoryName: c.categoryName,
+        storeCostSharePercent: c.storeCostSharePercent,
+        supplierCostSharePercent: c.supplierCostSharePercent,
+      })),
     };
     const res = await httpClient.put<ApiResponse<any>>(`/suppliers/${id}/return-policy`, body);
     if (res.data?.success && res.data.data) {

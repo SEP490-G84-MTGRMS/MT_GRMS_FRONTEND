@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, SlidersHorizontal, Info, RotateCcw, Check, Percent } from 'lucide-react';
+import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
 
 interface TaxRateConfigModalProps {
   isOpen: boolean;
@@ -26,10 +27,12 @@ export const TaxRateConfigModal: React.FC<TaxRateConfigModalProps> = ({
   onSave,
   onResetToDefault,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const [vatRate, setVatRate] = useState<string>('1.0');
   const [isVatReduced, setIsVatReduced] = useState<boolean>(false);
   const [vatReductionPct, setVatReductionPct] = useState<string>('20');
   const [pitRate, setPitRate] = useState<string>('0.5');
+  useDialogFocusTrap(isOpen, dialogRef, onClose);
 
   // Synchronize internal state when modal opens or currentRates changes
   useEffect(() => {
@@ -89,8 +92,8 @@ export const TaxRateConfigModal: React.FC<TaxRateConfigModalProps> = ({
   };
 
   return (
-    <div className="tax-modal-backdrop">
-      <div className="tax-modal-card" style={{ maxWidth: 560 }}>
+    <div className="tax-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <div ref={dialogRef} className="tax-modal-card" role="dialog" aria-modal="true" aria-label="Cấu hình thuế suất" style={{ maxWidth: 560 }}>
         {/* Header */}
         <div className="tax-modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

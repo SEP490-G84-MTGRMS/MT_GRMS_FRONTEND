@@ -33,6 +33,9 @@ describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
       counterpartyType: 'CUSTOMER',
       counterpartyName: 'Khách hàng VIP test',
       description: 'Khách thanh toán đợt 1',
+      categoryCode: 'OTHER_INCOME',
+      taxTreatment: 'NonTaxableReceipt',
+      taxTreatmentReason: 'Thu nợ đã ghi nhận doanh thu trước đó',
     });
 
     expect(newTx.transactionType).toBe('RECEIPT');
@@ -53,6 +56,7 @@ describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
         counterpartyType: 'OTHER',
         counterpartyName: 'Test',
         description: 'Test',
+        categoryCode: 'OWNER_DEPOSIT',
       })
     ).rejects.toThrow('Số tiền thu phải lớn hơn 0');
   });
@@ -70,6 +74,8 @@ describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
       counterpartyType: 'SUPPLIER',
       counterpartyName: 'EVN Điện Lực',
       description: 'Thanh toán tiền điện',
+      categoryCode: 'OTHER_PAYMENT',
+      taxTreatment: 'NonDeductibleExpense',
     });
 
     expect(newTx.transactionType).toBe('PAYMENT');
@@ -94,6 +100,8 @@ describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
         counterpartyType: 'OTHER',
         counterpartyName: 'Người nhận',
         description: 'Thử nghiệm âm két',
+        categoryCode: 'OTHER_PAYMENT',
+        taxTreatment: 'NonDeductibleExpense',
       })
     ).rejects.toThrow(/vượt quá số dư két hiện có.*GBR-CSH-03/);
   });
@@ -207,6 +215,8 @@ describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
       counterpartyType: 'SUPPLIER',
       counterpartyName: 'Nhà sách Fahasa',
       description: 'Chi tiền mua giấy in bill',
+      categoryCode: 'OTHER_PAYMENT',
+      taxTreatment: 'NonDeductibleExpense',
     });
 
     // Void the transaction

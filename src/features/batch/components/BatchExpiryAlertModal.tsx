@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type FC } from 'react';
-import { AlertTriangle, ClipboardCheck, Loader2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FC } from 'react';
+import { AlertTriangle, ClipboardCheck, ImagePlus, Loader2, Trash2, X } from 'lucide-react';
 import type { BatchFilterState, BatchItem } from '../types/batch.types';
 import { batchApi } from '../api/batchApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
 import type { SupplierReturnPolicy } from '../../supplier/types/supplier.types';
 import { supplierReturnApi } from '../../supplier-return/api/supplierReturnApi';
+import { uploadImageToCloudinary } from '../../../utils/cloudinary';
 
 export type BatchAlertMode = 'near_expiry' | 'expired';
 
@@ -17,6 +18,7 @@ interface AlertRow {
   action: LotAction;
   hint: string;
   resolutionType?: string;
+  requireEvidenceImage?: boolean;
 }
 
 const GUID_RE =
@@ -57,6 +59,32 @@ const canReturnNearExpiry = (policy: SupplierReturnPolicy | null, daysLeft: numb
   return true;
 };
 
+/** qtyCurrent trên BatchItem là ĐVT tồn; popup này nhập/hiển thị theo ĐVT nhập. */
+const getPurchaseRate = (batch: BatchItem) =>
+  Number(batch.purchaseToStockRate) > 0 ? Number(batch.purchaseToStockRate) : 1;
+
+const purchaseUnitOf = (batch: BatchItem) =>
+  (batch.unit || batch.stockUnit || 'Cái').trim() || 'Cái';
+
+const stockUnitOf = (batch: BatchItem) =>
+  (batch.stockUnit || batch.unit || 'Cái').trim() || 'Cái';
+
+const stockToPurchase = (stockQty: number, rate: number) => {
+  const r = rate > 0 ? rate : 1;
+  return Math.round((Number(stockQty) / r) * 1000) / 1000;
+};
+
+const purchaseToStock = (purchaseQty: number, rate: number) => {
+  const r = rate > 0 ? rate : 1;
+  return Math.round(Number(purchaseQty) * r * 1000) / 1000;
+};
+
+const maxPurchaseQty = (batch: BatchItem) =>
+  stockToPurchase(Number(batch.qtyCurrent) || 0, getPurchaseRate(batch));
+
+const fmtQty = (n: number) =>
+  n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+
 const actionLabel = (action: LotAction): string => {
   switch (action) {
     case 'return':
@@ -82,6 +110,9 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [evidenceUrl, setEvidenceUrl] = useState<string | null>(null);
+  const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
+  const evidenceInputRef = useRef<HTMLInputElement>(null);
 
   const isExpiredMode = mode === 'expired';
 
@@ -92,6 +123,7 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
     const load = async () => {
       setIsLoading(true);
       setErrorMsg('');
+      setEvidenceUrl(null);
       try {
         let lots: BatchItem[] = [];
         if (isExpiredMode) {
@@ -133,11 +165,12 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
         if (cancelled) return;
 
         const nextRows: AlertRow[] = [...unique.values()].map((batch) => {
+          const confirmPurchaseQty = maxPurchaseQty(batch);
           if (isExpiredMode) {
             return {
               batch,
               selected: true,
-              confirmQty: batch.qtyCurrent,
+              confirmQty: confirmPurchaseQty,
               action: 'expired' as const,
               hint: 'Hết hạn: tạo phiếu kiểm kê để write-off khi Store Owner duyệt.',
             };
@@ -148,7 +181,7 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
             return {
               batch,
               selected: false,
-              confirmQty: batch.qtyCurrent,
+              confirmQty: confirmPurchaseQty,
               action: 'no_grn' as const,
               hint: 'Lô không gắn phiếu nhập gốc — không tạo được trả/đổi hàng.',
             };
@@ -156,20 +189,31 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
           const policy = policies[batch.supplierId] || null;
           const ok = canReturnNearExpiry(policy, batch.daysLeft);
           if (ok) {
-            const resolution = policy?.defaultResolutionType || 'REDUCE_PAYABLE';
+            // Cận hạn "Trả/đổi NCC": ưu tiên EXCHANGE (để sinh PO đổi hàng) nếu policy cho phép.
+            const allowedRes = (policy?.allowedResolutionTypes || []).map((t) =>
+              String(t || '').toUpperCase()
+            );
+            const preferExchange = allowedRes.length === 0 || allowedRes.includes('EXCHANGE');
+            const resolution = preferExchange
+              ? 'EXCHANGE'
+              : policy?.defaultResolutionType || 'REDUCE_PAYABLE';
+            const needEvidence = policy?.requireEvidenceImage !== false;
             return {
               batch,
               selected: true,
-              confirmQty: batch.qtyCurrent,
+              confirmQty: confirmPurchaseQty,
               action: 'return' as const,
-              hint: `Đủ điều kiện NEAR_EXPIRY · xử lý mặc định: ${resolution}`,
+              hint: needEvidence
+                ? `Đủ điều kiện NEAR_EXPIRY · ${resolution} · NCC yêu cầu ảnh minh chứng`
+                : `Đủ điều kiện NEAR_EXPIRY · xử lý mặc định: ${resolution}`,
               resolutionType: resolution,
+              requireEvidenceImage: needEvidence,
             };
           }
           return {
             batch,
             selected: false,
-            confirmQty: batch.qtyCurrent,
+            confirmQty: confirmPurchaseQty,
             action: 'markdown' as const,
             hint: 'Policy NCC không cho trả cận hạn — giữ bán FEFO.',
           };
@@ -209,8 +253,28 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
     [rows]
   );
 
+  const evidenceRequired = useMemo(
+    () => selectedReturnRows.some((r) => r.requireEvidenceImage),
+    [selectedReturnRows]
+  );
+
   const selectable = (row: AlertRow) =>
     isExpiredMode ? row.action === 'expired' : row.action === 'return';
+
+  const handleEvidenceUpload = async (file: File | null) => {
+    if (!file) return;
+    setIsUploadingEvidence(true);
+    setErrorMsg('');
+    try {
+      const url = await uploadImageToCloudinary(file, 'mtgrms/supplier-returns');
+      setEvidenceUrl(url);
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Không thể tải ảnh minh chứng.');
+    } finally {
+      setIsUploadingEvidence(false);
+      if (evidenceInputRef.current) evidenceInputRef.current.value = '';
+    }
+  };
 
   const handleCreateReturns = async () => {
     if (selectedReturnRows.length === 0) {
@@ -221,6 +285,11 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
     const missingGrn = selectedReturnRows.filter((r) => !r.batch.originalGrnId);
     if (missingGrn.length) {
       setErrorMsg('Có lô được chọn nhưng thiếu GRN gốc.');
+      return;
+    }
+
+    if (evidenceRequired && !evidenceUrl) {
+      setErrorMsg('Chính sách NCC yêu cầu ảnh minh chứng khi trả/đổi hàng. Vui lòng đính kèm ảnh.');
       return;
     }
 
@@ -245,15 +314,17 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
             branchId: first.batch.branchId,
             reason: 'Hàng sắp hết hạn (Near-Expiry)',
             reasonNotes: `Tạo từ cảnh báo cận hạn · ${group.length} lô · xác nhận SL trên kệ.`,
+            attachmentUrl: evidenceUrl || undefined,
             autoSubmit: false,
-            resolutionType: first.resolutionType || 'REDUCE_PAYABLE',
+            resolutionType: first.resolutionType || 'EXCHANGE',
             lines: group.map((r) => ({
               productId: r.batch.productId,
               batchCode: r.batch.batchCode !== '—' ? r.batch.batchCode : undefined,
               expiryDate: r.batch.rawExpiryDate || undefined,
-              requestedQty: r.confirmQty,
+              // API / tồn kho dùng ĐVT tồn (base)
+              requestedQty: purchaseToStock(r.confirmQty, getPurchaseRate(r.batch)),
               unitCost: r.batch.costPrice || 0,
-              notes: `Lô ${r.batch.batchCode} · còn ${r.batch.daysLeft} ngày`,
+              notes: `Lô ${r.batch.batchCode} · còn ${r.batch.daysLeft} ngày · ${fmtQty(r.confirmQty)} ${purchaseUnitOf(r.batch)}`,
             })),
           },
           { allowMock: false }
@@ -285,7 +356,8 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
     onCreateStocktake(
       selectedExpiredRows.map((r) => ({
         ...r.batch,
-        confirmQty: r.confirmQty,
+        // Phiếu kiểm kê nhận SL theo ĐVT tồn
+        confirmQty: purchaseToStock(r.confirmQty, getPurchaseRate(r.batch)),
       }))
     );
   };
@@ -294,8 +366,8 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
 
   const title = isExpiredMode ? 'Lô hết hạn' : 'Lô cận hạn — trả / đổi NCC';
   const subtitle = isExpiredMode
-    ? 'Xác nhận SL còn trên kệ rồi tạo phiếu kiểm kê (write-off khi Store Owner duyệt).'
-    : 'Chỉ lô cảnh báo / khẩn cấp. Xác nhận SL rồi tạo phiếu trả/đổi nháp (Store Owner gửi NCC).';
+    ? 'Tồn & SL xác nhận theo ĐVT nhập. Tạo phiếu kiểm kê (write-off khi Store Owner duyệt).'
+    : 'Chỉ lô cảnh báo / khẩn cấp. Tồn & SL xác nhận theo ĐVT nhập. Tạo phiếu trả/đổi nháp (Store Owner gửi NCC).';
   const emptyText = isExpiredMode
     ? 'Không có lô hết hạn theo chi nhánh đang lọc.'
     : 'Không có lô cận hạn (cảnh báo / khẩn cấp) theo chi nhánh đang lọc.';
@@ -391,7 +463,7 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                   </th>
                   <th className="so-list-th">NCC</th>
                   <th className="so-list-th" style={{ textAlign: 'right' }}>
-                    Tồn
+                    Tồn (ĐVT nhập)
                   </th>
                   <th className="so-list-th" style={{ textAlign: 'right' }}>
                     SL xác nhận
@@ -439,36 +511,62 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                       {row.batch.daysLeft}
                     </td>
                     <td>{row.batch.supplierName}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
-                      {row.batch.qtyCurrent}
+                    <td
+                      style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}
+                      title={
+                        getPurchaseRate(row.batch) > 1 &&
+                        purchaseUnitOf(row.batch).toLowerCase() !==
+                          stockUnitOf(row.batch).toLowerCase()
+                          ? `Tồn gốc: ${fmtQty(Number(row.batch.qtyCurrent) || 0)} ${stockUnitOf(row.batch)} · 1 ${purchaseUnitOf(row.batch)} = ${getPurchaseRate(row.batch)} ${stockUnitOf(row.batch)}`
+                          : undefined
+                      }
+                    >
+                      {fmtQty(maxPurchaseQty(row.batch))}{' '}
+                      <span style={{ fontWeight: 600, color: '#64748b' }}>
+                        {purchaseUnitOf(row.batch)}
+                      </span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <input
-                        type="number"
-                        min={0}
-                        max={row.batch.qtyCurrent}
-                        disabled={!selectable(row)}
-                        value={row.confirmQty}
-                        onChange={(e) => {
-                          const n = Math.max(0, Number(e.target.value) || 0);
-                          setRows((prev) =>
-                            prev.map((r) =>
-                              r.batch.id === row.batch.id
-                                ? { ...r, confirmQty: Math.min(n, r.batch.qtyCurrent) }
-                                : r
-                            )
-                          );
-                        }}
+                      <div
                         style={{
-                          width: 72,
-                          height: 28,
-                          textAlign: 'right',
-                          padding: '0 6px',
-                          borderRadius: 5,
-                          border: '1px solid #cbd5e1',
-                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          justifyContent: 'flex-end',
                         }}
-                      />
+                      >
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          max={maxPurchaseQty(row.batch)}
+                          disabled={!selectable(row)}
+                          value={row.confirmQty}
+                          onChange={(e) => {
+                            const maxP = maxPurchaseQty(row.batch);
+                            const n = Math.max(0, Number(e.target.value) || 0);
+                            setRows((prev) =>
+                              prev.map((r) =>
+                                r.batch.id === row.batch.id
+                                  ? { ...r, confirmQty: Math.min(n, maxP) }
+                                  : r
+                              )
+                            );
+                          }}
+                          style={{
+                            width: 72,
+                            height: 28,
+                            textAlign: 'right',
+                            padding: '0 6px',
+                            borderRadius: 5,
+                            border: '1px solid #cbd5e1',
+                            fontWeight: 700,
+                          }}
+                        />
+                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
+                          {purchaseUnitOf(row.batch)}
+                        </span>
+                      </div>
                     </td>
                     <td>
                       <div
@@ -491,6 +589,109 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
             </table>
           )}
         </div>
+
+        {!isExpiredMode && selectedReturnRows.length > 0 && (
+          <div
+            style={{
+              padding: '10px 18px',
+              borderTop: '1px solid #e2e8f0',
+              background: evidenceRequired && !evidenceUrl ? '#fffbeb' : '#f8fafc',
+              flexShrink: 0,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ minWidth: 0, flex: '1 1 240px' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+                  Ảnh minh chứng
+                  {evidenceRequired ? (
+                    <span style={{ color: '#b45309', fontWeight: 800 }}> (bắt buộc)</span>
+                  ) : (
+                    <span style={{ color: '#64748b', fontWeight: 500 }}> (tuỳ chọn)</span>
+                  )}
+                </div>
+                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                  {evidenceRequired
+                    ? 'NCC đã chọn yêu cầu ảnh khi trả/đổi — đính kèm ảnh lô/kệ trước khi tạo phiếu.'
+                    : 'Có thể đính kèm ảnh để Store Owner gửi NCC thuận tiện hơn.'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {evidenceUrl ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <a
+                      href={evidenceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        width: 48,
+                        height: 48,
+                        background: '#fff',
+                      }}
+                      title="Xem ảnh minh chứng"
+                    >
+                      <img
+                        src={evidenceUrl}
+                        alt="Ảnh minh chứng"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </a>
+                    <button
+                      type="button"
+                      className="so-list-action-btn"
+                      title="Xóa ảnh"
+                      disabled={isUploadingEvidence || isSubmitting}
+                      onClick={() => setEvidenceUrl(null)}
+                    >
+                      <Trash2 size={14} color="#dc2626" />
+                    </button>
+                  </div>
+                ) : null}
+
+                <input
+                  ref={evidenceInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => void handleEvidenceUpload(e.target.files?.[0] || null)}
+                />
+                <button
+                  type="button"
+                  className="so-list-filter-reset"
+                  disabled={isUploadingEvidence || isSubmitting}
+                  onClick={() => evidenceInputRef.current?.click()}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    ...(evidenceRequired && !evidenceUrl
+                      ? { borderColor: '#f59e0b', color: '#b45309' }
+                      : undefined),
+                  }}
+                >
+                  {isUploadingEvidence ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <ImagePlus size={14} />
+                  )}
+                  {evidenceUrl ? 'Đổi ảnh' : 'Chọn ảnh'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div
           style={{
@@ -531,9 +732,17 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
               <button
                 type="button"
                 className="so-list-filter-search"
-                disabled={isSubmitting || selectedReturnRows.length === 0}
+                disabled={
+                  isSubmitting ||
+                  isUploadingEvidence ||
+                  selectedReturnRows.length === 0 ||
+                  (evidenceRequired && !evidenceUrl)
+                }
                 style={
-                  isSubmitting || selectedReturnRows.length === 0
+                  isSubmitting ||
+                  isUploadingEvidence ||
+                  selectedReturnRows.length === 0 ||
+                  (evidenceRequired && !evidenceUrl)
                     ? { opacity: 0.55, cursor: 'not-allowed' }
                     : undefined
                 }

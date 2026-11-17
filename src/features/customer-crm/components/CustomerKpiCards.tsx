@@ -7,7 +7,6 @@ interface CustomerKpiCardsProps {
   customers?: CustomerDto[];
   debtorsCount?: number;
   isLoading?: boolean;
-  onFilterOverLimit?: () => void;
   onFilterDebt?: () => void;
 }
 
@@ -16,13 +15,11 @@ export const CustomerKpiCards: FC<CustomerKpiCardsProps> = ({
   customers,
   debtorsCount,
   isLoading,
-  onFilterOverLimit,
   onFilterDebt,
 }) => {
   if (isLoading) {
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', marginBottom: '20px' }}>
-        <div style={{ background: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #E2E8F0', height: '110px', opacity: 0.6 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', marginBottom: '20px' }}>
         <div style={{ background: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #E2E8F0', height: '110px', opacity: 0.6 }} />
         <div style={{ background: '#ffffff', borderRadius: '16px', padding: '20px', border: '1px solid #E2E8F0', height: '110px', opacity: 0.6 }} />
       </div>
@@ -38,7 +35,6 @@ export const CustomerKpiCards: FC<CustomerKpiCardsProps> = ({
         : summary?.totalCustomers
           ? Math.min(summary.totalCustomers, 5)
           : 0;
-  const overdueCount = summary?.overLimitCount || 0;
 
   return (
     <div
@@ -121,47 +117,6 @@ export const CustomerKpiCards: FC<CustomerKpiCardsProps> = ({
         </div>
       </div>
 
-      {/* KPI 3: Khách vượt hạn mức */}
-      <div
-        className="kpi-card"
-        onClick={onFilterOverLimit}
-        style={{
-          background: overdueCount > 0 ? '#FEF2F2' : '#ffffff',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          border: overdueCount > 0 ? '1px solid #FECACA' : '1px solid #E2E8F0',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
-          cursor: onFilterOverLimit ? 'pointer' : 'default',
-          transition: 'all 0.15s ease',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: overdueCount > 0 ? '#991B1B' : '#64748B' }}>
-            Khách vượt hạn mức
-          </span>
-          <span style={{ fontSize: '1.25rem' }}>🚨</span>
-        </div>
-        <div
-          style={{
-            fontSize: 'clamp(1.5rem, 2vw, 1.85rem)',
-            fontWeight: 800,
-            color: overdueCount > 0 ? '#DC2626' : '#0F172A',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          {overdueCount} khách
-        </div>
-        <div
-          style={{
-            fontSize: '0.8rem',
-            color: overdueCount > 0 ? '#B91C1C' : '#10B981',
-            marginTop: '6px',
-            fontWeight: 500,
-          }}
-        >
-          {overdueCount > 0 ? 'Chặn bán nợ thêm cho đến khi thanh toán' : 'Tất cả trong hạn mức an toàn'}
-        </div>
-      </div>
     </div>
   );
 };

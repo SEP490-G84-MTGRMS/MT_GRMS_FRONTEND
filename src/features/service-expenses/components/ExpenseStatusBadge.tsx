@@ -26,11 +26,13 @@ const calculateRealDaysDiff = (dueDate: string | Date): number => {
 interface ExpenseStatusBadgeProps {
   status: ExpenseStatus;
   dueDate?: string;
+  approvalStatus?: string;
 }
 
 export const ExpenseStatusBadge: FC<ExpenseStatusBadgeProps> = ({
   status,
   dueDate,
+  approvalStatus,
 }) => {
   if (status === 'Paid') {
     return (
@@ -46,6 +48,42 @@ export const ExpenseStatusBadge: FC<ExpenseStatusBadgeProps> = ({
       <span className="expense-badge badge-cancelled">
         <CloseIcon size={12} color="#64748b" />
         Đã hủy
+      </span>
+    );
+  }
+
+  if (approvalStatus === 'PaymentFailed') {
+    return (
+      <span
+        className="expense-badge badge-overdue"
+        style={{
+          background: '#FEF2F2',
+          color: '#B91C1C',
+          borderColor: '#FECACA',
+          fontWeight: 700,
+        }}
+        title="Xuất quỹ thất bại (ví dụ số dư két không đủ), cần chi lại"
+      >
+        <AlertTriangleIcon size={13} color="#B91C1C" />
+        Chi thất bại
+      </span>
+    );
+  }
+
+  if (approvalStatus === 'Approved') {
+    return (
+      <span
+        className="expense-badge"
+        style={{
+          background: '#F0FDFA',
+          color: '#0F766E',
+          borderColor: '#CCFBF1',
+          fontWeight: 700,
+        }}
+        title="Đã phê duyệt, sẵn sàng xuất quỹ chi tiền"
+      >
+        <CheckCircleIcon size={13} color="#0F766E" />
+        Đã duyệt (Chờ chi)
       </span>
     );
   }
