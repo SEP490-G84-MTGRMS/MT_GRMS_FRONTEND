@@ -32,7 +32,9 @@ export const LoginPage: FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sessionExpiredNotice] = useState<string | null>(
-    redirectUrl ? "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại để tiếp tục." : null
+    redirectUrl
+      ? "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại để tiếp tục."
+      : null,
   );
 
   // State cho bước xác thực 2FA Email OTP khi đăng nhập
@@ -47,7 +49,11 @@ export const LoginPage: FC = () => {
   const [isResendingOtp, setIsResendingOtp] = useState(false);
 
   const navigateByRole = (user: { isAdmin?: boolean; role: string }) => {
-    if (redirectUrl && !redirectUrl.startsWith("/auth") && redirectUrl !== "/login") {
+    if (
+      redirectUrl &&
+      !redirectUrl.startsWith("/auth") &&
+      redirectUrl !== "/login"
+    ) {
       navigate(redirectUrl, { replace: true });
       return;
     }
@@ -114,7 +120,9 @@ export const LoginPage: FC = () => {
         msg = anyErr.message || anyErr.response?.data?.message || msg;
       }
 
-      console.warn(`[Login OTP Send Failed] API Status: ${status}, ErrorCode: ${errorCode}, Message: ${msg}`);
+      console.warn(
+        `[Login OTP Send Failed] API Status: ${status}, ErrorCode: ${errorCode}, Message: ${msg}`,
+      );
       setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -183,7 +191,11 @@ export const LoginPage: FC = () => {
       <h1 className="auth-card-heading">Đăng nhập</h1>
 
       {/* FORM ĐĂNG NHẬP */}
-      <form onSubmit={handleLoginSubmit} className="auth-form-fields" autoComplete="off">
+      <form
+        onSubmit={handleLoginSubmit}
+        className="auth-form-fields"
+        autoComplete="off"
+      >
         {/* 1. Email / Tài khoản */}
         <div className="auth-field-block">
           <label
@@ -316,20 +328,14 @@ export const LoginPage: FC = () => {
             </>
           )}
         </button>
-
-        {/* Nút phụ: Vào nhanh Quầy POS Thu Ngân */}
-        <button
-          type="button"
-          className="auth-cta-secondary-btn"
-          onClick={() => navigate("/pos")}
-        >
-          <Store size={18} strokeWidth={2} />
-          <span>Vào Nhanh Quầy POS Thu Ngân</span>
-        </button>
       </form>
 
       <AdminToast
-        toast={errorMessage ? { id: "login-error", type: "error", message: errorMessage } : null}
+        toast={
+          errorMessage
+            ? { id: "login-error", type: "error", message: errorMessage }
+            : null
+        }
         onClose={() => setErrorMessage(null)}
       />
 
