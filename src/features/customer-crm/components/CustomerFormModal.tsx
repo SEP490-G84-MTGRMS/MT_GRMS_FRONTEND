@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
-import { X, User, Phone, Mail, MapPin, DollarSign, Award, Building } from 'lucide-react';
+import { X, User, Phone, Mail, MapPin, Award, Building } from 'lucide-react';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
 import {
   sanitizeCustomerText,
   validateSafeCustomerText,
   validateVietnamesePhone,
-  validateDebtLimit,
-  normalizeDebtLimit,
 } from '../utils/customerValidation';
 
 interface CustomerFormModalProps {
@@ -19,8 +17,6 @@ interface CustomerFormModalProps {
     email?: string;
     address?: string;
     taxCode?: string;
-    debtLimit: number;
-    allowDebt: boolean;
     membershipTier: MembershipTier;
   }) => Promise<void>;
   initialData?: CustomerDto | null;
@@ -39,8 +35,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [taxCode, setTaxCode] = useState('');
-  const [debtLimit, setDebtLimit] = useState<number>(0);
-  const [allowDebt, setAllowDebt] = useState(false);
   const [membershipTier, setMembershipTier] = useState<MembershipTier>('Standard');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -53,8 +47,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       setEmail(initialData.email || '');
       setAddress(sanitizeCustomerText(initialData.address));
       setTaxCode(initialData.taxCode || '');
-      setDebtLimit(normalizeDebtLimit(initialData.debtLimit));
-      setAllowDebt(Boolean(initialData.allowDebt));
       setMembershipTier(initialData.membershipTier || 'Standard');
     } else {
       setFullName('');
@@ -62,8 +54,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       setEmail('');
       setAddress('');
       setTaxCode('');
-      setDebtLimit(0);
-      setAllowDebt(false);
       setMembershipTier('Standard');
     }
     setErrorMsg('');
@@ -99,11 +89,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       return;
     }
 
-    if (!validateDebtLimit(Number(debtLimit))) {
-      setErrorMsg('Hạn mức nợ không thể là số âm.');
-      return;
-    }
-
     try {
       await onSubmit({
         fullName: sanitizeCustomerText(fullName),
@@ -111,8 +96,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
         email: email.trim() || undefined,
         address: sanitizeCustomerText(address) || undefined,
         taxCode: taxCode.trim() || undefined,
-        debtLimit: normalizeDebtLimit(debtLimit),
-        allowDebt,
         membershipTier,
       });
     } catch (err: any) {
@@ -207,40 +190,8 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
               )}
             </div>
 
-            <div className="form-group" style={{ padding: '12px', border: '1px solid #CBD5E1', borderRadius: 10, background: '#F8FAFC' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontWeight: 700 }}>
-                <input type="checkbox" checked={allowDebt} onChange={(e) => setAllowDebt(e.target.checked)} />
-                Chủ cửa hàng cho phép khách hàng này mua nợ
-              </label>
-              <p style={{ margin: '7px 0 0', fontSize: '0.75rem', color: '#64748B', display: 'flex', gap: 6, alignItems: 'center' }}>
-                <Building className="w-4 h-4" /> Khách hàng và quyền mua nợ được dùng chung tại tất cả chi nhánh trong cửa hàng.
-              </p>
-            </div>
-
-            {/* Hạn mức nợ tùy chọn & Hạng thẻ */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">
-                  Hạn mức nợ tùy chọn (VNĐ)
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <DollarSign className="w-4 h-4 customer-search-icon" />
-                  <input
-                    type="number"
-                    min="0"
-                    step="100000"
-                    value={debtLimit}
-                    onChange={(e) => setDebtLimit(Number(e.target.value))}
-                    placeholder="5000000"
-                    className="form-input"
-                    style={{ paddingLeft: '40px', fontFamily: 'var(--font-mono, monospace)' }}
-                  />
-                </div>
-                <p style={{ margin: '4px 0 0', fontSize: '0.72rem', color: '#94A3B8' }}>
-                  Nhập 0 nếu chủ cửa hàng không muốn giới hạn số tiền nợ
-                </p>
-              </div>
-
+            {/* Hạng thẻ */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
               <div className="form-group">
                 <label className="form-label">
                   Hạng thành viên

@@ -247,9 +247,6 @@ export const TaxSnapshotPage: FC = () => {
                       : 'Nhóm 2: 1 – 3 tỷ (Sổ S2a)'}
                   </span>
                 </div>
-                <p className="tax-topbar-subtitle">
-                  Kiểm soát ngưỡng 1 tỷ, quản lý kê khai thuế và hệ thống 7 sổ kế toán HKD (Thông tư 152/2025/TT-BTC).
-                </p>
               </div>
             </div>
 
@@ -353,17 +350,17 @@ export const TaxSnapshotPage: FC = () => {
                 </select>
               </div>
 
+              <button
+                type="button"
+                className="btn-secondary-pill tax-refresh-button"
+                disabled={isSummaryLoading || isSummaryRefetching}
+                onClick={() => { void refetchSummary(); }}
+                title="Cập nhật số liệu"
+              >
+                <RotateCcw size={14} className={isSummaryRefetching ? 'tax-refresh-icon spinning' : 'tax-refresh-icon'} />
+                <span>{isSummaryRefetching ? 'Đang cập nhật' : 'Cập nhật'}</span>
+              </button>
               <div ref={actionMenuRef} className="tax-actions-menu-wrap">
-                <button
-                  type="button"
-                  className="btn-secondary-pill tax-refresh-button"
-                  disabled={isSummaryLoading || isSummaryRefetching}
-                  onClick={() => { void refetchSummary(); }}
-                  title="Cập nhật số liệu từ máy chủ"
-                >
-                  <RotateCcw size={14} className={isSummaryRefetching ? 'tax-refresh-icon spinning' : 'tax-refresh-icon'} />
-                  <span>{isSummaryRefetching ? 'Đang cập nhật' : 'Cập nhật'}</span>
-                </button>
                 <button
                   type="button"
                   className="btn-secondary-pill tax-actions-menu-trigger"

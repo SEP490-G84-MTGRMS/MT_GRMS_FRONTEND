@@ -6,7 +6,7 @@ export type MembershipTier = 'Standard' | 'Silver' | 'Gold' | 'VIP';
 /**
  * Filter status for accounts receivable
  */
-export type DebtFilterStatus = 'ALL' | 'NO_DEBT' | 'IN_LIMIT' | 'OVER_LIMIT' | 'DEBT';
+export type DebtFilterStatus = 'ALL' | 'NO_DEBT' | 'DEBT';
 
 /**
  * Summary of an invoice linked to a customer
@@ -15,7 +15,7 @@ export interface CustomerInvoiceSummary {
   id: string;
   date: string;
   amount: number;
-  status: 'Paid' | 'Unpaid' | 'Partial';
+  status: 'Debt';
 }
 
 /**
@@ -46,8 +46,6 @@ export interface CustomerDto {
   loyaltyPoints: number;
   membershipTier: MembershipTier;
   currentDebtAR: number;
-  debtLimit: number;
-  allowDebt?: boolean;
   totalSpending: number;
   status: 'Active' | 'Inactive';
   createdAt: string;
@@ -65,8 +63,6 @@ export interface CreateCustomerInput {
   email?: string;
   address?: string;
   taxCode?: string;
-  debtLimit: number;
-  allowDebt?: boolean;
   membershipTier?: MembershipTier;
 }
 
@@ -78,8 +74,6 @@ export interface UpdateCustomerInput {
   email?: string;
   address?: string;
   taxCode?: string;
-  debtLimit?: number;
-  allowDebt?: boolean;
   membershipTier?: MembershipTier;
   status?: 'Active' | 'Inactive';
 }
@@ -100,7 +94,6 @@ export interface CustomerDebtLedgerDto {
   customerId: string;
   transactionType: 'DEBT_INCREASE' | 'DEBT_DECREASE';
   amount: number;
-  balanceAfter: number;
   referenceDocId?: string;
   paymentMethod?: 'Cash' | 'VietQR';
   cashTransactionCode?: string;
@@ -127,6 +120,6 @@ export interface VietQrConfig {
 export interface CustomerKpiSummary {
   totalCustomers: number;
   totalDebtAR: number;
-  overLimitCount: number;
+  debtorCount: number;
   totalLoyaltyPoints: number;
 }

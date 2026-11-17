@@ -190,22 +190,20 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
             </div>
           </div>
 
-          {/* FIFO Unpaid Invoices Badges */}
-          {customer.invoices && customer.invoices.filter((inv) => inv.status !== 'Paid').length > 0 && (
+          {/* Các đơn đã phát sinh bán nợ */}
+          {customer.invoices && customer.invoices.length > 0 && (
             <div style={{ marginTop: '12px', padding: '10px 12px', background: '#F0FDFA', borderRadius: '10px', border: '1px solid #99F6E4' }}>
               <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#0F766E', marginBottom: '6px' }}>
-                HÓA ĐƠN NỢ THEO THỨ TỰ FIFO (CẦN THU TRƯỚC):
+                CÁC ĐƠN BÁN NỢ GẦN ĐÂY:
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {customer.invoices
-                  .filter((inv) => inv.status !== 'Paid')
-                  .map((inv, idx) => (
+                {customer.invoices.map((inv) => (
                     <span
                       key={inv.id}
                       className="badge badge-teal"
                       style={{ fontSize: '0.74rem', padding: '3px 8px' }}
                     >
-                      #{idx + 1} {inv.id}: {formatCurrency(inv.amount)} ({inv.status === 'Partial' ? 'Nợ một phần' : 'Chưa trả'})
+                      {inv.id}: {formatCurrency(inv.amount)} (Bán nợ)
                     </span>
                   ))}
               </div>
@@ -441,9 +439,6 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ color: '#94a3b8' }}>
                           {new Date(item.createdAt).toLocaleDateString('vi-VN')} {new Date(item.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <span>
-                          Dư nợ sau GD: <strong style={{ color: '#0F766E', fontFamily: 'var(--font-mono, monospace)' }}>{formatCurrency(item.balanceAfter)}</strong>
                         </span>
                       </div>
                     </div>

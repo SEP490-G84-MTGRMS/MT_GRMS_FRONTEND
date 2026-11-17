@@ -1127,7 +1127,7 @@ export const InvoiceManagementPage: FC = () => {
                     <option value="ALL">Tất cả phương thức</option>
                     <option value="VIETQR">Chuyển khoản VietQR</option>
                     <option value="CASH">Tiền mặt</option>
-                    <option value="DEBT">Ghi nợ (Còn nợ)</option>
+                    <option value="DEBT">Đơn bán nợ</option>
                   </select>
 
                   <select
@@ -1138,7 +1138,7 @@ export const InvoiceManagementPage: FC = () => {
                   >
                     <option value="ALL">Tất cả trạng thái</option>
                     <option value="COMPLETED">Đã thanh toán 100%</option>
-                    <option value="DEBT">Đang ghi nợ (Chưa tất toán)</option>
+                    <option value="DEBT">Đơn bán nợ</option>
                     <option value="CANCELLED">Đã hủy / Đổi trả</option>
                   </select>
                 </div>
@@ -2363,6 +2363,7 @@ export const InvoiceManagementPage: FC = () => {
         invoice={returnExchangeModalInvoice}
         availableProducts={exchangeBranchProducts.length > 0 ? exchangeBranchProducts : catalogProducts}
         currentDrawerCash={activeShiftCash}
+        isStoreOwner={isStoreOwner}
         onClose={() => setReturnExchangeModalInvoice(null)}
         onConfirm={handleConfirmReturnExchange}
       />

@@ -16,14 +16,14 @@ import type {
 const DEFAULT_TILL_ID = '01a19664-6210-7b12-a9eb-6fa16ca5b9db';
 const DEFAULT_BANK_ID = '01a19664-6741-7f3d-9be7-cb4c7b876559';
 
-interface BackendCustomerDebtEntry {
+interface BackendCustomerDebtLedgerItem {
   id: string;
   entryCode: string;
   customerId: string;
   entryType: string;
   amount: number;
-  balanceAfter: number;
-  prepaymentAfter: number;
+  balanceBefore: number | null;
+  balanceAfter: number | null;
   referenceCode: string;
   description: string;
   occurredAtUtc: string;
@@ -31,7 +31,7 @@ interface BackendCustomerDebtEntry {
 
 /**
  * Customer CRM & Accounts Receivable (FE-08) Live API Service
- * Backed by PostgreSQL Neon DB & EF Core CustomerDebtService (FIFO Debt Clearing)
+ * Backed by PostgreSQL Neon DB & customer-level debt balance.
  */
 export const customerApi = {
   /**
@@ -84,9 +84,7 @@ export const customerApi = {
       fullName: input.fullName.trim(),
       email: input.email?.trim() || null,
       address: input.address?.trim() || null,
-      debtLimit: Number(input.debtLimit) || 0,
       membershipTier: input.membershipTier || 'Standard',
-      allowDebt: input.allowDebt !== undefined ? Boolean(input.allowDebt) : (Number(input.debtLimit) || 0) > 0,
     });
 
     if (!res.data.success || !res.data.data) {
@@ -104,10 +102,8 @@ export const customerApi = {
       fullName: input.fullName !== undefined ? input.fullName.trim() : undefined,
       email: input.email !== undefined ? input.email.trim() : undefined,
       address: input.address !== undefined ? input.address.trim() : undefined,
-      debtLimit: input.debtLimit !== undefined ? Number(input.debtLimit) : undefined,
       membershipTier: input.membershipTier,
       status: input.status,
-      allowDebt: input.allowDebt,
     });
 
     if (!res.data.success || !res.data.data) {
@@ -118,8 +114,7 @@ export const customerApi = {
   },
 
   /**
-   * Execute FIFO debt collection receipt
-   * Automatically clears oldest debt invoices first, generates SHA-256 cashbook receipt entry
+   * Collect against the customer's total debt and generate a cashbook receipt.
    */
   async collectDebt(input: CollectDebtInput): Promise<CustomerDto> {
     if (input.amount <= 0) {
@@ -187,11 +182,11 @@ export const customerApi = {
   },
 
   /**
-   * Get detailed debt audit history from CustomerDebtEntries in Neon DB
+   * Get detailed debt audit history
    */
   async getCustomerDebtLedger(customerId: string): Promise<CustomerDebtLedgerDto[]> {
     try {
-      const res = await financeHttpClient.get<ApiResponse<BackendCustomerDebtEntry[]>>(
+      const res = await financeHttpClient.get<ApiResponse<BackendCustomerDebtLedgerItem[]>>(
         `/customers/debt/ledger/${customerId}`
       );
 
@@ -211,7 +206,6 @@ export const customerApi = {
           customerId: entry.customerId,
           transactionType: isDecrease ? 'DEBT_DECREASE' : 'DEBT_INCREASE',
           amount: entry.amount,
-          balanceAfter: entry.balanceAfter,
           referenceDocId: entry.referenceCode,
           paymentMethod:
             entry.entryType === 'DebtRepayment' ? (isBankMethod ? 'VietQR' : 'Cash') : undefined,

@@ -76,7 +76,6 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
         phoneNumber: normalizedPhone,
         email: trimmedEmail || undefined,
         address: fullAddress || undefined,
-        debtLimit: 0,
         membershipTier: 'Standard',
       });
 
@@ -96,11 +95,9 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
         note: note.trim() || undefined,
         loyaltyPoints: created.loyaltyPoints ?? 0,
         membershipTier: created.membershipTier || 'Standard',
-        debtLimit: created.debtLimit ?? 0,
         debtCount: 0,
         totalDebtPurchased: 0,
         currentDebt: created.currentDebtAR ?? 0,
-        allowDebt: Boolean((created.debtLimit ?? 0) > 0 || cAny.allowDebt),
       };
 
       onSave(newCust);

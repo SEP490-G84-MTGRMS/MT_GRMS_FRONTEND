@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, Clock, AlertCircle, Users, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, ChevronRight } from 'lucide-react';
 import { formatMoney } from '../utils/formatters';
 
 export interface ActionInboxProps {
@@ -8,15 +8,13 @@ export interface ActionInboxProps {
   cashInTransit: number;
   overduePayablesCount: number;
   overduePayablesAmount: number;
-  overLimitCustomersCount: number;
   onNavigateCashControl: () => void;
   onNavigateExpenses: () => void;
-  onNavigateCustomers: () => void;
 }
 
 /**
  * Action Inbox component: Urgently alerts the store owner to unconfirmed POS cash drops,
- * pending counter disbursements, overdue operating expenses, and customers exceeding credit limits.
+ * pending counter disbursements and overdue operating expenses.
  */
 export const ActionInbox: React.FC<ActionInboxProps> = ({
   unconfirmedDropsCount,
@@ -24,16 +22,13 @@ export const ActionInbox: React.FC<ActionInboxProps> = ({
   cashInTransit,
   overduePayablesCount,
   overduePayablesAmount,
-  overLimitCustomersCount,
   onNavigateCashControl,
   onNavigateExpenses,
-  onNavigateCustomers,
 }) => {
   const pendingPosTasksCount = unconfirmedDropsCount + pendingApprovalsCount;
   const totalTasks =
     (pendingPosTasksCount > 0 ? 1 : 0) +
-    (overduePayablesCount > 0 ? 1 : 0) +
-    (overLimitCustomersCount > 0 ? 1 : 0);
+    (overduePayablesCount > 0 ? 1 : 0);
 
   // If there are zero urgent tasks, display a compact reassuring green banner
   if (totalTasks === 0) {
@@ -126,31 +121,6 @@ export const ActionInbox: React.FC<ActionInboxProps> = ({
             </div>
           )}
 
-          {/* 3. Customers Exceeding Credit Limit */}
-          {overLimitCustomersCount > 0 && (
-            <div className="action-inbox-item warning">
-              <div className="action-inbox-icon-box warning">
-                <Users size={18} />
-              </div>
-              <div className="action-inbox-content">
-                <div className="action-inbox-title">
-                  {overLimitCustomersCount} khách hàng vượt hạn mức nợ
-                </div>
-                <div className="action-inbox-meta">
-                  Cần thu hồi công nợ trước khi tiếp tục cho phép ghi nợ đơn mới
-                </div>
-              </div>
-              <div className="action-inbox-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={onNavigateCustomers}
-                >
-                  Thu nợ ngay →
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </section>

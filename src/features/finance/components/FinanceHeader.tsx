@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, BookOpen, Clock } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 export type FinanceTabKey = 'overview' | 'pnl';
 
@@ -9,8 +9,6 @@ interface FinanceHeaderProps {
   onTabChange: (tab: FinanceTabKey) => void;
   isRefreshing: boolean;
   onRefreshAll: () => void;
-  onNavigateCashbook: () => void;
-  onNavigateCashControl: () => void;
 }
 
 /**
@@ -23,8 +21,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
   onTabChange,
   isRefreshing,
   onRefreshAll,
-  onNavigateCashbook,
-  onNavigateCashControl,
 }) => {
   return (
     <div className="finance-header-wrapper">
@@ -49,30 +45,6 @@ export const FinanceHeader: React.FC<FinanceHeaderProps> = ({
             <span>Cập nhật</span>
           </button>
 
-          {/* Pending shifts remain accessible from the cash health overview. */}
-          {activeTab === 'overview' && (
-            <button
-              type="button"
-              onClick={onNavigateCashControl}
-              className="finance-btn-secondary"
-              title="Xem Ca & Két chờ duyệt"
-            >
-              <Clock size={15} />
-              <span>Ca & Két chờ duyệt</span>
-            </button>
-          )}
-
-          {/* Navigate to Cashbook */}
-          <button
-            type="button"
-            onClick={onNavigateCashbook}
-            className="btn-primary-teal"
-            id="btn-quick-receipt-payment"
-            title="Mở Sổ quỹ chi tiết để quản lý Thu / Chi tiền"
-          >
-            <BookOpen size={15} />
-            <span>Mở Sổ quỹ Thu/Chi</span>
-          </button>
         </div>
       </div>
 
