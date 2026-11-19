@@ -9,11 +9,20 @@ import {
   CheckCircle2, 
   Clock, 
   ShieldCheck,
-  Building2
+  Building2,
+  AlertTriangle
 } from 'lucide-react';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuthStore } from '../../../../stores/useAuthStore';
 import { httpClient } from '../../../../api/httpClient';
-import { financeAccountsApi } from '../../../finance-accounts/api/financeAccountsApi';
+
+function resolveHubUrl(): string {
+  const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  if (apiBase && /^https?:\/\//i.test(apiBase)) {
+    return `${apiBase.replace(/\/api\/?$/, '')}/hubs/notifications`;
+  }
+  return '/hubs/notifications';
+}
 
 interface Props {
   isOpen: boolean;
@@ -41,6 +50,10 @@ export const VietQrModal: FC<Props> = ({
   const [copiedContent, setCopiedContent] = useState(false);
   const [isConfigLoading, setIsConfigLoading] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [partialPayment, setPartialPayment] = useState<{
+    paidAmount: number;
+    remainingAmount: number;
+  } | null>(null);
 
   // Đọc cấu hình ngân hàng công khai của cửa hàng (Zero-Plaintext: Không chứa API Key)
   const [bankCode, setBankCode] = useState('');
@@ -57,6 +70,7 @@ export const VietQrModal: FC<Props> = ({
     setIsChecking(false);
     setIsConfigLoading(true);
     setConfigError(null);
+    setPartialPayment(null);
     setBankCode('');
     setBankAccountNumber('');
     setBankAccountName('');
@@ -72,19 +86,7 @@ export const VietQrModal: FC<Props> = ({
 
     // Đồng bộ cấu hình QR công khai từ Backend (An toàn cho mọi nhân viên thu ngân, không lộ API Key)
     httpClient
-      .get('/payments/public-qr-config', { params: { tenantId: currentTenantId, branchId } })
-      .catch(async (error) => {
-        if (error?.response?.status !== 404) throw error;
-        const account = await financeAccountsApi.getVietQrDefault(branchId);
-        const cleanTenantId = currentTenantId.replace(/[^a-z0-9]/gi, '').toUpperCase();
-        const tenantPrefix = currentTenantId.includes('an_nhien_02') ? 'AN02'
-          : currentTenantId.includes('an_nhien_01') ? 'AN01'
-          : currentTenantId.includes('cau_giay') ? 'CG01'
-          : cleanTenantId.length >= 4 ? cleanTenantId.slice(-4) : 'MT01';
-        return { data: { paymentAccountId: account.id, bankCode: account.bankCode,
-          bankAccountNumber: account.accountNumber, bankAccountName: account.accountHolderName,
-          bankName: account.bankName, tenantPrefix, isActive: true } };
-      })
+      .get('/payments/public-qr-config', { params: { tenantId: currentTenantId, branchId, orderCode } })
       .then((res) => {
         if (cancelled) return;
         const data = res.data;
@@ -107,9 +109,56 @@ export const VietQrModal: FC<Props> = ({
       });
 
     return () => { cancelled = true; };
-  }, [isOpen, currentTenantId, branchId]);
+  }, [isOpen, currentTenantId, branchId, orderCode]);
 
-  // LỚP 6: Tự động Polling kiểm tra trạng thái gạch nợ mỗi 2.5 giây khi đang mở QR
+  // LẮNG NGHE SIGNALR REALTIME (Tự động đóng popup & in hóa đơn khi SePay bắn Webhook)
+  useEffect(() => {
+    if (!isOpen || !orderCode) return;
+
+    const connection = new HubConnectionBuilder()
+      .withUrl(resolveHubUrl(), { withCredentials: true })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
+
+    connection.on('PaymentReceived', (data: {
+      orderCode?: string;
+      isFullPayment?: boolean;
+      amountIn?: number;
+      totalPaid?: number;
+      remaining?: number;
+    }) => {
+      if (!data) return;
+      const incomingCode = String(data.orderCode || '').toUpperCase();
+      const currentCode = String(orderCode || '').toUpperCase();
+      if (incomingCode !== currentCode && !incomingCode.includes(currentCode) && !currentCode.includes(incomingCode)) return;
+
+      if (data.isFullPayment) {
+        setIsSuccessPaid(true);
+        setTimeout(() => {
+          onConfirmAndPrint();
+        }, 1000);
+      } else {
+        setPartialPayment({
+          paidAmount: data.totalPaid || data.amountIn || 0,
+          remainingAmount: data.remaining || 0,
+        });
+      }
+    });
+
+    connection.start()
+      .then(() => {
+        connection.invoke('JoinOrderGroup', orderCode).catch(() => {});
+      })
+      .catch(() => {});
+
+    return () => {
+      connection.invoke('LeaveOrderGroup', orderCode).catch(() => {});
+      void connection.stop();
+    };
+  }, [isOpen, orderCode, onConfirmAndPrint]);
+
+  // LỚP 6: Tự động Polling kiểm tra trạng thái gạch nợ mỗi 2.5 giây khi đang mở QR (Dự phòng mạng)
   useEffect(() => {
     if (!isOpen || isSuccessPaid || !orderCode || isConfigLoading || configError) return;
 
@@ -121,6 +170,11 @@ export const VietQrModal: FC<Props> = ({
           setTimeout(() => {
             onConfirmAndPrint();
           }, 1000);
+        } else if (res.data?.paymentStatus === 'PARTIALLY_PAID') {
+          setPartialPayment({
+            paidAmount: res.data.depositAmount || 0,
+            remainingAmount: res.data.remainingAmount || 0,
+          });
         }
       } catch {
         // Bỏ qua lỗi mạng tạm thời trong khi chờ khách quét QR
@@ -147,12 +201,16 @@ export const VietQrModal: FC<Props> = ({
   const seconds = countdown % 60;
   const timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-  // Tiền tố đơn hàng phân lập theo Tenant (VD: AN02_HD1005)
+  // Tiền tố đơn hàng phân lập theo Tenant viết liền (VD: AN02HD1005) chống app ngân hàng tự động lọc bỏ dấu gạch dưới
   const cleanCode = orderCode.replace(/^HD/i, '');
-  const transferContent = `${customTenantPrefix}_HD${cleanCode}`;
+  const transferContent = `${customTenantPrefix}HD${cleanCode}`;
+
+  const currentPayAmount = partialPayment && partialPayment.remainingAmount > 0
+    ? partialPayment.remainingAmount
+    : amount;
 
   // Link mã VietQR động chuẩn Napas 247
-  const qrUrl = `https://img.vietqr.io/image/${bankCode}-${bankAccountNumber}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(
+  const qrUrl = `https://img.vietqr.io/image/${bankCode}-${bankAccountNumber}-compact2.png?amount=${currentPayAmount}&addInfo=${encodeURIComponent(
     transferContent
   )}&accountName=${encodeURIComponent(bankAccountName)}`;
 
@@ -168,11 +226,17 @@ export const VietQrModal: FC<Props> = ({
         }, 1000);
         return;
       }
+      if (res.data?.paymentStatus === 'PARTIALLY_PAID') {
+        setPartialPayment({
+          paidAmount: res.data.depositAmount || 0,
+          remainingAmount: res.data.remainingAmount || 0,
+        });
+      }
     } catch {
       // Backend offline
+    } finally {
+      setIsChecking(false);
     }
-
-    setIsChecking(false);
   };
 
   const handleCopyContent = () => {
@@ -183,7 +247,7 @@ export const VietQrModal: FC<Props> = ({
 
   return (
     <div className="pos-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pos-modal-dialog" style={{ maxWidth: 540, padding: 0, overflow: 'hidden' }}>
+      <div className="pos-modal-dialog" style={{ maxWidth: 640, width: '95%', padding: 0, overflow: 'hidden' }}>
         {/* Header Modal */}
         <div 
           style={{
@@ -254,6 +318,30 @@ export const VietQrModal: FC<Props> = ({
             </div>
           ) : (
             <>
+              {/* Cảnh báo khách chuyển thiếu tiền */}
+              {partialPayment && partialPayment.remainingAmount > 0 && (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    backgroundColor: '#fffbeb',
+                    border: '1.5px solid #f59e0b',
+                    borderRadius: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#b45309', fontWeight: 800, fontSize: 13.5 }}>
+                    <AlertTriangle size={18} />
+                    <span>CẢNH BÁO: KHÁCH CHUYỂN THIẾU TIỀN!</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#92400e', marginTop: 4 }}>
+                    Đã nhận vào TK: <b>{partialPayment.paidAmount.toLocaleString('vi-VN')} đ</b> · Còn thiếu: <b style={{ color: '#dc2626', fontSize: 14 }}>{partialPayment.remainingAmount.toLocaleString('vi-VN')} đ</b>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#78350f', marginTop: 4 }}>
+                    Mã QR bên dưới đã cập nhật lại số tiền còn thiếu (<b>{partialPayment.remainingAmount.toLocaleString('vi-VN')} đ</b>). Bạn có thể yêu cầu khách quét tiếp lần 2, hoặc thu tiền mặt phần còn lại rồi bấm <b>"Xác nhận đã nhận tiền & In Bill"</b>.
+                  </div>
+                </div>
+              )}
+
               {/* Bảng tóm tắt tài khoản nhận tiền */}
               <div 
                 style={{
@@ -284,9 +372,18 @@ export const VietQrModal: FC<Props> = ({
                 </div>
 
                 <div>
-                  <span style={{ color: '#64748b' }}>Số tiền thanh toán:</span>
+                  <span style={{ color: '#64748b' }}>Số tiền cần thanh toán:</span>
                   <div style={{ fontWeight: 800, color: '#dc2626', fontSize: 15 }}>
-                    {amount.toLocaleString('vi-VN')} đ
+                    {partialPayment ? (
+                      <>
+                        <span style={{ textDecoration: 'line-through', color: '#94a3b8', fontSize: 12.5, marginRight: 6 }}>
+                          {amount.toLocaleString('vi-VN')} đ
+                        </span>
+                        <span>{partialPayment.remainingAmount.toLocaleString('vi-VN')} đ</span>
+                      </>
+                    ) : (
+                      `${amount.toLocaleString('vi-VN')} đ`
+                    )}
                   </div>
                 </div>
               </div>
@@ -317,16 +414,18 @@ export const VietQrModal: FC<Props> = ({
                 {/* Ảnh VietQR động */}
                 <div
                   style={{
-                    width: 220,
-                    height: 220,
+                    width: 340,
+                    height: 340,
+                    maxWidth: '100%',
                     margin: '0 auto',
                     backgroundColor: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    padding: 8,
-                    borderRadius: 8,
+                    border: '2px solid #cbd5e1',
+                    padding: 12,
+                    borderRadius: 12,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
                   }}
                 >
                   <img
