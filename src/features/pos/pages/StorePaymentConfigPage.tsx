@@ -39,6 +39,7 @@ interface PaymentAccountAssignment {
   bankCode: string;
   bankAccountNumber: string;
   branchIds: string[];
+  isActive?: boolean;
 }
 
 export const StorePaymentConfigPage: FC = () => {
@@ -111,7 +112,7 @@ export const StorePaymentConfigPage: FC = () => {
         ) || accounts[0];
         setPaymentAccountId(currentAccount?.paymentAccountId || null);
         setSavedAccountKey(currentAccount ? `${currentAccount.bankCode}|${currentAccount.bankAccountNumber}` : '');
-        setSelectedBranchIds(Array.isArray(currentAccount?.branchIds) ? currentAccount.branchIds : []);
+        setSelectedBranchIds(Array.isArray(currentAccount?.branchIds) ? currentAccount.branchIds.slice(0, 1) : []);
       })
       .catch(() => {
         setSaveMessage('Không thể tải cấu hình từ máy chủ. Không sử dụng dữ liệu mẫu.');
@@ -156,7 +157,7 @@ export const StorePaymentConfigPage: FC = () => {
     setBankAccountNumber(acc.bankAccountNumber);
     setBankAccountName(acc.bankAccountName);
     setPaymentAccountId(existingAccount?.paymentAccountId || null);
-    setSelectedBranchIds(existingAccount?.branchIds || []);
+    setSelectedBranchIds(existingAccount?.branchIds.slice(0, 1) || []);
     setSaveMessage(
       existingAccount
         ? 'Đã mở cấu hình tài khoản. Hãy chọn các chi nhánh cần gán rồi bấm Lưu Cấu Hình.'
@@ -197,11 +198,7 @@ export const StorePaymentConfigPage: FC = () => {
   };
 
   const toggleBranch = (branchId: string) => {
-    setSelectedBranchIds((current) =>
-      current.includes(branchId)
-        ? current.filter((id) => id !== branchId)
-        : [...current, branchId]
-    );
+    setSelectedBranchIds([branchId]);
   };
 
   const handleSave = async () => {
@@ -450,21 +447,25 @@ export const StorePaymentConfigPage: FC = () => {
               </div>
             </div>
 
+            <div style={{ padding: '12px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Tài khoản ngân hàng đã lưu</div>
+              {paymentAccountAssignments.length === 0 ? <div style={{ fontSize: 12, color: '#64748b' }}>Chưa có tài khoản.</div> :
+                paymentAccountAssignments.map((account) => <div key={account.paymentAccountId} style={{ fontSize: 12, padding: '6px 0', borderTop: '1px solid #f1f5f9' }}>
+                  <b>{account.bankCode} · {account.bankAccountNumber}</b>{' — '}
+                  {account.branchIds.length > 0
+                    ? `Đang nhận QR tại ${branches.find(branch => branch.id === account.branchIds[0])?.name || 'chi nhánh'}`
+                    : 'Lịch sử; đơn và giao dịch cũ vẫn giữ tài khoản này'}
+                </div>)}
+            </div>
+
             <div style={{ padding: '12px 14px', backgroundColor: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#115e59' }}>Chi nhánh sử dụng tài khoản này</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#115e59' }}>Chi nhánh nhận tiền</div>
                   <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
-                    Chọn chi nhánh nhận tiền vào tài khoản này.
+                    Chọn một chi nhánh. Khi đổi tài khoản, đơn và giao dịch cũ vẫn giữ tài khoản ban đầu.
                   </div>
                 </div>
-                {branches.length > 0 && (
-                  <button type="button" disabled={!isOwnerOrAdmin}
-                    onClick={() => setSelectedBranchIds(selectedBranchIds.length === branches.length ? [] : branches.map((branch) => branch.id))}
-                    style={{ border: 0, background: 'transparent', color: '#0f766e', fontSize: 11.5, fontWeight: 800, cursor: 'pointer' }}>
-                    {selectedBranchIds.length === branches.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
-                  </button>
-                )}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 7 }}>
                 {branches.map((branch) => (
@@ -474,7 +475,7 @@ export const StorePaymentConfigPage: FC = () => {
                     backgroundColor: selectedBranchIds.includes(branch.id) ? '#ccfbf1' : '#ffffff',
                     cursor: isOwnerOrAdmin ? 'pointer' : 'default', fontSize: 12.5, color: '#334155',
                   }}>
-                    <input type="checkbox" disabled={!isOwnerOrAdmin} checked={selectedBranchIds.includes(branch.id)} onChange={() => toggleBranch(branch.id)} />
+                    <input type="radio" name="receiving-branch" disabled={!isOwnerOrAdmin} checked={selectedBranchIds.includes(branch.id)} onChange={() => toggleBranch(branch.id)} />
                     <span><b>{branch.code || 'CN'}</b> — {branch.name}</span>
                   </label>
                 ))}

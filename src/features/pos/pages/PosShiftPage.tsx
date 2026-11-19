@@ -17,6 +17,7 @@ import {
   FileText,
   Search,
   RotateCcw,
+  CalendarCheck,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
 import { posOrderApi, type OwnerUnsettledSummaryResponse } from '../api/posOrderApi';
@@ -47,6 +48,13 @@ export const PosShiftPage: FC = () => {
   const [selectedBranchId, setSelectedBranchId] = useState<string>(
     branchFromUrl || user?.branchId || ''
   );
+  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+  const selectedBranchName = branches.find((branch) => branch.id === selectedBranchId)?.name || 'Chi nhánh chưa xác định';
+  const fundTypeLabel = (type: string) => ({ Till: 'Két quầy', Safe: 'Két sắt', Bank: 'Ngân hàng', Transit: 'Tiền đang chuyển', Suspense: 'Khoản chờ xử lý', '1': 'Két quầy', '2': 'Két sắt', '3': 'Ngân hàng', '4': 'Tiền đang chuyển', '5': 'Khoản chờ xử lý' }[type] || 'Quỹ');
+  const fundDisplayName = (fund: { fundName: string; fundType: string }) =>
+    fund.fundName.includes('?') || fund.fundName.includes('�')
+      ? `${fundTypeLabel(fund.fundType)} · ${selectedBranchName}`
+      : fund.fundName;
 
   // Bộ lọc dải thời gian & tìm kiếm
   const [timePreset, setTimePreset] = useState<'today' | '7days' | '30days' | 'all'>('7days');
@@ -85,6 +93,7 @@ export const PosShiftPage: FC = () => {
   const [businessDayPreviewError, setBusinessDayPreviewError] = useState<string | null>(null);
   const [businessDayFundCounts, setBusinessDayFundCounts] = useState<Record<string, string>>({});
   const [businessDayHistory, setBusinessDayHistory] = useState<BusinessDayClosingVersion[]>([]);
+  const isBusinessDayClosed = businessDayHistory.some((closing) => closing.isActive && closing.status.toLowerCase() === 'closed');
 
   // Modal Buộc đóng ca (Force Close) cho Chủ cửa hàng khi nhân viên quên chốt ca
   const [forceCloseTargetShift, setForceCloseTargetShift] = useState<ShiftDetailResponse | null>(null);
@@ -111,6 +120,7 @@ export const PosShiftPage: FC = () => {
     let isMounted = true;
     employeeApi.getBranches().then((list) => {
       if (!isMounted) return;
+      setBranches(list || []);
       if (list && list.length > 0) {
         // Khởi tạo từ mtgrms_active_branch nếu là Chủ cửa hàng
         let initialId = '';
@@ -260,31 +270,6 @@ export const PosShiftPage: FC = () => {
     return () => { cancelled = true; };
   }, [isOwnerEodModalOpen, eodBranchScope, selectedBranchId, eodBusinessDate]);
 
-  const handleReopenBusinessDay = async (closing: BusinessDayClosingVersion) => {
-    const reason = window.prompt('Nhập lý do mở lại ngày nghiệp vụ (bắt buộc, tối đa 500 ký tự):', '');
-    if (reason == null) return;
-    const normalized = reason.trim();
-    if (!normalized || normalized.length > 500) {
-      alert('Lý do mở lại phải có từ 1 đến 500 ký tự.');
-      return;
-    }
-    setIsSettlingOwnerEod(true);
-    try {
-      await posShiftApi.reopenBusinessDay(closing.id, normalized);
-      const [history, preview] = await Promise.all([
-        posShiftApi.getBusinessDayHistory(selectedBranchId, eodBusinessDate),
-        posShiftApi.previewBusinessDay(selectedBranchId, eodBusinessDate),
-      ]);
-      setBusinessDayHistory(history);
-      setBusinessDayPreview(preview);
-      alert('Đã mở lại ngày nghiệp vụ. Snapshot cũ được giữ nguyên; sau khi điều chỉnh hãy chốt lại để tạo phiên bản mới.');
-    } catch (error: any) {
-      alert(error?.response?.data?.message || error?.message || 'Không thể mở lại ngày nghiệp vụ.');
-    } finally {
-      setIsSettlingOwnerEod(false);
-    }
-  };
-
   // Danh sách tất cả các ca của Nhân viên đã đóng nhưng đang chờ Chủ cửa hàng duyệt bàn giao (tiền đang lơ lửng chưa vào Két sắt)
   const pendingEmployeeShifts = useMemo(() => {
     return shifts.filter(
@@ -321,17 +306,14 @@ export const PosShiftPage: FC = () => {
     [shifts, eodBusinessDate, getShiftBusinessDate]
   );
 
-  // Các ca mở trong Ngày nghiệp vụ đang chọn mà nhân viên quên chưa chốt (Ca của ngày hôm sau đang mở sẽ KHÔNG nằm trong danh sách này và KHÔNG chặn khóa sổ ngày cũ)
+  // Mọi ca đang mở hoặc đang kiểm đếm của ngày này đều phải được chốt, kể cả ca của Chủ cửa hàng.
   const openShiftsForBusinessDate = useMemo(
     () =>
       shiftsForBusinessDate.filter(
         (s) =>
-          !s.closedAtUtc &&
-          s.status !== 2 &&
-          s.status !== 'Closed' &&
-          s.cashierUserId !== user?.id
+          s.status === 1 || s.status === 3 || s.status === 'Open' || s.status === 'Closing'
       ),
-    [shiftsForBusinessDate, user?.id]
+    [shiftsForBusinessDate]
   );
 
   const pendingShiftsForBusinessDate = useMemo(
@@ -372,19 +354,10 @@ export const PosShiftPage: FC = () => {
     };
   }, [shiftsForBusinessDate, openShiftsForBusinessDate, pendingShiftsForBusinessDate]);
 
-  const handleChangeEodScope = (scope: 'CURRENT' | 'ALL') => {
-    setEodBranchScope(scope);
-    if (isOwnerOrAdmin) {
-      posOrderApi
-        .getOwnerUnsettledSummary(scope === 'ALL' ? undefined : selectedBranchId)
-        .then((summary) => setOwnerUnsettled(summary))
-        .catch(() => setOwnerUnsettled(null));
-    }
-  };
-
   // Thao tác 1 (Độc lập 24/7): Kết toán đơn Chủ tự bán (ShiftId = null) tính đến thời điểm hiện tại (Không bị chặn bởi ca nhân viên đang mở)
   // Thao tác 2: Duyệt bàn giao & Khóa sổ các ca nhân viên đã đóng thuộc Ngày nghiệp vụ đang chọn
   const handleApproveBusinessDateShifts = async () => {
+    if (isBusinessDayClosed) return;
     const blockersOtherThanPendingHandover = businessDayPreview?.blockers.filter(
       (blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER'
     ) ?? [];
@@ -518,8 +491,16 @@ export const PosShiftPage: FC = () => {
   const handleConfirmForceCloseShift = async () => {
     if (!forceCloseTargetShift) return;
     if (forceCloseTargetShift.cashierUserId === user?.id) return;
+    if (![forceActualCash, forceRetainedFloat].every((amount) => Number.isSafeInteger(amount) && amount >= 0 && amount <= 999_999_999_999) || forceRetainedFloat > forceActualCash) {
+      alert('Tiền kiểm đếm và tiền để lại phải là số nguyên không âm, tối đa 999.999.999.999 đ; tiền để lại không vượt quá tiền thực đếm.');
+      return;
+    }
     if (!forceReason.trim()) {
       alert('Vui lòng nhập lý do buộc đóng ca (VD: Nhân viên quên bấm chốt ca khi hết giờ).');
+      return;
+    }
+    if (forceReason.trim().length > 470) {
+      alert('Lý do buộc đóng ca tối đa 470 ký tự.');
       return;
     }
     const dropped = Math.max(0, forceActualCash - forceRetainedFloat);
@@ -729,7 +710,38 @@ export const PosShiftPage: FC = () => {
           </h1>
         </div>
 
-        <div className="so-list-header-actions">
+        <div className="so-list-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isOwnerOrAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedBranchId === 'ALL' && branches[0]) setSelectedBranchId(branches[0].id);
+                setEodBranchScope('CURRENT');
+                setIsOwnerEodModalOpen(true);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                height: 32,
+                padding: '0 12px',
+                borderRadius: 6,
+                border: 'none',
+                backgroundColor: '#0F766E',
+                color: '#FFFFFF',
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                transition: 'background-color 0.15s ease',
+              }}
+              title="Khóa sổ ngày nghiệp vụ, kiểm đếm quỹ và kết toán doanh thu tiền mặt về Két sắt"
+            >
+              <CalendarCheck size={15} />
+              <span>Chốt doanh thu ngày</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={fetchShiftHistory}
@@ -987,7 +999,7 @@ export const PosShiftPage: FC = () => {
                               }}
                               title={`Giải trình giờ chốt ca: ${earlyLateText}`}
                             >
-                              <span>{isEarlyClose ? '⚠️ Chốt sớm' : isLateClose ? '⏰ Chốt muộn' : '⏱ Giải trình'}</span>
+                              <span>{isEarlyClose ? 'Chốt sớm' : isLateClose ? 'Chốt muộn' : 'Giải trình'}</span>
                             </div>
                           )}
                         </td>
@@ -1534,15 +1546,12 @@ export const PosShiftPage: FC = () => {
           className="pos-modal-overlay"
           onClick={(e) => e.target === e.currentTarget && setIsOwnerEodModalOpen(false)}
         >
-          <div className="pos-modal-dialog" style={{ maxWidth: 680, maxHeight: '90vh', overflowY: 'auto', padding: 20 }}>
+          <div className="pos-modal-dialog" style={{ width: 'min(1080px, calc(100vw - 32px))', maxWidth: 'none', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid #E2E8F0' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0F172A' }}>
-                  Báo Cáo Cuối Ngày &amp; Kết Toán Doanh Thu (Chủ Cửa Hàng)
+                  Chốt doanh thu ngày · {selectedBranchName}
                 </h3>
-                <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                  Quy tắc Ngày nghiệp vụ: Ca làm việc (kể cả ca xuyên đêm 22:00 - 06:00) tính theo Ngày mở ca; Đơn Chủ tự bán tính theo Ngày tạo đơn
-                </div>
               </div>
               <button
                 type="button"
@@ -1557,48 +1566,15 @@ export const PosShiftPage: FC = () => {
               {/* Thanh chọn Chi nhánh (Mặc định theo từng chi nhánh) & Ngày nghiệp vụ */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: 10, padding: '10px 12px', backgroundColor: '#F8FAFC', borderRadius: 8, border: '1px solid #CBD5E1' }}>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                    Phạm vi Chi nhánh (Kiểm tra độc lập từng chi nhánh):
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    <button
-                      type="button"
-                      onClick={() => handleChangeEodScope('CURRENT')}
-                      style={{
-                        padding: '6px 8px',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        border: eodBranchScope === 'CURRENT' ? '1.5px solid #0F766E' : '1px solid #CBD5E1',
-                        backgroundColor: eodBranchScope === 'CURRENT' ? '#F0FDFA' : '#FFFFFF',
-                        color: eodBranchScope === 'CURRENT' ? '#0F766E' : '#475569',
-                      }}
-                    >
-                      Chi nhánh đang chọn
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleChangeEodScope('ALL')}
-                      style={{
-                        padding: '6px 8px',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        border: eodBranchScope === 'ALL' ? '1.5px solid #0F766E' : '1px solid #CBD5E1',
-                        backgroundColor: eodBranchScope === 'ALL' ? '#F0FDFA' : '#FFFFFF',
-                        color: eodBranchScope === 'ALL' ? '#0F766E' : '#475569',
-                      }}
-                    >
-                      Tất cả chi nhánh
-                    </button>
-                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>Chi nhánh</div>
+                  <select className="pos-input" value={selectedBranchId === 'ALL' ? '' : selectedBranchId} onChange={(event) => setSelectedBranchId(event.target.value)} style={{ width: '100%', height: 36 }}>
+                    {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                  </select>
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                    Ngày nghiệp vụ (Mở ca):
+                    Ngày kinh doanh
                   </label>
                   <input
                     type="date"
@@ -1662,12 +1638,9 @@ export const PosShiftPage: FC = () => {
               <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 800, color: '#0F172A' }}>
-                    1. Đơn Chủ cửa hàng tự bán đến hiện tại (ShiftId = null):
+                    1. Đơn chủ cửa hàng tự bán
                   </span>
                   <strong style={{ color: '#0F766E' }}>{ownerUnsettled?.unsettledOrdersCount || 0} đơn chưa kết toán</strong>
-                </div>
-                <div style={{ fontSize: 11.5, color: '#64748B' }}>
-                  Các đơn này được cộng đúng một lần khi Chủ cửa hàng khóa sổ ngày nghiệp vụ; không tạo phiếu thu riêng trước đó.
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginTop: 2 }}>
                   <span style={{ color: '#065F46' }}>Tiền mặt Chủ tự bán (vào Két sắt):</span>
@@ -1697,25 +1670,31 @@ export const PosShiftPage: FC = () => {
                 </div>
               )}
               {businessDayPreview && (
-                <div style={{ backgroundColor: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 10, padding: 14, display: 'grid', gap: 10 }}>
-                  <div style={{ fontWeight: 800, color: '#0F766E' }}>Số liệu tạm tính từ hệ thống</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, fontSize: 12.5 }}>
-                    <span>Doanh thu tiền mặt: <b>{formatVND(businessDayPreview.totalCashSales)}</b></span>
-                    <span>Doanh thu QR/chuyển khoản: <b>{formatVND(businessDayPreview.totalBankSales)}</b></span>
-                    <span>Thu khác: <b>{formatVND(businessDayPreview.totalCashIn)}</b></span>
-                    <span>Chi vận hành: <b>{formatVND(businessDayPreview.totalCashOut)}</b></span>
+              <div style={{ backgroundColor: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 10, padding: 18, display: 'grid', gap: 16, fontSize: 14 }}>
+                  <div style={{ fontWeight: 800, color: '#0F766E', fontSize: 16 }}>Số liệu ngày kinh doanh</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
+                    {([
+                      ['Doanh thu tiền mặt', businessDayPreview.totalCashSales],
+                      ['Doanh thu chuyển khoản', businessDayPreview.totalBankSales],
+                      ['Thu khác', businessDayPreview.totalCashIn],
+                      ['Chi vận hành', businessDayPreview.totalCashOut],
+                    ] as const).map(([label, amount]) => <div key={label} style={{ background: '#FFFFFF', border: '1px solid #CCFBF1', borderRadius: 8, padding: '10px 12px', display: 'grid', gap: 4 }}><span style={{ color: '#475569' }}>{label}</span><strong style={{ fontSize: 16, color: '#0F172A' }}>{formatVND(amount)}</strong></div>)}
+                  </div>
+                  <div style={{ color: '#475569', fontSize: 13 }}>
+                    Tiền chuyển khoản đã vào ngân hàng khi SePay xác nhận và chỉ được tổng hợp khi chốt ngày. Không cộng thêm lần nữa vào số dư.
+                    <button type="button" onClick={() => navigate('/store-owner/subscriptions?tab=finance-accounts&subtab=history')} style={{ marginLeft: 8, border: 0, background: 'none', color: '#0F766E', fontWeight: 700, cursor: 'pointer' }}>Đối chiếu giao dịch</button>
                   </div>
                   <div style={{ borderTop: '1px dashed #5EEAD4', paddingTop: 8 }}>
                     <div style={{ fontWeight: 700, marginBottom: 5 }}>Đối soát theo quỹ</div>
                     {businessDayPreview.funds.length === 0
                       ? <span style={{ color: '#64748B' }}>Chưa có quỹ hoạt động tại chi nhánh.</span>
                       : businessDayPreview.funds.map((fund) => (
-                        <div key={fund.fundId} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) auto minmax(150px, 190px)', alignItems: 'center', gap: 12, padding: '4px 0' }}>
-                          <span>{fund.fundName} ({fund.fundType})</span>
+                        <div key={fund.fundId} style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) minmax(145px, auto) minmax(180px, 210px)', alignItems: 'center', gap: 16, padding: '10px 12px', background: '#FFFFFF', border: '1px solid #CCFBF1', borderRadius: 8 }}>
+                          <span style={{ display: 'grid', gap: 2, minWidth: 0, overflowWrap: 'anywhere' }}><strong>{fundDisplayName(fund)}</strong><small style={{ color: '#64748B' }}>{fundTypeLabel(fund.fundType)}</small></span>
                           <span>Dự kiến: <b>{formatVND(fund.expectedCash)}</b></span>
                           {fund.requiresPhysicalCount ? (
-                            <label style={{ display: 'grid', gap: 3, fontSize: 11.5 }}>
-                              Thực đếm (VNĐ)
+                            <label style={{ display: 'grid', gap: 3, fontSize: 13 }}>
+                              Thực đếm (đ)
                               <input
                                 aria-label={`Tiền thực đếm quỹ ${fund.fundName}`}
                                 type="number"
@@ -1726,7 +1705,7 @@ export const PosShiftPage: FC = () => {
                                 style={{ padding: '7px 9px', border: '1px solid #94A3B8', borderRadius: 6 }}
                               />
                             </label>
-                          ) : <span style={{ color: '#64748B' }}>Không cần kiểm đếm</span>}
+                          ) : <span style={{ color: '#64748B' }}>Không kiểm đếm</span>}
                         </div>
                       ))}
                   </div>
@@ -1735,7 +1714,7 @@ export const PosShiftPage: FC = () => {
                       <div style={{ fontWeight: 800, color: '#9A3412', marginBottom: 6 }}>Việc cần xử lý trước khi khóa sổ</div>
                       {businessDayPreview.blockers.map((blocker) => (
                         <div key={`${blocker.code}-${blocker.entityId}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '3px 0' }}>
-                          <span>{blocker.displayName} — {blocker.status}{blocker.amount != null ? ` — ${formatVND(blocker.amount)}` : ''}</span>
+                          <span>{blocker.displayName}{blocker.amount != null ? ` · ${formatVND(blocker.amount)}` : ''}</span>
                           {blocker.actionPath && <button type="button" onClick={() => navigate(blocker.actionPath!)} style={{ border: 0, background: 'none', color: '#C2410C', fontWeight: 700, cursor: 'pointer' }}>Xem/Xử lý</button>}
                         </div>
                       ))}
@@ -1820,6 +1799,7 @@ export const PosShiftPage: FC = () => {
                   <button
                     type="button"
                     disabled={
+                      isBusinessDayClosed ||
                       isSettlingOwnerEod ||
                       isLoadingBusinessDayPreview ||
                       Boolean(businessDayPreview?.blockers.some((blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER')) ||
@@ -1852,7 +1832,9 @@ export const PosShiftPage: FC = () => {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {isSettlingOwnerEod
+                    {isBusinessDayClosed
+                      ? 'Đã chốt ngày'
+                      : isSettlingOwnerEod
                       ? 'Đang duyệt...'
                       : pendingShiftsForBusinessDate.length > 0
                         ? `Xác nhận bàn giao (${pendingShiftsForBusinessDate.length} ca)`
@@ -1866,12 +1848,7 @@ export const PosShiftPage: FC = () => {
                   <strong style={{ color: '#334155' }}>Lịch sử chốt ngày nghiệp vụ</strong>
                   {businessDayHistory.map((closing) => (
                     <div key={closing.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '7px 0', borderTop: '1px solid #E2E8F0', fontSize: 12.5 }}>
-                      <span><b>Phiên bản {closing.version}</b> — {closing.referenceCode} — {closing.status}{closing.reopenReason ? ` — Lý do mở lại: ${closing.reopenReason}` : ''}</span>
-                      {closing.isActive && closing.status.toLowerCase() === 'closed' && (
-                        <button type="button" disabled={isSettlingOwnerEod} onClick={() => handleReopenBusinessDay(closing)} style={{ padding: '5px 9px', border: '1px solid #DC2626', borderRadius: 6, background: '#FFF', color: '#B91C1C', fontWeight: 700, cursor: 'pointer' }}>
-                          Mở lại để điều chỉnh
-                        </button>
-                      )}
+                      <span><b>{closing.referenceCode}</b> — {closing.status.toLowerCase() === 'closed' ? 'Đã chốt' : closing.status}</span>
                     </div>
                   ))}
                 </div>
@@ -1971,7 +1948,8 @@ export const PosShiftPage: FC = () => {
                   className="pos-input"
                   value={forceActualCash}
                   onChange={(e) => {
-                    const val = Math.max(0, Number(e.target.value) || 0);
+                    const val = Number(e.target.value);
+                    if (!Number.isSafeInteger(val) || val < 0 || val > 999_999_999_999) return;
                     setForceActualCash(val);
                     if (forceRetainedFloat > val) setForceRetainedFloat(val);
                   }}
@@ -1991,7 +1969,8 @@ export const PosShiftPage: FC = () => {
                     className="pos-input"
                     value={forceRetainedFloat}
                     onChange={(e) => {
-                      const val = Math.min(forceActualCash, Math.max(0, Number(e.target.value) || 0));
+                      const val = Number(e.target.value);
+                      if (!Number.isSafeInteger(val) || val < 0 || val > forceActualCash) return;
                       setForceRetainedFloat(val);
                     }}
                     style={{ width: '100%', height: 36, fontSize: 13, fontWeight: 600 }}
@@ -2019,6 +1998,7 @@ export const PosShiftPage: FC = () => {
                   type="text"
                   className="pos-input"
                   value={forceReason}
+                  maxLength={470}
                   onChange={(e) => setForceReason(e.target.value)}
                   placeholder="VD: Nhân viên ca tối về quên bấm chốt ca..."
                   style={{ width: '100%', height: 38, fontSize: 13 }}
@@ -2035,7 +2015,7 @@ export const PosShiftPage: FC = () => {
                 </button>
                 <button
                   type="button"
-                  disabled={isSubmittingForceClose || !forceReason.trim()}
+                  disabled={isSubmittingForceClose || !forceReason.trim() || !Number.isSafeInteger(forceActualCash) || !Number.isSafeInteger(forceRetainedFloat) || forceRetainedFloat > forceActualCash}
                   onClick={handleConfirmForceCloseShift}
                   style={{
                     padding: '8px 16px',
