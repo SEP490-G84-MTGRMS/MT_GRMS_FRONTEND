@@ -25,11 +25,6 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { authService } from "../../features/auth/authService";
-import {
-  NotificationBadge,
-  NotificationPopover,
-  NotificationDrawer,
-} from "../../features/notifications";
 import { BranchSelectorDropdown } from "./BranchSelectorDropdown";
 import { posShiftApi } from "../../features/pos/api/posShiftApi";
 /* ─── Data ─── */
@@ -1508,10 +1503,8 @@ export const AppTopNav: FC = () => {
               }}
             />
 
-            {/* 4. Bell notification (Dynamic Notification Center) */}
+            {/* 4. Bell notification */}
             <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 4 }}>
-              <NotificationBadge />
-              <NotificationPopover />
               <NotificationBell badgeBorderColor="#0d9488" />
             </div>
 
@@ -2403,8 +2396,6 @@ export const AppTopNav: FC = () => {
           </div>
         </div>
       )}
-      {/* Extended Global Notification Drawer */}
-      <NotificationDrawer />
     </>
   );
 };

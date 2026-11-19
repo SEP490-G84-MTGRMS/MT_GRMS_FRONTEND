@@ -2,14 +2,21 @@ import { useEffect, useRef, useState, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useNotifications } from '../hooks/useNotifications';
+import { resolveNotificationItemUrl } from '../lib/notificationNavigation';
 import type { NotificationItem } from '../types';
 
 interface NotificationBellProps {
   badgeBorderColor?: string;
 }
 
+function parseUtcIsoDate(isoDate: string): Date {
+  const trimmed = isoDate.trim();
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  return new Date(hasTimezone ? trimmed : `${trimmed}Z`);
+}
+
 function formatRelativeTime(isoDate: string): string {
-  const date = new Date(isoDate);
+  const date = parseUtcIsoDate(isoDate);
   if (Number.isNaN(date.getTime())) return '';
   const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
   if (diffMin < 1) return 'Vừa xong';
@@ -48,8 +55,9 @@ export const NotificationBell: FC<NotificationBellProps> = ({ badgeBorderColor =
       await markAsRead(item.id);
     }
     setOpen(false);
-    if (item.actionUrl) {
-      navigate(item.actionUrl);
+    const targetUrl = resolveNotificationItemUrl(item);
+    if (targetUrl) {
+      navigate(targetUrl);
     }
   };
 
