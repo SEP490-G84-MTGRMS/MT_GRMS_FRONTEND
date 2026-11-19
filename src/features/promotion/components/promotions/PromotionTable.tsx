@@ -45,13 +45,13 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   const renderStatusBadge = (status: PromotionStatus) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="badge-status badge-active" style={{ whiteSpace: 'nowrap' }}>● Đang chạy</span>;
+        return <span className="badge-status badge-active" style={{ whiteSpace: 'nowrap' }}>Đang chạy</span>;
       case 'UPCOMING':
-        return <span className="badge-status badge-upcoming" style={{ whiteSpace: 'nowrap' }}>● Sắp diễn ra</span>;
+        return <span className="badge-status badge-upcoming" style={{ whiteSpace: 'nowrap' }}>Sắp diễn ra</span>;
       case 'PAUSED':
-        return <span className="badge-status badge-paused" style={{ whiteSpace: 'nowrap' }}>⏸ Tạm dừng</span>;
+        return <span className="badge-status badge-paused" style={{ whiteSpace: 'nowrap' }}>Tạm dừng</span>;
       case 'EXPIRED':
-        return <span className="badge-status badge-expired" style={{ whiteSpace: 'nowrap' }}>✕ Đã kết thúc</span>;
+        return <span className="badge-status badge-expired" style={{ whiteSpace: 'nowrap' }}>Đã kết thúc</span>;
     }
   };
 

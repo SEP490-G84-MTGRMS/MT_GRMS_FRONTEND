@@ -203,7 +203,7 @@ export const LoyaltyConfigPage: FC = () => {
                 title={config.isEnabled ? 'Nhấp để tạm ngưng tích điểm' : 'Nhấp để kích hoạt tích điểm'}
               >
                 <span className="loyalty-switch-status-text">
-                  {config.isEnabled ? '● Tích điểm: Đang bật' : '⏸ Tích điểm: Tắt'}
+                  {config.isEnabled ? 'Tích điểm: Đang bật' : 'Tích điểm: Tắt'}
                 </span>
                 <div className={`switch-track switch-track-sm ${config.isEnabled ? 'switch-active' : ''}`}>
                   <div className="switch-thumb switch-thumb-sm" />

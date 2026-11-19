@@ -68,6 +68,8 @@ export const CashbookPage: FC = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
+  const urlAccountId = searchParams.get('accountId') || 'ALL';
+  const urlBranchId = searchParams.get('branchId');
 
   const [accounts, setAccounts] = useState<CashAccount[]>([]);
   const [transactions, setTransactions] = useState<LedgerTransaction[]>([]);
@@ -113,8 +115,8 @@ export const CashbookPage: FC = () => {
   const [filters, setFilters] = useState<CashbookFilterParams>(() => {
     const period = getInitialPeriod();
     return {
-      branchId: 'ALL',
-      accountId: 'ALL',
+      branchId: urlBranchId || 'ALL',
+      accountId: urlAccountId,
       transactionType: 'ALL',
       datePeriod: period.datePeriod,
       startDate: period.startDate,
@@ -125,7 +127,8 @@ export const CashbookPage: FC = () => {
   });
 
   useEffect(() => {
-    // Initial sync from active branch storage
+    // A direct account link keeps its branch; otherwise follow the active branch.
+    if (urlBranchId) return;
     try {
       const stored = localStorage.getItem('mtgrms_active_branch');
       if (stored) {
@@ -153,7 +156,7 @@ export const CashbookPage: FC = () => {
     return () => {
       window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
     };
-  }, []);
+  }, [urlBranchId]);
 
   useEffect(() => {
     if (urlSearch) {
@@ -508,6 +511,18 @@ export const CashbookPage: FC = () => {
           >
             <ArrowRightLeft size={14} />
             <span>Chuyển quỹ nội bộ</span>
+          </button>
+
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            aria-pressed={filters.sourceType === 'INTERNAL_TRANSFER'}
+            onClick={() => {
+              setFilters(current => ({ ...current, sourceType: current.sourceType === 'INTERNAL_TRANSFER' ? undefined : 'INTERNAL_TRANSFER' }));
+              setCurrentPage(1);
+            }}
+          >
+            <span>{filters.sourceType === 'INTERNAL_TRANSFER' ? 'Xem toàn bộ sổ quỹ' : 'Lịch sử chuyển tiền'}</span>
           </button>
 
           <button

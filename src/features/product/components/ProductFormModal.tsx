@@ -12,6 +12,7 @@ import {
   Plus,
   Loader2,
   History,
+  Tag,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { readFileAsDataUrl } from '../../../utils/imageFile';
@@ -249,51 +250,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return () => clearTimeout(timer);
   }, [barcode, productToEdit, isOpen]);
 
-  const handleApplyMasterSuggestion = () => {
-    if (!masterSuggestion) return;
-
-    if (!productName.trim()) {
-      setProductName(masterSuggestion.name);
-    }
-    if (masterSuggestion.baseUnit) {
-      setBaseUnit(masterSuggestion.baseUnit);
-    }
-    if (masterSuggestion.imageUrl && images.length === 0) {
-      setImages([masterSuggestion.imageUrl]);
-    }
-    if (masterSuggestion.suggestedRetailPrice && (!sellingPrice || sellingPrice === 0)) {
-      setSellingPrice(masterSuggestion.suggestedRetailPrice);
-    }
-
-    if (categories && categories.length > 0 && masterSuggestion.categoryName) {
-      const match = categories.find(
-        (c) =>
-          c.name.toLowerCase().includes(masterSuggestion.categoryName.toLowerCase()) ||
-          masterSuggestion.categoryName.toLowerCase().includes(c.name.toLowerCase())
-      );
-      if (match) {
-        setCategoryId(match.id);
-      }
-    }
-
-    if (masterSuggestion.units && masterSuggestion.units.length > 0) {
-      const newUoms: UomConversion[] = masterSuggestion.units.map((u, i) => ({
-        id: `master-uom-${Date.now()}-${i}`,
-        unitName: u.unitName,
-        conversionRate: u.conversionRate,
-        barcode: u.barcode || '',
-        price: masterSuggestion.suggestedRetailPrice
-          ? Math.round(masterSuggestion.suggestedRetailPrice * u.conversionRate)
-          : (sellingPrice || 0) * u.conversionRate,
-        productCode: '',
-        isPurchaseUnit: Boolean(u.isPurchaseUnit),
-      }));
-      setUomConversions(newUoms);
-    }
-
-    setMasterSuggestion(null);
-  };
-
   // Category Searchable Dropdown state (phong cách tương tự EmployeeFormModal)
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [categorySearchKeyword, setCategorySearchKeyword] = useState('');
@@ -373,6 +329,68 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     createUnitRow({ isBaseUnit: true, isPurchaseUnit: true }),
   ]);
   const [deletedUnitIds, setDeletedUnitIds] = useState<string[]>([]);
+
+  const handleApplyMasterSuggestion = () => {
+    if (!masterSuggestion) return;
+
+    if (!productName.trim()) {
+      setProductName(masterSuggestion.name);
+    }
+    if (masterSuggestion.imageUrl && images.length === 0) {
+      setImages([masterSuggestion.imageUrl]);
+    }
+
+    if (categories && categories.length > 0 && masterSuggestion.categoryName) {
+      const match = categories.find(
+        (c) =>
+          c.name.toLowerCase().includes(masterSuggestion.categoryName.toLowerCase()) ||
+          masterSuggestion.categoryName.toLowerCase().includes(c.name.toLowerCase())
+      );
+      if (match) {
+        setCategoryId(match.id);
+      }
+    }
+
+    setUnitRows((prev) => {
+      const baseRow = prev.find((r) => r.isBaseUnit) || prev[0];
+      const baseId = baseRow?.id || 'base';
+      const updatedBase: FormUnitRow = {
+        ...baseRow,
+        id: baseId,
+        unitName: masterSuggestion.baseUnit || baseRow?.unitName || '',
+        sellingPrice:
+          masterSuggestion.suggestedRetailPrice && (!baseRow?.sellingPrice || baseRow.sellingPrice === 0)
+            ? masterSuggestion.suggestedRetailPrice
+            : (baseRow?.sellingPrice || 0),
+        isBaseUnit: true,
+        isPurchaseUnit: baseRow?.isPurchaseUnit ?? true,
+      };
+
+      const extraRows: FormUnitRow[] =
+        masterSuggestion.units && masterSuggestion.units.length > 0
+          ? masterSuggestion.units.map((u, i) => {
+              const rate = u.conversionRate > 0 ? u.conversionRate : 1;
+              const price = masterSuggestion.suggestedRetailPrice
+                ? Math.round(masterSuggestion.suggestedRetailPrice * rate)
+                : updatedBase.sellingPrice * rate;
+              return createUnitRow({
+                id: `master-uom-${Date.now()}-${i}`,
+                unitName: u.unitName,
+                convertsToQty: rate,
+                convertsToId: baseId,
+                barcode: u.barcode || '',
+                sellingPrice: price,
+                isBaseUnit: false,
+                isPurchaseUnit: Boolean(u.isPurchaseUnit),
+              });
+            })
+          : prev.filter((r) => !r.isBaseUnit);
+
+      return [updatedBase, ...extraRows];
+    });
+
+    setMasterSuggestion(null);
+  };
 
   // 5. Mô tả & Ghi chú sản phẩm
   const [description, setDescription] = useState('');

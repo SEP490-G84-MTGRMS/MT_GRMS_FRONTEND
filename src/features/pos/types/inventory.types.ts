@@ -216,7 +216,7 @@ export class InvoiceDTO {
   referenceCode?: string = '';         // Mã tham chiếu giao dịch ngân hàng
   
   // Trạng thái hóa đơn
-  status: 'COMPLETED' | 'CANCELLED' | 'RETURNED' | 'DEBT' = 'COMPLETED';
+  status: 'COMPLETED' | 'CANCELLED' | 'RETURNED' | 'DEBT' | 'PENDING_PAYMENT' = 'COMPLETED';
   statusLabel: string = 'Hoàn thành';
   
   // Nguồn gốc đơn hàng

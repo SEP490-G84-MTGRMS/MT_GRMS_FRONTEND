@@ -138,7 +138,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
           const account = accounts.find((item: any) => item.bankCode === data.bankCode && item.bankAccountNumber === data.bankAccountNumber) || accounts[0];
           setPaymentAccountId(account?.paymentAccountId || null);
           setSavedAccountKey(account ? `${account.bankCode}|${account.bankAccountNumber}` : '');
-          setSelectedBranchIds(Array.isArray(account?.branchIds) ? account.branchIds : []);
+          setSelectedBranchIds(Array.isArray(account?.branchIds) ? account.branchIds.slice(0, 1) : []);
         }
       })
       .catch(() => {
@@ -157,7 +157,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
 
   const handleSave = async () => {
     if (selectedBranchIds.length === 0) {
-      setSaveMessage('Vui lòng chọn ít nhất một chi nhánh sử dụng tài khoản này.');
+      setSaveMessage('Vui lòng chọn một chi nhánh sử dụng tài khoản này.');
       return;
     }
     const nextAccountKey = `${bankCode}|${bankAccountNumber.trim()}`;
@@ -349,9 +349,7 @@ export const PaymentConfigModal: FC<Props> = ({ isOpen, onClose, onSaveSuccess }
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                   {branches.map((branch) => (
                     <label key={branch.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#334155' }}>
-                      <input type="checkbox" checked={selectedBranchIds.includes(branch.id)} onChange={() => setSelectedBranchIds((current) =>
-                        current.includes(branch.id) ? current.filter((id) => id !== branch.id) : [...current, branch.id]
-                      )} />
+                      <input type="radio" name="receiving-branch-modal" checked={selectedBranchIds.includes(branch.id)} onChange={() => setSelectedBranchIds([branch.id])} />
                       <span>{branch.code || 'CN'} — {branch.name}</span>
                     </label>
                   ))}

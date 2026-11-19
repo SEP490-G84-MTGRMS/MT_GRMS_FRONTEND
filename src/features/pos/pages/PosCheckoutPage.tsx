@@ -931,7 +931,7 @@ export const PosCheckoutPage: FC = () => {
       setIsValidatingCoupon(true);
       const res = await promotionApi.validateVoucher(
         currentTab.couponCode.trim(),
-        subTotalBeforePoints,
+        totalItemAmount,
         currentTab.customer?.id,
         orderDiscountAmount > 0
       );

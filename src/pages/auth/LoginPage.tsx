@@ -8,7 +8,6 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  Store,
   AlertCircle,
   Loader2,
 } from "lucide-react";
