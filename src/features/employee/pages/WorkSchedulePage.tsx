@@ -112,10 +112,8 @@ export const WorkSchedulePage: React.FC = () => {
   const roleUpper = (user?.role || '').toUpperCase();
   const isEmployeePortal = location.pathname.startsWith('/employee/') || location.pathname === '/employee';
   const isStoreOwnerOrAdmin =
-    Boolean(user?.isAdmin) ||
     roleUpper === 'STORE_OWNER' ||
-    roleUpper === 'STOREOWNER' ||
-    roleUpper === 'ADMIN';
+    roleUpper === 'STOREOWNER';
 
   const isEmployeeRole =
     isEmployeePortal ||

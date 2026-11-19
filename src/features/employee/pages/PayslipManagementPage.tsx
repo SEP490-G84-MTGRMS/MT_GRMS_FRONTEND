@@ -38,10 +38,8 @@ export const PayslipManagementPage: React.FC = () => {
   const roleUpper = (user?.role || '').toUpperCase();
   const isEmployeePortal = location.pathname.startsWith('/employee/') || location.pathname === '/employee';
   const isOwnerOrAdmin = !isEmployeePortal && Boolean(
-    user?.isAdmin ||
     roleUpper === 'STORE_OWNER' ||
-    roleUpper === 'STOREOWNER' ||
-    roleUpper === 'ADMIN'
+    roleUpper === 'STOREOWNER'
   );
 
   const [payslips, setPayslips] = useState<PayslipDetailedRecord[]>([]);
