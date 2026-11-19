@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, Fragment } from "react";
 import type { FC, RefObject } from "react";
 import { NavLink, Link, useLocation, useNavigate } from "react-router-dom";
+import { NotificationBell } from "../../features/notifications/components/NotificationBell";
 import {
   DashboardIcon,
   TruckIcon,
@@ -1508,9 +1509,10 @@ export const AppTopNav: FC = () => {
             />
 
             {/* 4. Bell notification (Dynamic Notification Center) */}
-            <div style={{ position: "relative" }}>
+            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 4 }}>
               <NotificationBadge />
               <NotificationPopover />
+              <NotificationBell badgeBorderColor="#0d9488" />
             </div>
 
             {/* 5. Settings Gear icon with Interactive Dropdown */}
