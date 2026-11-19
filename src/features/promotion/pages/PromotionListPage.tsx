@@ -243,14 +243,33 @@ export const PromotionListPage: FC = () => {
       }
       // Branch
       if (filter.branch !== 'ALL' && !item.branches.includes('ALL')) {
-        const matchesBranch = item.branches.some(
-          (b) => b.toLowerCase().includes(filter.branch.toLowerCase()) || filter.branch.toLowerCase().includes(b.toLowerCase())
+        const filterStr = filter.branch.toLowerCase();
+        const matchedBranchObj = dbBranches.find(
+          (b) => b.id.toLowerCase() === filterStr || b.name.toLowerCase().includes(filterStr) || filterStr.includes(b.name.toLowerCase())
         );
+        const branchIdsToMatch = [filterStr];
+        const branchNamesToMatch = [filterStr];
+        if (matchedBranchObj) {
+          branchIdsToMatch.push(matchedBranchObj.id.toLowerCase());
+          branchNamesToMatch.push(matchedBranchObj.name.toLowerCase());
+        }
+
+        const matchesBranch = item.branches.some((b) => {
+          const bLower = b.toLowerCase();
+          if (bLower === 'all') return true;
+          // Direct ID or name match
+          if (branchIdsToMatch.includes(bLower)) return true;
+          if (branchNamesToMatch.some((name) => bLower.includes(name) || name.includes(bLower))) return true;
+          // Look up mapped name if b is an ID
+          const mappedName = branchMap.get(b)?.toLowerCase();
+          if (mappedName && branchNamesToMatch.some((name) => mappedName.includes(name) || name.includes(mappedName))) return true;
+          return false;
+        });
         if (!matchesBranch) return false;
       }
       return true;
     });
-  }, [promotions, filter]);
+  }, [promotions, filter, dbBranches, branchMap]);
 
   // Handlers
   const handleOpenCreate = () => {
@@ -334,7 +353,7 @@ export const PromotionListPage: FC = () => {
 
       if (savedPromo.type === 'BUY_X_GET_Y') {
         for (const [idx, t] of (savedPromo.tiers || []).entries()) {
-          if (t.buyProductId) {
+          if (t.buyProductId && t.buyProductId !== '00000000-0000-0000-0000-000000000000') {
             conditions.push({
               productId: t.buyProductId,
               productName: t.buyProductName,
@@ -343,25 +362,16 @@ export const PromotionListPage: FC = () => {
               discountValue: 0,
             });
           }
-          conditions.push({
-            productId: t.giftProductId || '00000000-0000-0000-0000-000000000000',
-            productName: t.giftProductName || `Quà tặng bậc ${idx + 1}`,
-            productRole: 'GIFT',
-            minQty: t.giftQty || 1,
-            discountValue: 0,
-            note: t.giftUnit ? `ĐVT: ${t.giftUnit}` : undefined,
-          });
-        }
-      } else {
-        for (const t of savedPromo.tiers || []) {
-          conditions.push({
-            productId: t.giftProductId || '00000000-0000-0000-0000-000000000000',
-            productName: t.giftProductName,
-            productRole: 'DISCOUNT',
-            minQty: t.requiredQty || t.giftQty || 1,
-            discountValue: t.discountValue,
-            note: t.giftUnit ? `ĐVT: ${t.giftUnit}` : undefined,
-          });
+          if (t.giftProductId && t.giftProductId !== '00000000-0000-0000-0000-000000000000') {
+            conditions.push({
+              productId: t.giftProductId,
+              productName: t.giftProductName || `Quà tặng bậc ${idx + 1}`,
+              productRole: 'GIFT',
+              minQty: t.giftQty || 1,
+              discountValue: 0,
+              note: t.giftUnit ? `ĐVT: ${t.giftUnit}` : undefined,
+            });
+          }
         }
       }
 
@@ -390,7 +400,7 @@ export const PromotionListPage: FC = () => {
           description: descriptionWithTiers,
           targetBranches: savedPromo.branches.join(','),
           budgetLimit: savedPromo.budgetLimit,
-          conditions,
+          conditions: conditions.length > 0 ? conditions : undefined,
         });
       } else {
         await promotionApi.createPromotion({
@@ -407,14 +417,17 @@ export const PromotionListPage: FC = () => {
           description: descriptionWithTiers,
           targetBranches: savedPromo.branches.join(','),
           budgetLimit: savedPromo.budgetLimit,
-          conditions,
+          conditions: conditions.length > 0 ? conditions : undefined,
         });
       }
       await loadPromotions();
+      setIsModalOpen(false);
+      setEditingPromo(null);
       showToast(`Đã lưu chương trình "${savedPromo.name}" thành công!`);
     } catch (err: any) {
       console.error('Lỗi khi lưu chương trình khuyến mãi:', err);
       showToast(err?.response?.data?.message || err?.message || 'Lỗi khi lưu chương trình khuyến mãi!', 'error');
+      throw err;
     }
   };
 

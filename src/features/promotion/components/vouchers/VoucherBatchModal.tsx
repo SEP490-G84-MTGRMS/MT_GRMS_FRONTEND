@@ -9,7 +9,7 @@ import type {
 interface VoucherBatchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (batch: VoucherBatchItem) => void;
+  onSave: (batch: VoucherBatchItem) => Promise<void> | void;
   editingBatch?: VoucherBatchItem | null;
 }
 
@@ -34,6 +34,7 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
   const [description, setDescription] = useState('');
   const [allowWithPromotions, setAllowWithPromotions] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setValidationErrors([]);
@@ -48,7 +49,8 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
       setTotalQuantity(editingBatch.totalQuantity);
       setStartDate(editingBatch.startDate);
       setEndDate(editingBatch.endDate);
-      setDescription(editingBatch.description || '');
+      const cleanDesc = (editingBatch.description || '').replace(/\[CONFIG_JSON\][\s\S]*?\[\/CONFIG_JSON\]/gi, '').trim();
+      setDescription(cleanDesc);
       setAllowWithPromotions(editingBatch.allowWithPromotions !== false);
     } else {
       setName('');
@@ -68,7 +70,7 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: string[] = [];
     if (!name.trim() || name.trim().length > 150) errors.push('Tên đợt voucher phải có từ 1 đến 150 ký tự');
@@ -89,59 +91,68 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
     }
     setValidationErrors([]);
 
-    if (editingBatch) {
-      const updatedBatch: VoucherBatchItem = {
-        ...editingBatch,
+    const cleanDescription = description.replace(/\[CONFIG_JSON\][\s\S]*?\[\/CONFIG_JSON\]/gi, '').trim();
+
+    try {
+      setIsSubmitting(true);
+      if (editingBatch) {
+        const updatedBatch: VoucherBatchItem = {
+          ...editingBatch,
+          name: name.trim(),
+          discountType,
+          discountValue: Number(discountValue),
+          minOrderValue: Number(minOrderValue),
+          maxDiscount: maxDiscount ? Number(maxDiscount) : undefined,
+          totalQuantity: Number(totalQuantity),
+          startDate,
+          endDate,
+          description: cleanDescription,
+          allowWithPromotions,
+        };
+        await onSave(updatedBatch);
+        onClose();
+        return;
+      }
+
+      const effectiveBatchCode =
+        batchCode.trim() ||
+        `DOT-${prefix.toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+
+      // Generate sample codes based on initial quantity (up to 8 for UI mock preview)
+      const initialCodesCount = Math.min(totalQuantity, 8);
+      const codes: VoucherCodeItem[] = Array.from({ length: initialCodesCount }).map((_, i) => ({
+        id: `code-${Date.now()}-${i}`,
+        code: `${prefix.toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}${i + 1}`,
+        status: 'UNUSED',
+        createdAt: new Date().toISOString().slice(0, 10),
+      }));
+
+      const newBatch: VoucherBatchItem = {
+        id: `batch-${Date.now()}`,
+        batchCode: effectiveBatchCode,
         name: name.trim(),
         discountType,
         discountValue: Number(discountValue),
         minOrderValue: Number(minOrderValue),
         maxDiscount: maxDiscount ? Number(maxDiscount) : undefined,
         totalQuantity: Number(totalQuantity),
+        usedQuantity: 0,
         startDate,
         endDate,
-        description: description.trim(),
+        status: 'ACTIVE',
+        prefix: prefix.toUpperCase().trim(),
+        description: cleanDescription,
         allowWithPromotions,
+        codes,
       };
-      onSave(updatedBatch);
+
+      await onSave(newBatch);
       onClose();
-      return;
+    } catch {
+      // Keep modal open so user doesn't lose inputs
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const effectiveBatchCode =
-      batchCode.trim() ||
-      `DOT-${prefix.toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
-
-    // Generate sample codes based on initial quantity (up to 8 for UI mock preview)
-    const initialCodesCount = Math.min(totalQuantity, 8);
-    const codes: VoucherCodeItem[] = Array.from({ length: initialCodesCount }).map((_, i) => ({
-      id: `code-${Date.now()}-${i}`,
-      code: `${prefix.toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}${i + 1}`,
-      status: 'UNUSED',
-      createdAt: new Date().toISOString().slice(0, 10),
-    }));
-
-    const newBatch: VoucherBatchItem = {
-      id: `batch-${Date.now()}`,
-      batchCode: effectiveBatchCode,
-      name: name.trim(),
-      discountType,
-      discountValue: Number(discountValue),
-      minOrderValue: Number(minOrderValue),
-      maxDiscount: maxDiscount ? Number(maxDiscount) : undefined,
-      totalQuantity: Number(totalQuantity),
-      usedQuantity: 0,
-      startDate,
-      endDate,
-      status: 'ACTIVE',
-      prefix: prefix.toUpperCase().trim(),
-      description: description.trim(),
-      allowWithPromotions,
-      codes,
-    };
-
-    onSave(newBatch);
-    onClose();
   };
 
   return (
@@ -358,8 +369,8 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
             <button type="button" onClick={onClose} className="btn-secondary-pill">
               Hủy bỏ
             </button>
-            <button type="submit" className="btn-primary-pill">
-              {editingBatch ? 'Lưu thay đổi' : 'Phát hành đợt Voucher'}
+            <button type="submit" disabled={isSubmitting} className="btn-primary-pill">
+              {isSubmitting ? 'Đang lưu...' : editingBatch ? 'Lưu thay đổi' : 'Phát hành đợt Voucher'}
             </button>
           </div>
         </form>

@@ -92,11 +92,11 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   const renderBatchStatus = (status: VoucherBatchStatus) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="badge-status badge-active" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>● Đang lưu hành</span>;
+        return <span className="badge-status badge-active" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Đang lưu hành</span>;
       case 'EXPIRED':
-        return <span className="badge-status badge-expired" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>✕ Đã hết hạn</span>;
+        return <span className="badge-status badge-expired" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Đã hết hạn</span>;
       case 'PAUSED':
-        return <span className="badge-status badge-paused" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>⏸ Tạm dừng</span>;
+        return <span className="badge-status badge-paused" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Tạm dừng</span>;
       case 'DEPLETED':
         return <span className="badge-status badge-pill-neutral" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Đã phát hết</span>;
     }
