@@ -1,10 +1,52 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Copy, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import type { PayslipDetailedRecord } from '../../types';
 import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
 import { employeeApi } from '../../api/employeeApi';
 import { cashbookService } from '../../../cashbook/services/cashbookService';
 import type { CashAccount } from '../../../cashbook/types/cashbook.types';
+import { VIETNAM_BANKS } from '../../../supplier/lib/vietQrHelper';
+import { EmployeeVietQrCard } from './EmployeeVietQrCard';
+
+const isBankMatchedInVietnamBanks = (bankNameInput?: string): boolean => {
+  if (!bankNameInput || !bankNameInput.trim()) return false;
+  const input = bankNameInput.trim().toLowerCase();
+  if (
+    VIETNAM_BANKS.some(
+      (b) =>
+        b.code.toLowerCase() === input ||
+        b.bin === input ||
+        b.shortName.toLowerCase() === input ||
+        b.name.toLowerCase() === input
+    )
+  ) {
+    return true;
+  }
+  if (
+    VIETNAM_BANKS.some(
+      (b) =>
+        input.includes(b.shortName.toLowerCase()) ||
+        b.shortName.toLowerCase().includes(input) ||
+        input.includes(b.name.toLowerCase()) ||
+        b.name.toLowerCase().includes(input)
+    )
+  ) {
+    return true;
+  }
+  const words = input.split(/[\s\-_,.]+/);
+  return VIETNAM_BANKS.some((b) => words.includes(b.code.toLowerCase()));
+};
+
+const formatVietQrDescription = (raw: string): string =>
+  raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .replace(/[^A-Za-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 50);
 
 const getLocalDateTimeInputValue = (): string => {
   const d = new Date();
@@ -36,7 +78,6 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
   const [paymentTime, setPaymentTime] = useState<string>(getLocalDateTimeInputValue);
   const [amountInput, setAmountInput] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<CashAccount[]>([]);
@@ -48,6 +89,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
     bankAccountName?: string;
   } | null>(null);
   const [isLoadingBankInfo, setIsLoadingBankInfo] = useState<boolean>(false);
+  const [manualBankCode, setManualBankCode] = useState<string>('');
 
   const isBatchMode = !isAdvanceMode && Array.isArray(batchPayslips) && batchPayslips.length > 0;
 
@@ -70,12 +112,13 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    setMethod(mode === 'advance' ? 'CASH' : 'VIETQR');
+    setMethod(mode === 'advance' || isBatchMode ? 'CASH' : 'VIETQR');
     setPaymentTime(getLocalDateTimeInputValue());
     setAmountInput(currentPayable > 0 ? Math.round(currentPayable).toLocaleString('en-US') : '');
     setNotes('');
     setSubmitError(null);
     setSelectedAccountId('');
+    setManualBankCode('');
 
     let cancelled = false;
     setIsLoadingAccounts(true);
@@ -147,14 +190,16 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
     payslip?.bankAccountName,
   ]);
 
+  const effectiveMethod: 'VIETQR' | 'CASH' = isBatchMode ? 'CASH' : method;
+
   const filteredAccounts = useMemo(() => {
-    if (method === 'VIETQR') {
+    if (effectiveMethod === 'VIETQR') {
       return accounts.filter((acc) => acc.accountType === 'BANK');
     }
     return accounts
       .filter((acc) => acc.accountType === 'CASH')
       .sort((a, b) => Number(Boolean(b.isSafeDeposit)) - Number(Boolean(a.isSafeDeposit)));
-  }, [accounts, method]);
+  }, [accounts, effectiveMethod]);
 
   useEffect(() => {
     if (filteredAccounts.length === 0) {
@@ -176,13 +221,6 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
   const formatAmount = (num?: number) => Math.round(num || 0).toLocaleString('en-US');
 
-  const handleCopyAccount = (text: string) => {
-    if (!text) return;
-    navigator.clipboard?.writeText(text);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
-
   const handleSubmit = async () => {
     if (parsedAmount <= 0) {
       setSubmitError(
@@ -202,6 +240,11 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
         );
         return;
       }
+    } else if (!isBatchMode && parsedAmount > currentPayable) {
+      setSubmitError(
+        `Số tiền chi (${formatAmount(parsedAmount)}đ) không được vượt quá số tiền trong phiếu lương (${formatAmount(currentPayable)}đ).`
+      );
+      return;
     }
 
     setIsSubmitting(true);
@@ -221,7 +264,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
       } else if (isBatchMode && batchPayslips) {
         await payslipApi.batchPayPayslips({
           payslipIds: batchPayslips.map((p) => p.id),
-          paymentMethod: method,
+          paymentMethod: 'CASH',
           note: notes.trim() || undefined,
           cashbookAccountId: selectedAccountId || undefined,
           paidAt: paidAtIso,
@@ -340,36 +383,65 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
               {/* Cột 1: Số tiền */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13.5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>Còn cần trả:</span>
-                  <span style={{ color: '#0F172A', fontWeight: 500 }}>{formatAmount(currentPayable)}</span>
+                  <span style={{ color: '#334155', fontWeight: 600 }}>
+                    {isBatchMode ? 'Tổng cần trả:' : 'Còn cần trả:'}
+                  </span>
+                  <span style={{ color: '#0F172A', fontWeight: 600 }}>{formatAmount(currentPayable)}đ</span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>Số tiền:</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className="emp-form-input"
-                    style={{
-                      width: 140,
-                      textAlign: 'right',
-                      padding: '6px 10px',
-                      borderRadius: 6,
-                      fontWeight: 600,
-                    }}
-                    placeholder="0"
-                    value={amountInput}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/[^\d]/g, '');
-                      setAmountInput(digits ? Number(digits).toLocaleString('en-US') : '');
-                    }}
-                  />
-                </div>
+                {!isBatchMode && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <span style={{ color: '#334155', fontWeight: 600 }}>Số tiền:</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="emp-form-input"
+                        style={{
+                          width: 140,
+                          textAlign: 'right',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          borderColor: parsedAmount > currentPayable ? 'var(--red-accent, #FF3B30)' : undefined,
+                        }}
+                        placeholder="0"
+                        value={amountInput}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/[^\d]/g, '');
+                          setAmountInput(digits ? Number(digits).toLocaleString('en-US') : '');
+                        }}
+                      />
+                    </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>Còn lại sau chi:</span>
-                  <span style={{ color: '#0F172A', fontWeight: 500 }}>{formatAmount(remainingAfter)}</span>
-                </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#334155', fontWeight: 600 }}>Còn lại sau chi:</span>
+                      <span style={{ color: '#0F172A', fontWeight: 500 }}>{formatAmount(remainingAfter)}đ</span>
+                    </div>
+
+                    {parsedAmount > currentPayable && (
+                      <div
+                        role="alert"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 6,
+                          padding: '8px 10px',
+                          background: 'var(--red-light, #FFF0F0)',
+                          border: '1px solid var(--red-border, #FFD6D6)',
+                          borderRadius: 6,
+                          color: 'var(--red-accent, #FF3B30)',
+                          fontSize: 12,
+                        }}
+                      >
+                        <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <span>
+                          Số tiền chi ({formatAmount(parsedAmount)}đ) đang vượt quá số tiền trong phiếu lương ({formatAmount(currentPayable)}đ).
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Cột 2: Thời gian, Phương thức, Nguồn quỹ */}
@@ -394,15 +466,23 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
                 <div style={{ display: 'grid', gridTemplateColumns: '105px minmax(0, 1fr)', alignItems: 'center', gap: 10 }}>
                   <span style={{ color: '#334155', fontWeight: 600 }}>Phương thức:</span>
-                  <select
-                    className="emp-form-input"
-                    style={{ width: '100%', minWidth: 0, padding: '6px 10px', borderRadius: 6, fontSize: 13 }}
-                    value={method}
-                    onChange={(e) => setMethod(e.target.value as 'VIETQR' | 'CASH')}
-                  >
-                    <option value="VIETQR">Chuyển khoản</option>
-                    <option value="CASH">Tiền mặt</option>
-                  </select>
+                  <div>
+                    <select
+                      className="emp-form-input"
+                      style={{ width: '100%', minWidth: 0, padding: '6px 10px', borderRadius: 6, fontSize: 13 }}
+                      value={isBatchMode ? 'CASH' : method}
+                      disabled={isBatchMode}
+                      onChange={(e) => setMethod(e.target.value as 'VIETQR' | 'CASH')}
+                    >
+                      {!isBatchMode && <option value="VIETQR">Chuyển khoản</option>}
+                      <option value="CASH">Tiền mặt</option>
+                    </select>
+                    {isBatchMode && (
+                      <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 4 }}>
+                        Thanh toán hàng loạt chỉ áp dụng cho Tiền mặt.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '105px minmax(0, 1fr)', alignItems: 'center', gap: 10 }}>
@@ -451,65 +531,168 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
               </div>
             </div>
 
-            {/* Thông tin tài khoản nhận của nhân viên (nếu chuyển khoản đơn lẻ) */}
-            {method === 'VIETQR' && !isBatchMode && payslip && (
+            {/* Danh sách số tiền chi riêng biệt từng nhân viên khi thanh toán hàng loạt */}
+            {isBatchMode && batchPayslips && (
               <div
+                data-testid="batch-payslip-breakdown"
                 style={{
                   marginTop: 14,
-                  padding: '8px 12px',
-                  background: 'var(--blue-light, #F0FDFA)',
-                  border: '1px solid var(--blue-border, #99F6E4)',
-                  borderRadius: 6,
-                  fontSize: 12.5,
-                  color: 'var(--text-muted, #4B5563)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 8,
+                  border: '1px solid var(--border-subtle, #E5EDF8)',
+                  borderRadius: 8,
+                  overflow: 'hidden',
                 }}
               >
-                {isLoadingBankInfo ? (
-                  <span>Đang tải thông tin TK nhận...</span>
-                ) : (
-                  <>
-                    <span>
-                      TK nhận:{' '}
-                      <strong style={{ color: 'var(--text-main, #111827)' }}>
-                        {bankInfo?.bankName || payslip.bankName || 'Chưa cập nhật ngân hàng'}
-                      </strong>
-                      {' · '}
-                      <strong style={{ color: 'var(--blue-primary, #0F766E)' }}>
-                        {bankInfo?.bankAccountNumber || payslip.bankAccountNumber || 'Chưa cập nhật STK'}
-                      </strong>
-                      {' · '}
-                      <span>{bankInfo?.bankAccountName || payslip.bankAccountName || payslip.employeeName}</span>
-                    </span>
-                    {(bankInfo?.bankAccountNumber || payslip.bankAccountNumber) && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopyAccount((bankInfo?.bankAccountNumber || payslip.bankAccountNumber)!)}
-                        style={{
-                          border: '1px solid var(--border-subtle, #E5EDF8)',
-                          background: 'var(--bg-card, #FFFFFF)',
-                          borderRadius: 4,
-                          padding: '2px 8px',
-                          fontSize: 11.5,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          color: isCopied ? 'var(--green-money, #00C853)' : 'var(--text-muted, #4B5563)',
-                        }}
-                      >
-                        {isCopied ? <Check size={12} /> : <Copy size={12} />}
-                        <span>{isCopied ? 'Đã sao chép' : 'Sao chép STK'}</span>
-                      </button>
-                    )}
-                  </>
-                )}
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    background: '#F8FAFC',
+                    borderBottom: '1px solid var(--border-subtle, #E5EDF8)',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: '#334155',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Chi tiết số tiền chi từng nhân viên ({batchPayslips.length})</span>
+                  <span>Tổng: {formatAmount(currentPayable)}đ</span>
+                </div>
+                <div style={{ maxHeight: 190, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC', color: '#64748B', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 12px', fontWeight: 600 }}>Mã NV</th>
+                        <th style={{ padding: '6px 12px', fontWeight: 600 }}>Nhân viên</th>
+                        <th style={{ padding: '6px 12px', fontWeight: 600 }}>Kỳ lương</th>
+                        <th style={{ padding: '6px 12px', fontWeight: 600, textAlign: 'right' }}>Số tiền chi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batchPayslips.map((item) => (
+                        <tr key={item.id} style={{ borderTop: '1px solid var(--border-subtle, #E5EDF8)' }}>
+                          <td style={{ padding: '7px 12px', fontFamily: 'monospace', color: '#475569' }}>
+                            {item.employeeCode}
+                          </td>
+                          <td style={{ padding: '7px 12px', fontWeight: 600, color: '#0F172A' }}>
+                            {item.employeeName}
+                          </td>
+                          <td style={{ padding: '7px 12px', color: '#475569' }}>{item.periodMonth}</td>
+                          <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
+                            {formatAmount(item.netSalary)}đ
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
+
+            {/* Thông tin tài khoản nhận & VietQR Napas 247 (chuyển khoản đơn lẻ) */}
+            {method === 'VIETQR' && !isBatchMode && payslip && (() => {
+              const rawAccountNo = (bankInfo?.bankAccountNumber || payslip.bankAccountNumber || '').trim();
+              const rawBankName = bankInfo?.bankName || payslip.bankName || '';
+              const accountHolder =
+                bankInfo?.bankAccountName || payslip.bankAccountName || payslip.employeeName || '';
+              const isBankMatched = isBankMatchedInVietnamBanks(rawBankName);
+              const effectiveBankName = manualBankCode || rawBankName;
+              const transferDescription = formatVietQrDescription(
+                isAdvanceMode
+                  ? `TAM UNG ${payslip.employeeCode || payslip.employeeName}`
+                  : `TRA LUONG ${payslip.payslipCode || payslip.employeeCode}`
+              );
+
+              if (isLoadingBankInfo) {
+                return (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: '10px 12px',
+                      background: 'var(--blue-light, #F0FDFA)',
+                      border: '1px solid var(--blue-border, #99F6E4)',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      color: 'var(--text-muted, #4B5563)',
+                    }}
+                  >
+                    Đang tải thông tin TK nhận...
+                  </div>
+                );
+              }
+
+              if (!rawAccountNo) {
+                return (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: '10px 12px',
+                      background: 'var(--orange-light, #FFF8EB)',
+                      border: '1px solid var(--orange-border, #FFE8CC)',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      color: '#B45309',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                    <span>
+                      Nhân viên chưa có số tài khoản ngân hàng — vui lòng cập nhật hồ sơ hoặc chuyển sang Tiền mặt.
+                    </span>
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ marginTop: 12 }}>
+                  {!isBankMatched && (
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        background: 'var(--orange-light, #FFF8EB)',
+                        border: '1px solid var(--orange-border, #FFE8CC)',
+                        borderRadius: 8,
+                        fontSize: 12.5,
+                        color: '#92400E',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span>
+                        Chưa tự nhận diện được ngân hàng{rawBankName ? ` "${rawBankName}"` : ''} — chọn nhanh ngân hàng Napas 247:
+                      </span>
+                      <select
+                        aria-label="Chọn ngân hàng Napas 247"
+                        className="emp-form-input"
+                        style={{ minWidth: 200, padding: '4px 8px', borderRadius: 6, fontSize: 12.5 }}
+                        value={manualBankCode}
+                        onChange={(e) => setManualBankCode(e.target.value)}
+                      >
+                        <option value="">-- Chọn ngân hàng --</option>
+                        {VIETNAM_BANKS.map((bank) => (
+                          <option key={bank.code} value={bank.code}>
+                            {bank.shortName} ({bank.code} · {bank.bin})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <EmployeeVietQrCard
+                    bankName={effectiveBankName}
+                    accountNo={rawAccountNo}
+                    accountHolder={accountHolder}
+                    amount={parsedAmount}
+                    description={transferDescription}
+                    compact
+                  />
+                </div>
+              );
+            })()}
 
             {/* Ghi chú bên dưới */}
             <div style={{ marginTop: 14 }}>
