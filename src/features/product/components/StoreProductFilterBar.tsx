@@ -181,7 +181,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const excelStoreId = resolveExcelStoreId();
   const canExcel = showExcel && Boolean(excelStoreId);
   const excelHint = canExcel
-    ? 'Xuất/Nhập Excel theo data đang hiện trên màn (nếu có lọc chip thì theo bộ lọc)'
+    ? 'Xuất/Nhập Excel theo bộ lọc hiện tại. Sửa cột Giá mới trong sheet Gia_Theo_Don_Vi.'
     : 'Chọn 1 cửa hàng cụ thể (thẻ ngữ cảnh hoặc lọc đúng 1 mã/tên CH) để Xuất/Nhập Excel';
 
   useEffect(() => {
