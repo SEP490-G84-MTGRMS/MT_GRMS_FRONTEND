@@ -16,7 +16,7 @@ export const PlanPricingCard: React.FC<PlanPricingCardProps> = ({ plan }) => {
     : 0;
 
   return (
-    <div
+    <div className="plans-panel"
       style={{
         backgroundColor: '#ffffff',
         borderRadius: 14,
@@ -40,7 +40,7 @@ export const PlanPricingCard: React.FC<PlanPricingCardProps> = ({ plan }) => {
         }}
       >
         <DollarSign size={18} color="var(--blue-primary)" />
-        <span>1. Thông tin Niêm yết & Biểu phí (Pricing & Billing)</span>
+        <span>Thông tin gói & biểu phí</span>
       </div>
 
       <div

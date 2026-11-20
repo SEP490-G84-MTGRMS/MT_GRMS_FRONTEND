@@ -31,7 +31,7 @@ export const PlanLivePreviewCard: React.FC<PlanLivePreviewCardProps> = ({
     : 0;
 
   return (
-    <div
+    <div className="plans-panel"
       style={{
         background: '#ffffff',
         border: '1.5px solid var(--border-light, #e2e8f0)',
@@ -58,7 +58,7 @@ export const PlanLivePreviewCard: React.FC<PlanLivePreviewCardProps> = ({
               color: 'var(--blue-primary, #0066ff)',
             }}
           >
-            LIVE PREVIEW
+            Xem trước
           </span>
         </div>
 
@@ -113,7 +113,7 @@ export const PlanLivePreviewCard: React.FC<PlanLivePreviewCardProps> = ({
         style={{
           border: '1.5px solid var(--blue-border, #dbe9fe)',
           borderRadius: '14px',
-          background: 'linear-gradient(180deg, #ffffff 0%, #f8faff 100%)',
+          background: '#f7fbfa',
           padding: '20px',
         }}
       >

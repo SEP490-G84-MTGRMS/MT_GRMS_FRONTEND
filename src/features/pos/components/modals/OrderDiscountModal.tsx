@@ -20,6 +20,7 @@ export const OrderDiscountModal: FC<Props> = ({
 }) => {
   const [discountType, setDiscountType] = useState<'percent' | 'vnd'>('percent');
   const [val, setVal] = useState<number>(currentDiscountPercent);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -32,6 +33,24 @@ export const OrderDiscountModal: FC<Props> = ({
   const effectiveDiscount = Math.min(totalItemAmount, Math.max(calculatedDiscount, autoPromotion));
 
   const handleSave = () => {
+    if (!Number.isFinite(val) || val < 0) {
+      setErrorMessage('Mức giảm giá phải là số không âm.');
+      return;
+    }
+    if (discountType === 'percent' && val > 100) {
+      setErrorMessage('Chiết khấu theo phần trăm không được vượt quá 100%.');
+      return;
+    }
+    if (discountType === 'vnd' && val > totalItemAmount) {
+      setErrorMessage('Tiền giảm giá không được vượt quá tổng tiền hàng.');
+      return;
+    }
+    if (totalItemAmount <= 0) {
+      setErrorMessage('Giỏ hàng chưa có giá trị để áp dụng chiết khấu.');
+      return;
+    }
+
+    setErrorMessage(null);
     const finalPercent =
       discountType === 'percent'
         ? val
@@ -64,8 +83,15 @@ export const OrderDiscountModal: FC<Props> = ({
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     <input
                       type="number"
+                      min={0}
+                      max={discountType === 'percent' ? 100 : totalItemAmount}
+                      step={discountType === 'percent' ? 1 : 1000}
                       value={val}
-                      onChange={(e) => setVal(Math.max(0, Number(e.target.value)))}
+                      onChange={(e) => {
+                        setErrorMessage(null);
+                        const nextValue = Number(e.target.value);
+                        setVal(Number.isFinite(nextValue) ? nextValue : 0);
+                      }}
                       className="pos-input"
                       style={{ width: 70, textAlign: 'right', fontWeight: 600 }}
                     />
@@ -102,6 +128,11 @@ export const OrderDiscountModal: FC<Props> = ({
               </tr>
             </tbody>
           </table>
+          {errorMessage && (
+            <div role="alert" style={{ marginTop: 10, color: '#b91c1c', fontSize: 12 }}>
+              {errorMessage}
+            </div>
+          )}
         </div>
         <div className="pos-modal-footer">
           <button type="button" className="pos-btn-secondary" onClick={onClose}>

@@ -221,7 +221,7 @@ export const InventoryTable: FC<Props> = ({
               {renderSortTh('productName', 'Tên sản phẩm')}
               <th style={thBaseStyle}>Nhóm</th>
               <th style={thBaseStyle}>Chi nhánh</th>
-              <th style={{ ...thBaseStyle, textAlign: 'center' }}>ĐVT</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }} title="Đơn vị nhập">DVN</th>
               {renderSortTh('onHand', 'Tồn', 'right')}
               <th style={{ ...thBaseStyle, textAlign: 'right' }}>Cách ly/Giữ</th>
               {renderSortTh('available', 'Khả dụng', 'right')}
@@ -262,26 +262,17 @@ export const InventoryTable: FC<Props> = ({
                     }}
                   >
                     <td style={{ ...tdBase, textAlign: 'center', color: '#64748b' }}>{rowNo}</td>
-                    <td style={tdBase}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontWeight: 700,
-                          color: '#0f766e',
-                          backgroundColor: '#f0fdfa',
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          border: '1px solid #ccfbf1',
-                          fontSize: 11,
-                          whiteSpace: 'nowrap',
-                          display: 'inline-block',
-                          maxWidth: '100%',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
-                        {item.sku}
-                      </span>
+                    <td
+                      style={{
+                        ...tdBase,
+                        fontFamily: 'var(--font-mono, monospace)',
+                        fontWeight: 600,
+                        color: '#334155',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={item.sku}
+                    >
+                      {item.sku}
                     </td>
                     <td
                       style={{ ...tdBase, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}

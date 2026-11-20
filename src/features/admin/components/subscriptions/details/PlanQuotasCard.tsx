@@ -41,7 +41,7 @@ export const PlanQuotasCard: React.FC<PlanQuotasCardProps> = ({ plan }) => {
   ];
 
   return (
-    <div
+    <div className="plans-panel"
       style={{
         backgroundColor: '#ffffff',
         borderRadius: 14,
@@ -65,7 +65,7 @@ export const PlanQuotasCard: React.FC<PlanQuotasCardProps> = ({ plan }) => {
         }}
       >
         <Database size={18} color="var(--blue-primary)" />
-        <span>2. Hạn mức Kỹ thuật & Định mức Tài nguyên Cấp phép (Resource Quotas)</span>
+        <span>Hạn mức tài nguyên</span>
       </div>
 
       <div style={{ overflowX: 'auto' }}>

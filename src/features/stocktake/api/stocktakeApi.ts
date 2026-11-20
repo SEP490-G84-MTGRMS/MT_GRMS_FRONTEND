@@ -134,13 +134,24 @@ const is404OrNetworkError = (_err: unknown): boolean => false;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapLineDto = (dto: any): StocktakeLine => {
+  const damagedAction =
+    dto.damagedAction === 'RETURN_SUPPLIER' || dto.damagedAction === 'RETURN'
+      ? 'RETURN_SUPPLIER'
+      : dto.damagedAction || (Number(dto.damagedQty || 0) > 0 ? 'WRITE_OFF' : null);
+  const expiredAction =
+    dto.expiredAction === 'RETURN_SUPPLIER' || dto.expiredAction === 'RETURN'
+      ? 'RETURN_SUPPLIER'
+      : dto.expiredAction || (Number(dto.expiredQty || 0) > 0 ? 'WRITE_OFF' : null);
+
   const eligible =
     dto.eligibleReturnQty !== undefined
       ? Number(dto.eligibleReturnQty)
       : Number(dto.defectiveQty || 0) +
         (dto.nearExpiryAction === 'NEAR_EXPIRY_RETURN' || dto.nearExpiryAction === 'RETURN_SUPPLIER'
           ? Number(dto.nearExpiryQty || 0)
-          : 0);
+          : 0) +
+        (damagedAction === 'RETURN_SUPPLIER' ? Number(dto.damagedQty || 0) : 0) +
+        (expiredAction === 'RETURN_SUPPLIER' ? Number(dto.expiredQty || 0) : 0);
   const returned = Number(dto.returnedQty || 0);
   return {
     id: dto.id,
@@ -174,6 +185,8 @@ const mapLineDto = (dto: any): StocktakeLine => {
         : dto.nearExpiryAction === 'NEAR_EXPIRY_MARKDOWN'
         ? 'DISCOUNT_SALE'
         : dto.nearExpiryAction || null,
+    damagedAction,
+    expiredAction,
     discountPercent: dto.discountPercent ?? null,
     returnedQty: returned,
     returnableQty: Math.max(0, eligible - returned),
@@ -366,6 +379,7 @@ export const stocktakeApi = {
         note: l.note || null,
       })),
       autoSubmit: payload.submitImmediately,
+      createdByName: payload.createdByName || null,
     };
 
     try {
@@ -589,6 +603,11 @@ export const stocktakeApi = {
       decision: payload.action,
       reviewNote: payload.note || null,
       confirmSurplusFound: !!payload.confirmSurplusFound,
+      lineActions: (payload.lineActions || []).map((a) => ({
+        stocktakeLineId: a.stocktakeLineId,
+        damagedAction: a.damagedAction || null,
+        expiredAction: a.expiredAction || null,
+      })),
     };
     try {
       const res = await httpClient.post(`/stocktakes/${id}/review`, command);
@@ -641,7 +660,12 @@ export const stocktakeApi = {
         throw new Error(res.data?.message || 'Không thể tạo phiếu trả hàng từ phiếu kiểm kê.');
       }
       const created = res.data.data;
-      return Array.isArray(created) ? created : [created.id];
+      if (Array.isArray(created)) {
+        return created.map((c: string | { id: string }) =>
+          typeof c === 'string' ? c : c.id
+        );
+      }
+      return [created.id];
     } catch (err: unknown) {
       if (!is404OrNetworkError(err)) {
         throw err;

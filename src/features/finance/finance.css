@@ -15,7 +15,7 @@
   padding: 24px 20px 48px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   box-sizing: border-box;
 }
 
@@ -122,7 +122,7 @@
 }
 
 .finance-overview-title h1 {
-  font-size: 1.6rem;
+  font-size: 1.45rem;
   font-weight: 800;
   color: #0F172A;
   margin: 0;
@@ -130,9 +130,570 @@
 }
 
 .finance-overview-title p {
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   color: #64748B;
   margin: 4px 0 0;
+}
+
+.finance-overview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.finance-global-filter {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #FFFFFF;
+  border: 1px solid #DCE5EA;
+  border-radius: 14px;
+}
+
+.finance-global-filter label,
+.finance-custom-range label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.finance-global-filter select,
+.finance-custom-range input {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 9px;
+  background: #FFFFFF;
+  color: #0F172A;
+  font: inherit;
+}
+
+.finance-global-filter select {
+  min-width: 230px;
+}
+
+.finance-period-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.finance-period-options button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid #CBD5E1;
+  border-radius: 9px;
+  background: #FFFFFF;
+  color: #334155;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.finance-period-options button.active {
+  border-color: #0F766E;
+  background: #0F766E;
+  color: #FFFFFF;
+}
+
+.finance-custom-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.finance-cash-health-card {
+  min-width: 0;
+  padding: 18px;
+  background: #FFFFFF;
+  border: 1px solid #DCE5EA;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.finance-panel-loading {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  color: #64748B;
+}
+
+.finance-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.finance-section-heading h2 {
+  margin: 0;
+  color: #0F172A;
+  font-size: 1.05rem;
+}
+
+.finance-section-heading p {
+  margin: 4px 0 0;
+  color: #64748B;
+  font-size: 0.76rem;
+}
+
+.finance-fetching-label {
+  color: #0F766E;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.finance-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+}
+
+.finance-branch-health-table {
+  width: 100%;
+  min-width: 1080px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.finance-branch-health-table th,
+.finance-branch-health-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #E2E8F0;
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.78rem;
+}
+
+.finance-branch-health-table th {
+  background: #F8FAFC;
+  color: #475569;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.finance-branch-health-table th:first-child,
+.finance-branch-health-table td:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #FFFFFF;
+}
+
+.finance-branch-health-table th:first-child {
+  background: #F8FAFC;
+}
+
+.finance-branch-health-table tbody tr:not(.total-row) {
+  cursor: pointer;
+}
+
+.finance-branch-health-table tbody tr:hover td {
+  background: #F0FDFA;
+}
+
+.finance-branch-health-table td button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #0F766E;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.finance-branch-health-table td button small {
+  display: block;
+  margin-top: 2px;
+  color: #94A3B8;
+  font-weight: 600;
+}
+
+.finance-branch-health-table .positive { color: #047857; }
+.finance-branch-health-table .negative { color: #C2410C; }
+.finance-branch-health-table .total-row td { background: #F0FDFA; font-weight: 800; }
+
+.finance-health-status {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #DCFCE7;
+  color: #166534;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.finance-health-status.attention { background: #FFF7ED; color: #C2410C; }
+.finance-health-status.historical_cash_only { background: #F1F5F9; color: #475569; }
+
+.finance-summary-unified-card {
+  overflow: hidden;
+  background: #FFFFFF;
+  border: 1px solid #DCE5EA;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.finance-position-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 1.5fr) repeat(4, minmax(145px, 1fr));
+  padding: 0 4px;
+}
+
+.finance-position-main,
+.finance-flow-card {
+  min-width: 0;
+  padding: 18px 20px;
+  border-right: 1px solid #E2E8F0;
+}
+
+.finance-flow-card:last-child { border-right: 0; }
+
+.finance-position-main > span,
+.finance-flow-card > span {
+  color: #64748B;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.finance-position-main > strong {
+  display: block;
+  margin: 5px 0 10px;
+  color: #0F172A;
+  font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.finance-flow-card strong {
+  display: block;
+  margin-top: 8px;
+  color: #0F172A;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.finance-flow-card.positive strong { color: #047857; }
+.finance-flow-card.negative strong { color: #C2410C; }
+.finance-flow-card small { display: block; margin-top: 8px; color: #64748B; font-size: 0.68rem; }
+
+.finance-balance-allocation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  color: #64748B;
+  font-size: 0.7rem;
+}
+
+.finance-balance-allocation b { color: #334155; }
+.finance-position-main p { margin: 9px 0 0; color: #64748B; font-size: 0.68rem; }
+
+@media (max-width: 1180px) {
+  .finance-position-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finance-position-main { grid-column: 1 / -1; }
+  .finance-position-main,
+  .finance-flow-card { border-bottom: 1px solid #E2E8F0; }
+  .finance-flow-card:nth-child(odd) { border-right: 0; }
+}
+
+@media (max-width: 720px) {
+  .finance-global-filter select { min-width: 0; width: 100%; }
+  .finance-global-filter > label { width: 100%; }
+  .finance-position-grid { grid-template-columns: 1fr; }
+  .finance-position-main { grid-column: auto; }
+  .finance-position-main,
+  .finance-flow-card { border-right: 0; }
+}
+
+/* Finance P&L tab — compact mockup-aligned presentation */
+.finance-pnl-redesign {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.finance-pnl-toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.finance-pnl-periods {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #F1F5F9;
+}
+
+.finance-pnl-periods button {
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #52647A;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.finance-pnl-periods button.active {
+  border-color: #99F6E4;
+  background: #FFFFFF;
+  color: #0F766E;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.finance-pnl-branch-filter,
+.finance-pnl-custom-dates label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.finance-pnl-branch-filter select,
+.finance-pnl-custom-dates input {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #0F172A;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.finance-pnl-branch-filter select { min-width: 250px; }
+
+.finance-pnl-custom-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.finance-pnl-scope-note {
+  margin: 0;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.finance-pnl-story-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 15px;
+  border: 1px solid #99E6DE;
+  border-radius: 13px;
+  background: linear-gradient(90deg, #ECFDF9, #F0FDFA);
+}
+
+.finance-pnl-story-banner strong,
+.finance-pnl-story-banner span {
+  display: block;
+}
+
+.finance-pnl-story-banner strong {
+  color: #0F5F58;
+  font-size: 0.82rem;
+}
+
+.finance-pnl-story-banner span {
+  margin-top: 3px;
+  color: #64748B;
+  font-size: 0.68rem;
+}
+
+.finance-pnl-story-banner button {
+  min-height: 36px;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  border: 1px solid #D7E1E8;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #334155;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.finance-pnl-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px solid #FCA5A5;
+  border-radius: 10px;
+  background: #FEF2F2;
+  color: #991B1B;
+  font-size: 0.78rem;
+}
+
+.finance-pnl-loading {
+  min-height: 340px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  background: #FFFFFF;
+  color: #64748B;
+}
+
+.finance-pnl-redesign .pnl-waterfall-svg-wrapper {
+  padding: 18px;
+  border-radius: 16px;
+}
+
+.finance-pnl-redesign .pnl-waterfall-svg-container svg {
+  max-height: 330px !important;
+}
+
+.finance-pnl-mini-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr);
+  gap: 12px;
+}
+
+.finance-pnl-mini-card {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  background: #FFFFFF;
+}
+
+.finance-pnl-mini-card h3 {
+  margin: 0 0 12px;
+  color: #0F172A;
+  font-size: 0.78rem;
+}
+
+.finance-pnl-trend {
+  height: 112px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 8px;
+  padding: 8px 6px 0;
+  border-bottom: 1px solid #DDE6EC;
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent 34px, #EDF2F7 35px);
+}
+
+.finance-pnl-trend-column {
+  min-width: 28px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.finance-pnl-trend-bars {
+  height: 86px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.finance-pnl-trend-bars i {
+  width: 7px;
+  border-radius: 3px 3px 0 0;
+  background: #2A9D8F;
+}
+
+.finance-pnl-trend-bars i + i { background: #F2B544; }
+.finance-pnl-trend-column > span { margin-top: 5px; color: #78909C; font-size: 0.58rem; }
+
+.finance-pnl-expense-row {
+  min-height: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.finance-pnl-donut {
+  width: 92px;
+  height: 92px;
+  flex: 0 0 92px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.finance-pnl-donut::after {
+  content: '';
+  position: absolute;
+  inset: 23px;
+  border-radius: 50%;
+  background: #FFFFFF;
+}
+
+.finance-pnl-expense-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.finance-pnl-expense-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748B;
+  font-size: 0.65rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.finance-pnl-expense-legend i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+}
+
+.finance-pnl-mini-empty {
+  min-height: 112px;
+  display: grid;
+  place-items: center;
+  color: #94A3B8;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 900px) {
+  .finance-pnl-mini-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .finance-pnl-toolbar,
+  .finance-pnl-periods,
+  .finance-pnl-branch-filter,
+  .finance-pnl-branch-filter select { width: 100%; }
+  .finance-pnl-story-banner { align-items: flex-start; flex-direction: column; }
+  .finance-pnl-expense-row { align-items: flex-start; flex-direction: column; }
 }
 
 /* Hero Card */
@@ -160,7 +721,7 @@
 }
 
 .finance-hero-amount {
-  font-size: 2.8rem;
+  font-size: 2.45rem;
   font-weight: 900;
   color: #0F172A;
   font-variant-numeric: tabular-nums;
@@ -378,8 +939,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 18px;
-  border-radius: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
   background-color: #F0FDF4;
   border: 1px solid #BBF7D0;
   color: #166534;
@@ -408,13 +969,13 @@
 .finance-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 12px;
 }
 
 .finance-summary-card {
   background: #FFFFFF;
-  border-radius: 18px;
-  padding: 20px;
+  border-radius: 14px;
+  padding: 16px;
   border: 1px solid #E2E8F0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   cursor: pointer;
@@ -463,11 +1024,11 @@
 }
 
 .finance-summary-val {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 800;
   color: #0F172A;
   font-variant-numeric: tabular-nums;
-  margin: 6px 0 12px;
+  margin: 6px 0 9px;
 }
 
 .finance-summary-footer {
@@ -568,13 +1129,43 @@
     width: 100%;
   }
   .finance-hero-card {
-    padding: 20px 16px;
+    padding: 14px 12px;
   }
   .finance-hero-amount {
-    font-size: 2.1rem;
+    font-size: 2rem;
+  }
+  .finance-hero-summary-card {
+    padding: 14px 12px;
+  }
+  .finance-hero-header {
+    align-items: flex-start;
+  }
+  .finance-hero-badge {
+    font-size: 0.7rem;
+    padding: 5px 8px;
+  }
+  .finance-cashflow-equation {
+    justify-content: flex-start;
+    font-size: 0.72rem;
+    gap: 6px;
+  }
+  .finance-cashflow-equation > span {
+    display: none;
   }
   .finance-summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .finance-summary-card {
+    padding: 12px;
+  }
+  .finance-summary-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .finance-summary-val {
+    font-size: 1.15rem;
   }
   .finance-legend-grid {
     grid-template-columns: 1fr;
@@ -708,32 +1299,78 @@
 .finance-hero-section {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .finance-hero-summary-card {
   background: #FFFFFF;
-  border-radius: 20px;
-  padding: 22px 28px;
+  border-radius: 16px;
+  padding: 16px 20px;
   border: 1px solid #E2E8F0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.finance-cashflow-equation {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #F1F5F9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.finance-cashflow-equation > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.finance-cashflow-equation > div strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.finance-cashflow-equation > div span {
+  color: #64748B;
+  font-weight: 500;
+}
+
+.finance-cashflow-equation > span {
+  color: #CBD5E1;
+  font-weight: 800;
+  user-select: none;
+}
+
+.finance-cashflow-closing {
+  background: #ECFDF5;
+  padding: 3px 10px;
+  border-radius: 8px;
+  border: 1px solid #A7F3D0;
+}
+
+.finance-cashflow-closing span {
+  color: #065F46;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .finance-accounts-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 12px;
 }
 
 .finance-account-card {
   background: #FFFFFF;
-  border-radius: 18px;
-  padding: 18px 20px;
+  border-radius: 14px;
+  padding: 14px 16px;
   border: 1px solid #E2E8F0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
@@ -879,7 +1516,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 12px 18px;
   border-bottom: 1px solid #F1F5F9;
   background: #FAFAFA;
   flex-wrap: wrap;
@@ -1073,5 +1710,11 @@
   .finance-accounting-toggle-pill {
     width: 100%;
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 400px) {
+  .finance-summary-grid {
+    grid-template-columns: 1fr;
   }
 }

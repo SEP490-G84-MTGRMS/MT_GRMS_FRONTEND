@@ -87,14 +87,15 @@ describe('transferService', () => {
       ],
     };
 
-    it('map chính xác trạng thái InTransit sang In-Transit', () => {
+    it('giữ nguyên trạng thái InTransit theo contract backend', () => {
       const mapped = mapTransfer(rawDto);
-      expect(mapped.status).toBe('In-Transit');
+      expect(mapped.status).toBe('InTransit');
     });
 
-    it('giữ nguyên các trạng thái Draft, Received, Cancelled', () => {
+    it('giữ nguyên các trạng thái Draft, Pending, Completed, Cancelled', () => {
       expect(mapTransfer({ ...rawDto, status: 'Draft' }).status).toBe('Draft');
-      expect(mapTransfer({ ...rawDto, status: 'Received' }).status).toBe('Received');
+      expect(mapTransfer({ ...rawDto, status: 'Pending' }).status).toBe('Pending');
+      expect(mapTransfer({ ...rawDto, status: 'Completed' }).status).toBe('Completed');
       expect(mapTransfer({ ...rawDto, status: 'Cancelled' }).status).toBe('Cancelled');
     });
 
@@ -117,6 +118,7 @@ describe('transferService', () => {
         onHandReceiver: 0,
         sentQty: 10,
         receivedQty: 10,
+        damagedQty: 0,
         unitPrice: 150000,
         amount: 1500000,
         batchNumber: 'LOT-2026-A',
@@ -337,7 +339,7 @@ describe('transferService', () => {
   });
 
   describe('list()', () => {
-    it('chuyển đổi params.status từ "In-Transit" sang "InTransit" khi gửi request', async () => {
+    it('gửi params.status theo contract chuẩn', async () => {
       vi.mocked(httpClient.get).mockResolvedValueOnce({
         data: {
           data: {
@@ -348,7 +350,7 @@ describe('transferService', () => {
       });
 
       await transferService.list({
-        status: 'In-Transit',
+        status: 'InTransit',
         page: 1,
         pageSize: 15,
         search: 'TRF001',
@@ -384,7 +386,7 @@ describe('transferService', () => {
     it('chuẩn hóa mảng trạng thái và ngày lọc theo contract API', async () => {
       vi.mocked(httpClient.get).mockResolvedValueOnce({ data: { data: { items: [], totalCount: 0 } } });
       await transferService.list({
-        statuses: ['Draft', 'In-Transit'],
+        statuses: ['Draft', 'InTransit'],
         fromDate: '2026-11-01',
         toDate: '2026-11-15',
         dateField: 'receive',
@@ -399,7 +401,7 @@ describe('transferService', () => {
       });
     });
 
-    it('map chính xác status InTransit từ backend sang In-Transit ở kết quả trả về', async () => {
+    it('map chính xác status InTransit từ backend ở kết quả trả về', async () => {
       vi.mocked(httpClient.get).mockResolvedValueOnce({
         data: {
           data: {
@@ -440,7 +442,7 @@ describe('transferService', () => {
 
       expect(result.totalItems).toBe(2);
       expect(result.items).toHaveLength(2);
-      expect(result.items[0].status).toBe('In-Transit');
+      expect(result.items[0].status).toBe('InTransit');
       expect(result.items[1].status).toBe('Draft');
     });
 
@@ -458,7 +460,7 @@ describe('transferService', () => {
                 toBranchName: 'Kho B',
                 createdBy: 'Admin',
                 createdAt: '2026-11-13T08:00:00Z',
-                status: 'Received',
+                status: 'Completed',
                 totalAmount: 200000,
                 items: [],
               },
@@ -471,7 +473,7 @@ describe('transferService', () => {
       const result = await transferService.list();
       expect(result.totalItems).toBe(1);
       expect(result.items[0].transferCode).toBe('TRF003');
-      expect(result.items[0].status).toBe('Received');
+      expect(result.items[0].status).toBe('Completed');
     });
 
     it('đọc totalCount từ contract trang API', async () => {
@@ -522,7 +524,7 @@ describe('transferService', () => {
 
       expect(httpClient.get).toHaveBeenCalledWith('/transfers/trf-999');
       expect(transfer.id).toBe('trf-999');
-      expect(transfer.status).toBe('In-Transit');
+      expect(transfer.status).toBe('InTransit');
       expect(transfer.items).toHaveLength(1);
       expect(transfer.items[0].productName).toBe('Bia Heineken');
     });
@@ -536,7 +538,7 @@ describe('transferService', () => {
 
       expect(httpClient.get).toHaveBeenCalledWith('/transfers/trf-999');
       expect(transfer.id).toBe('trf-999');
-      expect(transfer.status).toBe('In-Transit');
+      expect(transfer.status).toBe('InTransit');
     });
 
     it('propagate lỗi khi không tìm thấy phiếu hoặc lỗi server', async () => {
@@ -600,7 +602,6 @@ describe('transferService', () => {
       const result = await transferService.create({
         fromBranchId: 'branch-1',
         toBranchId: 'branch-2',
-        dispatchNow: true,
         note: 'Chuyển hàng gấp',
         items: inputItems,
       });
@@ -608,7 +609,9 @@ describe('transferService', () => {
       expect(httpClient.post).toHaveBeenCalledWith('/transfers', {
         fromBranchId: 'branch-1',
         toBranchId: 'branch-2',
-        dispatchNow: true,
+        dispatchNow: false,
+        origin: 'OwnerAllocation',
+        priority: 'Normal',
         note: 'Chuyển hàng gấp',
         items: [
           {
@@ -623,7 +626,7 @@ describe('transferService', () => {
       });
 
       expect(result.id).toBe('trf-created-1');
-      expect(result.status).toBe('In-Transit');
+      expect(result.status).toBe('InTransit');
       expect(result.items[0].sentQty).toBe(5);
     });
 
@@ -633,7 +636,6 @@ describe('transferService', () => {
         transferService.create({
           fromBranchId: 'b1',
           toBranchId: 'b2',
-          dispatchNow: false,
           items: inputItems,
         })
       ).rejects.toThrow('Tồn kho không đủ để điều chuyển');
@@ -665,7 +667,7 @@ describe('transferService', () => {
 
       expect(httpClient.post).toHaveBeenCalledWith('/transfers/trf-001/dispatch');
       expect(result.id).toBe('trf-001');
-      expect(result.status).toBe('In-Transit');
+      expect(result.status).toBe('InTransit');
     });
 
     it('propagate lỗi khi xuất chuyển thất bại', async () => {
@@ -686,6 +688,7 @@ describe('transferService', () => {
         onHandReceiver: 10,
         sentQty: 10,
         receivedQty: 9,
+        damagedQty: 1,
         unitPrice: 35000,
         amount: 315000,
         note: 'Thiếu 1 chai do vỡ khi vận chuyển',
@@ -705,7 +708,7 @@ describe('transferService', () => {
             createdBy: 'Admin',
             createdAt: '2026-11-13T08:00:00Z',
             receivedAt: '2026-11-13T15:00:00Z',
-            status: 'Received',
+            status: 'Completed',
             totalAmount: 315000,
             discrepancyNote: 'Vỡ 1 chai',
             items: [
@@ -735,14 +738,15 @@ describe('transferService', () => {
           {
             detailId: 'detail-line-1',
             receivedQuantity: 9,
-            damagedQuantity: 0,
+            damagedQuantity: 1,
             discrepancyReason: 'Thiếu 1 chai do vỡ khi vận chuyển',
           },
         ],
       });
 
-      expect(result.status).toBe('Received');
+      expect(result.status).toBe('Completed');
       expect(result.items[0].receivedQty).toBe(9);
+      expect(result.items[0].damagedQty).toBe(1);
       expect(result.items[0].note).toBe('Thiếu 1 chai do vỡ khi vận chuyển');
     });
 
@@ -774,7 +778,7 @@ describe('transferService', () => {
             toBranchName: 'Kho B',
             createdBy: 'Admin',
             createdAt: '2026-11-13T08:00:00Z',
-            status: 'Received',
+            status: 'Completed',
             totalAmount: 80000,
             items: [],
           },
@@ -793,6 +797,32 @@ describe('transferService', () => {
             discrepancyReason: undefined,
           },
         ],
+      });
+    });
+
+    it('dùng ghi chú chung làm lý do dự phòng khi dòng hàng hỏng chưa có lý do riêng', async () => {
+      vi.mocked(httpClient.put).mockResolvedValueOnce({
+        data: { data: {
+          id: 'trf-001', transferCode: 'TRF001', fromBranchId: 'b1', fromBranchName: 'Kho A',
+          toBranchId: 'b2', toBranchName: 'Kho B', createdBy: 'Staff', createdAt: '2026-11-15T17:30:00Z',
+          status: 'Completed', totalAmount: 315000, items: [],
+        } },
+      });
+      const damagedWithoutLineReason: TransferItem[] = [{
+        ...receiveItems[0],
+        note: undefined,
+        receivedQty: 9,
+        damagedQty: 1,
+      }];
+
+      await transferService.receive('trf-001', damagedWithoutLineReason, 'Móp khi vận chuyển');
+
+      expect(httpClient.put).toHaveBeenCalledWith('/transfers/trf-001/receive', {
+        note: 'Móp khi vận chuyển',
+        items: [expect.objectContaining({
+          damagedQuantity: 1,
+          discrepancyReason: 'Móp khi vận chuyển',
+        })],
       });
     });
 

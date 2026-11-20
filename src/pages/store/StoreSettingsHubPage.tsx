@@ -24,6 +24,7 @@ import { storeApi, mapBackendStoreToFrontend, type TrialStatus } from "./api/sto
 import { StorageAddonCard } from "./components/StorageAddonCard";
 import { BranchAddonModal } from "./components/BranchAddonModal";
 import { TrialStatusBanner } from "./components/TrialStatusBanner";
+import { FinanceAccountsSettingsPage } from "../../features/finance-accounts/pages/FinanceAccountsSettingsPage";
 
 const VALID_TABS: StoreHubTabKey[] = [
   "store-info",
@@ -32,6 +33,7 @@ const VALID_TABS: StoreHubTabKey[] = [
   "order-history",
   "terms",
   "wallet",
+  "finance-accounts",
 ];
 
 export const StoreSettingsHubPage: FC = () => {
@@ -298,6 +300,8 @@ export const StoreSettingsHubPage: FC = () => {
             />
           </div>
         )}
+
+        {activeTab === "finance-accounts" && <FinanceAccountsSettingsPage />}
       </div>
 
       {/* Modal Checkout */}

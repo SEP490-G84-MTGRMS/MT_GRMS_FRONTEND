@@ -47,7 +47,7 @@ export const PlanFeaturesCard: React.FC<PlanFeaturesCardProps> = ({ plan }) => {
   ];
 
   return (
-    <div
+    <div className="plans-panel"
       style={{
         backgroundColor: '#ffffff',
         borderRadius: 14,
@@ -71,7 +71,7 @@ export const PlanFeaturesCard: React.FC<PlanFeaturesCardProps> = ({ plan }) => {
         }}
       >
         <ShieldCheck size={18} color="var(--blue-primary)" />
-        <span>3. Ma trận Phân quyền & 6 Module Tính năng Tích hợp (Feature Matrix)</span>
+        <span>Tính năng của gói</span>
       </div>
 
       <div style={{ overflowX: 'auto' }}>

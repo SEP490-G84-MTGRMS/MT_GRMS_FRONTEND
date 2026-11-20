@@ -27,7 +27,6 @@ type SortField =
   | 'supplierCode'
   | 'supplierName'
   | 'costPrice'
-  | 'retailPrice'
   | 'minOrderQuantity'
   | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -65,13 +64,23 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
     return String(Math.round(n));
   };
 
-  /** One product row → all units on one line: Chai:10k Lốc:60k Thùng:200k */
+  /** One product row → all units on one line: Chai:10k Lốc:60k · Khay:50k/kg */
   const formatUnitPrices = (item: StoreProductItem) => {
     const units = item.unitPrices?.filter((u) => u.unitName?.trim()) ?? [];
-    if (units.length === 0) {
-      return `${item.unit || 'Cái'}:${fmtCompact(item.retailPrice)}`;
+    const parts =
+      units.length === 0
+        ? [`${item.unit || 'Cái'}:${fmtCompact(item.retailPrice)}`]
+        : units.map((u) => `${u.unitName}:${fmtCompact(u.price)}`);
+
+    if (item.allowRepack) {
+      const trayPerKg =
+        item.processedSellingPricePerKg && item.processedSellingPricePerKg > 0
+          ? item.processedSellingPricePerKg
+          : item.retailPrice;
+      parts.push(`Khay:${fmtCompact(trayPerKg)}/kg`);
     }
-    return units.map((u) => `${u.unitName}:${fmtCompact(u.price)}`).join(' ');
+
+    return parts.join(' ');
   };
 
   const handleSort = (field: SortField) => {
@@ -127,10 +136,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         case 'costPrice':
           valA = a.costPrice;
           valB = b.costPrice;
-          break;
-        case 'retailPrice':
-          valA = a.retailPrice;
-          valB = b.retailPrice;
           break;
         case 'minOrderQuantity':
           valA = a.minOrderQuantity || 0;
@@ -192,9 +197,8 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
       <col style={{ width: '7%' }} />
       <col style={{ width: '10%' }} />
       <col style={{ width: '4%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '10%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '15%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '7%' }} />
@@ -225,7 +229,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: 1520, tableLayout: 'fixed' }}>
+        <table className="so-list-table" style={{ minWidth: 1400, tableLayout: 'fixed' }}>
           {tableColGroup}
           <thead>
             <tr>
@@ -310,17 +314,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 </div>
               </th>
 
-              <th
-                style={{ ...thStyle, textAlign: 'right', cursor: 'pointer' }}
-                onClick={() => handleSort('retailPrice')}
-                title="Sắp xếp theo giá bán lẻ niêm yết"
-              >
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
-                  <span>Giá Bán Lẻ (đ)</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'retailPrice' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
-                </div>
-              </th>
-
               <th style={{ ...thStyle }}>
                 <span>Giá Bán Theo ĐVT</span>
               </th>
@@ -376,13 +369,13 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
       >
-        <table className="so-list-table" style={{ minWidth: 1520, tableLayout: 'fixed' }}>
+        <table className="so-list-table" style={{ minWidth: 1400, tableLayout: 'fixed' }}>
           {tableColGroup}
           <tbody>
             {sortedProducts.length === 0 ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={13}
                   style={{
                     textAlign: 'center',
                     padding: '48px 16px',
@@ -581,22 +574,6 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                         }}
                       >
                         {fmt(p.costPrice)} đ
-                      </span>
-                    </td>
-
-                    {/* Giá Bán Lẻ (đ) */}
-                    <td style={{ padding: '8px 6px', textAlign: 'right', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono, monospace)',
-                          fontWeight: 700,
-                          fontSize: 13,
-                          color: '#0f766e',
-                          whiteSpace: 'normal',
-                          overflowWrap: 'anywhere',
-                        }}
-                      >
-                        {fmt(p.retailPrice)} đ
                       </span>
                     </td>
 

@@ -1,0 +1,46 @@
+.admin-audit-logs { width: 100%; min-width: 0; max-width: 1560px; margin: 0 auto; color: #14253e; display: flex; flex-direction: column; gap: 16px; }
+.admin-audit-logs .plans-hero { margin-bottom: 0; }
+.admin-audit-logs .audit-toolbar { margin: 0; flex-wrap: wrap; }
+.audit-toolbar .plans-search { flex: 1 1 320px; }
+.audit-toolbar select { max-width: 100%; flex: 0 1 240px; }
+.audit-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #718096; font-size: 11px; }
+.audit-state { padding: 48px 20px; text-align: center; color: #64748b; background: #fff; border-radius: 24px; }
+.audit-state[role="alert"] { border: 1px solid #e2eaf0; color: #b91c1c; }
+.admin-audit-logs .plans-table-card { flex: 0 0 auto; }
+.admin-audit-logs .plans-table-scroll { max-height: 65vh; }
+.audit-table { table-layout: fixed; min-width: 900px; }
+.audit-table th:first-child { width: 21%; }
+.audit-table th:nth-child(2) { width: 18%; }
+.audit-table th:nth-child(3) { width: 21%; }
+.audit-table th:nth-child(4) { width: 20%; }
+.audit-table th:nth-child(5) { width: 12%; }
+.audit-table th:last-child { width: 8%; }
+.audit-table td { overflow-wrap: anywhere; font-size: 12px; }
+.audit-table .audit-action { white-space: normal; overflow-wrap: anywhere; }
+.audit-id { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+.audit-ip { font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+.audit-dialog { box-sizing: border-box; width: min(860px, calc(100vw - 32px)); max-height: 90vh; padding: 0; border: 1px solid #e2eaf0; border-radius: 24px; color: #14253e; background: #fff; box-shadow: 0 20px 60px #14253e26; }
+.audit-dialog::backdrop { background: #0f172a66; }
+.audit-dialog.admin-plans { margin: auto; max-width: 860px; font-family: inherit; }
+.audit-dialog-header { display: flex; gap: 12px; align-items: center; padding: 22px 24px; border-bottom: 1px solid #e2eaf0; }
+.audit-dialog h2 { margin: 0 0 5px; font-size: 18px; }
+.audit-dialog small { display: block; color: #718096; font-size: 11px; overflow-wrap: anywhere; }
+.audit-close { margin-left: auto; display: grid; place-items: center; flex-shrink: 0; width: 34px; height: 34px; background: #f1f5f9; border: 0; border-radius: 9999px; color: #64748b; cursor: pointer; }
+.audit-dialog-body { padding: 24px; overflow-y: auto; max-height: 62vh; }
+.audit-detail-grid { margin: 0 0 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.audit-detail-grid > div { min-width: 0; }
+.audit-detail-grid dt { color: #718096; font-size: 12px; margin-bottom: 8px; }
+.audit-detail-grid dd { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.audit-detail-grid dd small { margin-top: 5px; font-weight: 400; }
+.audit-detail-wide { grid-column: 1 / -1; }
+.audit-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.audit-diff section { min-width: 0; background: #f7f9fb; border: 1px solid #e2eaf0; border-radius: 16px; padding: 16px; }
+.audit-diff h3 { margin: 0 0 12px; font-size: 13px; }
+.audit-diff pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.8; color: #475569; }
+.audit-dialog footer { display: flex; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid #e2eaf0; }
+@media (max-width: 640px) {
+  .audit-toolbar select { flex: 1 1 100%; width: 100%; }
+  .audit-detail-grid, .audit-diff { grid-template-columns: 1fr; }
+  .audit-dialog-header, .audit-dialog-body { padding: 18px; }
+  .audit-dialog-header small { max-width: 220px; }
+}

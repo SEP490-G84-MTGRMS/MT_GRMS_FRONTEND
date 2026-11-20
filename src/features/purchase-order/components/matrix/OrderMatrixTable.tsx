@@ -144,7 +144,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
     return acc + rowQty * p.price;
   }, 0);
 
-  // Number of fixed metadata columns: Tên SP + (NCC nếu flat) + ĐVT + MOQ + Giá nhập + (SOH)
+  // Number of fixed metadata columns: Tên SP + (NCC nếu flat) + DVN + MOQ + Giá nhập + (SOH)
   const metaExtra = flatByPrice ? 1 : 0; // cột NCC khi flat
   const fixedColCount = 4 + metaExtra + (showSoh ? 2 : 0);
   const totalColSpan = fixedColCount + days.length + 2;
@@ -242,7 +242,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
             <tr>
               <th className="po-th-left po-th-product">Tên Sản Phẩm</th>
               {flatByPrice && <th className="po-th-left">Nhà Cung Cấp</th>}
-              <th>ĐVT</th>
+              <th>DVN</th>
               <th>MOQ</th>
               <th
                 style={{ cursor: flatByPrice ? 'pointer' : undefined, userSelect: 'none' }}

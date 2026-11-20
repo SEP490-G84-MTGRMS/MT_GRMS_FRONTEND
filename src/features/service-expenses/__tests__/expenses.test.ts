@@ -138,6 +138,90 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
       expect(paid.status).toBe('Paid');
       expect(paid.amount).toBe(3500000);
     });
+
+    it('TC-EXP-04b: should skip approve call when currentStatus is already Approved', async () => {
+      const postSpy = vi.spyOn(financeHttpClient, 'post').mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: {
+            id: '01a1a64c-4421-7751-9c42-e5a5f4a00295',
+            voucherCode: 'EXP-001',
+            status: 'Paid',
+            amount: 3500000,
+            beneficiaryName: 'EVN HCMC',
+            category: 'Tiền điện',
+          },
+        },
+      } as any); // directly disburse
+
+      const paid = await expenseApi.payServiceExpense('01a1a64c-4421-7751-9c42-e5a5f4a00295', {
+        paymentMethod: 'Cash',
+        createCashBookEntry: true,
+        paymentDate: '2026-11-04',
+        currentStatus: 'Approved',
+      });
+
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      expect(postSpy).toHaveBeenCalledWith(
+        '/expenses/01a1a64c-4421-7751-9c42-e5a5f4a00295/disburse',
+        expect.anything(),
+        expect.anything()
+      );
+      expect(paid.status).toBe('Paid');
+    });
+
+    it('TC-EXP-04c: should approve a draft voucher via approveServiceExpense', async () => {
+      vi.spyOn(financeHttpClient, 'post').mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: {
+            id: 'fa02e5a1-dcbf-4eae-a168-084d8d090c0c',
+            voucherCode: 'PC-202611-THUE',
+            status: 'Approved',
+            amount: 5000000,
+            beneficiaryName: 'Kho bạc',
+            category: 'Thuế',
+          },
+        },
+      } as any);
+
+      const approved = await expenseApi.approveServiceExpense(
+        'fa02e5a1-dcbf-4eae-a168-084d8d090c0c',
+        'Duyệt phiếu nộp thuế'
+      );
+
+      expect(approved.approvalStatus).toBe('Approved');
+      expect(approved.status).toBe('Pending');
+    });
+
+    it('TC-EXP-04d: should preserve approvalNote and pass it to disburse note for audit trail', async () => {
+      const postSpy = vi.spyOn(financeHttpClient, 'post').mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: {
+            id: 'fa02e5a1-dcbf-4eae-a168-084d8d090c0c',
+            voucherCode: 'PC-202611-THUE',
+            status: 'Paid',
+            amount: 5000000,
+            beneficiaryName: 'Kho bạc',
+            category: 'Thuế',
+          },
+        },
+      } as any);
+
+      await expenseApi.payServiceExpense('fa02e5a1-dcbf-4eae-a168-084d8d090c0c', {
+        paymentMethod: 'Cash',
+        createCashBookEntry: true,
+        paymentDate: '2026-11-04',
+        currentStatus: 'Approved',
+        approvalNote: 'Giải trình: Đã đối chiếu hợp đồng thuê hợp lệ',
+        note: 'Xuất két chi tiền',
+      });
+
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      const callPayload = postSpy.mock.calls[0][1] as any;
+      expect(callPayload.note).toBe('Giải trình: Đã đối chiếu hợp đồng thuê hợp lệ | Xuất két chi tiền');
+    });
   });
 
   describe('Bad & Edge Cases', () => {

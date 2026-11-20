@@ -1,0 +1,107 @@
+.admin-plans { --blue-primary: #0f766e; --blue-light: #eaf6f4; --bg-soft-blue: #f7fafb; --border-light: #e2eaf0; width: 100%; max-width: 1560px; min-width: 0; margin: 0 auto; color: #14253e; }
+.admin-plans * { box-sizing: border-box; }
+.plans-hero { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; flex-shrink: 0; padding: 24px 26px; margin-bottom: 18px; border: 1px solid #e2eaf0; border-radius: 24px; background: #fff; }
+.plans-hero h1 { margin: 0; font-size: 26px; letter-spacing: -.025em; }
+.plans-hero p { margin: 7px 0 0; color: #718096; font-size: 12px; }
+.plans-hero .plans-eyebrow { margin: 0 0 7px; color: #0f766e; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.plans-kpis { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin-bottom: 18px; flex-shrink: 0; }
+.plans-kpi { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 20px; border: 1px solid #e2eaf0; border-radius: 22px; background: #fff; }
+.plans-kpi-icon { display: grid; place-items: center; grid-column: 2; grid-row: 1 / 3; height: 38px; width: 38px; border-radius: 12px; color: #0f766e; background: #eaf6f4; }
+.plans-kpi > span:not(.plans-kpi-icon) { color: #64748b; font-size: 12px; font-weight: 600; }
+.plans-kpi strong { font-family: 'JetBrains Mono', monospace; font-size: 26px; }
+.plans-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 15px 18px; margin-bottom: 16px; background: #fff; border: 1px solid #e2eaf0; border-radius: 18px; flex-shrink: 0; }
+.plans-search { display: flex; align-items: center; gap: 9px; flex: 1 1 240px; min-width: 0; color: #8493a5; border: 1px solid #d3dfe7; border-radius: 9999px; padding: 0 14px; }
+.plans-search input { min-width: 0; width: 100%; height: 36px; padding: 0; border: 0; background: transparent; color: #14253e; font: inherit; font-size: 12px; }
+.plans-toolbar > select { height: 38px; padding: 0 13px; border: 1px solid #d3dfe7; border-radius: 9999px; background: #fff; color: #41546e; font: inherit; font-size: 12px; }
+.plans-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.admin-plans .admin-toolbar-card { padding: 15px 18px !important; border-radius: 18px !important; box-shadow: none; }
+.admin-plans .admin-btn { min-height: 36px; border-radius: 9999px !important; box-shadow: none !important; gap: 7px; }
+.admin-plans .admin-btn-primary { background: #0f766e; border-color: #0f766e; }
+.admin-plans .admin-search-input, .admin-plans .admin-filter-select { border-radius: 9999px !important; background: #fff; }
+.admin-plans input:not([type=checkbox]):not([type=radio]), .admin-plans select, .admin-plans textarea { max-width: 100%; border-color: #d3dfe7 !important; box-shadow: none !important; }
+.admin-plans input:focus, .admin-plans select:focus, .admin-plans textarea:focus { outline: 2px solid #d9efeb; border-color: #0f766e !important; }
+.admin-plans button:focus-visible, .admin-plans a:focus-visible { outline: 2px solid #0f766e; outline-offset: 3px; }
+.plans-table-card { display: flex; flex-direction: column; flex: 1; min-height: 280px; min-width: 0; overflow: hidden; background: #fff; border: 1px solid #e2eaf0; border-radius: 18px; }
+.plans-table-summary { padding: 13px 18px; font-size: 12px; color: #64748b; border-bottom: 1px solid #eaf0f4; }
+.plans-table-scroll { overflow: auto; flex: 1; min-height: 0; }
+.plans-table { width: 100%; min-width: 950px; border-spacing: 0; text-align: left; font-size: 12px; }
+.plans-table th { position: sticky; top: 0; background: #f7f9fb; color: #41546e; padding: 12px 16px; border-bottom: 1px solid #e2eaf0; text-transform: uppercase; font-size: 10px; letter-spacing: .04em; white-space: nowrap; }
+.plans-table th:first-child { width: 29%; }
+.plans-table td { padding: 17px 16px; border-bottom: 1px solid #edf2f6; vertical-align: middle; }
+.plans-table tbody tr:hover { background: #fafcfd; }
+.plans-table th:last-child { text-align: right; }
+.plans-name { display: flex; align-items: center; gap: 12px; }
+.plans-name-icon { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 10px; background: #edf7f5; color: #0f766e; }
+.plans-name-link { padding: 0; border: 0; background: none; color: #14253e; font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.plans-name-link:hover { color: #0f766e; }
+.plans-table small { display: block; margin-top: 5px; font-size: 11px; color: #718096; }
+.plans-money { font-family: 'JetBrains Mono', monospace; color: #14253e; font-size: 14px; }
+.plans-table .plans-money + small { display: inline; margin-left: 4px; }
+.plans-yearly { display: block; margin-top: 6px; color: #718096; font-size: 11px; }
+.plans-count, .plans-status { display: inline-block; padding: 4px 9px; border-radius: 9999px; background: #f1f5f9; color: #64748b; font-size: 11px; white-space: nowrap; }
+.plans-status.is-active, .plans-count { background: #eaf6f4; color: #0f766e; }
+.plans-row-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.plans-row-actions button { display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 1px solid #d9e4eb; border-radius: 6px; background: #fff; color: #0f766e; cursor: pointer; }
+.plans-row-actions button:hover { border-color: #0f766e; background: #edf7f5; }
+.plans-empty { padding: 50px !important; text-align: center; color: #718096; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-store { width: 23%; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-owner { width: 22%; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-scale { width: 12%; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-status { width: 11%; }
+.admin-tenant-list .admin-tenant-table .admin-tenant-col-actions { width: 12%; }
+.admin-tenant-list .admin-tenant-table td { white-space: normal; }
+.admin-tenant-list .admin-tenant-store-cell { gap: 12px; }
+.admin-tenant-list .admin-tenant-cell-copy > span { margin-top: 5px; font-size: 11px; }
+.admin-tenant-list .admin-tenant-scale { gap: 5px; font-family: inherit; font-size: 12px; }
+.admin-tenant-list .admin-tenant-expiry { font-size: 12px; font-weight: 500; }
+.admin-tenant-list .plans-table .tenant-cell--actions { overflow: visible; }
+.admin-tenant-list .plans-row-actions button { flex-shrink: 0; }
+.admin-tenant-list .admin-tenant-empty { text-align: center; padding: 50px 20px !important; }
+.admin-tenant-list .plans-table td:nth-child(3) > span { border-radius: 9999px !important; border: 0 !important; padding: 4px 9px !important; font-size: 11px !important; }
+.admin-plans-form { min-height: 0 !important; padding: 4px 0 32px !important; background: transparent !important; }
+.plans-page-heading { padding: 22px 24px; border: 1px solid #e2eaf0; border-radius: 24px; background: #fff; margin-bottom: 20px !important; }
+.plans-page-heading > div:last-child { flex-wrap: wrap; }
+.plans-edit-fields { min-width: 0; margin: 0 0 20px; padding: 0; border: 0; }
+.plans-detail-back { margin-bottom: 16px; padding: 0; border: 0; background: transparent; color: #0f766e; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.plans-inline-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 24px; margin-bottom: 20px; background: #fff; border: 1px solid #e2eaf0; border-radius: 24px; }
+.plans-inline-header > div:first-child { min-width: 0; flex: 1 1 300px; }
+.plans-inline-header .plans-eyebrow { color: #0f766e; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+.plans-inline-header h1 { margin: 8px 0 10px; font-size: 24px; line-height: 1.4; overflow-wrap: anywhere; }
+.plans-inline-actions, .plans-inline-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.plans-inline-footer { position: sticky; bottom: 0; z-index: 5; justify-content: flex-end; margin-top: 18px; padding: 14px 18px; background: #fff; border: 1px solid #e2eaf0; border-radius: 18px; box-shadow: 0 -3px 16px rgb(15 23 42 / 3%); }
+.plans-saved-summary { position: sticky; top: 20px; }
+.plans-saved-summary h2 { margin: 0 0 16px; font-size: 15px; }
+.plans-saved-summary dl { margin: 0; font-size: 12px; }
+.plans-saved-summary dl > div { display: flex; justify-content: space-between; gap: 14px; padding: 13px 0; border-top: 1px solid #edf2f6; }
+.plans-saved-summary dt { color: #718096; }
+.plans-saved-summary dd { margin: 0; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.plans-editor > div, .plans-edit-fields > div { grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr) !important; gap: 20px !important; }
+.plans-editor > div > div, .plans-edit-fields > div > div { min-width: 0; }
+.plans-editor > div > div:last-child { position: sticky; top: 20px; }
+.admin-plans .plans-panel { min-width: 0; padding: 22px !important; border: 1px solid #e2eaf0 !important; border-radius: 22px !important; background: #fff !important; box-shadow: none !important; }
+.admin-plans .plans-panel > div:first-child { flex-wrap: wrap; }
+.admin-plans .plans-panel > div:first-child svg { color: #0f766e !important; }
+.admin-plans .plans-panel input, .admin-plans .plans-panel select { border-radius: 10px !important; }
+.admin-plans .plans-panel table th { padding: 11px !important; color: #41546e; background: #f7f9fb; text-align: left; font-size: 11px; }
+.admin-plans .plans-panel table td { padding: 13px 11px !important; border-bottom: 1px solid #edf2f6; }
+.plans-detail-sections { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.plans-detail-sections > .plans-panel { margin: 0 !important; }
+.plans-detail-sections > .plans-panel:nth-child(3), .plans-detail-sections > .plans-panel:nth-child(4) { grid-column: 1 / -1; }
+.plans-detail-sections .plans-panel:has(table) { overflow-x: auto; }
+.plans-detail-sections table { min-width: 540px; }
+@media (max-width: 1150px) {
+  .plans-editor > div, .plans-edit-fields > div { grid-template-columns: minmax(0,1fr) !important; }
+  .plans-editor > div > div:last-child { position: static; }
+  .plans-detail-sections { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 760px) {
+  .plans-kpis { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .plans-hero { padding: 20px; }
+  .plans-hero h1 { font-size: 23px; }
+  .plans-page-heading { padding: 18px; }
+  .plans-page-heading > div { flex-wrap: wrap; }
+  .admin-plans .plans-panel { padding: 18px !important; }
+  .admin-plans .plans-panel > div[style*="grid"] { grid-template-columns: minmax(0,1fr) !important; }
+  .admin-plans .admin-search-row > div { min-width: 0; }
+}
+@media (max-width: 420px) { .plans-kpi { padding: 14px; } .plans-kpi-icon { display: none; } }

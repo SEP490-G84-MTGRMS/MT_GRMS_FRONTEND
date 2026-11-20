@@ -40,7 +40,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(15);
   const [batchCodesMap, setBatchCodesMap] = useState<Record<string, VoucherCodeItem[]>>({});
   const [loadingCodesMap, setLoadingCodesMap] = useState<Record<string, boolean>>({});
 
@@ -92,13 +92,13 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   const renderBatchStatus = (status: VoucherBatchStatus) => {
     switch (status) {
       case 'ACTIVE':
-        return <span className="badge-status badge-active">● Đang lưu hành</span>;
+        return <span className="badge-status badge-active" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Đang lưu hành</span>;
       case 'EXPIRED':
-        return <span className="badge-status badge-expired">✕ Đã hết hạn</span>;
+        return <span className="badge-status badge-expired" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Đã hết hạn</span>;
       case 'PAUSED':
-        return <span className="badge-status badge-paused">⏸ Tạm dừng</span>;
+        return <span className="badge-status badge-paused" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Tạm dừng</span>;
       case 'DEPLETED':
-        return <span className="badge-status badge-pill-neutral">Đã phát hết</span>;
+        return <span className="badge-status badge-pill-neutral" style={{ padding: '3px 8px', fontSize: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>Đã phát hết</span>;
     }
   };
 
@@ -150,21 +150,48 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
     }
   };
 
+  const thStyle: React.CSSProperties = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    backgroundColor: '#f8fafc',
+    padding: '8px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.02em',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+    boxSizing: 'border-box',
+  };
+
   return (
-    <div className="promotion-card">
-      <div className="table-responsive">
-        <table className="promotion-table">
-          <thead>
+    <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+      <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1450, width: '100%', tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: 44 }} />
+            <col style={{ width: 110 }} />
+            <col style={{ width: 220 }} />
+            <col style={{ width: 130 }} />
+            <col style={{ width: 165 }} />
+            <col style={{ width: 140 }} />
+            <col style={{ width: 165 }} />
+            <col style={{ width: 180 }} />
+            <col style={{ width: 250 }} />
+          </colgroup>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
-              <th style={{ width: 44 }}></th>
-              <th style={{ width: 120 }}>Mã đợt</th>
-              <th style={{ minWidth: 200 }}>Tên đợt Voucher / Coupon</th>
-              <th style={{ width: 140 }}>Loại ưu đãi</th>
-              <th style={{ width: 170 }}>Điều kiện áp dụng</th>
-              <th style={{ width: 140 }}>Đã dùng / Phát hành</th>
-              <th style={{ width: 180 }}>Thời gian hiệu lực</th>
-              <th style={{ width: 140 }}>Trạng thái</th>
-              <th style={{ width: 110, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
+              <th style={{ ...thStyle, width: 110 }}>Mã đợt</th>
+              <th style={{ ...thStyle, width: 220 }}>Tên đợt Voucher / Coupon</th>
+              <th style={{ ...thStyle, width: 130 }}>Loại ưu đãi</th>
+              <th style={{ ...thStyle, width: 165 }}>Điều kiện áp dụng</th>
+              <th style={{ ...thStyle, width: 140 }}>Đã dùng / Phát hành</th>
+              <th style={{ ...thStyle, width: 165 }}>Thời gian hiệu lực</th>
+              <th style={{ ...thStyle, width: 180 }}>Trạng thái</th>
+              <th style={{ ...thStyle, width: 250, textAlign: 'right', paddingRight: 16 }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -184,8 +211,20 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
 
                 return (
                   <Fragment key={batch.id}>
-                    <tr className={isExpanded ? 'row-expanded' : ''}>
-                      <td>
+                    <tr
+                      className={`so-list-row ${isExpanded ? 'row-expanded' : ''}`}
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        backgroundColor: isExpanded ? '#f0fdfa' : '#ffffff',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isExpanded) e.currentTarget.style.backgroundColor = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isExpanded) e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
+                    >
+                      <td className="so-list-td" style={{ textAlign: 'center' }}>
                         <button
                           onClick={() => toggleExpand(batch.id)}
                           className="btn-table-icon"
@@ -198,13 +237,13 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           )}
                         </button>
                       </td>
-                      <td>
-                        <span className="promo-code-text">{batch.batchCode}</span>
+                      <td className="so-list-td">
+                        <span className="so-list-code">{batch.batchCode}</span>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="promo-title-box">
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                            <span className="promo-title-main">{batch.name}</span>
+                            <span className="promo-title-main so-list-name">{batch.name}</span>
                             {batch.allowWithPromotions !== false ? (
                               <span
                                 style={{
@@ -242,9 +281,9 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td>{renderDiscountType(batch.discountType, batch.discountValue)}</td>
-                      <td>
-                        <div className="voucher-conditions">
+                      <td className="so-list-td">{renderDiscountType(batch.discountType, batch.discountValue)}</td>
+                      <td className="so-list-td">
+                        <div className="voucher-conditions" style={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
                           <div>
                             Đơn tối thiểu: <strong>{batch.minOrderValue.toLocaleString('vi-VN')} đ</strong>
                           </div>
@@ -255,7 +294,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           )}
                         </div>
                       </td>
-                      <td>
+                      <td className="so-list-td">
                         <div className="voucher-usage-container">
                           <div className="voucher-usage-text">
                             <span>{batch.usedQuantity} / {batch.totalQuantity}</span>
@@ -269,20 +308,27 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           </div>
                         </div>
                       </td>
-                      <td>
-                        <div className="promo-date-badge">
-                          <Calendar size={13} />
-                          <span className="promo-date-text">{batch.startDate}</span>
-                          <span className="promo-date-arrow">→</span>
-                          <span className="promo-date-text">{batch.endDate}</span>
+                      <td className="so-list-td">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
+                            <Calendar size={12} style={{ color: '#0f766e', flexShrink: 0 }} />
+                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Từ:</span>
+                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{batch.startDate}</span>
+                          </div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
+                            <span style={{ width: 12, display: 'inline-block', flexShrink: 0 }} />
+                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Đến:</span>
+                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{batch.endDate}</span>
+                          </div>
                         </div>
                       </td>
-                      <td>
-                        <div className="promo-status-cell">
+                      <td className="so-list-td" style={{ overflow: 'hidden', padding: '8px 10px', boxSizing: 'border-box' }}>
+                        <div className="promo-status-cell" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
                           <div
                             className="switch-container"
                             onClick={() => onToggleBatchStatus(batch.id)}
                             title={batch.status === 'ACTIVE' ? 'Tạm dừng đợt phát hành' : 'Kích hoạt đợt'}
+                            style={{ flexShrink: 0 }}
                           >
                             <div className={`switch-track ${batch.status === 'ACTIVE' ? 'switch-active' : ''}`}>
                               <div className="switch-thumb" />
@@ -291,30 +337,33 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                           {renderBatchStatus(batch.status)}
                         </div>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div className="table-actions">
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden', padding: '8px 14px', boxSizing: 'border-box' }}>
+                        <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap', maxWidth: '100%' }}>
                           <button
                             onClick={() => onOpenGenerateCodes(batch)}
                             className="btn-secondary-pill"
-                            style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                            style={{ padding: '3px 8px', fontSize: '11.5px', height: 28, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
                             title="Phát hành thêm mã cho đợt này"
                           >
-                            <PlusCircle size={14} color="#0F766E" />
+                            <PlusCircle size={13} color="#0F766E" />
                             <span>Tạo thêm mã</span>
                           </button>
                           <button
                             onClick={() => onEdit(batch)}
                             className="btn-table-icon"
+                            style={{ width: 28, height: 28, flexShrink: 0 }}
                             title="Chỉnh sửa đợt voucher"
                           >
-                            <Edit2 size={14} />
+                            <Edit2 size={13} />
                           </button>
                           <button
                             onClick={() => onDelete(batch.id)}
                             className="btn-table-icon btn-danger-icon"
-                            title="Xóa đợt voucher"
+                            style={{ width: 28, height: 28, flexShrink: 0 }}
+                            disabled={batch.status === 'ACTIVE'}
+                            title={batch.status === 'ACTIVE' ? 'Hãy tạm dừng đợt voucher trước khi xóa' : 'Xóa đợt voucher'}
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </td>
@@ -444,12 +493,12 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
         </table>
       </div>
 
-      {/* Shared Enterprise Pagination */}
+      {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
       <TablePagination
         currentPage={currentPage}
         pageSize={pageSize}
         totalItems={batches.length}
-        pageSizeOptions={[5, 10, 20]}
+        pageSizeOptions={[15, 24, 36, 48]}
         itemLabel="đợt voucher"
         onPageChange={setCurrentPage}
         onPageSizeChange={(newSize) => {

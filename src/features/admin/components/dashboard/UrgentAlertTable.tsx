@@ -59,7 +59,13 @@ export const UrgentAlertTable: FC<UrgentAlertTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {tenants.map((t) => (
+          {tenants.length === 0 ? (
+            <tr>
+              <td colSpan={7} style={{ padding: '28px 16px', color: '#64748b', textAlign: 'center' }}>
+                Hiện không có khách hàng cần can thiệp khẩn cấp.
+              </td>
+            </tr>
+          ) : tenants.map((t) => (
             <tr key={t.subdomain}>
               <td>
                 <span className="admin-subdomain-tag">{t.subdomain}</span>

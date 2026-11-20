@@ -11,6 +11,11 @@ import type {
   UrgentAlertTenant,
   MonthlyAnalyticsData,
 } from '../types/admin.types';
+import type {
+  PlatformSetting,
+  UpdatePlatformSettingPayload,
+  PlatformPublicConfig,
+} from '../types/settings.types';
 
 // ======================== Plan DTOs ========================
 
@@ -123,6 +128,18 @@ export interface UpdateTenantPayload {
   city?: string | null;
 }
 
+export interface CreateTenantPayload {
+  name: string;
+  subdomain: string;
+  ownerName: string;
+  ownerEmail: string;
+  ownerPhone: string;
+  password: string;
+  address?: string;
+  city?: string;
+  taxCode?: string;
+}
+
 export interface LockTenantPayload {
   lockType: 'SOFT' | 'HARD';
   reason: string;
@@ -175,6 +192,11 @@ export const planApi = {
 };
 
 export const tenantApi = {
+  create: async (payload: CreateTenantPayload): Promise<ApiResponse<{ id: string }>> => {
+    const res = await httpClient.post<ApiResponse<{ id: string }>>('/admin/tenants', payload);
+    return res.data;
+  },
+
   getTenants: async (params?: {
     keyword?: string;
     status?: string;
@@ -232,6 +254,23 @@ export const dashboardApi = {
 
   getMonthlyAnalytics: async (): Promise<ApiResponse<MonthlyAnalyticsData[]>> => {
     const res = await httpClient.get<ApiResponse<MonthlyAnalyticsData[]>>('/admin/dashboard/analytics');
+    return res.data;
+  },
+};
+
+export const settingsApi = {
+  getSettings: async (): Promise<ApiResponse<PlatformSetting>> => {
+    const res = await httpClient.get<ApiResponse<PlatformSetting>>('/admin/settings');
+    return res.data;
+  },
+
+  updateSettings: async (payload: UpdatePlatformSettingPayload): Promise<ApiResponse<PlatformSetting>> => {
+    const res = await httpClient.put<ApiResponse<PlatformSetting>>('/admin/settings', payload);
+    return res.data;
+  },
+
+  getPublicConfig: async (): Promise<ApiResponse<PlatformPublicConfig>> => {
+    const res = await httpClient.get<ApiResponse<PlatformPublicConfig>>('/platform/public-config');
     return res.data;
   },
 };

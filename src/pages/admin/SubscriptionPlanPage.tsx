@@ -1,3 +1,4 @@
+import './adminPlans.css';
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type {
@@ -221,7 +222,7 @@ export const SubscriptionPlanPage: React.FC = () => {
   };
 
   return (
-    <div style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, height: "100%" }}>
+    <div className="admin-plans admin-plans-list" style={{ width: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0, height: "100%" }}>
       {/* TOAST NOTIFICATION */}
       {toast && (
         <div
@@ -257,56 +258,10 @@ export const SubscriptionPlanPage: React.FC = () => {
         </div>
       )}
 
-      {/* HEADER & BREADCRUMB */}
-      <div style={{ marginBottom: 14, flexShrink: 0 }}>
-        <div
-          style={{
-            fontSize: 12.5,
-            color: "var(--text-muted)",
-            marginBottom: 4,
-            display: "flex",
-            gap: 6,
-            alignItems: "center",
-          }}
-        >
-          <span>Quản trị hệ thống</span>
-          <span>/</span>
-          <span style={{ color: "var(--blue-primary)", fontWeight: 600 }}>
-            Gói dịch vụ & Biểu phí SaaS
-          </span>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-end",
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontSize: 22,
-                fontWeight: 800,
-                color: "var(--text-main)",
-                margin: 0,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Quản Lý Gói Dịch Vụ SaaS
-            </h1>
-            <p
-              style={{
-                fontSize: 13.5,
-                color: "var(--text-muted)",
-                margin: "4px 0 0 0",
-              }}
-            >
-              Thiết lập biểu phí, định ngạch tài nguyên (Quotas) và các tính
-              năng mở khóa theo từng phân khúc khách hàng
-            </p>
-          </div>
-        </div>
-      </div>
+      <header className="plans-hero">
+        <div><p className="plans-eyebrow">GÓI DỊCH VỤ</p><h1>Quản lý gói dịch vụ</h1><p>Biểu phí, hạn mức và tính năng dành cho cửa hàng</p></div>
+        <button type="button" className="admin-btn admin-btn-secondary" onClick={() => void fetchPlans()} disabled={isLoading}>Làm mới</button>
+      </header>
 
       {/* 4 KPI CARDS */}
       <PlanKPIBanner plans={plans} />
@@ -346,7 +301,6 @@ export const SubscriptionPlanPage: React.FC = () => {
         <PlanDataTable
           plans={filteredPlans}
           onDetail={(plan) => navigate(`/admin/subscriptions/${plan.id}`)}
-          onEdit={(plan) => navigate(`/admin/subscriptions/${plan.id}/edit`)}
           onToggleStatus={handleToggleStatus}
         />
       )}

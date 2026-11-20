@@ -22,5 +22,4 @@ export * from './components/ShiftHistoryTable';
 export * from './components/modals/CashInOutModal';
 export * from './components/modals/ZReportModal';
 export * from './components/modals/EditFloatModal';
-export * from './components/modals/DebtLimitWarningModal';
 export * from './components/modals/CollectDebtModal';

@@ -1,0 +1,55 @@
+.plan-profile { max-width: 1500px; padding-bottom: 24px; }
+.plan-profile-back { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 18px; padding: 0; border: 0; background: none; color: #0f766e; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.plan-profile-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; padding: 25px; border: 1px solid #e1e9ef; border-radius: 24px; background: #fff; }
+.plan-profile-heading { display: flex; align-items: center; gap: 14px; flex: 1 1 350px; min-width: 0; }
+.plan-profile-heading > div { min-width: 0; }
+.plan-profile-icon { display: grid; place-items: center; width: 52px; height: 52px; flex-shrink: 0; border-radius: 16px; background: #eaf6f4; color: #0f766e; }
+.plan-profile-title { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.plan-profile h1 { margin: 0; font-size: 24px; line-height: 1.4; overflow-wrap: anywhere; color: #14253e; }
+.plan-profile-heading p { margin: 6px 0 0; color: #718096; font-size: 12px; }
+.plan-profile-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-profile .admin-btn { display: inline-flex; align-items: center; justify-content: center; padding: 9px 17px; min-height: 38px; font-size: 12px; }
+.plan-profile-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin: 18px 0; }
+.plan-profile-metrics > div { display: flex; flex-direction: column; gap: 13px; padding: 20px; background: #fff; border: 1px solid #e1e9ef; border-radius: 20px; }
+.plan-profile-metrics > div > span { color: #718096; font-size: 12px; }
+.plan-profile-metrics strong { color: #14253e; font-family: 'JetBrains Mono', monospace; font-size: 21px; overflow-wrap: anywhere; }
+.plan-profile-metrics small { color: #718096; font-family: 'Be Vietnam Pro', sans-serif; font-size: 10px; font-weight: 400; white-space: nowrap; }
+.plan-profile-metrics .plan-profile-date { font-size: 18px; }
+.plan-profile-fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
+.plan-profile-columns { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(0,1fr); gap: 18px; }
+.plan-profile-card { min-width: 0; padding: 24px; background: #fff; border: 1px solid #e1e9ef; border-radius: 24px; }
+.plan-profile-card h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 22px; padding-bottom: 17px; border-bottom: 1px solid #e8eef3; color: #14253e; font-size: 15px; font-weight: 700; }
+.plan-profile-card h2 svg { color: #0f766e; }
+.plan-profile-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px 16px; }
+.plan-profile-fields label { min-width: 0; color: #41546e; font-size: 12px; font-weight: 600; }
+.plan-profile-fields input, .plan-profile-fields select, .plan-profile-fields textarea { display: block; width: 100%; min-width: 0; margin-top: 8px; padding: 10px 12px; min-height: 40px; border: 1px solid #cfdce6; border-radius: 12px; background: #fff; color: #14253e; font: inherit; font-weight: 400; }
+.plan-profile-fields input[type=number] { font-family: 'JetBrains Mono', monospace; }
+.plan-profile-fields input[readonly] { background: #f7f9fb; color: #718096; }
+.plan-profile-fields textarea { resize: vertical; line-height: 1.7; }
+.plan-profile-fields .is-full { grid-column: 1 / -1; }
+.plan-profile-fields .plan-profile-hint { margin: -10px 0 0; color: #8493a5; font-size: 10px; line-height: 1.6; }
+.plan-profile-fields [aria-invalid=true] { border-color: #c2413b !important; }
+.plan-profile-record { margin: 26px 0 0; padding: 16px; border-radius: 14px; background: #f7fafb; font-size: 11px; }
+.plan-profile-record > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 7px 0; }
+.plan-profile-record dt { color: #718096; }
+.plan-profile-record dd { margin: 0; color: #41546e; overflow-wrap: anywhere; }
+.plan-profile-features { margin-top: 18px; }
+.plan-profile-feature-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.plan-profile-feature { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 58px; padding: 14px; border: 1px solid #e5edf2; border-radius: 14px; background: #fafcfd; font-size: 12px; cursor: pointer; }
+.plan-profile-feature input { position: absolute; right: 14px; width: 34px; height: 20px; margin: 0; opacity: 0; }
+.plan-profile-switch { width: 34px; height: 20px; flex-shrink: 0; padding: 3px; border-radius: 9999px; background: #cbd5e1; }
+.plan-profile-switch::after { content: ''; display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+.plan-profile-feature input:checked + .plan-profile-switch { background: #0f766e; }
+.plan-profile-feature input:checked + .plan-profile-switch::after { margin-left: 14px; }
+.plan-profile-feature input:focus-visible + .plan-profile-switch { outline: 2px solid #0f766e; outline-offset: 3px; }
+.plan-profile-fieldset:disabled { opacity: .7; }
+.plan-profile-tenants { margin-top: 18px; min-width: 0; }
+.plan-profile-tenants > div { border-radius: 24px !important; overflow-x: auto; }
+.plan-profile-tenants table { min-width: 700px; }
+.plan-profile-management { margin-top: 18px; }
+.plan-profile-footer { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; padding: 14px 20px; background: #fff; border: 1px solid #e1e9ef; border-radius: 18px; }
+.plan-profile-feedback, .plan-profile-errors { margin: 16px 0; padding: 13px 16px; border: 1px solid #dce8ed; border-radius: 12px; background: #f7fafb; color: #41546e; font-size: 12px; line-height: 1.7; }
+.plan-profile-errors { border-color: #f0d4d1; background: #fff6f5; color: #b42318; }
+.plan-profile-errors p { margin: 3px 0; }
+@media (max-width: 1100px) { .plan-profile-columns { grid-template-columns: 1fr; } .plan-profile-feature-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .plan-profile-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 600px) { .plan-profile-header, .plan-profile-card { padding: 18px; } .plan-profile h1 { font-size: 20px; } .plan-profile-fields, .plan-profile-feature-grid { grid-template-columns: 1fr; } .plan-profile-metrics > div { padding: 15px; } .plan-profile-metrics strong { font-size: 16px; } .plan-profile-actions { width: 100%; } }

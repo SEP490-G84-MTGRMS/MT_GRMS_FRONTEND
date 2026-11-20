@@ -616,6 +616,179 @@
   gap: 6px;
 }
 
+/* Admin dashboard: keep the shared admin styles intact on other pages. */
+.admin-dashboard-page {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 4px 0 48px;
+  color: #14253e;
+}
+
+.admin-dashboard-hero {
+  padding: 24px 28px;
+  border: 1px solid #e5edf1;
+  border-radius: 24px;
+  background: #fff;
+  margin-bottom: 0;
+}
+
+.admin-dashboard-eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.admin-dashboard-hero h1 {
+  font-size: clamp(22px, 2vw, 29px);
+  margin-bottom: 8px;
+}
+
+.admin-dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-dashboard-meta {
+  padding: 15px 4px 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admin-dashboard-page .admin-btn {
+  height: 38px;
+  padding-inline: 18px;
+  border-radius: 9999px;
+  font-weight: 700;
+}
+
+.admin-dashboard-page .admin-kpi-grid {
+  gap: 14px;
+  margin: 10px 0 16px;
+}
+
+.admin-dashboard-page .admin-kpi-card {
+  min-width: 0;
+  min-height: 165px;
+  padding: 19px 20px;
+  border-color: #e5edf1;
+  border-radius: 22px;
+  box-shadow: 0 3px 14px rgba(22, 46, 63, 0.035);
+}
+
+.admin-dashboard-page .admin-kpi-title {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.admin-dashboard-page .admin-kpi-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #e8f5f3 !important;
+  color: #0f766e !important;
+  border: 0 !important;
+}
+
+.admin-dashboard-page .admin-kpi-val {
+  margin: 12px 0 7px;
+  color: #12263f !important;
+  font-size: clamp(18px, 1.7vw, 25px);
+}
+
+.admin-dashboard-page .ac-root,
+.admin-dashboard-page .admin-table-card {
+  border-color: #e5edf1;
+  border-radius: 22px;
+  box-shadow: 0 3px 14px rgba(22, 46, 63, 0.035);
+}
+
+.admin-dashboard-page .ac-root {
+  padding: 22px;
+}
+
+.admin-dashboard-page .ac-header {
+  align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e8eef2;
+}
+
+.admin-dashboard-page .ac-title { font-size: 16px; font-weight: 800; }
+.admin-dashboard-page .ac-tab-btn.active { color: #0f766e; }
+.admin-dashboard-page .ac-panel {
+  background: #fff;
+  border-color: #e5edf1;
+  border-radius: 18px;
+}
+.admin-dashboard-page .ac-panel-title svg { color: #0f766e; }
+.admin-dashboard-page .admin-table-card { overflow-x: auto; }
+.admin-dashboard-page .admin-data-table { min-width: 880px; }
+
+.admin-dashboard-page .admin-kpi-card:hover { border-color: #0f766e; }
+.admin-dashboard-page .admin-btn-secondary:hover { border-color: #0f766e; color: #0f766e; }
+
+/* Tenant list — compact management table. */
+.admin-tenant-list-card { border-color: #dbe4ec; border-radius: 10px; box-shadow: none; }
+.admin-tenant-list-summary { flex: 0 0 auto; padding: 10px 16px; border-bottom: 1px solid #e7edf2; color: #475569; font-size: 12px; }
+.admin-tenant-list-summary strong { color: #12263f; }
+.admin-tenant-table { min-width: 980px !important; table-layout: fixed; }
+.admin-tenant-table thead tr { background: #f5f7f9; }
+.admin-tenant-table .so-list-th { position: sticky; top: 0; z-index: 2; padding: 10px 10px !important; background: #f5f7f9 !important; color: #20334d !important; font-size: 11px !important; white-space: nowrap; }
+.admin-tenant-table .so-list-td { height: 52px; padding: 7px 10px !important; border-bottom-color: #e8edf2 !important; }
+.admin-tenant-table .so-list-row:hover { background: #f8fbfc; }
+.admin-tenant-col-store { width: 24%; }
+.admin-tenant-col-owner { width: 24%; }
+.admin-tenant-col-plan { width: 10%; }
+.admin-tenant-table tbody td:nth-child(3) > span { max-width: 100%; white-space: normal !important; overflow-wrap: anywhere; }
+.admin-tenant-col-scale { width: 13%; }
+.admin-tenant-col-expiry { width: 10%; }
+.admin-tenant-col-status { width: 10%; }
+.admin-tenant-col-actions { width: 9%; text-align: right !important; }
+.admin-tenant-store-cell { display: flex; align-items: center; min-width: 0; gap: 9px; }
+.admin-tenant-store-icon { display: grid; flex: 0 0 29px; width: 29px; height: 29px; place-items: center; border: 1px solid #bfeee8; border-radius: 6px; background: #effbf9; color: #0f8a80; }
+.admin-tenant-cell-copy { min-width: 0; }
+.admin-tenant-cell-copy strong,
+.admin-tenant-cell-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-tenant-cell-copy strong { color: #14253e; font-size: 12px; font-weight: 700; }
+.admin-tenant-cell-copy span { margin-top: 2px; color: #718096; font-size: 10.5px; }
+.admin-tenant-cell-copy span.is-locked { color: #c2413b; }
+.admin-tenant-scale { display: flex; flex-direction: column; gap: 3px; color: #52657b; font-family: var(--font-mono); font-size: 10.5px; white-space: nowrap; }
+.admin-tenant-scale b { color: #14253e; }
+.admin-tenant-expiry { color: #334155; font-family: var(--font-mono); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.admin-tenant-expiry.is-urgent { color: #c2413b; }
+.admin-tenant-table .so-list-td--actions { overflow: visible !important; white-space: normal !important; }
+.admin-tenant-actions { display: flex; justify-content: flex-end; flex-wrap: nowrap; gap: 5px; }
+.admin-tenant-icon-btn { display: inline-grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; padding: 0; border: 1px solid #d6e0e8; border-radius: 6px; background: #fff; color: #52657b; cursor: pointer; }
+.admin-tenant-icon-btn:hover { border-color: #0f766e; background: #f0fdfa; color: #0f766e; }
+.admin-tenant-icon-btn-primary { color: #0f766e; }
+.admin-tenant-icon-btn-danger { border-color: #f3d4d4; color: #c2413b; }
+.admin-tenant-icon-btn-danger:hover { border-color: #e5a8a8; background: #fff7f7; color: #a93030; }
+.admin-tenant-empty { padding: 42px 20px !important; color: #718096 !important; text-align: center; }
+
+@media (max-width: 1200px) {
+  .admin-tenant-table { min-width: 900px !important; }
+  .admin-tenant-col-owner { width: 21%; }
+  .admin-tenant-col-store { width: 22%; }
+  .admin-tenant-col-scale { width: 15%; }
+  .admin-tenant-col-actions { width: 11%; }
+}
+
+@media (max-width: 1200px) {
+  .admin-dashboard-page .admin-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .admin-dashboard-hero { padding: 22px; }
+  .admin-dashboard-actions { width: 100%; }
+  .admin-dashboard-page .admin-kpi-grid { grid-template-columns: 1fr; }
+}
+
 /* ════════════════════════════════════════════════════════════
    Platform Analytics Chart — (ac-* namespace)
    ════════════════════════════════════════════════════════════ */
@@ -1442,7 +1615,8 @@
   box-shadow: 0 10px 30px rgba(0, 40, 120, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04);
   font-size: 13.5px;
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
+  max-width: min(420px, calc(100vw - 48px));
   animation: adminToastIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   transition: all 0.2s ease;
 }

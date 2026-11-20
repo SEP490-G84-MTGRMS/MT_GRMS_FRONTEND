@@ -14,34 +14,36 @@ interface KpiCardProps {
 
 export const KpiCard: FC<KpiCardProps> = ({ metric, onClick }) => {
   const renderIcon = () => {
-    switch (metric.icon) {
-      case 'check-circle':
-      case 'active':
-        return <CheckCircleIcon size={18} />;
-      case 'alert-triangle':
-      case 'warning':
-      case 'locked':
-        return <AlertTriangleIcon size={18} />;
-      case 'trending-up':
-      case 'revenue':
-        return <TrendingUpIcon size={18} />;
-      case 'store':
-      case 'tenants':
-      default:
-        return <StoreIcon size={18} />;
+    const id = (metric.id || '').toLowerCase();
+    const icon = (metric.icon || '').toLowerCase();
+
+    if (id.includes('mrr') || id.includes('revenue') || icon.includes('dollar') || icon.includes('trending')) {
+      return <TrendingUpIcon size={19} />;
     }
+    if (id.includes('alert') || id.includes('urgent') || id.includes('lock') || icon.includes('alert') || icon.includes('warning')) {
+      return <AlertTriangleIcon size={19} />;
+    }
+    if (id.includes('upgrade') || id.includes('branch') || icon.includes('apartment') || icon.includes('check')) {
+      return <CheckCircleIcon size={19} />;
+    }
+    return <StoreIcon size={19} />;
   };
 
   return (
-    <div className="admin-kpi-card" onClick={onClick} role="button" tabIndex={0}>
-      <div className="admin-kpi-header">
-        <span className="admin-kpi-title">{metric.title}</span>
+    <div
+      className="admin-kpi-card admin-dash-kpi"
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      data-testid={`kpi-${metric.id}`}
+    >
+      <div className="admin-kpi-header admin-dash-kpi-header">
+        <span className="admin-kpi-title admin-dash-kpi-title">{metric.title}</span>
         <span
-          className="admin-kpi-icon"
+          className="admin-kpi-icon admin-dash-kpi-icon"
           style={{
-            backgroundColor: metric.iconBg || 'var(--bg-soft-blue)',
-            color: metric.iconColor || 'var(--text-muted)',
-            border: '1px solid var(--border-light)',
+            backgroundColor: metric.iconBg || '#e8f5f3',
+            color: metric.iconColor || '#0f766e',
           }}
         >
           {renderIcon()}
@@ -49,20 +51,20 @@ export const KpiCard: FC<KpiCardProps> = ({ metric, onClick }) => {
       </div>
 
       <div
-        className="admin-kpi-val"
-        style={{ color: metric.valueColor || 'var(--text-main)' }}
+        className="admin-kpi-val admin-dash-kpi-val"
+        style={{ color: metric.valueColor || '#12263f' }}
       >
         {metric.value}
         {metric.unit && (
-          <small style={{ fontSize: 14, fontWeight: 'normal', color: 'var(--text-muted)', marginLeft: 4 }}>
+          <small style={{ fontSize: 13, fontWeight: 'normal', color: '#64748b', marginLeft: 4 }}>
             {metric.unit}
           </small>
         )}
       </div>
 
-      <div className="admin-kpi-sub">
+      <div className="admin-kpi-sub admin-dash-kpi-sub">
         {metric.trendText && (
-          <span className="admin-badge admin-badge-active">
+          <span className={`admin-badge ${metric.trendType === 'down' ? 'admin-badge-warning admin-dash-badge-warning' : 'admin-badge-active admin-dash-badge-active'}`}>
             {metric.trendText}
           </span>
         )}

@@ -4,6 +4,23 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-15
+
+### Added
+- **Xây dựng Màn hình Quản trị Giao dịch & Hóa đơn Thuê bao SaaS (`/admin/billing`, `/admin/invoices`)**:
+  - Bổ sung màn hình theo dõi dòng tiền SaaS toàn diện, tích hợp 4 thẻ KPI doanh thu & tỷ lệ khớp tiền tự động, thanh công cụ tìm kiếm và lọc trạng thái giao dịch (`SUCCESS`, `PENDING`, `FAILED`).
+  - Tích hợp Modal xem Hóa đơn điện tử VAT dịch vụ phần mềm chuẩn thương hiệu THViet hỗ trợ in ấn trực tiếp (`window.print()`), xuất báo cáo Excel (.csv UTF-8 BOM), và quy trình duyệt đối soát khớp tiền thủ công cho các giao dịch chuyển khoản VietQR pending [FE-ADMIN-BILLING] [worklog: docs/worklogs/2026-11-15_FE-ADMIN-BILLING_AI_saas-billing-and-invoices-screen.md].
+
+### Changed
+- **Tái thiết kế Modal Tạo cửa hàng mới dạng rộng ngang 2 cột song song (`CreateTenantModal.tsx`, `createTenantModal.css`)**:
+  - Mở rộng chiều ngang modal lên 980px và chia thành 2 cột cân đối: Cột 1 (Thông tin cửa hàng, Subdomain `.thviet.vn`, Mã số thuế & Tỉnh/TP, Địa chỉ); Cột 2 (Họ tên & SĐT chủ sở hữu, Email, Mật khẩu ban đầu và Ghi chú gói dịch vụ).
+  - Giảm một nửa chiều cao form, loại bỏ hoàn toàn tình trạng modal kéo dài ngoằng phải cuộn chuột, vừa vặn khung nhìn màn hình máy tính [FE-TENANT-MODAL] [worklog: docs/worklogs/2026-11-15_FE-TENANT-MODAL_AI_wide-horizontal-create-tenant-modal.md].
+- **Tái thiết kế toàn diện màn hình Master Dashboard Quản trị nền tảng (`AdminDashboardPage.tsx`, `adminDashboard.css`, `DashboardAnalyticsChart.tsx`)**:
+  - Chuẩn hóa giao diện tinh gọn, tối ưu và thẩm mỹ theo đúng phong cách Dashboard Chủ cửa hàng (`StoreOwnerDashboardPage`).
+  - Sửa lỗi trục Y hiển thị số tiền `8460000M đ` bị đè lấp mờ nét trong biểu đồ doanh thu; chuẩn hóa định dạng số tiền VND gọn gàng (`846K đ`, `10.1M đ`).
+  - Tổ chức bố cục lưới chuẩn Dashboard 3 tầng: 4 thẻ KPI nền tảng với icon chuyên biệt; Lưới trọng tâm (Primary Grid) kết hợp biểu đồ doanh thu MRR và Thẻ cơ cấu gói cước SaaS; Lưới vận hành (Operations Grid) 3 cột đồng đều (Sự việc cần can thiệp, Mạng lưới điểm bán, Giám sát hệ thống tự động).
+  - Giữ nguyên 100% các modal nghiệp vụ (Chi tiết tenant, Gia hạn ân hạn, Khóa mềm/khóa cứng) [FE-ADMIN-DASH] [worklog: docs/worklogs/2026-11-15_FE-ADMIN-DASH_AI_redesign-admin-dashboard-like-store-owner.md].
+
 ## [Unreleased] - 2026-11-13
 
 ### Changed

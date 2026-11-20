@@ -142,32 +142,22 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
 
       {/* 9. Giá Nhập Sỉ */}
       <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 12.5,
-            fontWeight: 700,
-            color: '#0f766e',
-          }}
-        >
-          {fmtCurrency(item.effectivePrice ?? item.agreedPrice)}
-          {!(item.agreedPrice > 0) && (item.effectivePrice ?? 0) > 0 ? (
+        {(() => {
+          const isFromMaster = !(item.agreedPrice > 0) && (item.effectivePrice ?? 0) > 0;
+          return (
             <span
               style={{
-                marginLeft: 6,
-                fontSize: 10,
+                fontFamily: 'var(--font-mono, monospace)',
+                fontSize: 12.5,
                 fontWeight: 700,
-                color: '#64748b',
-                background: '#f1f5f9',
-                borderRadius: 4,
-                padding: '1px 5px',
+                color: isFromMaster ? '#94a3b8' : '#0f766e',
               }}
-              title="Chưa thỏa thuận — đang dùng giá Master"
+              title={isFromMaster ? 'Chưa thỏa thuận — đang dùng giá Master' : undefined}
             >
-              Master
+              {fmtCurrency(item.effectivePrice ?? item.agreedPrice)}
             </span>
-          ) : null}
-        </span>
+          );
+        })()}
       </td>
 
       {/* 10. MOQ */}

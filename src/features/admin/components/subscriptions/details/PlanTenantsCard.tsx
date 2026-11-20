@@ -11,7 +11,7 @@ export const PlanTenantsCard: React.FC<PlanTenantsCardProps> = ({ plan }) => {
   const tenants = plan.tenants || [];
 
   return (
-    <div
+    <div className="plans-panel"
       style={{
         backgroundColor: '#ffffff',
         borderRadius: 14,

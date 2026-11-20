@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { CashAccount, FundTransferDTO } from '../types/cashbook.types';
+import { ArrowRightLeft, ShieldCheck, X } from 'lucide-react';
 
 interface InternalTransferModalProps {
   isOpen: boolean;
@@ -8,6 +9,8 @@ interface InternalTransferModalProps {
   onClose: () => void;
   onSubmit: (dto: FundTransferDTO) => Promise<void>;
 }
+
+const MAX_NOTE_LENGTH = 255;
 
 export const InternalTransferModal: FC<InternalTransferModalProps> = ({
   isOpen,
@@ -69,6 +72,10 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
       );
       return;
     }
+    if (note.trim().length > MAX_NOTE_LENGTH) {
+      setErrorMessage(`Ghi chú không được vượt quá ${MAX_NOTE_LENGTH} ký tự`);
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -90,17 +97,16 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
   return (
     <div className="cb-modal-backdrop" onClick={onClose}>
       <div className="cb-modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
-        <div className="cb-modal-header">
-          <div>
-            <h2 className="cb-modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>⇄</span> Chuyển Tiền Quỹ Nội Bộ
-            </h2>
-            <p className="cb-modal-subtitle">
-              Điều chuyển thanh khoản giữa két tiền mặt và tài khoản ngân hàng
-            </p>
+        <div className="cb-modal-header cb-modal-header--transfer">
+          <div className="cb-modal-heading">
+            <span className="cb-modal-icon"><ArrowRightLeft size={20} /></span>
+            <div>
+              <h2 className="cb-modal-title">Chuyển quỹ nội bộ</h2>
+              <p className="cb-modal-subtitle">Điều chuyển giữa các tài khoản của cửa hàng</p>
+            </div>
           </div>
-          <button type="button" className="cb-modal-close-btn" onClick={onClose}>
-            ✕
+          <button type="button" className="cb-modal-close-btn" onClick={onClose} aria-label="Đóng">
+            <X size={20} />
           </button>
         </div>
 
@@ -120,34 +126,34 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="cb-modal-body">
+        <form onSubmit={handleSubmit} className="cb-modal-body cb-transfer-form">
           {/* Nguồn tiền */}
           <div className="cb-form-group">
-            <label className="cb-label">Tài khoản Nguồn (Rút / Trích tiền) *</label>
+            <label className="cb-form-label">Từ tài khoản *</label>
             <select
-              className="cb-select"
+              className="cb-form-select"
               value={fromAccountId}
               onChange={(e) => setFromAccountId(e.target.value)}
               required
             >
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.accountName} ({acc.accountType === 'CASH' ? 'Két tiền mặt' : 'Ngân hàng'}) - Số dư: {acc.currentBalance.toLocaleString('vi-VN')} đ
+                  {acc.accountName} · {acc.currentBalance.toLocaleString('vi-VN')} đ
                 </option>
               ))}
             </select>
             {selectedFromAccount && (
               <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
-                Số dư khả dụng: <strong style={{ color: availableBalance < 0 ? '#DC2626' : '#059669' }}>{availableBalance.toLocaleString('vi-VN')} đ</strong>
+                Khả dụng: <strong style={{ color: availableBalance < 0 ? '#DC2626' : '#059669' }}>{availableBalance.toLocaleString('vi-VN')} đ</strong>
               </div>
             )}
           </div>
 
           {/* Đích đến */}
           <div className="cb-form-group">
-            <label className="cb-label">Tài khoản Đích (Nạp / Nhận tiền) *</label>
+            <label className="cb-form-label">Đến tài khoản *</label>
             <select
-              className="cb-select"
+              className="cb-form-select"
               value={toAccountId}
               onChange={(e) => setToAccountId(e.target.value)}
               required
@@ -156,7 +162,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
                 .filter((a) => a.id !== fromAccountId)
                 .map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.accountName} ({acc.accountType === 'CASH' ? 'Két tiền mặt' : 'Ngân hàng'}) - Số dư: {acc.currentBalance.toLocaleString('vi-VN')} đ
+                    {acc.accountName} · {acc.currentBalance.toLocaleString('vi-VN')} đ
                   </option>
                 ))}
             </select>
@@ -169,10 +175,10 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
 
           {/* Số tiền */}
           <div className="cb-form-group">
-            <label className="cb-label">Số tiền cần chuyển (VND) *</label>
+            <label className="cb-form-label">Số tiền chuyển *</label>
             <input
               type="number"
-              className="cb-input"
+              className="cb-form-input cb-amount-input"
               placeholder="0"
               value={amount}
               onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
@@ -189,10 +195,10 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
 
           {/* Phí chuyển khoản nếu có */}
           <div className="cb-form-group">
-            <label className="cb-label">Phí chuyển khoản (nếu có, do NH thu)</label>
+            <label className="cb-form-label">Phí ngân hàng</label>
             <input
               type="number"
-              className="cb-input"
+              className="cb-form-input"
               placeholder="0"
               value={transferFee}
               onChange={(e) => setTransferFee(e.target.value === '' ? '' : Number(e.target.value))}
@@ -203,29 +209,21 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
 
           {/* Ghi chú */}
           <div className="cb-form-group">
-            <label className="cb-label">Diễn giải / Lý do điều chuyển quỹ</label>
+            <label className="cb-form-label">Ghi chú</label>
             <textarea
-              className="cb-input"
+              className="cb-form-textarea"
               rows={2}
+              maxLength={MAX_NOTE_LENGTH}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="VD: Nộp tiền mặt cuối ca vào tài khoản MB Bank..."
             />
+            <span className="cb-character-count">{note.length}/{MAX_NOTE_LENGTH}</span>
           </div>
 
           {/* Quy tắc kế toán đối ứng callout */}
-          <div
-            style={{
-              padding: '10px 14px',
-              backgroundColor: '#F0FDF4',
-              border: '1px solid #DCFCE7',
-              borderRadius: '8px',
-              fontSize: '12px',
-              color: '#166534',
-              lineHeight: 1.5,
-            }}
-          >
-            🛡️ <strong>Kế toán kép tự động:</strong> Hệ thống sẽ tự động lập đồng thời 1 Phiếu Chi (ghi giảm tại tài khoản nguồn) và 1 Phiếu Thu (ghi tăng tại tài khoản đích) liên kết với nhau bằng mã đối ứng.
+          <div className="cb-automation-note">
+            <ShieldCheck size={16} /> <span>Hệ thống tự tạo cặp phiếu chi – thu đối ứng.</span>
           </div>
 
           <div className="cb-modal-footer">
@@ -235,7 +233,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
               onClick={onClose}
               disabled={isSubmitting}
             >
-              Hủy bỏ
+              Hủy
             </button>
             <button
               type="submit"
@@ -243,7 +241,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
               style={{ backgroundColor: '#6366F1', borderColor: '#6366F1', color: '#ffffff' }}
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Đang điều chuyển...' : 'Xác nhận chuyển quỹ'}
+              {isSubmitting ? 'Đang chuyển...' : 'Xác nhận chuyển'}
             </button>
           </div>
         </form>

@@ -39,6 +39,7 @@ const PRESET_OPTIONS: { id: PresetPeriod; label: string }[] = [
   { id: 'THIS_MONTH', label: 'Tháng này' },
   { id: 'LAST_MONTH', label: 'Tháng trước' },
   { id: 'THIS_QUARTER', label: 'Quý này' },
+  { id: 'THIS_YEAR', label: 'Năm nay' },
   { id: 'CUSTOM', label: 'Tùy chọn ngày' },
 ];
 
@@ -79,6 +80,9 @@ function computePresetDateRange(
     const quarterMonth = Math.floor(today.getMonth() / 3) * 3;
     const firstDay = new Date(today.getFullYear(), quarterMonth, 1);
     return { startDate: formatLocalYmd(firstDay), endDate };
+  }
+  if (preset === 'THIS_YEAR') {
+    return { startDate: formatLocalYmd(new Date(today.getFullYear(), 0, 1)), endDate };
   }
 
   return { startDate: endDate, endDate };

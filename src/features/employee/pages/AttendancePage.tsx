@@ -19,6 +19,7 @@ import {
 import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
 import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
+import { attendancePolicyApi, type AttendancePolicyDto } from '../api/attendancePolicyApi';
 import { employeeApi } from '../api/employeeApi';
 import { AttendanceDetailModal } from '../components/attendance/AttendanceDetailModal';
 import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalRequestsModal';
@@ -123,7 +124,63 @@ const formatTime = (isoOrTime?: string | null): string | undefined => {
   return isoOrTime;
 };
 
-const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord => {
+const parseMinutesFromHHmm = (hhmm?: string | null): number | null => {
+  if (!hhmm || hhmm === '--:--') return null;
+  const parts = hhmm.split(':');
+  if (parts.length < 2) return null;
+  const h = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+};
+
+const evaluateAttendanceThresholds = (
+  s: ScheduleResponse,
+  checkInTime?: string | null,
+  checkOutTime?: string | null,
+  policy?: AttendancePolicyDto
+): { effectiveLateMinutes: number; effectiveEarlyLeaveMinutes: number } => {
+  if (!policy) {
+    return {
+      effectiveLateMinutes: s.lateMinutes || 0,
+      effectiveEarlyLeaveMinutes: s.earlyLeaveMinutes || 0,
+    };
+  }
+
+  const plannedStartMins = parseMinutesFromHHmm(formatTime(s.plannedStartTime));
+  const plannedEndMins = parseMinutesFromHHmm(formatTime(s.plannedEndTime));
+  const checkInMins = parseMinutesFromHHmm(checkInTime);
+  const checkOutMins = parseMinutesFromHHmm(checkOutTime);
+
+  let effectiveLateMinutes = 0;
+  if (policy.enableLateThreshold) {
+    if (checkInMins !== null && plannedStartMins !== null) {
+      let diff = checkInMins - plannedStartMins;
+      if (diff < -720) diff += 1440;
+      effectiveLateMinutes = diff > policy.lateThresholdMinutes ? diff : 0;
+    } else if (s.lateMinutes > policy.lateThresholdMinutes) {
+      effectiveLateMinutes = s.lateMinutes;
+    }
+  }
+
+  let effectiveEarlyLeaveMinutes = 0;
+  if (policy.enableEarlyLeaveThreshold) {
+    if (checkOutMins !== null && plannedEndMins !== null) {
+      let diff = plannedEndMins - checkOutMins;
+      if (diff < -720) diff += 1440;
+      effectiveEarlyLeaveMinutes = diff > policy.earlyLeaveThresholdMinutes ? diff : 0;
+    } else if (s.earlyLeaveMinutes > policy.earlyLeaveThresholdMinutes) {
+      effectiveEarlyLeaveMinutes = s.earlyLeaveMinutes;
+    }
+  }
+
+  return { effectiveLateMinutes, effectiveEarlyLeaveMinutes };
+};
+
+const mapScheduleToAttendanceRecord = (
+  s: ScheduleResponse,
+  policyMap?: Map<string, AttendancePolicyDto>
+): AttendanceRecord => {
   const d = new Date(s.workDate);
   const dayOfWeek = DAY_KEYS[d.getDay()] || 'T2';
   const dd = String(d.getDate()).padStart(2, '0');
@@ -132,6 +189,14 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
 
   const checkInTime = formatTime(s.checkInTime);
   const checkOutTime = formatTime(s.checkOutTime);
+
+  const branchPolicy = s.branchId ? policyMap?.get(s.branchId) : undefined;
+  const { effectiveLateMinutes, effectiveEarlyLeaveMinutes } = evaluateAttendanceThresholds(
+    s,
+    checkInTime,
+    checkOutTime,
+    branchPolicy
+  );
 
   // Status mapping
   const isPaidLeave =
@@ -150,14 +215,14 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
     scheduleDate.setHours(0, 0, 0, 0);
     if (scheduleDate < today) {
       status = 'missing'; // Chấm công thiếu
-    } else if (s.lateMinutes > 0) {
+    } else if (effectiveLateMinutes > 0) {
       status = 'late';
     } else {
       status = 'ontime';
     }
-  } else if (s.lateMinutes > 0) {
+  } else if (effectiveLateMinutes > 0) {
     status = 'late';
-  } else if (s.earlyLeaveMinutes > 0) {
+  } else if (effectiveEarlyLeaveMinutes > 0) {
     status = 'early';
   } else if (s.checkInTime) {
     status = 'ontime';
@@ -194,7 +259,7 @@ const mapScheduleToAttendanceRecord = (s: ScheduleResponse): AttendanceRecord =>
     plannedStartTime: formatTime(s.plannedStartTime),
     plannedEndTime: formatTime(s.plannedEndTime),
     status,
-    lateMinutes: s.lateMinutes || 0,
+    lateMinutes: effectiveLateMinutes,
     workHours: s.actualWorkHours > 0 ? s.actualWorkHours : (s.durationHours || 0),
     gpsLocation: s.branchName || 'Chi nhánh',
     deviceInfo: s.checkInMethod || (s.checkInFaceImageUrl ? 'Khuôn mặt (FaceID)' : 'QR Code / GPS'),
@@ -214,10 +279,8 @@ export const AttendancePage: React.FC = () => {
   const roleUpper = (user?.role || '').toUpperCase();
   const isEmployeePortal = location.pathname.startsWith('/employee/') || location.pathname === '/employee';
   const isStoreOwnerOrAdmin =
-    Boolean(user?.isAdmin) ||
     roleUpper === 'STORE_OWNER' ||
-    roleUpper === 'STOREOWNER' ||
-    roleUpper === 'ADMIN';
+    roleUpper === 'STOREOWNER';
 
   const isEmployeeRole =
     isEmployeePortal ||
@@ -226,8 +289,7 @@ export const AttendancePage: React.FC = () => {
   // Backend data states
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [todayMySchedules, setTodayMySchedules] = useState<ScheduleResponse[]>([]);
-  const [isSelfCheckingIn, setIsSelfCheckingIn] = useState(false);
-  const [selfCheckInNotice, setSelfCheckInNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [selfCheckInNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [shifts, setShifts] = useState<ShiftRowItem[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -443,8 +505,29 @@ export const AttendancePage: React.FC = () => {
 
       setShifts(shiftRows);
 
+      // Fetch AttendancePolicy cho các chi nhánh liên quan để áp dụng ngưỡng đi muộn / về sớm
+      const branchIdsToFetch = Array.from(
+        new Set([
+          ...(branchParam ? [branchParam] : []),
+          ...rawSchedules.map((s) => s.branchId).filter((id): id is string => Boolean(id)),
+        ])
+      );
+      const policyMap = new Map<string, AttendancePolicyDto>();
+      if (branchIdsToFetch.length > 0) {
+        const policyResults = await Promise.allSettled(
+          branchIdsToFetch.map((bId) => attendancePolicyApi.getByBranch(bId))
+        );
+        policyResults.forEach((res, idx) => {
+          if (res.status === 'fulfilled' && res.value) {
+            policyMap.set(branchIdsToFetch[idx], res.value);
+          }
+        });
+      }
+
       // Map danh sách chấm công
-      const mappedRecords: AttendanceRecord[] = rawSchedules.map(mapScheduleToAttendanceRecord);
+      const mappedRecords: AttendanceRecord[] = rawSchedules.map((s) =>
+        mapScheduleToAttendanceRecord(s, policyMap)
+      );
       setRecords(mappedRecords);
 
       // Map yêu cầu duyệt chấm công
@@ -544,40 +627,6 @@ export const AttendancePage: React.FC = () => {
     [todayMySchedules]
   );
 
-  const unCheckedTodaySchedule = useMemo(
-    () =>
-      todayMySchedules.find(
-        (s) =>
-          !s.checkInTime &&
-          !s.checkOutTime &&
-          (s.status === 'Scheduled' || s.status === 'Published')
-      ) || null,
-    [todayMySchedules]
-  );
-
-  const handleSelfCheckIn = async () => {
-    if (!unCheckedTodaySchedule || isSelfCheckingIn) return;
-    setIsSelfCheckingIn(true);
-    setSelfCheckInNotice(null);
-    try {
-      await scheduleApi.selfCheckIn(unCheckedTodaySchedule.id);
-      window.dispatchEvent(new CustomEvent('pos-attendance-updated'));
-      setSelfCheckInNotice({
-        text: `Đã chấm công vào ca "${unCheckedTodaySchedule.shiftName}" thành công! Bạn có thể vào màn hình Bán hàng POS ngay bây giờ.`,
-        type: 'success',
-      });
-      await fetchAttendanceData();
-    } catch (err: any) {
-      const apiMsg =
-        err?.response?.data?.message ||
-        err?.message ||
-        'Không thể chấm công vào ca. Vui lòng thử lại.';
-      setSelfCheckInNotice({ text: apiMsg, type: 'error' });
-    } finally {
-      setIsSelfCheckingIn(false);
-    }
-  };
-
   return (
     <div className="emp-page-container">
       {/* ─── HEADER BAR ─── */}
@@ -610,43 +659,24 @@ export const AttendancePage: React.FC = () => {
               <span>Vào màn hình Bán hàng POS</span>
             </button>
           )}
-          {isEmployeeRole && !activeCheckedInToday && unCheckedTodaySchedule && (
+          {!isStoreOwnerOrAdmin && (
             <button
               type="button"
               className="emp-btn emp-btn-primary"
-              onClick={handleSelfCheckIn}
-              disabled={isSelfCheckingIn}
-              title={`Chấm công vào ca: ${unCheckedTodaySchedule.shiftName}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                backgroundColor: '#059669',
-                borderColor: '#059669',
-                color: '#FFFFFF',
-                fontWeight: 700,
+              onClick={() => {
+                if (!user) {
+                  alert('Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.');
+                  return;
+                }
+                setIsFaceIdModalOpen(true);
               }}
+              title="Chấm công AI FaceID"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#0F766E', borderColor: '#0F766E' }}
             >
-              <LogIn size={16} />
-              <span>{isSelfCheckingIn ? 'Đang chấm công...' : 'Chấm công vào ca'}</span>
+              <Camera size={16} />
+              <span>Chấm công AI FaceID</span>
             </button>
           )}
-          <button
-            type="button"
-            className="emp-btn emp-btn-primary"
-            onClick={() => {
-              if (!user) {
-                alert('Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.');
-                return;
-              }
-              setIsFaceIdModalOpen(true);
-            }}
-            title="Chấm công AI FaceID"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, backgroundColor: '#0F766E', borderColor: '#0F766E' }}
-          >
-            <Camera size={16} />
-            <span>Chấm công AI FaceID</span>
-          </button>
           <button
             type="button"
             className="emp-btn emp-btn-secondary"

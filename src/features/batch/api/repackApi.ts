@@ -10,10 +10,15 @@ export interface PackageDto {
   barcode?: string | null;
   netWeight: number;
   sellingPrice: number;
+  manufactureDate?: string | null;
   expiryDate?: string | null;
   repackType: string;
+  /** AVAILABLE | QUARANTINED | SOLD | RETURNED | VOID */
   status: string;
   repackOrderId?: string | null;
+  /** Mã đợt chế biến, vd RP-20261114-001 */
+  repackOrderCode?: string | null;
+  soldAt?: string | null;
   createdAt: string;
 }
 
@@ -40,6 +45,7 @@ export interface BranchStockPackageSummary {
 export interface PackageLineInput {
   netWeight: number;
   sellingPrice: number;
+  manufactureDate?: string | null;
   expiryDate?: string | null;
   barcode?: string | null;
 }
@@ -63,6 +69,7 @@ export interface RepackOrderDto {
   inputWeight: number;
   wasteWeight: number;
   wasteCostAmount: number;
+  completedAt?: string | null;
   packages: PackageDto[];
 }
 

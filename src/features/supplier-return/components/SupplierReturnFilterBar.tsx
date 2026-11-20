@@ -20,7 +20,7 @@ const STATUS_OPTIONS: { value: '' | SupplierReturnStatus; label: string }[] = [
   { value: '', label: 'Tất cả trạng thái' },
   { value: 'DRAFT', label: 'Bản nháp' },
   { value: 'PENDING_SUPPLIER', label: 'Chờ NCC duyệt' },
-  { value: 'APPROVED', label: 'Đã duyệt (Chờ giao)' },
+  { value: 'APPROVED', label: 'Đã xác nhận' },
   { value: 'COMPLETED', label: 'Đã bàn giao' },
   { value: 'REJECTED', label: 'NCC từ chối' },
   { value: 'CANCELLED', label: 'Đã hủy' },

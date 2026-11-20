@@ -534,18 +534,9 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
         </div>
       </div>
 
-      {/* 7 Accounting Book Tabs Navigation */}
-      <div
-        className="no-print"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 8,
-          marginBottom: 18,
-          borderBottom: '1px solid #E2E8F0',
-          paddingBottom: 12,
-        }}
-      >
+      <div className="tax-books-layout">
+      <aside className="tax-books-sidebar no-print" aria-label="Chọn mẫu sổ kế toán">
+        <div className="tax-books-sidebar-title">Mẫu sổ kế toán · 7</div>
         {bookTabs.map((tab) => {
           const isActive = activeBookTab === tab.type;
           return (
@@ -556,24 +547,11 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                 setActiveBookTab(tab.type);
                 setCurrentPage(1);
               }}
-              style={{
-                padding: '9px 15px',
-                borderRadius: 10,
-                border: isActive ? '1.5px solid #0F766E' : '1px solid #E2E8F0',
-                background: isActive ? '#F0FDFA' : '#ffffff',
-                color: isActive ? '#0F766E' : '#475569',
-                fontWeight: isActive ? 800 : 600,
-                fontSize: '0.82rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                transition: 'all 0.15s ease',
-                position: 'relative',
-              }}
+              className={`tax-book-choice ${isActive ? 'active' : ''}`}
+              aria-pressed={isActive}
             >
               <BookOpen size={15} style={{ color: isActive ? '#0F766E' : '#64748B' }} />
-              <span>{tab.label}</span>
+              <span><strong>{tab.code}</strong>{tab.name}</span>
               {tab.badge && (
                 <span
                   style={{
@@ -591,7 +569,13 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
             </button>
           );
         })}
-      </div>
+        <button type="button" className="tax-export-all-books" onClick={() => handleExportExcel(false)} disabled={isExporting}>
+          {isExporting ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
+          Xuất trọn bộ 7 sổ
+        </button>
+      </aside>
+
+      <section className="tax-book-detail-panel">
 
       {/* Active Tab Description Bar */}
       <div
@@ -875,27 +859,6 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
           >
             {isExporting ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} style={{ color: '#059669' }} />}
             <span>{isExporting ? 'Đang xuất...' : `Xuất Excel sổ ${activeTabMetadata.code}`}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportExcel(false)}
-            disabled={isExporting}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 14px',
-              borderRadius: 8,
-              background: '#F1F5F9',
-              border: '1px solid #CBD5E1',
-              color: '#334155',
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              cursor: isExporting ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isExporting ? <Loader2 size={15} className="animate-spin" /> : <FileSpreadsheet size={15} style={{ color: '#0F766E' }} />}
-            <span>{isExporting ? 'Đang xuất...' : 'Xuất trọn bộ 7 sổ Excel'}</span>
           </button>
           <button
             type="button"
@@ -1803,6 +1766,8 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
             </div>
           </div>
         </div>
+      </div>
+      </section>
       </div>
 
       {/* Modal Xem trước và in ấn A4 chuẩn Thông tư 152 */}

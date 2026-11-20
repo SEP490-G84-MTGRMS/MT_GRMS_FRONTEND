@@ -1,5 +1,6 @@
+import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { ProductFormModal } from '../components/ProductFormModal';
 import { productApi } from '../api/productApi';
 
@@ -20,6 +21,56 @@ vi.mock('../api/productApi', () => ({
   },
 }));
 
+vi.mock('../components/PriceHistoryModal', () => ({
+  PriceHistoryModal: ({ productId, productName }: { productId: string; productName: string }) => (
+    <div data-testid="master-price-history-modal">{productId}:{productName}</div>
+  ),
+}));
+
+it('FE-03: Chỉ hiển thị lịch sử giá khi chỉnh sửa và mở đúng sản phẩm', () => {
+  const categories = [{ id: 'cat-1', code: 'CAT01', name: 'Đồ uống', productCount: 1 }];
+  const productToEdit: any = {
+    id: 'product-history-01',
+    productCode: 'SP-HISTORY',
+    productName: 'Sản phẩm kiểm tra lịch sử',
+    categoryId: 'cat-1',
+    categoryName: 'Đồ uống',
+    baseUnit: 'Chai',
+    sellingPrice: 10000,
+    costPrice: 7000,
+    status: 'Active',
+    createdAt: '2026-11-16',
+    uomConversions: [],
+  };
+
+  const { rerender } = render(
+    <ProductFormModal
+      isOpen={true}
+      productToEdit={null}
+      categories={categories}
+      onClose={vi.fn()}
+      onSave={vi.fn()}
+      onOpenCreateCategoryModal={vi.fn()}
+    />
+  );
+  expect(screen.queryByRole('button', { name: /Lịch sử giá/i })).not.toBeInTheDocument();
+
+  rerender(
+    <ProductFormModal
+      isOpen={true}
+      productToEdit={productToEdit}
+      categories={categories}
+      onClose={vi.fn()}
+      onSave={vi.fn()}
+      onOpenCreateCategoryModal={vi.fn()}
+    />
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Lịch sử giá/i }));
+  expect(screen.getByTestId('master-price-history-modal')).toHaveTextContent(
+    'product-history-01:Sản phẩm kiểm tra lịch sử'
+  );
+});
+
 const mockCategories = [
   {
     id: 'cat-1',
@@ -30,74 +81,14 @@ const mockCategories = [
 ];
 
 describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (REQ-05, REQ-06)', () => {
-  it('REQ-05: Nút "+ Thêm đơn vị" bị disabled khi đơn vị cơ bản rỗng, và enabled khi đã nhập', () => {
-    render(
-      <ProductFormModal
-        isOpen={true}
-        categories={mockCategories}
-        onClose={vi.fn()}
-        onSave={vi.fn()}
-        onOpenCreateCategoryModal={vi.fn()}
-      />
-    );
-
-    // Lấy ô Tên đơn vị cơ bản
-    const baseUnitInput = screen.getByPlaceholderText(/Chai/i) as HTMLInputElement;
-
-    // Ban đầu chưa nhập đơn vị cơ bản -> Nút "+ Thêm đơn vị" bị disabled
-    const addUnitBtn = screen.getByText('+ Thêm đơn vị') as HTMLButtonElement;
-    expect(addUnitBtn.disabled).toBe(true);
-    expect(screen.getByText('(Cần nhập tên đơn vị cơ bản trước)')).toBeDefined();
-
-    // Nhập tên đơn vị cơ bản "chai"
-    fireEvent.change(baseUnitInput, { target: { value: 'chai' } });
-
-    // Nút "+ Thêm đơn vị" chuyển sang enabled
-    expect(addUnitBtn.disabled).toBe(false);
-    expect(screen.queryByText('(Cần nhập tên đơn vị cơ bản trước)')).toBeNull();
-  });
-
-  it('REQ-06: Bảng "Hàng cùng loại" tự động xuất hiện khi thêm đơn vị quy đổi', () => {
-    render(
-      <ProductFormModal
-        isOpen={true}
-        categories={mockCategories}
-        onClose={vi.fn()}
-        onSave={vi.fn()}
-        onOpenCreateCategoryModal={vi.fn()}
-      />
-    );
-
-    // Ban đầu chưa có đơn vị quy đổi, bảng "Hàng cùng loại" không hiển thị
-    expect(screen.queryByText('Hàng cùng loại')).toBeNull();
-
-    // Nhập đơn vị cơ bản "chai"
-    const baseUnitInput = screen.getByPlaceholderText(/Chai/i);
-    fireEvent.change(baseUnitInput, { target: { value: 'chai' } });
-
-    // Click "+ Thêm đơn vị"
-    const addUnitBtn = screen.getByText('+ Thêm đơn vị');
-    fireEvent.click(addUnitBtn);
-
-    // Bảng "Hàng cùng loại" xuất hiện với tiêu đề và các cột chuẩn
-    expect(screen.getByText('Hàng cùng loại')).toBeDefined();
-    expect(screen.getByText('Thiết lập giá')).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Đơn vị' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Quy đổi' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Mã hàng' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Mã vạch' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Giá vốn' })).toBeDefined();
-    expect(screen.getByRole('columnheader', { name: 'Giá bán' })).toBeDefined();
-
-    // Dòng 1 hiển thị tên đơn vị cơ bản "chai" trong bảng
-    expect(screen.getAllByText('chai').length).toBeGreaterThan(0);
-
-    // Nhập tên đơn vị quy đổi "thung"
-    const uomNameInput = screen.getByPlaceholderText('thùng, lốc...');
-    fireEvent.change(uomNameInput, { target: { value: 'thung' } });
-
-    // Trong bảng hàng cùng loại xuất hiện dòng "thung"
-    expect(screen.getByText('thung')).toBeDefined();
+  it('REQ-05: thêm đơn vị vào bảng đơn vị và giá', () => {
+    render(<ProductFormModal isOpen categories={mockCategories} onClose={vi.fn()} onSave={vi.fn()} onOpenCreateCategoryModal={vi.fn()} />);
+    const baseUnit = screen.getByPlaceholderText('Hộp, Lốc, Thùng...');
+    fireEvent.change(baseUnit, { target: { value: 'Chai' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm đơn vị' }));
+    expect(screen.getAllByPlaceholderText('Hộp, Lốc, Thùng...')).toHaveLength(2);
+    expect(screen.getAllByDisplayValue('Chai')).toHaveLength(2);
+    expect(screen.getByRole('columnheader', { name: 'Quy đổi' })).toBeInTheDocument();
   });
 
   it('REQ-09: Ô Mã hàng bị disabled khi chỉnh sửa và enabled khi tạo mới', () => {
@@ -192,7 +183,7 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
     // Click nút xóa đơn vị quy đổi (title="Xóa đơn vị" hoặc "Xóa đơn vị quy đổi")
     const removeButtons = screen.getAllByTitle(/Xóa đơn vị/);
     expect(removeButtons.length).toBeGreaterThan(0);
-    fireEvent.click(removeButtons[0]);
+    fireEvent.click(within(screen.getByDisplayValue('Lốc 6').closest('tr')!).getByTitle('Xóa đơn vị'));
 
     // Nhấn nút "Cập nhật"
     const updateButton = screen.getByText('Cập nhật');
@@ -273,37 +264,23 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
     expect(screen.queryByTestId('category-option-cat-1')).toBeNull();
   });
 
-  it('REQ-10: Tự động tính tiền đơn vị quy đổi theo giá bán đơn vị cơ bản khi thay đổi tỷ lệ quy đổi', () => {
-    render(
-      <ProductFormModal
-        isOpen={true}
-        categories={mockCategories}
-        onClose={vi.fn()}
-        onSave={vi.fn()}
-        onOpenCreateCategoryModal={vi.fn()}
-      />
-    );
-
-    // Nhập giá bán đơn vị cơ bản: 10,000 đ
-    const sellingPriceInputs = screen.getAllByPlaceholderText('0');
-    // Ô giá bán
-    fireEvent.change(sellingPriceInputs[1], { target: { value: '10000' } });
-
-    // Nhập đơn vị cơ bản "chai"
-    const baseUnitInput = screen.getByPlaceholderText(/Chai/i);
-    fireEvent.change(baseUnitInput, { target: { value: 'chai' } });
-
-    // Thêm đơn vị quy đổi
-    const addUnitBtn = screen.getByText('+ Thêm đơn vị');
-    fireEvent.click(addUnitBtn);
-
-    // Tìm ô conversionRate trong bảng "Hàng cùng loại" hoặc form
-    const rateInputs = screen.getAllByPlaceholderText('1');
-    // Thay đổi số lượng quy đổi thành 6 (Lốc 6)
-    fireEvent.change(rateInputs[0], { target: { value: '6' } });
-
-    // Giá bán của đơn vị quy đổi phải tự động thành 60,000 đ (6 * 10,000)
-    expect(screen.getAllByDisplayValue('60000').length).toBeGreaterThan(0);
+  it('REQ-10: lưu tỷ lệ quy đổi và giá bán riêng của từng đơn vị', () => {
+    const onSave = vi.fn();
+    render(<ProductFormModal isOpen categories={mockCategories} onClose={vi.fn()} onSave={onSave} onOpenCreateCategoryModal={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText('Nhập tên sản phẩm (Bắt buộc)'), { target: { value: 'Nước uống' } });
+    fireEvent.change(screen.getByPlaceholderText('Hộp, Lốc, Thùng...'), { target: { value: 'Chai' } });
+    fireEvent.change(screen.getAllByPlaceholderText('0')[1], { target: { value: '10000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm đơn vị' }));
+    const names = screen.getAllByPlaceholderText('Hộp, Lốc, Thùng...');
+    fireEvent.change(names[1], { target: { value: 'Lốc' } });
+    fireEvent.change(screen.getByPlaceholderText('4'), { target: { value: '6' } });
+    const prices = screen.getAllByPlaceholderText('0');
+    fireEvent.change(prices[3], { target: { value: '55000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu' }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      sellingPrice: 10000,
+      uomConversions: [expect.objectContaining({ unitName: 'Lốc', conversionRate: 6, price: 55000 })],
+    }), false, []);
   });
 
   it('REQ-10: Hiển thị Validation Popup khi submit thiếu thông tin bắt buộc thay vì banner trên form', () => {
@@ -323,7 +300,7 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
 
     // Phải hiển thị modal popup "Thông tin chưa hợp lệ" với nút "Đã hiểu"
     expect(screen.getByText('Thông tin chưa hợp lệ')).toBeDefined();
-    expect(screen.getByText('Vui lòng nhập tên sản phẩm (Bắt buộc).')).toBeDefined();
+    expect(screen.getAllByText('Vui lòng nhập tên sản phẩm (Bắt buộc).').length).toBeGreaterThan(0);
     const dismissBtn = screen.getByText('Đã hiểu');
     expect(dismissBtn).toBeDefined();
 
@@ -363,7 +340,7 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
     );
 
     // Tìm nút "Xem to" hoặc click vào thumbnail
-    const enlargeBtn = screen.getByText('Xem to');
+    const enlargeBtn = screen.getByTitle('Ảnh đại diện (Bấm để xem to)');
     fireEvent.click(enlargeBtn);
 
     // Lightbox modal mở ra với nút "Đóng xem ảnh"
@@ -406,12 +383,12 @@ describe('ProductFormModal - Quản lý đơn vị tính & Hàng cùng loại (R
       />
     );
 
-    const checkbox = screen.getByLabelText(/Quản lý theo lô & hạn sử dụng/i) as HTMLInputElement;
-    expect(checkbox.checked).toBe(false);
+    const checkbox = screen.getByRole('switch', { name: /Quản lý theo lô & hạn sử dụng/i }) as HTMLInputElement;
+    expect(checkbox).toHaveAttribute('aria-checked', 'false');
 
     // Click checkbox để bật quản lý lô
     fireEvent.click(checkbox);
-    expect(checkbox.checked).toBe(true);
+    expect(checkbox).toHaveAttribute('aria-checked', 'true');
 
     // Nhấn Cập nhật (trong chế độ chỉnh sửa)
     const saveBtn = screen.getByText('Cập nhật');

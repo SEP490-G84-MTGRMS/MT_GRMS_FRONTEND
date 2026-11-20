@@ -1,19 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   validateVietnamesePhone,
-  validateDebtLimit,
   validateCollectionAmount,
   sanitizeCustomerText,
-  normalizeDebtLimit,
   validateSafeCustomerText,
 } from '../utils/customerValidation';
 
 export {
   validateVietnamesePhone,
-  validateDebtLimit,
   validateCollectionAmount,
   sanitizeCustomerText,
-  normalizeDebtLimit,
   validateSafeCustomerText,
 };
 
@@ -30,20 +26,6 @@ describe('Customer CRM Validation & Sanitization Unit Tests', () => {
       expect(validateVietnamesePhone('0123456789')).toBe(false);
       expect(validateVietnamesePhone('09123456789')).toBe(false);
       expect(validateVietnamesePhone('abcdefghij')).toBe(false);
-    });
-  });
-
-  describe('validateDebtLimit & normalizeDebtLimit', () => {
-    it('should allow valid positive debt limits and zero', () => {
-      expect(validateDebtLimit(0)).toBe(true);
-      expect(validateDebtLimit(5000000)).toBe(true);
-      expect(normalizeDebtLimit(5000000)).toBe(5000000);
-    });
-
-    it('should reject negative debt limits and clamp them to 0 in normalizeDebtLimit', () => {
-      expect(validateDebtLimit(-1)).toBe(false);
-      expect(validateDebtLimit(-5000000)).toBe(false);
-      expect(normalizeDebtLimit(-5000000)).toBe(0);
     });
   });
 

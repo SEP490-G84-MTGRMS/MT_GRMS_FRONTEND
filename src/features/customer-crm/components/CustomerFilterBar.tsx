@@ -1,126 +1,270 @@
-import type { FC } from 'react';
-import { Search, RotateCw, X } from 'lucide-react';
+import { useState, useEffect, type FC, type KeyboardEvent } from 'react';
+import { Search, RotateCcw, X } from 'lucide-react';
 import type { DebtFilterStatus } from '../types/customer.types';
 
-interface CustomerFilterBarProps {
+export interface CustomerFilterBarProps {
   searchTerm: string;
   onSearchChange: (val: string) => void;
-  selectedTier: string;
-  onTierChange: (val: string) => void;
+  selectedTier?: string;
+  onTierChange?: (val: string) => void;
   selectedDebtStatus: DebtFilterStatus;
   onDebtStatusChange: (val: DebtFilterStatus) => void;
-  onRefresh: () => void;
+  selectedBranch?: string;
+  onBranchChange?: (branch: string) => void;
+  branches?: { id: string; name: string }[];
+  sortOrder?: string;
+  onSortOrderChange?: (sort: string) => void;
+  timeRange?: string;
+  onTimeRangeChange?: (range: string) => void;
+  onRefresh?: () => void;
   isRefreshing?: boolean;
+  onSearchSubmit?: () => void;
+  onResetFilters?: () => void;
 }
 
 export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
   searchTerm,
   onSearchChange,
-  selectedTier,
+  selectedTier: _selectedTier = 'ALL',
   onTierChange,
   selectedDebtStatus,
   onDebtStatusChange,
-  onRefresh,
-  isRefreshing,
+  selectedBranch = 'ALL',
+  onBranchChange,
+  branches = [],
+  sortOrder = 'name_asc',
+  onSortOrderChange,
+  timeRange = 'ALL',
+  onTimeRangeChange,
+  onSearchSubmit,
+  onResetFilters,
 }) => {
-  const pills: { id: DebtFilterStatus; label: string }[] = [
-    { id: 'ALL', label: 'Tất cả' },
-    { id: 'DEBT', label: 'Đang nợ' },
-    { id: 'OVER_LIMIT', label: 'Vượt hạn mức' },
-  ];
+  const [searchInput, setSearchInput] = useState(searchTerm);
+
+  useEffect(() => {
+    setSearchInput(searchTerm);
+  }, [searchTerm]);
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onSearchChange(searchInput);
+      onSearchSubmit?.();
+    }
+  };
+
+  const handleManualSearch = () => {
+    onSearchChange(searchInput);
+    onSearchSubmit?.();
+  };
+
+  const handleReset = () => {
+    setSearchInput('');
+    onSearchChange('');
+    onTierChange?.('ALL');
+    onDebtStatusChange('ALL');
+    onBranchChange?.('ALL');
+    onSortOrderChange?.('name_asc');
+    onTimeRangeChange?.('ALL');
+    onResetFilters?.();
+  };
+
+  const isFiltered =
+    Boolean(searchTerm) ||
+    selectedDebtStatus !== 'ALL' ||
+    (selectedBranch && selectedBranch !== 'ALL') ||
+    timeRange !== 'ALL' ||
+    sortOrder !== 'name_asc';
 
   return (
-    <div className="customer-filter-bar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: '#ffffff', padding: '14px 18px', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '20px' }}>
-      {/* Search & Select filters */}
-      <div className="customer-filter-left" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px', flex: 1 }}>
-        {/* Search Input */}
-        <div className="customer-search-box" style={{ position: 'relative', minWidth: '260px', flex: '1 1 300px', maxWidth: '420px' }}>
-          <Search className="w-4 h-4 customer-search-icon" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Tìm tên, SĐT, mã KH, mã số thuế..."
-            className="customer-search-input"
-            style={{ width: '100%', padding: '9px 36px 9px 36px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13.5px', outline: 'none' }}
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => onSearchChange('')}
-              className="customer-clear-btn"
-              title="Xóa tìm kiếm"
-              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}
+    <div className="so-list-filter" style={{ marginBottom: 8 }}>
+      {/* ── ROW 1: 3 columns CSS Grid (~38px) ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1.4fr 1fr 1fr',
+          gap: '10px 14px',
+          alignItems: 'center',
+        }}
+      >
+        {/* Col 1: Search keyword (name, phone, code, tax) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Tìm kiếm:</span>
+          <div style={{ position: 'relative', width: '100%', minWidth: 0 }}>
+            <input
+              type="text"
+              className="so-list-filter-input"
+              style={{ width: '100%', minWidth: 0, paddingLeft: 28, paddingRight: 24 }}
+              placeholder="Tên, SĐT, mã KH, MST..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+            <Search
+              size={13}
+              style={{
+                position: 'absolute',
+                left: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: '#94a3b8',
+                pointerEvents: 'none',
+              }}
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  onSearchChange('');
+                }}
+                title="Xóa ô tìm kiếm"
+                style={{
+                  position: 'absolute',
+                  right: 6,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: 2,
+                  display: 'inline-flex',
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Col 2: Debt status dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Công nợ:</span>
+          <select
+            className={`so-list-filter-select ${selectedDebtStatus !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
+            value={selectedDebtStatus}
+            onChange={(e) => onDebtStatusChange(e.target.value as DebtFilterStatus)}
+            title="Lọc theo trạng thái công nợ"
+          >
+            <option value="ALL">-- Tất cả trạng thái --</option>
+            <option value="DEBT">Có công nợ (&gt; 0)</option>
+            <option value="NO_DEBT">Không có nợ</option>
+          </select>
+        </div>
+
+        {/* Col 3: Branch selector */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Chi nhánh:</span>
+          <select
+            className={`so-list-filter-select ${selectedBranch && selectedBranch !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
+            value={selectedBranch}
+            onChange={(e) => onBranchChange?.(e.target.value)}
+            title="Lọc theo chi nhánh"
+          >
+            <option value="ALL">-- Toàn hệ thống --</option>
+            {branches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* ── ROW 2: 4 columns CSS Grid (~38px) ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '10px 14px',
+          alignItems: 'center',
+          paddingTop: 8,
+          borderTop: '1px dashed #f1f5f9',
+        }}
+      >
+        {/* Col 1: Sort order */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Sắp xếp:</span>
+          <select
+            className={`so-list-filter-select ${sortOrder && sortOrder !== 'name_asc' ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
+            value={sortOrder}
+            onChange={(e) => onSortOrderChange?.(e.target.value)}
+            title="Sắp xếp danh sách khách hàng"
+          >
+            <option value="name_asc">Tên khách hàng (A - Z)</option>
+            <option value="name_desc">Tên khách hàng (Z - A)</option>
+            <option value="debt_desc">Công nợ giảm dần</option>
+            <option value="debt_asc">Công nợ tăng dần</option>
+            <option value="points_desc">Điểm tích lũy cao nhất</option>
+            <option value="created_desc">Mới tạo gần đây</option>
+          </select>
+        </div>
+
+        {/* Col 2: Created time range */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Thời gian:</span>
+          <select
+            className={`so-list-filter-select ${timeRange && timeRange !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            style={{ width: '100%', minWidth: 0 }}
+            value={timeRange}
+            onChange={(e) => onTimeRangeChange?.(e.target.value)}
+            title="Khoảng thời gian tạo khách hàng"
+          >
+            <option value="ALL">Tất cả thời gian</option>
+            <option value="this_month">Tháng này</option>
+            <option value="last_month">Tháng trước</option>
+            <option value="this_year">Năm nay</option>
+          </select>
+        </div>
+
+        {/* Col 3: Indicator badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          {isFiltered && (
+            <span
+              style={{
+                fontSize: 11,
+                color: '#0f766e',
+                fontWeight: 700,
+                backgroundColor: '#ccfbf1',
+                padding: '3px 8px',
+                borderRadius: 999,
+                whiteSpace: 'nowrap',
+              }}
             >
-              <X className="w-4 h-4" />
-            </button>
+              Đang lọc
+            </span>
           )}
         </div>
 
-        {/* 3 Pill chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          {pills.map((p) => {
-            const isActive = selectedDebtStatus === p.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => onDebtStatusChange(p.id)}
-                className={`pill-btn ${isActive ? 'active' : ''}`}
-                style={{
-                  height: '34px',
-                  padding: '0 14px',
-                  borderRadius: '9999px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  border: isActive ? '1px solid #0F766E' : '1px solid #E2E8F0',
-                  background: isActive ? '#0F766E' : '#F8FAFC',
-                  color: isActive ? '#ffffff' : '#475569',
-                  boxShadow: isActive ? '0 2px 6px rgba(15, 118, 110, 0.22)' : 'none',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {p.label}
-              </button>
-            );
-          })}
+        {/* Col 4: Action buttons */}
+        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end', width: '100%', gap: 8 }}>
+          <button
+            type="button"
+            className="so-list-filter-search"
+            onClick={handleManualSearch}
+            title="Tìm kiếm theo điều kiện đã nhập"
+          >
+            <Search size={14} />
+            <span>Tìm kiếm</span>
+          </button>
+          <button
+            type="button"
+            className="so-list-filter-reset"
+            onClick={handleReset}
+            title="Đặt lại toàn bộ bộ lọc"
+          >
+            <RotateCcw size={13} />
+            <span>Đặt lại</span>
+          </button>
         </div>
-
-        {/* Membership Tier Filter */}
-        <select
-          value={selectedTier}
-          onChange={(e) => onTierChange(e.target.value)}
-          className="customer-select"
-          style={{ height: '34px', padding: '0 12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '13px', color: '#334155', background: '#F8FAFC' }}
-        >
-          <option value="ALL">Tất cả nhóm khách</option>
-          <option value="Standard">Thành viên</option>
-          <option value="Silver">Thân thiết</option>
-          <option value="Gold">Bán buôn / Khách sỉ</option>
-          <option value="VIP">Đối tác VIP</option>
-        </select>
-      </div>
-
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          title="Tải lại danh sách"
-          className="action-icon-btn"
-          style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid #CBD5E1', background: '#ffffff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <RotateCw
-            className="w-4 h-4"
-            style={{
-              animation: isRefreshing ? 'spin 1s linear infinite' : 'none',
-              color: isRefreshing ? '#0F766E' : '#64748B',
-            }}
-          />
-        </button>
       </div>
     </div>
   );
 };
+
+export default CustomerFilterBar;
+

@@ -29,29 +29,34 @@ export const VoucherListPage: FC = () => {
   const [editingBatch, setEditingBatch] = useState<VoucherBatchItem | null>(null);
   const [generateTargetBatch, setGenerateTargetBatch] = useState<VoucherBatchItem | null>(null);
 
-  const mapDtoToBatch = useCallback((dto: VoucherBatchDto): VoucherBatchItem => ({
-    id: dto.id,
-    batchCode: dto.batchCode,
-    name: dto.name,
-    discountType: dto.discountType,
-    discountValue: dto.discountValue,
-    minOrderValue: dto.minOrderValue,
-    maxDiscount: dto.maxDiscountAmount,
-    totalQuantity: dto.totalQuantity,
-    usedQuantity: dto.usedQuantity,
-    startDate: dto.startDate?.slice(0, 10) || '',
-    endDate: dto.endDate?.slice(0, 10) || '',
-    status: dto.status,
-    prefix: dto.prefix,
-    description: dto.description || '',
-    allowWithPromotions:
-      dto.allowWithPromotions !== undefined
-        ? dto.allowWithPromotions
-        : dto.description
-        ? !dto.description.includes('"allowWithPromotions":false')
-        : true,
-    codes: [],
-  }), []);
+  const mapDtoToBatch = useCallback((dto: VoucherBatchDto): VoucherBatchItem => {
+    const rawDesc = dto.description || '';
+    const cleanDescription = rawDesc.replace(/\[CONFIG_JSON\][\s\S]*?\[\/CONFIG_JSON\]/gi, '').trim();
+
+    return {
+      id: dto.id,
+      batchCode: dto.batchCode,
+      name: dto.name,
+      discountType: dto.discountType,
+      discountValue: dto.discountValue,
+      minOrderValue: dto.minOrderValue,
+      maxDiscount: dto.maxDiscountAmount,
+      totalQuantity: dto.totalQuantity,
+      usedQuantity: dto.usedQuantity,
+      startDate: dto.startDate?.slice(0, 10) || '',
+      endDate: dto.endDate?.slice(0, 10) || '',
+      status: dto.status,
+      prefix: dto.prefix,
+      description: cleanDescription,
+      allowWithPromotions:
+        dto.allowWithPromotions !== undefined
+          ? dto.allowWithPromotions
+          : rawDesc
+          ? !rawDesc.includes('"allowWithPromotions":false')
+          : true,
+      codes: [],
+    };
+  }, []);
 
   const loadBatches = useCallback(async () => {
     try {
@@ -104,8 +109,10 @@ export const VoucherListPage: FC = () => {
     });
   }, [batches, filter]);
 
-  const handleToggleBatchStatus = (batchId: string) => {
-    setBatches((prev) =>
+  const handleToggleBatchStatus = async (batchId: string) => {
+    try {
+      await promotionApi.toggleVoucherBatchStatus(batchId);
+      setBatches((prev) =>
       prev.map((b) => {
         if (b.id === batchId) {
           const nextStatus = b.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
@@ -122,7 +129,10 @@ export const VoucherListPage: FC = () => {
         }
         return b;
       })
-    );
+      );
+    } catch {
+      showToast('Không thể cập nhật trạng thái đợt voucher.', 'error');
+    }
   };
 
   const handleOpenCreate = () => {
@@ -135,18 +145,43 @@ export const VoucherListPage: FC = () => {
     setIsCreateModalOpen(true);
   };
 
-  const handleDeleteBatch = (batchId: string) => {
+  const handleDeleteBatch = async (batchId: string) => {
     const target = batches.find((b) => b.id === batchId);
     if (!target) return;
+    if (target.status === 'ACTIVE') {
+      showToast('Không thể xóa đợt voucher đang lưu hành. Hãy tạm dừng trước khi xóa.', 'error');
+      return;
+    }
     if (window.confirm(`Bạn có chắc chắn muốn xóa đợt voucher "${target.name}"?`)) {
-      setBatches((prev) => prev.filter((b) => b.id !== batchId));
-      showToast(`Đã xóa đợt voucher "${target.name}" thành công!`);
+      try {
+        await promotionApi.deleteVoucherBatch(batchId);
+        setBatches((prev) => prev.filter((b) => b.id !== batchId));
+        showToast(`Đã xóa đợt voucher "${target.name}" thành công!`);
+      } catch {
+        showToast('Không thể xóa đợt voucher. Nếu đang chạy, hãy tạm dừng trước.', 'error');
+      }
     }
   };
 
   const handleSaveBatch = async (savedBatch: VoucherBatchItem) => {
     try {
-      if (!editingBatch) {
+      const effectiveStartDate = savedBatch.startDate ? `${savedBatch.startDate}T00:00:00` : new Date().toISOString();
+      const effectiveEndDate = savedBatch.endDate ? `${savedBatch.endDate}T23:59:59` : new Date().toISOString();
+
+      if (editingBatch) {
+        await promotionApi.updateVoucherBatch(savedBatch.id, {
+          name: savedBatch.name,
+          discountType: savedBatch.discountType,
+          discountValue: savedBatch.discountValue,
+          minOrderValue: savedBatch.minOrderValue,
+          maxDiscountAmount: savedBatch.maxDiscount,
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          description: savedBatch.description,
+          allowWithPromotions: savedBatch.allowWithPromotions,
+        });
+        showToast(`Đã cập nhật đợt voucher "${savedBatch.name}" thành công!`);
+      } else {
         await promotionApi.createVoucherBatch({
           batchCode: savedBatch.batchCode,
           name: savedBatch.name,
@@ -155,29 +190,22 @@ export const VoucherListPage: FC = () => {
           minOrderValue: savedBatch.minOrderValue,
           maxDiscountAmount: savedBatch.maxDiscount,
           totalQuantity: savedBatch.totalQuantity,
-          startDate: savedBatch.startDate || new Date().toISOString(),
-          endDate: savedBatch.endDate || new Date().toISOString(),
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
           prefix: savedBatch.prefix,
           description: savedBatch.description,
           allowWithPromotions: savedBatch.allowWithPromotions,
         });
+        showToast(`Đã phát hành đợt voucher "${savedBatch.name}" thành công!`);
       }
       await loadBatches();
-    } catch {
-      // Ignored for optimistic UI
+      setIsCreateModalOpen(false);
+      setEditingBatch(null);
+    } catch (err: any) {
+      console.error('Lỗi khi lưu đợt voucher:', err);
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi lưu đợt voucher vào cơ sở dữ liệu!', 'error');
+      throw err;
     }
-
-    if (editingBatch) {
-      setBatches((prev) =>
-        prev.map((b) => (b.id === savedBatch.id ? savedBatch : b))
-      );
-      showToast(`Đã cập nhật đợt voucher "${savedBatch.name}" thành công!`);
-    } else {
-      setBatches((prev) => [savedBatch, ...prev]);
-      showToast(`Đã phát hành đợt voucher "${savedBatch.name}" thành công!`);
-    }
-    setIsCreateModalOpen(false);
-    setEditingBatch(null);
   };
 
   const handleGenerateCodes = async (batchId: string, additionalCodes: VoucherCodeItem[]) => {
@@ -207,7 +235,17 @@ export const VoucherListPage: FC = () => {
   };
 
   return (
-    <div className="promotion-page">
+    <div
+      className="promotion-page"
+      style={{
+        width: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+      }}
+    >
       {/* Shared AdminToast */}
       {toast && (
         <AdminToast
@@ -239,60 +277,101 @@ export const VoucherListPage: FC = () => {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="promotion-filter-bar">
-        <div className="promotion-filter-left">
-          <div className="promotion-search-box">
-            <Search className="w-4 h-4 promotion-search-icon" />
-            <input
-              type="text"
-              value={filter.searchTerm}
-              onChange={(e) => setFilter({ ...filter, searchTerm: e.target.value })}
-              placeholder="Tìm theo tên đợt, mã đợt, tiền tố prefix..."
-              className="promotion-search-input"
-            />
-            {filter.searchTerm && (
-              <button
-                onClick={() => setFilter({ ...filter, searchTerm: '' })}
-                className="promotion-clear-btn"
-                title="Xóa tìm kiếm"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+      {/* Filter Bar chuẩn StoreProductFilter */}
+      <div style={{ flexShrink: 0, marginBottom: 12 }}>
+        <div className="so-list-filter">
+        <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
+          <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
+            <label className="so-list-filter-label">Tìm kiếm:</label>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type="text"
+                value={filter.searchTerm}
+                onChange={(e) => setFilter({ ...filter, searchTerm: e.target.value })}
+                placeholder="Tìm theo tên đợt, mã đợt, tiền tố..."
+                className="so-list-filter-input"
+                style={{ width: '100%', paddingLeft: 30, paddingRight: filter.searchTerm ? 28 : 10 }}
+              />
+              <Search
+                size={14}
+                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+              />
+              {filter.searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setFilter({ ...filter, searchTerm: '' })}
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 2,
+                  }}
+                  title="Xóa tìm kiếm"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
 
-          <select
-            value={filter.discountType}
-            onChange={(e) => setFilter({ ...filter, discountType: e.target.value })}
-            className="promotion-select"
-          >
-            <option value="ALL">Tất cả hình thức</option>
-            <option value="FIXED_AMOUNT">Giảm tiền mặt (VNĐ)</option>
-            <option value="PERCENT">Giảm phần trăm (%)</option>
-          </select>
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label">Loại ưu đãi:</label>
+            <select
+              value={filter.discountType}
+              onChange={(e) => setFilter({ ...filter, discountType: e.target.value })}
+              className={`so-list-filter-select ${filter.discountType !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            >
+              <option value="ALL">Tất cả hình thức</option>
+              <option value="FIXED_AMOUNT">Giảm tiền mặt (VNĐ)</option>
+              <option value="PERCENT">Giảm phần trăm (%)</option>
+            </select>
+          </div>
 
-          <select
-            value={filter.status}
-            onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-            className="promotion-select"
-          >
-            <option value="ALL">Tất cả trạng thái</option>
-            <option value="ACTIVE">Đang lưu hành</option>
-            <option value="PAUSED">Tạm dừng</option>
-            <option value="EXPIRED">Đã hết hạn</option>
-          </select>
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label">Trạng thái:</label>
+            <select
+              value={filter.status}
+              onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+              className={`so-list-filter-select ${filter.status !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="ACTIVE">Đang lưu hành</option>
+              <option value="PAUSED">Tạm dừng</option>
+              <option value="EXPIRED">Đã hết hạn</option>
+            </select>
+          </div>
 
-          <button
-            onClick={loadBatches}
-            className="btn-secondary-pill"
-            title="Tải lại dữ liệu từ CSDL"
-          >
-            <RotateCw className="w-3.5 h-3.5" />
-            <span>Làm mới</span>
-          </button>
+          <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {(filter.searchTerm || filter.discountType !== 'ALL' || filter.status !== 'ALL') && (
+              <button
+                type="button"
+                onClick={() => setFilter({ searchTerm: '', discountType: 'ALL', status: 'ALL' })}
+                className="so-list-filter-reset"
+                title="Đặt lại bộ lọc"
+              >
+                <span>Đặt lại</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={loadBatches}
+              className="so-list-filter-search"
+              title="Tải lại dữ liệu"
+            >
+              <RotateCw size={13} />
+              <span>Làm mới</span>
+            </button>
+          </div>
         </div>
       </div>
+    </div>
 
       {/* Batch Table with Codes Accordion */}
       <VoucherBatchTable

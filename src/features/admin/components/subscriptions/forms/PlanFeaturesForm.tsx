@@ -66,7 +66,7 @@ export const PlanFeaturesForm: React.FC<PlanFeaturesFormProps> = ({
   const activeCount = Object.values(features).filter(Boolean).length;
 
   return (
-    <div
+    <div className="plans-panel"
       style={{
         background: '#ffffff',
         border: '1px solid var(--border-light, #e2e8f0)',

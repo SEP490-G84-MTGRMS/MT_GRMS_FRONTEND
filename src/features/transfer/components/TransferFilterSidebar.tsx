@@ -40,8 +40,9 @@ export const TransferFilterSidebar: React.FC<TransferFilterSidebarProps> = ({
 }) => {
   const ALL_STATUSES: { key: TransferStatus; label: string }[] = [
     { key: 'Draft', label: 'Phiếu tạm' },
-    { key: 'In-Transit', label: 'Đang chuyển' },
-    { key: 'Received', label: 'Đã nhận' },
+    { key: 'Pending', label: 'Chờ xử lý' },
+    { key: 'InTransit', label: 'Đang chuyển' },
+    { key: 'Completed', label: 'Hoàn tất' },
     { key: 'Cancelled', label: 'Đã hủy' },
   ];
 

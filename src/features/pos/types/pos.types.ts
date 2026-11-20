@@ -19,12 +19,14 @@ export class ProductDTO {
   imageUrl?: string;
   spec?: string;
   category: string = '';
+  categoryName?: string;
   baseUnit: string = '';
   basePrice: number = 0;
   costPrice: number = 0;
   quantityOnHand: number = 0;
   allocatedQty?: number;
   batchCode?: string;
+    batchId?: string;
   expiryDate?: string;
   shelfLocation?: string;
   unitPrices?: Array<{
@@ -58,6 +60,8 @@ export class CartItemDTO {
   totalAmount: number = 0;
   isBelowCostApproved?: boolean;
   batchCode?: string;
+  batchId?: string;
+  fefoDiscountPercent?: number;
   expiryDate?: string;
 
   constructor(init?: Partial<CartItemDTO>) {
@@ -83,11 +87,9 @@ export class CustomerDTO {
   group?: string;
   loyaltyPoints: number = 0;
   membershipTier: 'Standard' | 'Silver' | 'Gold' | 'VIP' = 'Standard';
-  debtLimit: number = 0;              // (Không bắt buộc) Hạn mức nợ cũ
   debtCount: number = 0;              // Số lần đã mua nợ
   totalDebtPurchased: number = 0;     // Tổng số tiền đã từng nợ
   currentDebt: number = 0;            // Nợ hiện tại chưa trả (VD: 120.000 đ)
-  allowDebt: boolean = false;         // Cho phép ghi nợ
   note?: string;
 
   constructor(init?: Partial<CustomerDTO>) {

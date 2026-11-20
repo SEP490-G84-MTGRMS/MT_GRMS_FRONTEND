@@ -1,11 +1,17 @@
 import { useState, type FC } from 'react';
 import { X, Award, Plus, Minus } from 'lucide-react';
-import type { PointLedgerItem } from '../../types/promotion.types';
+
+export interface AdjustPointsFormData {
+  customerPhone: string;
+  adjustmentType: 'ADD' | 'SUB';
+  points: number;
+  reason: string;
+}
 
 interface AdjustPointsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (entry: PointLedgerItem) => void;
+  onSave: (entry: AdjustPointsFormData) => Promise<void>;
 }
 
 export const AdjustPointsModal: FC<AdjustPointsModalProps> = ({
@@ -13,39 +19,35 @@ export const AdjustPointsModal: FC<AdjustPointsModalProps> = ({
   onClose,
   onSave,
 }) => {
-  const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [adjustType, setAdjustType] = useState<'ADD' | 'SUB'>('ADD');
   const [points, setPoints] = useState(50);
   const [reason, setReason] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim() || !customerPhone.trim() || !reason.trim()) {
-      alert('Vui lòng điền đầy đủ thông tin khách hàng và lý do điều chỉnh!');
+    if (!/^0\d{9}$/.test(customerPhone.trim())) {
+      setError('Số điện thoại khách hàng phải gồm 10 chữ số và bắt đầu bằng 0.');
       return;
     }
-
-    const changed = adjustType === 'ADD' ? Number(points) : -Number(points);
-
-    const newLedgerItem: PointLedgerItem = {
-      id: `pl-${Date.now()}`,
-      transactionCode: `TX-ADJ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(10 + Math.random() * 89)}`,
-      customerId: `CUST-${Math.floor(100 + Math.random() * 900)}`,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      type: adjustType === 'ADD' ? 'MANUAL_ADJUST_ADD' : 'MANUAL_ADJUST_SUB',
-      pointsChanged: changed,
-      balanceAfter: 200 + changed,
-      reason: reason.trim(),
-      createdAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      createdBy: 'Store Owner (Admin)',
-    };
-
-    onSave(newLedgerItem);
-    onClose();
+    if (!Number.isInteger(points) || points <= 0 || !reason.trim()) {
+      setError('Số điểm phải là số nguyên dương và lý do điều chỉnh là bắt buộc.');
+      return;
+    }
+    setError('');
+    setIsSaving(true);
+    try {
+      await onSave({ customerPhone: customerPhone.trim(), adjustmentType: adjustType, points, reason: reason.trim() });
+      onClose();
+    } catch {
+      // Trang cha hiển thị thông báo lỗi từ máy chủ.
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -65,18 +67,6 @@ export const AdjustPointsModal: FC<AdjustPointsModalProps> = ({
           <div className="promo-modal-body">
             <div className="form-grid-2">
               <div className="form-group">
-                <label className="form-label form-label-required">Họ và tên khách hàng</label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="VD: Trần Văn Bình..."
-                  className="form-input"
-                  required
-                />
-              </div>
-
-              <div className="form-group">
                 <label className="form-label form-label-required">Số điện thoại</label>
                 <input
                   type="text"
@@ -88,6 +78,8 @@ export const AdjustPointsModal: FC<AdjustPointsModalProps> = ({
                 />
               </div>
             </div>
+
+            {error && <div role="alert" className="promo-validation-summary">{error}</div>}
 
             <div className="form-grid-2">
               <div className="form-group">
@@ -143,8 +135,8 @@ export const AdjustPointsModal: FC<AdjustPointsModalProps> = ({
             <button type="button" onClick={onClose} className="btn-secondary-pill">
               Hủy bỏ
             </button>
-            <button type="submit" className="btn-primary-pill">
-              Xác nhận ghi nhận biến động
+            <button type="submit" className="btn-primary-pill" disabled={isSaving}>
+              {isSaving ? 'Đang lưu...' : 'Xác nhận ghi nhận biến động'}
             </button>
           </div>
         </form>

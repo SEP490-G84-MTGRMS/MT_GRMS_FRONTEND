@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
-import type { CashAccount, CreatePaymentDTO, CounterpartyType } from '../types/cashbook.types';
+import { ArrowUpFromLine, Info, X } from 'lucide-react';
+import type { CashAccount, CashbookTaxTreatment, CreatePaymentDTO, CounterpartyType } from '../types/cashbook.types';
 
 interface CreatePaymentModalProps {
   isOpen: boolean;
@@ -9,6 +10,14 @@ interface CreatePaymentModalProps {
   onSubmit: (dto: CreatePaymentDTO) => Promise<void>;
   initialCategory?: string;
 }
+
+const MAX_DESCRIPTION_LENGTH = 255;
+const PAYMENT_CATEGORIES = [
+  { code: 'OWNER_DRAW', label: 'Rút vốn chủ', treatment: 'NonDeductibleExpense' as const },
+  { code: 'TAX_PAYMENT', label: 'Nộp thuế nhà nước', treatment: 'TaxPayment' as const },
+  { code: 'ASSET_PURCHASE', label: 'Mua sắm trang thiết bị / Tài sản', treatment: 'NonDeductibleExpense' as const },
+  { code: 'OTHER_PAYMENT', label: 'Chi khác ngoài hóa đơn', treatment: null },
+];
 
 export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
   isOpen,
@@ -19,7 +28,9 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
 }) => {
   const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [amountStr, setAmountStr] = useState('');
-  const [category, setCategory] = useState(initialCategory || 'Rút vốn chủ (Owner Draw)');
+  const [category, setCategory] = useState(initialCategory || PAYMENT_CATEGORIES[0].label);
+  const [taxTreatment, setTaxTreatment] = useState<CashbookTaxTreatment>('NonDeductibleExpense');
+  const [taxTreatmentReason, setTaxTreatmentReason] = useState('');
   const [counterpartyType, setCounterpartyType] = useState<CounterpartyType>('OTHER');
   const [counterpartyName, setCounterpartyName] = useState('Chủ hộ kinh doanh');
   const [description, setDescription] = useState('');
@@ -29,32 +40,61 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (initialCategory) {
-      setCategory(initialCategory);
-      if (initialCategory === 'Rút vốn chủ (Owner Draw)') {
+    if (isOpen) {
+      setAmountStr('');
+      setTaxReferenceDocId('');
+      setErrorMsg('');
+      const normalizedCategory = PAYMENT_CATEGORIES.find((item) => item.label === initialCategory)?.label
+        || (initialCategory?.includes('Nộp thuế') ? 'Nộp thuế nhà nước' : PAYMENT_CATEGORIES[0].label);
+      setCategory(normalizedCategory);
+      const option = PAYMENT_CATEGORIES.find((item) => item.label === normalizedCategory)!;
+      setTaxTreatment(option.treatment || 'ReviewRequired');
+      setTaxTreatmentReason('');
+      if (option.code === 'OWNER_DRAW') {
         setCounterpartyType('OTHER');
         setCounterpartyName('Chủ hộ kinh doanh');
         setDescription('Chủ shop rút tiền chi tiêu cá nhân (Không tính P&L)');
         const safeOrBank = accounts.find((a) => a.isSafeDeposit || a.accountType === 'BANK') || accounts[0];
         if (safeOrBank) setAccountId(safeOrBank.id);
-      } else if (initialCategory === 'Nộp thuế nhà nước (Tax Payment)') {
+      } else if (option.code === 'TAX_PAYMENT') {
         setCounterpartyType('TAX_AUTHORITY');
         setCounterpartyName('Kho bạc Nhà nước / Cơ quan Thuế');
         setDescription('Nộp thuế GTGT & TNCN Quý 3/2026');
         const bankAcc = accounts.find((a) => a.accountType === 'BANK') || accounts[0];
         if (bankAcc) setAccountId(bankAcc.id);
+      } else {
+        setCounterpartyType('SUPPLIER');
+        setCounterpartyName('');
+        setDescription('');
+        if (accounts[0]) setAccountId(accounts[0].id);
       }
     }
   }, [initialCategory, isOpen, accounts]);
 
   if (!isOpen) return null;
 
-  const categories = [
-    'Rút vốn chủ (Owner Draw)',
-    'Nộp thuế nhà nước (Tax Payment)',
-    'Mua sắm trang thiết bị / Tài sản',
-    'Chi khác ngoài hóa đơn',
-  ];
+  const selectedCategory = PAYMENT_CATEGORIES.find((item) => item.label === category) || PAYMENT_CATEGORIES[0];
+
+  const handleCategoryChange = (value: string) => {
+    setCategory(value);
+    const option = PAYMENT_CATEGORIES.find((item) => item.label === value)!;
+    setTaxTreatment(option.treatment || 'ReviewRequired');
+    setTaxTreatmentReason('');
+    setTaxReferenceDocId('');
+    if (option.code === 'OWNER_DRAW') {
+      setCounterpartyType('OTHER');
+      setCounterpartyName('Chủ hộ kinh doanh');
+      setDescription('Chủ hộ rút tiền chi tiêu cá nhân');
+    } else if (option.code === 'TAX_PAYMENT') {
+      setCounterpartyType('TAX_AUTHORITY');
+      setCounterpartyName('Kho bạc Nhà nước / Cơ quan Thuế');
+      setDescription(`Nộp thuế GTGT & TNCN ${taxPeriod}`);
+    } else {
+      setCounterpartyType('SUPPLIER');
+      setCounterpartyName('');
+      setDescription('');
+    }
+  };
 
   // Tính trực tiếp, loại bỏ hook useMemo sau early return
   const selectedAccount = accounts.find((a) => a.id === accountId) || accounts[0];
@@ -84,9 +124,26 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
       return;
     }
 
+    if (description.trim().length > MAX_DESCRIPTION_LENGTH) {
+      setErrorMsg(`Diễn giải không được vượt quá ${MAX_DESCRIPTION_LENGTH} ký tự`);
+      return;
+    }
+    if (selectedCategory.code === 'OTHER_PAYMENT' && taxTreatment === 'ReviewRequired') {
+      setErrorMsg('Vui lòng chọn cách xử lý thuế cho khoản chi khác');
+      return;
+    }
+    if (taxTreatment === 'DeductibleExpense' && !taxReferenceDocId.trim()) {
+      setErrorMsg('Chi phí được trừ bắt buộc có số hoặc mã chứng từ');
+      return;
+    }
+    if (selectedCategory.code === 'TAX_PAYMENT' && !taxReferenceDocId.trim()) {
+      setErrorMsg('Nộp thuế bắt buộc có số giấy nộp tiền hoặc mã giao dịch ngân hàng');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      const isTax = category.includes('Nộp thuế');
+      const isTax = selectedCategory.code === 'TAX_PAYMENT';
       const finalDesc = isTax
         ? (description.trim() || `Nộp thuế ${taxPeriod}${taxReferenceDocId ? ` (GNT: ${taxReferenceDocId})` : ''}`)
         : (description.trim() || 'Chi tiền từ quỹ');
@@ -98,7 +155,10 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
         counterpartyType,
         counterpartyName: counterpartyName.trim(),
         description: finalDesc,
-        referenceDocId: isTax && taxReferenceDocId.trim() ? taxReferenceDocId.trim() : undefined,
+        referenceDocId: taxReferenceDocId.trim() || undefined,
+        categoryCode: selectedCategory.code,
+        taxTreatment,
+        taxTreatmentReason: taxTreatmentReason.trim() || undefined,
       });
       onClose();
     } catch (err: unknown) {
@@ -111,12 +171,13 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
   return (
     <div className="cb-modal-backdrop" onClick={onClose}>
       <div className="cb-modal-container" onClick={(e) => e.stopPropagation()}>
-        <div className="cb-modal-header">
-          <h2 className="cb-modal-title">
-            <span>🔴</span> Lập Phiếu Chi Tiền
-          </h2>
-          <button type="button" className="cb-modal-close-btn" onClick={onClose}>
-            ✕
+        <div className="cb-modal-header cb-modal-header--payment">
+          <div className="cb-modal-heading">
+            <span className="cb-modal-icon"><ArrowUpFromLine size={20} /></span>
+            <div><h2 className="cb-modal-title">Lập phiếu chi</h2><p className="cb-modal-subtitle">Ghi nhận tiền ra khỏi quỹ hoặc tài khoản</p></div>
+          </div>
+          <button type="button" className="cb-modal-close-btn" onClick={onClose} aria-label="Đóng">
+            <X size={20} />
           </button>
         </div>
 
@@ -132,9 +193,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
               <div className="cb-overdraft-alert">
                 <span>🚫</span>
                 <div>
-                  <strong>Cảnh báo Rule GBR-CSH-03:</strong> Số tiền chi (
-                  {parsedAmount.toLocaleString('vi-VN')} đ) vượt quá số dư két hiện có (
-                  {selectedAccount.currentBalance.toLocaleString('vi-VN')} đ). Nút xác nhận chi đã bị vô hiệu hóa!
+                  Số tiền chi vượt số dư khả dụng {selectedAccount.currentBalance.toLocaleString('vi-VN')} đ.
                 </div>
               </div>
             )}
@@ -172,23 +231,22 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
               <select
                 className="cb-form-select"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => handleCategoryChange(e.target.value)}
               >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {PAYMENT_CATEGORIES.map((item) => (
+                  <option key={item.code} value={item.label}>
+                    {item.label}
                   </option>
                 ))}
               </select>
-              {category.includes('Rút vốn') && (
-                <div style={{ marginTop: 6, padding: '8px 12px', background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8, fontSize: '12px', color: '#92400E' }}>
-                  💡 <strong>Rút vốn chủ:</strong> Bút toán giảm quỹ tiêu dùng cá nhân của Chủ hộ, được cách ly 100% khỏi chi phí kinh doanh P&L.
+              {selectedCategory.code === 'OTHER_PAYMENT' ? (
+                <div className="cb-tax-choice" role="group" aria-label="Xử lý thuế">
+                  <span className="cb-tax-choice__label">Xử lý kế toán và thuế *</span>
+                  <label><input type="radio" name="payment-tax" checked={taxTreatment === 'DeductibleExpense'} onChange={() => setTaxTreatment('DeductibleExpense')} /> Chi phí kinh doanh được trừ</label>
+                  <label><input type="radio" name="payment-tax" checked={taxTreatment === 'NonDeductibleExpense'} onChange={() => setTaxTreatment('NonDeductibleExpense')} /> Chi phí không được trừ</label>
                 </div>
-              )}
-              {category.includes('Nộp thuế') && (
-                <div style={{ marginTop: 6, padding: '10px 12px', background: '#EFF6FF', border: '1px solid #93C5FD', borderRadius: 8, fontSize: '12px', color: '#1E40AF' }}>
-                  💡 <strong>Quyền nộp thuế của Chủ hộ:</strong> Số liệu trên Sổ thuế là tính toán tham khảo theo doanh thu POS. Chủ tiệm toàn quyền điều chỉnh số tiền thực nộp (thêm/bớt) theo số thực nộp tại Kho bạc. Bút toán này trích giảm tiền quỹ và không tính vào P&L.
-                </div>
+              ) : (
+                <p className="cb-field-hint"><Info size={13} /> {selectedCategory.code === 'TAX_PAYMENT' ? 'Thanh toán nghĩa vụ thuế, không tính vào P&L.' : 'Khoản chi không được tính trực tiếp vào chi phí được trừ.'}</p>
               )}
             </div>
 
@@ -229,6 +287,14 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
               </>
             )}
 
+            {taxTreatment === 'DeductibleExpense' && (
+              <div className="cb-form-group">
+                <label className="cb-form-label">Số hoặc mã chứng từ *</label>
+                <input className="cb-form-input" value={taxReferenceDocId} maxLength={100} onChange={(e) => setTaxReferenceDocId(e.target.value)} placeholder="Ví dụ: HD-000123" />
+                <p className="cb-field-hint"><Info size={13} /> Bắt buộc để ghi nhận chi phí được trừ.</p>
+              </div>
+            )}
+
             <div className="cb-form-group">
               <label className="cb-form-label">Người nhận tiền *</label>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -260,31 +326,27 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
               <textarea
                 className="cb-form-textarea"
                 rows={2}
+                maxLength={MAX_DESCRIPTION_LENGTH}
                 placeholder="Ghi chú mục đích xuất chi..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+              <span className="cb-character-count">{description.length}/{MAX_DESCRIPTION_LENGTH}</span>
             </div>
 
-            {/* Smart Navigation Link to Service Expenses */}
-            <div style={{ marginTop: '8px', padding: '10px 14px', background: '#F8FAFC', border: '1px dashed #CBD5E1', borderRadius: 8, fontSize: '11px', color: '#475569' }}>
-              📌 <strong>Bạn muốn trả tiền điện, nước, internet, mặt bằng định kỳ?</strong>
-              <div style={{ marginTop: 2, color: '#64748B' }}>
-                Các khoản này có hóa đơn công nợ nên được quản lý và thanh toán tại <a href="/store-owner/expenses" style={{ color: '#0F766E', fontWeight: 700, textDecoration: 'underline' }}>Trang Hóa Đơn Phải Trả (Expenses)</a> để theo dõi hạn nộp và tự động ghi sổ quỹ, tránh bị trùng lặp chi phí!
-              </div>
-            </div>
+            <a className="cb-context-link" href="/store-owner/expenses">Thanh toán điện, nước, mặt bằng? Mở Hóa đơn phải trả →</a>
           </div>
 
           <div className="cb-modal-footer">
             <button type="button" className="cb-btn cb-btn-outline" onClick={onClose}>
-              Hủy bỏ
+              Hủy
             </button>
             <button
               type="submit"
               className="cb-btn cb-btn-payment"
               disabled={isSubmitting || isOverdraftViolation || parsedAmount <= 0}
             >
-              {isSubmitting ? 'Đang lưu...' : '✕ Xác Nhận Chi Tiền'}
+              {isSubmitting ? 'Đang lưu...' : 'Xác nhận chi'}
             </button>
           </div>
         </form>

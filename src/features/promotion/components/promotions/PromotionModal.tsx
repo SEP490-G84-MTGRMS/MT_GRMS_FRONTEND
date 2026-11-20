@@ -26,7 +26,7 @@ const COMMON_UNITS = [
 interface PromotionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (promo: PromotionItem) => void;
+  onSave: (promo: PromotionItem) => Promise<void> | void;
   editingPromo: PromotionItem | null;
   branches?: string[];
 }
@@ -60,10 +60,24 @@ export const PromotionModal: FC<PromotionModalProps> = ({
   ]);
 
   const [availableProducts, setAvailableProducts] = useState<
-    Array<{ id: string; name: string; productCode: string; baseUnit: string }>
+    Array<{ id: string; name: string; productCode: string; barcode: string; baseUnit: string }>
   >([]);
+  const [productSearch, setProductSearch] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const matchingProducts = (key: string) => {
+    const keyword = (productSearch[key] || "").trim().toLowerCase();
+    if (!keyword) return availableProducts.slice(0, 20);
+    return availableProducts.filter((product) =>
+      product.name.toLowerCase().includes(keyword) ||
+      product.productCode.toLowerCase().includes(keyword) ||
+      product.barcode.toLowerCase().includes(keyword)
+    ).slice(0, 20);
+  };
 
   useEffect(() => {
+    setValidationErrors([]);
     if (isOpen) {
       productApi
         .getProductsPaged({ pageSize: 100, status: "Active" })
@@ -74,6 +88,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                 id: p.id,
                 name: p.name,
                 productCode: p.productCode,
+                barcode: p.barcode || "",
                 baseUnit: p.baseUnit || "Cái",
               }))
             );
@@ -206,12 +221,33 @@ export const PromotionModal: FC<PromotionModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      alert("Vui lòng nhập tên chương trình khuyến mãi");
+    const errors: string[] = [];
+    if (!code.trim()) errors.push("Mã chương trình không được để trống");
+    if (code.trim().length > 50 || !/^[A-Za-z0-9_-]+$/.test(code.trim())) errors.push("Mã chương trình tối đa 50 ký tự và chỉ gồm chữ, số, _ hoặc -");
+    if (!name.trim() || name.trim().length > 150) errors.push("Tên chương trình phải có từ 1 đến 150 ký tự");
+    const today = new Date().toLocaleDateString('en-CA');
+    if (!editingPromo && startDate < today) errors.push("Ngày bắt đầu không được là ngày trong quá khứ");
+    if (!startDate || !endDate || new Date(endDate) <= new Date(startDate)) errors.push("Ngày kết thúc phải sau ngày bắt đầu");
+    if (budgetLimit !== undefined && budgetLimit <= 0) errors.push("Ngân sách phải lớn hơn 0 hoặc để trống");
+    if (description.trim().length > 1000) errors.push("Mô tả không quá 1.000 ký tự");
+    tiers.forEach((tier, index) => {
+      if (type === "BUY_X_GET_Y") {
+        if (!tier.requiredQty || tier.requiredQty <= 0) errors.push(`Bậc ${index + 1}: số lượng mua phải lớn hơn 0`);
+        if (!tier.giftProductId) errors.push(`Bậc ${index + 1}: phải chọn sản phẩm quà tặng từ kho`);
+        if (!tier.giftQty || tier.giftQty <= 0) errors.push(`Bậc ${index + 1}: số lượng tặng phải lớn hơn 0`);
+      } else {
+        if (!tier.minOrderValue || tier.minOrderValue <= 0) errors.push(`Bậc ${index + 1}: giá trị đơn phải lớn hơn 0`);
+        if (!tier.discountValue || tier.discountValue <= 0) errors.push(`Bậc ${index + 1}: mức giảm phải lớn hơn 0`);
+        if (tier.discountType === "PERCENT" && tier.discountValue > 100) errors.push(`Bậc ${index + 1}: phần trăm giảm không quá 100%`);
+      }
+    });
+    if (errors.length) {
+      setValidationErrors(errors);
       return;
     }
+    setValidationErrors([]);
 
     const payload: PromotionItem = {
       id: editingPromo ? editingPromo.id : `promo-${Date.now()}`,
@@ -233,8 +269,14 @@ export const PromotionModal: FC<PromotionModalProps> = ({
       tiers,
     };
 
-    onSave(payload);
-    onClose();
+    try {
+      setIsSubmitting(true);
+      await onSave(payload);
+    } catch {
+      // Keep modal open so user doesn't lose form data
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -264,6 +306,14 @@ export const PromotionModal: FC<PromotionModalProps> = ({
           }}
         >
           <div className="promo-modal-body">
+            {validationErrors.length > 0 && (
+              <div role="alert" className="promo-validation-summary">
+                <strong>Vui lòng kiểm tra lại thông tin:</strong>
+                <ul>
+                  {validationErrors.map((error) => <li key={error}>{error}</li>)}
+                </ul>
+              </div>
+            )}
             {/* Thông tin chung */}
             <div className="form-grid-2">
               <div className="form-group">
@@ -402,7 +452,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                         <span>Ngân sách còn lại:</span>
                         <strong style={{ color: budgetLimit - editingPromo.totalDiscountGiven <= 0 ? '#dc2626' : '#16a34a' }}>
                           {Math.max(0, budgetLimit - editingPromo.totalDiscountGiven).toLocaleString('vi-VN')} đ
-                          {budgetLimit - editingPromo.totalDiscountGiven <= 0 && ' (⚠️ Hết ngân sách)'}
+                          {budgetLimit - editingPromo.totalDiscountGiven <= 0 && ' (Hết ngân sách)'}
                         </strong>
                       </div>
                     )}
@@ -567,6 +617,14 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                           >
                             Sản phẩm mua (X)
                           </label>
+                          <input
+                            type="search"
+                            value={productSearch[`buy-${tier.id}`] || ""}
+                            onChange={(e) => setProductSearch((current) => ({ ...current, [`buy-${tier.id}`]: e.target.value }))}
+                            placeholder="Tìm tên hoặc barcode..."
+                            className="form-input"
+                            style={{ padding: "5px 8px", fontSize: "0.75rem", marginBottom: 4 }}
+                          />
                           <select
                             value={tier.buyProductId || ""}
                             onChange={(e) => {
@@ -589,9 +647,9 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                             style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%" }}
                           >
                             <option value="">-- Bất kỳ sản phẩm trong giỏ --</option>
-                            {availableProducts.map((p) => (
+                            {matchingProducts(`buy-${tier.id}`).map((p) => (
                               <option key={p.id} value={p.id}>
-                                {p.productCode} - {p.name} ({p.baseUnit})
+                                {p.name}
                               </option>
                             ))}
                           </select>
@@ -663,6 +721,14 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                           >
                             Sản phẩm quà tặng (Y)
                           </label>
+                          <input
+                            type="search"
+                            value={productSearch[`gift-${tier.id}`] || ""}
+                            onChange={(e) => setProductSearch((current) => ({ ...current, [`gift-${tier.id}`]: e.target.value }))}
+                            placeholder="Tìm tên hoặc barcode..."
+                            className="form-input"
+                            style={{ padding: "5px 8px", fontSize: "0.75rem", marginBottom: 4 }}
+                          />
                           <select
                             value={tier.giftProductId || ""}
                             onChange={(e) => {
@@ -687,9 +753,9 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                             style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%" }}
                           >
                             <option value="">-- Chọn sản phẩm từ kho --</option>
-                            {availableProducts.map((p) => (
+                            {matchingProducts(`gift-${tier.id}`).map((p) => (
                               <option key={p.id} value={p.id}>
-                                {p.productCode} - {p.name} ({p.baseUnit})
+                                {p.name}
                               </option>
                             ))}
                           </select>
@@ -851,8 +917,8 @@ export const PromotionModal: FC<PromotionModalProps> = ({
             >
               Hủy bỏ
             </button>
-            <button type="submit" className="btn-primary-pill">
-              {editingPromo ? "Lưu thay đổi" : "Kích hoạt CTKM"}
+            <button type="submit" disabled={isSubmitting} className="btn-primary-pill">
+              {isSubmitting ? "Đang lưu..." : editingPromo ? "Lưu thay đổi" : "Kích hoạt CTKM"}
             </button>
           </div>
         </form>
