@@ -1,10 +1,52 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Copy, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import type { PayslipDetailedRecord } from '../../types';
 import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
 import { employeeApi } from '../../api/employeeApi';
 import { cashbookService } from '../../../cashbook/services/cashbookService';
 import type { CashAccount } from '../../../cashbook/types/cashbook.types';
+import { VIETNAM_BANKS } from '../../../supplier/lib/vietQrHelper';
+import { EmployeeVietQrCard } from './EmployeeVietQrCard';
+
+const isBankMatchedInVietnamBanks = (bankNameInput?: string): boolean => {
+  if (!bankNameInput || !bankNameInput.trim()) return false;
+  const input = bankNameInput.trim().toLowerCase();
+  if (
+    VIETNAM_BANKS.some(
+      (b) =>
+        b.code.toLowerCase() === input ||
+        b.bin === input ||
+        b.shortName.toLowerCase() === input ||
+        b.name.toLowerCase() === input
+    )
+  ) {
+    return true;
+  }
+  if (
+    VIETNAM_BANKS.some(
+      (b) =>
+        input.includes(b.shortName.toLowerCase()) ||
+        b.shortName.toLowerCase().includes(input) ||
+        input.includes(b.name.toLowerCase()) ||
+        b.name.toLowerCase().includes(input)
+    )
+  ) {
+    return true;
+  }
+  const words = input.split(/[\s\-_,.]+/);
+  return VIETNAM_BANKS.some((b) => words.includes(b.code.toLowerCase()));
+};
+
+const formatVietQrDescription = (raw: string): string =>
+  raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .replace(/[^A-Za-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 50);
 
 const getLocalDateTimeInputValue = (): string => {
   const d = new Date();
@@ -36,7 +78,6 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
   const [paymentTime, setPaymentTime] = useState<string>(getLocalDateTimeInputValue);
   const [amountInput, setAmountInput] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const [isCopied, setIsCopied] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<CashAccount[]>([]);
@@ -48,6 +89,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
     bankAccountName?: string;
   } | null>(null);
   const [isLoadingBankInfo, setIsLoadingBankInfo] = useState<boolean>(false);
+  const [manualBankCode, setManualBankCode] = useState<string>('');
 
   const isBatchMode = !isAdvanceMode && Array.isArray(batchPayslips) && batchPayslips.length > 0;
 
@@ -76,6 +118,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
     setNotes('');
     setSubmitError(null);
     setSelectedAccountId('');
+    setManualBankCode('');
 
     let cancelled = false;
     setIsLoadingAccounts(true);
@@ -175,13 +218,6 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
   const selectedAccount = filteredAccounts.find((acc) => acc.id === selectedAccountId) || null;
 
   const formatAmount = (num?: number) => Math.round(num || 0).toLocaleString('en-US');
-
-  const handleCopyAccount = (text: string) => {
-    if (!text) return;
-    navigator.clipboard?.writeText(text);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
 
   const handleSubmit = async () => {
     if (parsedAmount <= 0) {
@@ -451,65 +487,111 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
               </div>
             </div>
 
-            {/* Thông tin tài khoản nhận của nhân viên (nếu chuyển khoản đơn lẻ) */}
-            {method === 'VIETQR' && !isBatchMode && payslip && (
-              <div
-                style={{
-                  marginTop: 14,
-                  padding: '8px 12px',
-                  background: 'var(--blue-light, #F0FDFA)',
-                  border: '1px solid var(--blue-border, #99F6E4)',
-                  borderRadius: 6,
-                  fontSize: 12.5,
-                  color: 'var(--text-muted, #4B5563)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                }}
-              >
-                {isLoadingBankInfo ? (
-                  <span>Đang tải thông tin TK nhận...</span>
-                ) : (
-                  <>
+            {/* Thông tin tài khoản nhận & VietQR Napas 247 (chuyển khoản đơn lẻ) */}
+            {method === 'VIETQR' && !isBatchMode && payslip && (() => {
+              const rawAccountNo = (bankInfo?.bankAccountNumber || payslip.bankAccountNumber || '').trim();
+              const rawBankName = bankInfo?.bankName || payslip.bankName || '';
+              const accountHolder =
+                bankInfo?.bankAccountName || payslip.bankAccountName || payslip.employeeName || '';
+              const isBankMatched = isBankMatchedInVietnamBanks(rawBankName);
+              const effectiveBankName = manualBankCode || rawBankName;
+              const transferDescription = formatVietQrDescription(
+                isAdvanceMode
+                  ? `TAM UNG ${payslip.employeeCode || payslip.employeeName}`
+                  : `TRA LUONG ${payslip.payslipCode || payslip.employeeCode}`
+              );
+
+              if (isLoadingBankInfo) {
+                return (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: '10px 12px',
+                      background: 'var(--blue-light, #F0FDFA)',
+                      border: '1px solid var(--blue-border, #99F6E4)',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      color: 'var(--text-muted, #4B5563)',
+                    }}
+                  >
+                    Đang tải thông tin TK nhận...
+                  </div>
+                );
+              }
+
+              if (!rawAccountNo) {
+                return (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: '10px 12px',
+                      background: 'var(--orange-light, #FFF8EB)',
+                      border: '1px solid var(--orange-border, #FFE8CC)',
+                      borderRadius: 8,
+                      fontSize: 12.5,
+                      color: '#B45309',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <AlertCircle size={16} style={{ flexShrink: 0 }} />
                     <span>
-                      TK nhận:{' '}
-                      <strong style={{ color: 'var(--text-main, #111827)' }}>
-                        {bankInfo?.bankName || payslip.bankName || 'Chưa cập nhật ngân hàng'}
-                      </strong>
-                      {' · '}
-                      <strong style={{ color: 'var(--blue-primary, #0F766E)' }}>
-                        {bankInfo?.bankAccountNumber || payslip.bankAccountNumber || 'Chưa cập nhật STK'}
-                      </strong>
-                      {' · '}
-                      <span>{bankInfo?.bankAccountName || payslip.bankAccountName || payslip.employeeName}</span>
+                      Nhân viên chưa có số tài khoản ngân hàng — vui lòng cập nhật hồ sơ hoặc chuyển sang Tiền mặt.
                     </span>
-                    {(bankInfo?.bankAccountNumber || payslip.bankAccountNumber) && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopyAccount((bankInfo?.bankAccountNumber || payslip.bankAccountNumber)!)}
-                        style={{
-                          border: '1px solid var(--border-subtle, #E5EDF8)',
-                          background: 'var(--bg-card, #FFFFFF)',
-                          borderRadius: 4,
-                          padding: '2px 8px',
-                          fontSize: 11.5,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          color: isCopied ? 'var(--green-money, #00C853)' : 'var(--text-muted, #4B5563)',
-                        }}
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ marginTop: 12 }}>
+                  {!isBankMatched && (
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        background: 'var(--orange-light, #FFF8EB)',
+                        border: '1px solid var(--orange-border, #FFE8CC)',
+                        borderRadius: 8,
+                        fontSize: 12.5,
+                        color: '#92400E',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <span>
+                        Chưa tự nhận diện được ngân hàng{rawBankName ? ` "${rawBankName}"` : ''} — chọn nhanh ngân hàng Napas 247:
+                      </span>
+                      <select
+                        aria-label="Chọn ngân hàng Napas 247"
+                        className="emp-form-input"
+                        style={{ minWidth: 200, padding: '4px 8px', borderRadius: 6, fontSize: 12.5 }}
+                        value={manualBankCode}
+                        onChange={(e) => setManualBankCode(e.target.value)}
                       >
-                        {isCopied ? <Check size={12} /> : <Copy size={12} />}
-                        <span>{isCopied ? 'Đã sao chép' : 'Sao chép STK'}</span>
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+                        <option value="">-- Chọn ngân hàng --</option>
+                        {VIETNAM_BANKS.map((bank) => (
+                          <option key={bank.code} value={bank.code}>
+                            {bank.shortName} ({bank.code} · {bank.bin})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <EmployeeVietQrCard
+                    bankName={effectiveBankName}
+                    accountNo={rawAccountNo}
+                    accountHolder={accountHolder}
+                    amount={parsedAmount}
+                    description={transferDescription}
+                    compact
+                  />
+                </div>
+              );
+            })()}
 
             {/* Ghi chú bên dưới */}
             <div style={{ marginTop: 14 }}>
