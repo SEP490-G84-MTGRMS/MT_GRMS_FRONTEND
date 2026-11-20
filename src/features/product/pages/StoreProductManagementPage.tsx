@@ -212,6 +212,7 @@ export const StoreProductManagementPage: FC = () => {
 
 
   const [importResult, setImportResult] = useState<StoreProductExcelImportResult | null>(null);
+  const [pendingImport, setPendingImport] = useState<{ storeId: string; file: File } | null>(null);
   const [isImportResultOpen, setIsImportResultOpen] = useState(false);
   const [excelBusy, setExcelBusy] = useState(false);
 
@@ -235,16 +236,21 @@ export const StoreProductManagementPage: FC = () => {
     }
   };
 
-  const handleImportExcel = async (storeId: string, file: File) => {
+  const handleImportExcel = async (storeId: string, file: File, previewOnly = true) => {
     if (!storeId || storeId === 'ALL') {
       showToast('Vui lòng chọn một cửa hàng cụ thể để nhập Excel.', 'error');
       return;
     }
     setExcelBusy(true);
     try {
-      const result = await storeProductApi.importUnitPriceExcel(storeId, file, appliedFilters);
+      const result = await storeProductApi.importUnitPriceExcel(storeId, file, appliedFilters, previewOnly);
       setImportResult(result);
       setIsImportResultOpen(true);
+      if (previewOnly) {
+        setPendingImport(result.isPreview && result.summary.failedCount === 0 ? { storeId, file } : null);
+        return;
+      }
+      setPendingImport(null);
       if (result.summary.successCount > 0) {
         await fetchProducts();
       }
@@ -396,11 +402,14 @@ export const StoreProductManagementPage: FC = () => {
       />
 
       <StoreProductImportResultModal
+        busy={excelBusy}
+        onConfirm={pendingImport ? () => void handleImportExcel(pendingImport.storeId, pendingImport.file, false) : undefined}
         isOpen={isImportResultOpen}
         result={importResult}
         onClose={() => {
           setIsImportResultOpen(false);
           setImportResult(null);
+          setPendingImport(null);
         }}
       />
     </div>

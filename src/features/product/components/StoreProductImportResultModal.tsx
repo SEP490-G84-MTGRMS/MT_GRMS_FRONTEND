@@ -6,9 +6,11 @@ interface Props {
   isOpen: boolean;
   result: StoreProductExcelImportResult | null;
   onClose: () => void;
+  onConfirm?: () => void;
+  busy?: boolean;
 }
 
-export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClose }) => {
+export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClose, onConfirm, busy }) => {
   if (!isOpen || !result) return null;
 
   const ok = result.summary.failedCount === 0;
@@ -27,7 +29,7 @@ export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClo
         justifyContent: 'center',
         padding: 16,
       }}
-      onClick={onClose}
+      onClick={busy ? undefined : onClose}
     >
       <div
         style={{
@@ -58,10 +60,12 @@ export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClo
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FileSpreadsheet size={20} />
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>Kết quả import Excel giá bán</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>
+                {result.isPreview ? 'Xem trước cập nhật giá bán' : 'Kết quả import Excel giá bán'}
+              </div>
               <div style={{ fontSize: 12, opacity: 0.92 }}>
                 {result.fileName} — {result.branchCode} {result.branchName} —{' '}
-                {result.summary.successCount}/{result.summary.totalRows} thành công
+                {result.summary.successCount}/{result.summary.totalRows} {result.isPreview ? 'hợp lệ' : 'thành công'}
                 {result.summary.failedCount > 0 ? ` · ${result.summary.failedCount} lỗi` : ''}
               </div>
             </div>
@@ -69,6 +73,7 @@ export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClo
           <button
             type="button"
             onClick={onClose}
+            disabled={busy}
             style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}
             title="Đóng"
           >
@@ -88,7 +93,7 @@ export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClo
             }}
           >
             <span style={{ background: '#ecfdf5', color: '#065f46', padding: '4px 10px', borderRadius: 999 }}>
-              Thành công: {result.summary.successCount}
+              {result.isPreview ? 'Hợp lệ' : 'Thành công'}: {result.summary.successCount}
             </span>
             <span style={{ background: '#fef2f2', color: '#991b1b', padding: '4px 10px', borderRadius: 999 }}>
               Lỗi: {result.summary.failedCount}
@@ -154,6 +159,14 @@ export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClo
             </table>
           </div>
         </div>
+        {onConfirm && result.isPreview && ok && (
+          <footer style={{ padding: '12px 16px', textAlign: 'right', borderTop: '1px solid #e2e8f0' }}>
+            <button type="button" onClick={onConfirm} disabled={busy}
+              style={{ background: '#0f766e', color: 'white', border: 0, borderRadius: 8, padding: '8px 16px' }}>
+              {busy ? 'Đang áp dụng…' : 'Xác nhận cập nhật giá'}
+            </button>
+          </footer>
+        )}
       </div>
     </div>
   );
