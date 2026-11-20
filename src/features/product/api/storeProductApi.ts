@@ -354,11 +354,12 @@ export const storeProductApi = {
   async importUnitPriceExcel(
     branchId: string,
     file: File,
-    filter?: StoreProductFilterValues
+    filter?: StoreProductFilterValues,
+    previewOnly = false
   ): Promise<StoreProductExcelImportResult> {
     const form = new FormData();
     form.append('file', file);
-    const params = storeProductApi.buildExcelFilterParams(filter);
+    const params = { ...storeProductApi.buildExcelFilterParams(filter), ...(previewOnly ? { previewOnly: true } : {}) };
     const res = await httpClient.post<ApiResponse<StoreProductExcelImportResult>>(
       `/branches/${branchId}/products/import`,
       form,
@@ -386,6 +387,7 @@ export interface StoreProductExcelImportRow {
 }
 
 export interface StoreProductExcelImportResult {
+  isPreview?: boolean;
   fileName: string;
   branchId: string;
   branchCode: string;
