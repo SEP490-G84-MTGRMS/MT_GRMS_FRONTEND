@@ -53,6 +53,12 @@
   gap: 10px;
   flex-shrink: 0;
   font-family: var(--font-sans);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  /* Phải visible: overflow-x:hidden sẽ biến overflow-y thành auto
+     → scroll cả card filter thay vì scroll dropdown gợi ý. */
+  overflow: visible;
 }
 
 .so-list-filter-row {
@@ -122,6 +128,12 @@
   align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+
+/* Dropdown gợi ý filter: scroll riêng, không kéo scroll card cha */
+.so-list-filter-suggest {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .so-list-filter-search,
@@ -214,6 +226,43 @@
   border-spacing: 0;
   text-align: left;
   font-size: 12.5px;
+}
+
+/* Bảng fit viewport (Hàng hóa): không ép min-width → không scroll ngang màn hình */
+.so-list-table-card--fit {
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.so-list-table-card--fit .so-list-table-head,
+.so-list-table-card--fit .so-list-table-body {
+  overflow-x: hidden;
+}
+
+.so-list-table-card--fit .so-list-table {
+  min-width: 0 !important;
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.so-list-table-card--fit .so-list-table thead th,
+.so-list-table-card--fit .so-list-table tbody td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.so-list-table-card--fit .so-list-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
+.so-list-table-card--fit .so-list-action-btn span {
+  display: none;
+}
+
+.so-list-table-card--fit .so-list-action-btn {
+  padding: 0 8px;
 }
 
 .so-list-table thead th,

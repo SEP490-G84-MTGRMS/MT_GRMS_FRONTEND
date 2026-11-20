@@ -19,6 +19,8 @@ export interface ProductResponse {
   costPrice: number | null; // Ẩn với Cashier/Staff theo BR-SEC-01
   minStock: number;
   maxStock: number;
+  vatRate?: number;
+  productType?: string;
   status: string; // "Active" | "Discontinued"
   imageUrl?: string | null;
   imageUrls?: string[];
@@ -26,6 +28,8 @@ export interface ProductResponse {
   internalNote?: string | null;
   hasBatches: boolean;
   isFavorite: boolean;
+  taxCategory?: string;
+  eligibleForVatReduction?: boolean;
   allowRepack?: boolean;
   sellRawByWeight?: boolean;
   /** Giá đ/kg khi đóng khay (PROCESSED). Null/0 = dùng sellingPrice (RAW). */
@@ -132,6 +136,7 @@ export interface ProductCreatePayload {
   costPrice?: number | null;
   minStock?: number;
   maxStock?: number;
+  vatRate?: number;
   taxCategory?: string;
   eligibleForVatReduction?: boolean;
   status?: string;
@@ -144,6 +149,7 @@ export interface ProductCreatePayload {
   processedSellingPricePerKg?: number | null;
   isFavorite?: boolean;
   isBaseUnitPurchaseUnit?: boolean;
+  sellRawByWeight?: boolean;
 }
 
 export interface ProductUpdatePayload {
@@ -155,6 +161,7 @@ export interface ProductUpdatePayload {
   costPrice?: number | null;
   minStock?: number;
   maxStock?: number;
+  vatRate?: number;
   taxCategory?: string;
   status?: string;
   imageUrl?: string | null;
@@ -167,6 +174,7 @@ export interface ProductUpdatePayload {
   isFavorite?: boolean;
   eligibleForVatReduction?: boolean;
   isBaseUnitPurchaseUnit?: boolean;
+  sellRawByWeight?: boolean;
 }
 
 export interface ComboComponent {
@@ -224,6 +232,7 @@ export interface ProductItem {
   imageUrls?: string[];
   minStock?: number;
   maxStock?: number;
+  vatRate?: number;
   taxCategory?: string;
   eligibleForVatReduction?: boolean;
   description?: string;

@@ -22,6 +22,8 @@ interface SupplierProductFilterBarProps {
   initialValues: SupplierProductFilterValues;
   suppliers: SupplierSummary[];
   products: SupplierProductItem[];
+  /** Nguồn gợi ý SKU/tên (master) — không bị thu hẹp theo bộ lọc đang apply */
+  suggestionProducts?: Array<{ id?: string; sku?: string; name?: string; productCode?: string }>;
   categories: string[];
   totalCount?: number;
   filteredCount?: number;
@@ -32,6 +34,8 @@ interface SupplierProductFilterBarProps {
   /** Import Excel — cần chọn 1 NCC cụ thể */
   onImportExcel?: (supplierId: string, file: File) => void;
   excelBusy?: boolean;
+  /** NCC đang ngữ cảnh (URL / mặc định Active) — dùng khi chưa lọc đúng 1 mã/tên NCC */
+  fallbackSupplierId?: string | null;
 }
 
 type FieldKey = 'sku' | 'name' | 'supplierCode' | 'supplierName';
@@ -126,12 +130,14 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
   initialValues,
   suppliers,
   products,
+  suggestionProducts,
   categories,
   onSearch,
   onReset,
   onExportExcel,
   onImportExcel,
   excelBusy = false,
+  fallbackSupplierId = null,
 }) => {
   const [tokens, setTokens] = useState<TokenMap>(() => tokensFromFilters(initialValues));
   const [queries, setQueries] = useState<QueryMap>(EMPTY_QUERIES);
@@ -171,6 +177,15 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
       const hit = suppliers.find((s) => s.name.toLowerCase() === names[0].toLowerCase());
       if (hit) return hit.id;
     }
+    // Tất cả SP đang hiện cùng 1 NCC
+    const productSupplierIds = [
+      ...new Set(products.map((p) => p.supplierId).filter(Boolean)),
+    ];
+    if (productSupplierIds.length === 1) return productSupplierIds[0];
+
+    if (fallbackSupplierId && fallbackSupplierId !== 'ALL') {
+      return fallbackSupplierId;
+    }
     return null;
   };
 
@@ -178,8 +193,8 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
   const excelSupplierId = resolveExcelSupplierId();
   const canExcel = showExcel && Boolean(excelSupplierId);
   const excelHint = canExcel
-    ? undefined
-    : 'Vào từ trang NCC hoặc lọc đúng 1 mã/tên NCC để Xuất/Nhập Excel';
+    ? 'Xuất/Nhập Excel theo bộ lọc màn hình của NCC đang chọn'
+    : 'Chọn/lọc đúng 1 nhà cung cấp (mã hoặc tên NCC) rồi bấm Xuất/Nhập Excel';
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -191,49 +206,44 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const executeSearch = (
-    updatedTokens: TokenMap,
-    currentStatus = status,
-    currentCategory = category
-  ) => {
-    setTokens(updatedTokens);
-    setQueries(EMPTY_QUERIES);
-    setOpenField(null);
-    setSuggestions([]);
-    setFocusedIndex(-1);
-    onSearch({
-      skus: updatedTokens.sku,
-      names: updatedTokens.name,
-      supplierCodes: updatedTokens.supplierCode,
-      supplierNames: updatedTokens.supplierName,
-      productSearch: '',
-      supplierSearch: '',
-      searchTerm: '',
-      supplierId: initialValues.supplierId || 'ALL',
-      categoryFilter: currentCategory,
-      statusFilter: currentStatus,
+  /** Chỉ cập nhật chip local — chưa gọi API; bấm "Tìm kiếm" mới apply. */
+  const addToken = (field: FieldKey, raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    setTokens((prev) => {
+      if (prev[field].some((t) => t.toLowerCase() === value.toLowerCase())) return prev;
+      return { ...prev, [field]: [...prev[field], value] };
     });
+    setQueries((prev) => ({ ...prev, [field]: '' }));
+    setSuggestions([]);
+    setOpenField(null);
+    setFocusedIndex(-1);
+    requestAnimationFrame(() => inputRefs.current[field]?.focus());
   };
 
   const addTokens = (field: FieldKey, newValues: string[]) => {
-    const nextTokens = {
-      ...tokens,
-      [field]: uniqueTokens([...tokens[field], ...newValues]),
-    };
-    executeSearch(nextTokens);
+    const cleaned = uniqueTokens(newValues);
+    if (!cleaned.length) return;
+    setTokens((prev) => ({
+      ...prev,
+      [field]: uniqueTokens([...prev[field], ...cleaned]),
+    }));
+    setQueries((prev) => ({ ...prev, [field]: '' }));
+    setSuggestions([]);
+    setOpenField(null);
+    setFocusedIndex(-1);
+    requestAnimationFrame(() => inputRefs.current[field]?.focus());
   };
 
   const handleSelectSuggestion = (field: FieldKey, val: string) => {
-    const nextTokens = {
-      ...tokens,
-      [field]: uniqueTokens([...tokens[field], val]),
-    };
-    executeSearch(nextTokens);
+    addToken(field, val);
   };
 
   const removeToken = (field: FieldKey, value: string) => {
-    const updated = tokens[field].filter((item) => item.toLowerCase() !== value.toLowerCase());
-    executeSearch({ ...tokens, [field]: updated });
+    setTokens((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((item) => item.toLowerCase() !== value.toLowerCase()),
+    }));
   };
 
   const loadSuggestions = useCallback(
@@ -249,24 +259,31 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
       const mapped: Suggestion[] = [];
       const seen = new Set<string>();
 
+      const skuNameSource =
+        suggestionProducts && suggestionProducts.length > 0 ? suggestionProducts : products;
+
       if (field === 'sku') {
-        for (const item of products) {
-          const val = item.sku;
+        for (const item of skuNameSource) {
+          const val = (item as { sku?: string; productCode?: string }).sku
+            || (item as { productCode?: string }).productCode
+            || '';
           if (!val?.trim()) continue;
           const key = val.toLowerCase();
           if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
           seen.add(key);
-          mapped.push({ id: `sku-${item.id}-${val}`, value: val, primary: val });
+          const id = (item as { id?: string }).id || key;
+          mapped.push({ id: `sku-${id}-${val}`, value: val, primary: val });
           if (mapped.length >= 8) break;
         }
       } else if (field === 'name') {
-        for (const item of products) {
-          const val = item.name;
+        for (const item of skuNameSource) {
+          const val = (item as { name?: string }).name || '';
           if (!val?.trim()) continue;
           const key = val.toLowerCase();
           if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
           seen.add(key);
-          mapped.push({ id: `name-${item.id}-${val}`, value: val, primary: val });
+          const id = (item as { id?: string }).id || key;
+          mapped.push({ id: `name-${id}-${val}`, value: val, primary: val });
           if (mapped.length >= 8) break;
         }
       } else if (field === 'supplierCode') {
@@ -321,7 +338,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
       setOpenField(mapped.length > 0 ? field : null);
       setFocusedIndex(mapped.length > 0 ? 0 : -1);
     },
-    [products, suppliers]
+    [products, suggestionProducts, suppliers]
   );
 
   const handleFieldChange = (field: FieldKey, rawValue: string) => {
@@ -368,7 +385,9 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
         handleSelectSuggestion(field, suggestions[focusedIndex].value);
         return;
       }
-      handleSubmit();
+      if (queries[field].trim()) {
+        addToken(field, queries[field]);
+      }
       return;
     }
 
@@ -386,8 +405,11 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
   };
 
   const handleClearField = (field: FieldKey) => {
+    setTokens((prev) => ({ ...prev, [field]: [] }));
+    setQueries((prev) => ({ ...prev, [field]: '' }));
+    setSuggestions([]);
+    setOpenField(null);
     inputRefs.current[field]?.focus();
-    executeSearch({ ...tokens, [field]: [] });
   };
 
   const buildCurrentValues = (): SupplierProductFilterValues => {
@@ -438,14 +460,6 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
     onReset();
   };
 
-  const totalActiveTokens =
-    tokens.sku.length +
-    tokens.name.length +
-    tokens.supplierCode.length +
-    tokens.supplierName.length;
-
-  const isFiltered = totalActiveTokens > 0 || status !== 'ALL' || category !== 'ALL';
-
   const renderField = (field: FieldConfig) => {
     const fieldTokens = tokens[field.key];
     const query = queries[field.key];
@@ -479,20 +493,6 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
           }}
         >
           <span>{field.label}:</span>
-          {hasValues && (
-            <span
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                color: '#0f766e',
-                backgroundColor: '#ccfbf1',
-                padding: '0 5px',
-                borderRadius: 8,
-              }}
-            >
-              {fieldTokens.length}
-            </span>
-          )}
         </label>
 
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -614,6 +614,8 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
 
           {isOpen && (
             <div
+              className="so-list-filter-suggest"
+              onWheel={(e) => e.stopPropagation()}
               style={{
                 position: 'absolute',
                 top: 'calc(100% + 4px)',
@@ -623,9 +625,11 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                 border: '1px solid #cbd5e1',
                 borderRadius: 8,
                 boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
-                zIndex: 80,
+                zIndex: 200,
                 maxHeight: 240,
                 overflowY: 'auto',
+                overflowX: 'hidden',
+                overscrollBehavior: 'contain',
                 padding: '4px 0',
               }}
             >
@@ -679,8 +683,7 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
           gridTemplateColumns: 'repeat(4, 1fr)',
           gap: '10px 14px',
           alignItems: 'center',
-          paddingTop: 8,
-          borderTop: '1px dashed #f1f5f9',
+          paddingTop: 2,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -748,32 +751,20 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
             <option value="Active">Hoạt động</option>
             <option value="Inactive">Tạm ngưng</option>
           </select>
-
-          {isFiltered && (
-            <span
-              style={{
-                fontSize: 11,
-                color: '#0f766e',
-                fontWeight: 700,
-                backgroundColor: '#ccfbf1',
-                padding: '2px 8px',
-                borderRadius: 999,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Đang lọc
-            </span>
-          )}
         </div>
 
-        <div />
-
-        <div className="so-list-filter-actions" style={{ justifyContent: 'flex-end', width: '100%', flexWrap: 'wrap', gap: 8 }}>
-          <button type="button" className="so-list-filter-search" onClick={handleSubmit}>
-            <Search size={14} />
-            <span>Tìm kiếm</span>
-          </button>
-
+        <div
+          className="so-list-filter-actions"
+          style={{
+            gridColumn: '3 / span 2',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            width: '100%',
+            flexWrap: 'nowrap',
+            gap: 8,
+            minWidth: 0,
+          }}
+        >
           {showExcel && onExportExcel && (
             <button
               type="button"
@@ -781,10 +772,10 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
               onClick={() => excelSupplierId && onExportExcel(excelSupplierId)}
               disabled={!canExcel || excelBusy}
               title={excelHint || 'Xuất Excel SP Active của NCC (giá nhập sỉ + MOQ)'}
-              style={{ opacity: !canExcel || excelBusy ? 0.55 : 1 }}
+              style={{ opacity: !canExcel || excelBusy ? 0.55 : 1, flexShrink: 0 }}
             >
               <Download size={13} />
-              <span>Xuất Excel</span>
+              <span>{excelBusy ? 'Đang xuất...' : 'Xuất Excel'}</span>
             </button>
           )}
 
@@ -796,10 +787,10 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!canExcel || excelBusy}
                 title={excelHint || 'Nhập Excel để cập nhật giá nhập sỉ + MOQ'}
-                style={{ opacity: !canExcel || excelBusy ? 0.55 : 1 }}
+                style={{ opacity: !canExcel || excelBusy ? 0.55 : 1, flexShrink: 0 }}
               >
                 <Upload size={13} />
-                <span>{excelBusy ? 'Đang nhập...' : 'Nhập Excel'}</span>
+                <span>{excelBusy ? 'Đang xử lý...' : 'Nhập Excel'}</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -815,7 +806,22 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
             </>
           )}
 
-          <button type="button" className="so-list-filter-reset" onClick={handleResetClick}>
+          <button
+            type="button"
+            className="so-list-filter-search"
+            onClick={handleSubmit}
+            style={{ flexShrink: 0 }}
+          >
+            <Search size={14} />
+            <span>Tìm kiếm</span>
+          </button>
+
+          <button
+            type="button"
+            className="so-list-filter-reset"
+            onClick={handleResetClick}
+            style={{ flexShrink: 0 }}
+          >
             <RotateCcw size={13} />
             <span>Đặt lại</span>
           </button>

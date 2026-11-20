@@ -12,6 +12,7 @@ import {
   Plus,
   Loader2,
   History,
+  Tag,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { readFileAsDataUrl } from '../../../utils/imageFile';
@@ -255,14 +256,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (!productName.trim()) {
       setProductName(masterSuggestion.name);
     }
-    if (masterSuggestion.baseUnit) {
-      setBaseUnit(masterSuggestion.baseUnit);
-    }
     if (masterSuggestion.imageUrl && images.length === 0) {
       setImages([masterSuggestion.imageUrl]);
-    }
-    if (masterSuggestion.suggestedRetailPrice && (!sellingPrice || sellingPrice === 0)) {
-      setSellingPrice(masterSuggestion.suggestedRetailPrice);
     }
 
     if (categories && categories.length > 0 && masterSuggestion.categoryName) {
@@ -276,20 +271,29 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       }
     }
 
-    if (masterSuggestion.units && masterSuggestion.units.length > 0) {
-      const newUoms: UomConversion[] = masterSuggestion.units.map((u, i) => ({
-        id: `master-uom-${Date.now()}-${i}`,
-        unitName: u.unitName,
-        conversionRate: u.conversionRate,
-        barcode: u.barcode || '',
-        price: masterSuggestion.suggestedRetailPrice
-          ? Math.round(masterSuggestion.suggestedRetailPrice * u.conversionRate)
-          : (sellingPrice || 0) * u.conversionRate,
-        productCode: '',
-        isPurchaseUnit: Boolean(u.isPurchaseUnit),
-      }));
-      setUomConversions(newUoms);
-    }
+    setUnitRows((previousRows) => {
+      const currentBase = previousRows.find((row) => row.isBaseUnit)
+        ?? createUnitRow({ isBaseUnit: true, isPurchaseUnit: true });
+      const basePrice = masterSuggestion.suggestedRetailPrice && currentBase.sellingPrice === 0
+        ? masterSuggestion.suggestedRetailPrice
+        : currentBase.sellingPrice;
+      const baseRow: FormUnitRow = {
+        ...currentBase,
+        unitName: masterSuggestion.baseUnit || currentBase.unitName,
+        sellingPrice: basePrice,
+      };
+      const suggestedUnits = (masterSuggestion.units || [])
+        .filter((unit) => unit.unitName.trim().toLowerCase() !== baseRow.unitName.trim().toLowerCase())
+        .map((unit) => createUnitRow({
+          unitName: unit.unitName,
+          convertsToQty: unit.conversionRate,
+          convertsToId: baseRow.id,
+          barcode: unit.barcode || '',
+          sellingPrice: basePrice > 0 ? Math.round(basePrice * unit.conversionRate) : 0,
+          isPurchaseUnit: Boolean(unit.isPurchaseUnit),
+        }));
+      return [baseRow, ...suggestedUnits];
+    });
 
     setMasterSuggestion(null);
   };
