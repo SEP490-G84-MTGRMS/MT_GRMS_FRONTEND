@@ -112,7 +112,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    setMethod(mode === 'advance' ? 'CASH' : 'VIETQR');
+    setMethod(mode === 'advance' || isBatchMode ? 'CASH' : 'VIETQR');
     setPaymentTime(getLocalDateTimeInputValue());
     setAmountInput(currentPayable > 0 ? Math.round(currentPayable).toLocaleString('en-US') : '');
     setNotes('');
@@ -190,14 +190,16 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
     payslip?.bankAccountName,
   ]);
 
+  const effectiveMethod: 'VIETQR' | 'CASH' = isBatchMode ? 'CASH' : method;
+
   const filteredAccounts = useMemo(() => {
-    if (method === 'VIETQR') {
+    if (effectiveMethod === 'VIETQR') {
       return accounts.filter((acc) => acc.accountType === 'BANK');
     }
     return accounts
       .filter((acc) => acc.accountType === 'CASH')
       .sort((a, b) => Number(Boolean(b.isSafeDeposit)) - Number(Boolean(a.isSafeDeposit)));
-  }, [accounts, method]);
+  }, [accounts, effectiveMethod]);
 
   useEffect(() => {
     if (filteredAccounts.length === 0) {
@@ -238,6 +240,11 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
         );
         return;
       }
+    } else if (!isBatchMode && parsedAmount > currentPayable) {
+      setSubmitError(
+        `Số tiền chi (${formatAmount(parsedAmount)}đ) không được vượt quá số tiền trong phiếu lương (${formatAmount(currentPayable)}đ).`
+      );
+      return;
     }
 
     setIsSubmitting(true);
@@ -257,7 +264,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
       } else if (isBatchMode && batchPayslips) {
         await payslipApi.batchPayPayslips({
           payslipIds: batchPayslips.map((p) => p.id),
-          paymentMethod: method,
+          paymentMethod: 'CASH',
           note: notes.trim() || undefined,
           cashbookAccountId: selectedAccountId || undefined,
           paidAt: paidAtIso,
@@ -376,36 +383,65 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
               {/* Cột 1: Số tiền */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13.5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>Còn cần trả:</span>
-                  <span style={{ color: '#0F172A', fontWeight: 500 }}>{formatAmount(currentPayable)}</span>
+                  <span style={{ color: '#334155', fontWeight: 600 }}>
+                    {isBatchMode ? 'Tổng cần trả:' : 'Còn cần trả:'}
+                  </span>
+                  <span style={{ color: '#0F172A', fontWeight: 600 }}>{formatAmount(currentPayable)}đ</span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>Số tiền:</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    className="emp-form-input"
-                    style={{
-                      width: 140,
-                      textAlign: 'right',
-                      padding: '6px 10px',
-                      borderRadius: 6,
-                      fontWeight: 600,
-                    }}
-                    placeholder="0"
-                    value={amountInput}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/[^\d]/g, '');
-                      setAmountInput(digits ? Number(digits).toLocaleString('en-US') : '');
-                    }}
-                  />
-                </div>
+                {!isBatchMode && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                      <span style={{ color: '#334155', fontWeight: 600 }}>Số tiền:</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="emp-form-input"
+                        style={{
+                          width: 140,
+                          textAlign: 'right',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          borderColor: parsedAmount > currentPayable ? 'var(--red-accent, #FF3B30)' : undefined,
+                        }}
+                        placeholder="0"
+                        value={amountInput}
+                        onChange={(e) => {
+                          const digits = e.target.value.replace(/[^\d]/g, '');
+                          setAmountInput(digits ? Number(digits).toLocaleString('en-US') : '');
+                        }}
+                      />
+                    </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>Còn lại sau chi:</span>
-                  <span style={{ color: '#0F172A', fontWeight: 500 }}>{formatAmount(remainingAfter)}</span>
-                </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#334155', fontWeight: 600 }}>Còn lại sau chi:</span>
+                      <span style={{ color: '#0F172A', fontWeight: 500 }}>{formatAmount(remainingAfter)}đ</span>
+                    </div>
+
+                    {parsedAmount > currentPayable && (
+                      <div
+                        role="alert"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 6,
+                          padding: '8px 10px',
+                          background: 'var(--red-light, #FFF0F0)',
+                          border: '1px solid var(--red-border, #FFD6D6)',
+                          borderRadius: 6,
+                          color: 'var(--red-accent, #FF3B30)',
+                          fontSize: 12,
+                        }}
+                      >
+                        <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <span>
+                          Số tiền chi ({formatAmount(parsedAmount)}đ) đang vượt quá số tiền trong phiếu lương ({formatAmount(currentPayable)}đ).
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Cột 2: Thời gian, Phương thức, Nguồn quỹ */}
@@ -430,15 +466,23 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
                 <div style={{ display: 'grid', gridTemplateColumns: '105px minmax(0, 1fr)', alignItems: 'center', gap: 10 }}>
                   <span style={{ color: '#334155', fontWeight: 600 }}>Phương thức:</span>
-                  <select
-                    className="emp-form-input"
-                    style={{ width: '100%', minWidth: 0, padding: '6px 10px', borderRadius: 6, fontSize: 13 }}
-                    value={method}
-                    onChange={(e) => setMethod(e.target.value as 'VIETQR' | 'CASH')}
-                  >
-                    <option value="VIETQR">Chuyển khoản</option>
-                    <option value="CASH">Tiền mặt</option>
-                  </select>
+                  <div>
+                    <select
+                      className="emp-form-input"
+                      style={{ width: '100%', minWidth: 0, padding: '6px 10px', borderRadius: 6, fontSize: 13 }}
+                      value={isBatchMode ? 'CASH' : method}
+                      disabled={isBatchMode}
+                      onChange={(e) => setMethod(e.target.value as 'VIETQR' | 'CASH')}
+                    >
+                      {!isBatchMode && <option value="VIETQR">Chuyển khoản</option>}
+                      <option value="CASH">Tiền mặt</option>
+                    </select>
+                    {isBatchMode && (
+                      <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 4 }}>
+                        Thanh toán hàng loạt chỉ áp dụng cho Tiền mặt.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '105px minmax(0, 1fr)', alignItems: 'center', gap: 10 }}>
@@ -486,6 +530,63 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Danh sách số tiền chi riêng biệt từng nhân viên khi thanh toán hàng loạt */}
+            {isBatchMode && batchPayslips && (
+              <div
+                data-testid="batch-payslip-breakdown"
+                style={{
+                  marginTop: 14,
+                  border: '1px solid var(--border-subtle, #E5EDF8)',
+                  borderRadius: 8,
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    background: '#F8FAFC',
+                    borderBottom: '1px solid var(--border-subtle, #E5EDF8)',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: '#334155',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span>Chi tiết số tiền chi từng nhân viên ({batchPayslips.length})</span>
+                  <span>Tổng: {formatAmount(currentPayable)}đ</span>
+                </div>
+                <div style={{ maxHeight: 190, overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                    <thead>
+                      <tr style={{ background: '#F8FAFC', color: '#64748B', textAlign: 'left' }}>
+                        <th style={{ padding: '6px 12px', fontWeight: 600 }}>Mã NV</th>
+                        <th style={{ padding: '6px 12px', fontWeight: 600 }}>Nhân viên</th>
+                        <th style={{ padding: '6px 12px', fontWeight: 600 }}>Kỳ lương</th>
+                        <th style={{ padding: '6px 12px', fontWeight: 600, textAlign: 'right' }}>Số tiền chi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batchPayslips.map((item) => (
+                        <tr key={item.id} style={{ borderTop: '1px solid var(--border-subtle, #E5EDF8)' }}>
+                          <td style={{ padding: '7px 12px', fontFamily: 'monospace', color: '#475569' }}>
+                            {item.employeeCode}
+                          </td>
+                          <td style={{ padding: '7px 12px', fontWeight: 600, color: '#0F172A' }}>
+                            {item.employeeName}
+                          </td>
+                          <td style={{ padding: '7px 12px', color: '#475569' }}>{item.periodMonth}</td>
+                          <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
+                            {formatAmount(item.netSalary)}đ
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Thông tin tài khoản nhận & VietQR Napas 247 (chuyển khoản đơn lẻ) */}
             {method === 'VIETQR' && !isBatchMode && payslip && (() => {

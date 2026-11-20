@@ -128,9 +128,37 @@ describe('PayslipPaymentModal - VietQR Napas 247', () => {
       <PayslipPaymentModal
         isOpen
         onClose={vi.fn()}
-        batchPayslips={[basePayslip, { ...basePayslip, id: 'ps-2', employeeCode: 'NV002' }]}
+        batchPayslips={[
+          basePayslip,
+          { ...basePayslip, id: 'ps-2', employeeCode: 'NV002', employeeName: 'Trần Thị Bình', netSalary: 4200000 },
+        ]}
       />
     );
     expect(screen.queryByTestId('employee-vietqr-card')).toBeNull();
+    expect(screen.getByText('Thanh toán hàng loạt chỉ áp dụng cho Tiền mặt.')).toBeDefined();
+    expect(screen.getByTestId('batch-payslip-breakdown')).toBeDefined();
+    expect(screen.getByText('Trần Thị Bình')).toBeDefined();
+    expect(screen.getByText('4,200,000đ')).toBeDefined();
+  });
+
+  it('cảnh báo và chặn tạo phiếu chi nếu số tiền vượt quá tiền trong phiếu lương', async () => {
+    const { payslipApi } = await import('../api/payslipApi');
+    render(<PayslipPaymentModal isOpen onClose={vi.fn()} payslip={basePayslip} />);
+
+    const amountInput = screen.getByPlaceholderText('0') as HTMLInputElement;
+    fireEvent.change(amountInput, { target: { value: '9000000' } });
+
+    expect(
+      screen.getByText(/Số tiền chi \(9,000,000đ\) đang vượt quá số tiền trong phiếu lương \(8,500,000đ\)/i)
+    ).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: /Tạo phiếu chi/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/không được vượt quá số tiền trong phiếu lương \(8,500,000đ\)/i)
+      ).toBeDefined();
+    });
+    expect(payslipApi.payPayslip).not.toHaveBeenCalled();
   });
 });
