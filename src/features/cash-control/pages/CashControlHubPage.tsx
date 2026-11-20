@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { FC } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -88,6 +88,7 @@ const dedupeParticipants = (participants?: any[]): any[] => {
  * CashControlHubPage - Unified management page for POS cash control, approval, shift history, and limits.
  */
 export const CashControlHubPage: FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
   const isOwnerOrAdmin = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
@@ -96,10 +97,14 @@ export const CashControlHubPage: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTabParam = searchParams.get('tab') as 'pending' | 'history' | 'limits' | null;
   const [activeTab, setActiveTab] = useState<'pending' | 'history' | 'limits'>(
-    currentTabParam && ['pending', 'history', 'limits'].includes(currentTabParam)
+    currentTabParam && ['pending', 'limits'].includes(currentTabParam)
       ? currentTabParam
       : 'pending'
   );
+
+  useEffect(() => {
+    if (currentTabParam === 'history') navigate('/store-owner/shifts', { replace: true });
+  }, [currentTabParam, navigate]);
 
   // Synchronize tab state with search params
   const handleTabChange = (tab: 'pending' | 'history' | 'limits') => {
@@ -915,43 +920,6 @@ export const CashControlHubPage: FC = () => {
 
         <button
           type="button"
-          onClick={() => handleTabChange('history')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '12px 18px',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            fontSize: 14,
-            fontWeight: 700,
-            color: activeTab === 'history' ? '#0f766e' : '#64748b',
-            borderBottom: activeTab === 'history' ? '3px solid #0f766e' : '3px solid transparent',
-            marginBottom: -2,
-            transition: 'all 0.15s ease',
-          }}
-        >
-          <History size={16} />
-          <span>Lịch Sử Ca &amp; Bàn Giao</span>
-          {shifts.length > 0 && (
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '2px 7px',
-                borderRadius: 12,
-                backgroundColor: '#f1f5f9',
-                color: '#475569',
-              }}
-            >
-              {shifts.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
           onClick={() => handleTabChange('limits')}
           style={{
             display: 'flex',
@@ -1182,7 +1150,7 @@ export const CashControlHubPage: FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Clock size={20} className="text-teal-700" />
                 <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  ⏳ Yêu cầu Ca &amp; Két đang chờ duyệt ({pendingMovements.length + unconfirmedDrops.length})
+                  Yêu cầu Ca &amp; Két đang chờ duyệt ({pendingMovements.length + unconfirmedDrops.length})
                 </h3>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1514,7 +1482,7 @@ export const CashControlHubPage: FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <History size={18} className="text-teal-700" />
                 <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  📜 Lịch sử đã duyệt trong ngày ({resolvedMovements.length})
+                  Lịch sử đã duyệt trong ngày ({resolvedMovements.length})
                 </h3>
               </div>
               <span style={{ fontSize: 12, color: '#64748b' }}>

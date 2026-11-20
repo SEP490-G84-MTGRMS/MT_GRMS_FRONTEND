@@ -250,54 +250,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return () => clearTimeout(timer);
   }, [barcode, productToEdit, isOpen]);
 
-  const handleApplyMasterSuggestion = () => {
-    if (!masterSuggestion) return;
-
-    if (!productName.trim()) {
-      setProductName(masterSuggestion.name);
-    }
-    if (masterSuggestion.imageUrl && images.length === 0) {
-      setImages([masterSuggestion.imageUrl]);
-    }
-
-    if (categories && categories.length > 0 && masterSuggestion.categoryName) {
-      const match = categories.find(
-        (c) =>
-          c.name.toLowerCase().includes(masterSuggestion.categoryName.toLowerCase()) ||
-          masterSuggestion.categoryName.toLowerCase().includes(c.name.toLowerCase())
-      );
-      if (match) {
-        setCategoryId(match.id);
-      }
-    }
-
-    setUnitRows((previousRows) => {
-      const currentBase = previousRows.find((row) => row.isBaseUnit)
-        ?? createUnitRow({ isBaseUnit: true, isPurchaseUnit: true });
-      const basePrice = masterSuggestion.suggestedRetailPrice && currentBase.sellingPrice === 0
-        ? masterSuggestion.suggestedRetailPrice
-        : currentBase.sellingPrice;
-      const baseRow: FormUnitRow = {
-        ...currentBase,
-        unitName: masterSuggestion.baseUnit || currentBase.unitName,
-        sellingPrice: basePrice,
-      };
-      const suggestedUnits = (masterSuggestion.units || [])
-        .filter((unit) => unit.unitName.trim().toLowerCase() !== baseRow.unitName.trim().toLowerCase())
-        .map((unit) => createUnitRow({
-          unitName: unit.unitName,
-          convertsToQty: unit.conversionRate,
-          convertsToId: baseRow.id,
-          barcode: unit.barcode || '',
-          sellingPrice: basePrice > 0 ? Math.round(basePrice * unit.conversionRate) : 0,
-          isPurchaseUnit: Boolean(unit.isPurchaseUnit),
-        }));
-      return [baseRow, ...suggestedUnits];
-    });
-
-    setMasterSuggestion(null);
-  };
-
   // Category Searchable Dropdown state (phong cách tương tự EmployeeFormModal)
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [categorySearchKeyword, setCategorySearchKeyword] = useState('');
@@ -377,6 +329,54 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     createUnitRow({ isBaseUnit: true, isPurchaseUnit: true }),
   ]);
   const [deletedUnitIds, setDeletedUnitIds] = useState<string[]>([]);
+
+  const handleApplyMasterSuggestion = () => {
+    if (!masterSuggestion) return;
+
+    if (!productName.trim()) {
+      setProductName(masterSuggestion.name);
+    }
+    if (masterSuggestion.imageUrl && images.length === 0) {
+      setImages([masterSuggestion.imageUrl]);
+    }
+
+    if (categories && categories.length > 0 && masterSuggestion.categoryName) {
+      const match = categories.find(
+        (c) =>
+          c.name.toLowerCase().includes(masterSuggestion.categoryName.toLowerCase()) ||
+          masterSuggestion.categoryName.toLowerCase().includes(c.name.toLowerCase())
+      );
+      if (match) {
+        setCategoryId(match.id);
+      }
+    }
+
+    setUnitRows((previousRows) => {
+      const currentBase = previousRows.find((row) => row.isBaseUnit)
+        ?? createUnitRow({ isBaseUnit: true, isPurchaseUnit: true });
+      const basePrice = masterSuggestion.suggestedRetailPrice && currentBase.sellingPrice === 0
+        ? masterSuggestion.suggestedRetailPrice
+        : currentBase.sellingPrice;
+      const baseRow: FormUnitRow = {
+        ...currentBase,
+        unitName: masterSuggestion.baseUnit || currentBase.unitName,
+        sellingPrice: basePrice,
+      };
+      const suggestedUnits = (masterSuggestion.units || [])
+        .filter((unit) => unit.unitName.trim().toLowerCase() !== baseRow.unitName.trim().toLowerCase())
+        .map((unit) => createUnitRow({
+          unitName: unit.unitName,
+          convertsToQty: unit.conversionRate,
+          convertsToId: baseRow.id,
+          barcode: unit.barcode || '',
+          sellingPrice: basePrice > 0 ? Math.round(basePrice * unit.conversionRate) : 0,
+          isPurchaseUnit: Boolean(unit.isPurchaseUnit),
+        }));
+      return [baseRow, ...suggestedUnits];
+    });
+
+    setMasterSuggestion(null);
+  };
 
   // 5. Mô tả & Ghi chú sản phẩm
   const [description, setDescription] = useState('');

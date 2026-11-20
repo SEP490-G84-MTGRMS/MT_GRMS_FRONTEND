@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { ApprovalRequestsModal } from '../../features/employee/components/approval-requests/ApprovalRequestsModal';
+import { NotificationBell } from '../../features/notifications/components/NotificationBell';
 import { CreateScheduleRequestModal } from '../../features/employee/components/approval-requests/CreateScheduleRequestModal';
 import { scheduleApprovalApi } from '../../features/employee/api/scheduleApprovalApi';
 import { scheduleApi } from '../../features/employee/api/scheduleApi';
@@ -484,6 +485,9 @@ export const AppTopNav: FC = () => {
             />
 
             {/* Notification Bell */}
+            {!isOwnerOrAdmin ? (
+              <NotificationBell />
+            ) : (
             <button
               type="button"
               onClick={() => {
@@ -538,6 +542,7 @@ export const AppTopNav: FC = () => {
                 </span>
               ) : null}
             </button>
+            )}
 
             {/* Profile Dropdown */}
             <div style={{ position: 'relative' }} ref={accountMenuRef}>

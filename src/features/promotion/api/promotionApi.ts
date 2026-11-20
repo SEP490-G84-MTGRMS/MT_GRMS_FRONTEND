@@ -257,6 +257,21 @@ export const promotionApi = {
     return res.data?.data;
   },
 
+  async updateVoucherBatch(id: string, data: {
+    name: string;
+    discountType: 'FIXED_AMOUNT' | 'PERCENT';
+    discountValue: number;
+    minOrderValue: number;
+    maxDiscountAmount?: number;
+    startDate: string;
+    endDate: string;
+    description?: string;
+    allowWithPromotions?: boolean;
+  }) {
+    const res = await httpClient.put<{ success: boolean; data: VoucherBatchDto }>(`/vouchers/${id}`, data);
+    return res.data?.data;
+  },
+
   async generateVoucherCodes(batchId: string, quantity: number, prefix?: string) {
     const res = await httpClient.post<{ success: boolean; data: number }>(`/vouchers/${batchId}/generate-codes`, { quantity, prefix });
     return res.data?.data;

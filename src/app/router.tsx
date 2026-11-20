@@ -261,10 +261,6 @@ export const router = createBrowserRouter([
         element: <Navigate to="/store-owner/customers" replace />,
       },
       {
-        path: 'employees/*',
-        element: <Navigate to="/store-owner/employees" replace />,
-      },
-      {
         path: 'promotions/*',
         element: <Navigate to="/store-owner/promotions" replace />,
       },

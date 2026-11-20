@@ -26,7 +26,7 @@ const COMMON_UNITS = [
 interface PromotionModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (promo: PromotionItem) => void;
+  onSave: (promo: PromotionItem) => Promise<void> | void;
   editingPromo: PromotionItem | null;
   branches?: string[];
 }
@@ -64,6 +64,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
   >([]);
   const [productSearch, setProductSearch] = useState<Record<string, string>>({});
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const matchingProducts = (key: string) => {
     const keyword = (productSearch[key] || "").trim().toLowerCase();
@@ -220,7 +221,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: string[] = [];
     if (!code.trim()) errors.push("Mã chương trình không được để trống");
@@ -268,8 +269,14 @@ export const PromotionModal: FC<PromotionModalProps> = ({
       tiers,
     };
 
-    onSave(payload);
-    onClose();
+    try {
+      setIsSubmitting(true);
+      await onSave(payload);
+    } catch {
+      // Keep modal open so user doesn't lose form data
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -445,7 +452,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                         <span>Ngân sách còn lại:</span>
                         <strong style={{ color: budgetLimit - editingPromo.totalDiscountGiven <= 0 ? '#dc2626' : '#16a34a' }}>
                           {Math.max(0, budgetLimit - editingPromo.totalDiscountGiven).toLocaleString('vi-VN')} đ
-                          {budgetLimit - editingPromo.totalDiscountGiven <= 0 && ' (⚠️ Hết ngân sách)'}
+                          {budgetLimit - editingPromo.totalDiscountGiven <= 0 && ' (Hết ngân sách)'}
                         </strong>
                       </div>
                     )}
@@ -910,8 +917,8 @@ export const PromotionModal: FC<PromotionModalProps> = ({
             >
               Hủy bỏ
             </button>
-            <button type="submit" className="btn-primary-pill">
-              {editingPromo ? "Lưu thay đổi" : "Kích hoạt CTKM"}
+            <button type="submit" disabled={isSubmitting} className="btn-primary-pill">
+              {isSubmitting ? "Đang lưu..." : editingPromo ? "Lưu thay đổi" : "Kích hoạt CTKM"}
             </button>
           </div>
         </form>

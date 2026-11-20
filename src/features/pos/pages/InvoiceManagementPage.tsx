@@ -99,6 +99,8 @@ export const InvoiceManagementPage: FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || searchParams.get('orderId') || '';
+  const showPendingPayments = searchParams.get('status') === 'PENDING_PAYMENT';
+  const pendingBranchId = searchParams.get('branchId');
 
   // Route gốc quay lại POS
   const salesPath = location.pathname.startsWith('/employee/pos')
@@ -114,7 +116,7 @@ export const InvoiceManagementPage: FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [timePreset, setTimePreset] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH' | 'DEBT' | 'CREDIT'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'DEBT'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'DEBT' | 'PENDING_PAYMENT'>(showPendingPayments ? 'PENDING_PAYMENT' : 'ALL');
 
   // Danh sách hóa đơn có thể hủy / cập nhật trạng thái (Phân lập theo Cửa Hàng / Tenant)
   const { user } = useAuthStore();
@@ -166,16 +168,16 @@ export const InvoiceManagementPage: FC = () => {
   }, [user, isAnNhienStore, dbBranches]);
 
   // Bộ lọc chi nhánh (Multi-Branch Filter): Nhân viên luôn cố định theo chi nhánh được giao ca
-  const [branchFilter, setBranchFilter] = useState<string>(() => (isStoreOwner ? 'ALL' : assignedBranch.id));
+  const [branchFilter, setBranchFilter] = useState<string>(() => pendingBranchId || (isStoreOwner ? 'ALL' : assignedBranch.id));
 
   // Tự động đồng bộ bộ lọc: Chủ cửa hàng mặc định xem toàn chuỗi (ALL), Nhân viên theo chi nhánh được giao ca
   useEffect(() => {
     if (isStoreOwner) {
-      setBranchFilter('ALL');
+      setBranchFilter(pendingBranchId || 'ALL');
     } else {
       setBranchFilter(assignedBranch.id);
     }
-  }, [isStoreOwner, assignedBranch.id]);
+  }, [isStoreOwner, assignedBranch.id, pendingBranchId]);
 
   const getInitialInvoices = () => {
     if (isDefaultDemoStore) return mockInvoicesList;
@@ -268,7 +270,7 @@ export const InvoiceManagementPage: FC = () => {
             : 'Tiền mặt',
       totalMerchandiseAmount: o.totalAmount || 0,
       totalDiscount: o.discountAmount || 0,
-      finalPaidAmount: isDebtMethod ? (o.depositAmount || 0) : (o.finalAmount || 0),
+      finalPaidAmount: o.status === 'PendingPayment' ? 0 : isDebtMethod ? (o.depositAmount || 0) : (o.finalAmount || 0),
       appliedPromotionId: o.appliedPromotionId || null,
       appliedPromotionSummary: o.appliedPromotionSummary || null,
       promotionDiscountAmount: o.promotionDiscountAmount || 0,
@@ -279,8 +281,8 @@ export const InvoiceManagementPage: FC = () => {
       debtAmount: isDebtMethod ? Math.max(0, (o.finalAmount || 0) - (o.depositAmount || 0)) : 0,
       paidDebtAmount: isDebtMethod ? (o.depositAmount || 0) : 0,
       debtPaymentRecords: [],
-      status: o.status === 'Cancelled' ? 'CANCELLED' : isDebtMethod ? 'DEBT' : 'COMPLETED',
-      statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : isDebtMethod ? 'Ghi nợ' : 'Hoàn thành',
+      status: o.status === 'Cancelled' ? 'CANCELLED' : o.status === 'PendingPayment' ? 'PENDING_PAYMENT' : isDebtMethod ? 'DEBT' : 'COMPLETED',
+      statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : o.status === 'PendingPayment' ? 'Chờ chuyển khoản' : isDebtMethod ? 'Ghi nợ' : 'Hoàn thành',
       isPreOrder: isPreOrderFlag,
       orderOrigin: isPreOrderFlag ? 'PRE_ORDER' : 'RETAIL',
       items: (o.items || []).map((it: any) => ({
@@ -310,19 +312,19 @@ export const InvoiceManagementPage: FC = () => {
 
   // Khi chuyển tài khoản hoặc đăng nhập chủ cửa hàng khác -> Reset danh sách hóa đơn
   useEffect(() => {
-    setInvoices(getInitialInvoices());
+    setInvoices(showPendingPayments ? [] : getInitialInvoices());
     setPreOrders(getInitialPreOrders());
-  }, [currentTenantId, isDefaultDemoStore]);
+  }, [currentTenantId, isDefaultDemoStore, showPendingPayments]);
 
   // Nạp dữ liệu thực tế từ Backend API theo Tenant
   useEffect(() => {
     let isMounted = true;
     posOrderApi
-      .getOrders()
+      .getOrders(showPendingPayments ? { status: 'PendingPayment', branchId: pendingBranchId || undefined, pageSize: 100 } : undefined)
       .then((res) => {
         if (!isMounted) return;
         if (!res || !res.items || res.items.length === 0) {
-          setInvoices(getInitialInvoices());
+          setInvoices(showPendingPayments ? [] : getInitialInvoices());
           setPreOrders(getInitialPreOrders());
           return;
         }
@@ -336,7 +338,7 @@ export const InvoiceManagementPage: FC = () => {
         // Hợp nhất đơn hàng Backend với danh sách hóa đơn lịch sử chi nhánh (ca trước) để luôn có dữ liệu đổi trả
         const combinedInvoices = [...mappedInvoices];
         const existingCodes = new Set(mappedInvoices.map((i) => i.invoiceId));
-        getInitialInvoices().forEach((initInv) => {
+        if (!showPendingPayments) getInitialInvoices().forEach((initInv) => {
           if (!existingCodes.has(initInv.invoiceId)) {
             combinedInvoices.push(initInv);
           }
@@ -414,7 +416,7 @@ export const InvoiceManagementPage: FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentTenantId, isDefaultDemoStore]);
+  }, [currentTenantId, isDefaultDemoStore, showPendingPayments, pendingBranchId]);
 
   // Danh sách các chi nhánh có trong hệ thống (Tự động hợp nhất từ CSDL & cấu hình chuỗi, loại trừ trùng lặp)
   const availableBranches = useMemo(() => {
@@ -1138,6 +1140,7 @@ export const InvoiceManagementPage: FC = () => {
                   >
                     <option value="ALL">Tất cả trạng thái</option>
                     <option value="COMPLETED">Đã thanh toán 100%</option>
+                    <option value="PENDING_PAYMENT">Chờ chuyển khoản</option>
                     <option value="DEBT">Đơn bán nợ</option>
                     <option value="CANCELLED">Đã hủy / Đổi trả</option>
                   </select>
@@ -1192,7 +1195,7 @@ export const InvoiceManagementPage: FC = () => {
                     const isExpanded = expandedInvoiceId === inv.invoiceId;
                     const isDebt = (inv.debtAmount !== undefined && inv.debtAmount > 0) || (inv.status === 'DEBT' && (!inv.debtAmount || inv.debtAmount > 0));
                     const isDebtMethod = inv.paymentMethod === 'DEBT' || inv.paymentMethod === 'CREDIT';
-                    const isCompleted = !isDebt && (inv.status === 'COMPLETED' || (isDebtMethod && (inv.debtAmount || 0) <= 0));
+                    const isCompleted = inv.status !== 'PENDING_PAYMENT' && !isDebt && (inv.status === 'COMPLETED' || (isDebtMethod && (inv.debtAmount || 0) <= 0));
 
                     return (
                       <tbody key={inv.invoiceId}>
@@ -1357,7 +1360,7 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td style={{ textAlign: 'left' }}>
                             <span
-                              className={`pos-status-pill ${isCompleted ? 'completed' : isDebt ? 'debt' : 'cancelled'
+                              className={`pos-status-pill ${isCompleted ? 'completed' : isDebt || inv.status === 'PENDING_PAYMENT' ? 'debt' : 'cancelled'
                                 }`}
                               style={
                                 isDebt
@@ -1369,6 +1372,8 @@ export const InvoiceManagementPage: FC = () => {
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                   <CheckCircle2 size={12} /> Hoàn thành
                                 </span>
+                              ) : inv.status === 'PENDING_PAYMENT' ? (
+                                'Chờ chuyển khoản'
                               ) : isDebt ? (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                   <DollarSign size={12} /> Còn nợ {(inv.debtAmount || 0).toLocaleString('vi-VN')} đ
@@ -1437,6 +1442,8 @@ export const InvoiceManagementPage: FC = () => {
                                   <XCircle size={12} />
                                   <span>Hủy đơn</span>
                                 </button>
+                              ) : inv.status === 'PENDING_PAYMENT' ? (
+                                <button type="button" className="pos-btn-secondary-pill" onClick={() => setCancelModalInvoice(inv)}>Hủy đơn chờ</button>
                               ) : isDebt ? null : (
                                 <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', alignSelf: 'center' }}>
                                   Đã hủy

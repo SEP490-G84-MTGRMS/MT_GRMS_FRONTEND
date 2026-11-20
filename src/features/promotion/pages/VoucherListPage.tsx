@@ -29,29 +29,34 @@ export const VoucherListPage: FC = () => {
   const [editingBatch, setEditingBatch] = useState<VoucherBatchItem | null>(null);
   const [generateTargetBatch, setGenerateTargetBatch] = useState<VoucherBatchItem | null>(null);
 
-  const mapDtoToBatch = useCallback((dto: VoucherBatchDto): VoucherBatchItem => ({
-    id: dto.id,
-    batchCode: dto.batchCode,
-    name: dto.name,
-    discountType: dto.discountType,
-    discountValue: dto.discountValue,
-    minOrderValue: dto.minOrderValue,
-    maxDiscount: dto.maxDiscountAmount,
-    totalQuantity: dto.totalQuantity,
-    usedQuantity: dto.usedQuantity,
-    startDate: dto.startDate?.slice(0, 10) || '',
-    endDate: dto.endDate?.slice(0, 10) || '',
-    status: dto.status,
-    prefix: dto.prefix,
-    description: dto.description || '',
-    allowWithPromotions:
-      dto.allowWithPromotions !== undefined
-        ? dto.allowWithPromotions
-        : dto.description
-        ? !dto.description.includes('"allowWithPromotions":false')
-        : true,
-    codes: [],
-  }), []);
+  const mapDtoToBatch = useCallback((dto: VoucherBatchDto): VoucherBatchItem => {
+    const rawDesc = dto.description || '';
+    const cleanDescription = rawDesc.replace(/\[CONFIG_JSON\][\s\S]*?\[\/CONFIG_JSON\]/gi, '').trim();
+
+    return {
+      id: dto.id,
+      batchCode: dto.batchCode,
+      name: dto.name,
+      discountType: dto.discountType,
+      discountValue: dto.discountValue,
+      minOrderValue: dto.minOrderValue,
+      maxDiscount: dto.maxDiscountAmount,
+      totalQuantity: dto.totalQuantity,
+      usedQuantity: dto.usedQuantity,
+      startDate: dto.startDate?.slice(0, 10) || '',
+      endDate: dto.endDate?.slice(0, 10) || '',
+      status: dto.status,
+      prefix: dto.prefix,
+      description: cleanDescription,
+      allowWithPromotions:
+        dto.allowWithPromotions !== undefined
+          ? dto.allowWithPromotions
+          : rawDesc
+          ? !rawDesc.includes('"allowWithPromotions":false')
+          : true,
+      codes: [],
+    };
+  }, []);
 
   const loadBatches = useCallback(async () => {
     try {
@@ -160,7 +165,23 @@ export const VoucherListPage: FC = () => {
 
   const handleSaveBatch = async (savedBatch: VoucherBatchItem) => {
     try {
-      if (!editingBatch) {
+      const effectiveStartDate = savedBatch.startDate ? `${savedBatch.startDate}T00:00:00` : new Date().toISOString();
+      const effectiveEndDate = savedBatch.endDate ? `${savedBatch.endDate}T23:59:59` : new Date().toISOString();
+
+      if (editingBatch) {
+        await promotionApi.updateVoucherBatch(savedBatch.id, {
+          name: savedBatch.name,
+          discountType: savedBatch.discountType,
+          discountValue: savedBatch.discountValue,
+          minOrderValue: savedBatch.minOrderValue,
+          maxDiscountAmount: savedBatch.maxDiscount,
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          description: savedBatch.description,
+          allowWithPromotions: savedBatch.allowWithPromotions,
+        });
+        showToast(`Đã cập nhật đợt voucher "${savedBatch.name}" thành công!`);
+      } else {
         await promotionApi.createVoucherBatch({
           batchCode: savedBatch.batchCode,
           name: savedBatch.name,
@@ -169,29 +190,22 @@ export const VoucherListPage: FC = () => {
           minOrderValue: savedBatch.minOrderValue,
           maxDiscountAmount: savedBatch.maxDiscount,
           totalQuantity: savedBatch.totalQuantity,
-          startDate: savedBatch.startDate || new Date().toISOString(),
-          endDate: savedBatch.endDate || new Date().toISOString(),
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
           prefix: savedBatch.prefix,
           description: savedBatch.description,
           allowWithPromotions: savedBatch.allowWithPromotions,
         });
+        showToast(`Đã phát hành đợt voucher "${savedBatch.name}" thành công!`);
       }
       await loadBatches();
-    } catch {
-      // Ignored for optimistic UI
+      setIsCreateModalOpen(false);
+      setEditingBatch(null);
+    } catch (err: any) {
+      console.error('Lỗi khi lưu đợt voucher:', err);
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi lưu đợt voucher vào cơ sở dữ liệu!', 'error');
+      throw err;
     }
-
-    if (editingBatch) {
-      setBatches((prev) =>
-        prev.map((b) => (b.id === savedBatch.id ? savedBatch : b))
-      );
-      showToast(`Đã cập nhật đợt voucher "${savedBatch.name}" thành công!`);
-    } else {
-      setBatches((prev) => [savedBatch, ...prev]);
-      showToast(`Đã phát hành đợt voucher "${savedBatch.name}" thành công!`);
-    }
-    setIsCreateModalOpen(false);
-    setEditingBatch(null);
   };
 
   const handleGenerateCodes = async (batchId: string, additionalCodes: VoucherCodeItem[]) => {
