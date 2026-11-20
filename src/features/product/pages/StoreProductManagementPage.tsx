@@ -222,8 +222,8 @@ export const StoreProductManagementPage: FC = () => {
     }
     setExcelBusy(true);
     try {
-      await storeProductApi.exportUnitPriceExcel(storeId);
-      showToast('Đã tải file Excel giá bán theo ĐVT.', 'success');
+      await storeProductApi.exportUnitPriceExcel(storeId, appliedFilters);
+      showToast('Đã tải file Excel giá bán theo ĐVT theo bộ lọc màn hình.', 'success');
     } catch (err: any) {
       const msg =
         err?.response?.data?.message ||
@@ -242,7 +242,7 @@ export const StoreProductManagementPage: FC = () => {
     }
     setExcelBusy(true);
     try {
-      const result = await storeProductApi.importUnitPriceExcel(storeId, file);
+      const result = await storeProductApi.importUnitPriceExcel(storeId, file, appliedFilters);
       setImportResult(result);
       setIsImportResultOpen(true);
       if (result.summary.successCount > 0) {
@@ -358,6 +358,7 @@ export const StoreProductManagementPage: FC = () => {
           onExportExcel={handleExportExcel}
           onImportExcel={handleImportExcel}
           excelBusy={excelBusy}
+          fallbackStoreId={currentStore?.id ?? stores[0]?.id ?? null}
         />
       </div>
 

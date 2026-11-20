@@ -160,10 +160,26 @@ export const SupplierProductImportResultModal: FC<Props> = ({ isOpen, result, on
             borderTop: '1px solid #e2e8f0',
             display: 'flex',
             justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: 10,
           }}
         >
-          <button type="button" className="po-btn po-btn-primary" onClick={onClose} style={{ height: 36 }}>
-            Đóng
+          <button
+            type="button"
+            className="po-btn po-btn-secondary"
+            onClick={onClose}
+            style={{ height: 36, minWidth: 96 }}
+            title="Đóng cửa sổ kết quả; dữ liệu đã import không bị hoàn tác"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            className="po-btn po-btn-primary"
+            onClick={onClose}
+            style={{ height: 36, minWidth: 112 }}
+          >
+            Chấp nhận
           </button>
         </div>
       </div>

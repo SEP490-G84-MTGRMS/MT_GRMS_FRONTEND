@@ -18,7 +18,8 @@ interface MasterProductFilterBarProps {
   onSearch: (values: MasterProductFilterValues) => void;
   onReset: () => void;
   onExport?: () => void;
-  onImport?: () => void;
+  onImport?: (file: File) => void;
+  excelBusy?: boolean;
   onPrintBarcode?: () => void;
 }
 
@@ -98,7 +99,9 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
   onExport,
   onImport,
   onPrintBarcode,
+  excelBusy = false,
 }) => {
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
   const [tokens, setTokens] = useState<TokenMap>(() => tokensFromFilters(initialValues));
   const [queries, setQueries] = useState<QueryMap>(EMPTY_QUERIES);
   const [status, setStatus] = useState(initialValues.statusFilter || 'ALL');
@@ -258,9 +261,6 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
     onReset();
   };
 
-  const totalActiveTokens = tokens.sku.length + tokens.name.length + tokens.barcode.length;
-  const isFiltered = totalActiveTokens > 0 || status !== 'ALL' || categoryId !== 'ALL';
-
   const renderField = (field: FieldConfig) => {
     const fieldTokens = tokens[field.key];
     const query = queries[field.key];
@@ -294,20 +294,6 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
           }}
         >
           <span>{field.label}:</span>
-          {hasValues && (
-            <span
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                color: '#0f766e',
-                backgroundColor: '#ccfbf1',
-                padding: '0 5px',
-                borderRadius: 8,
-              }}
-            >
-              {fieldTokens.length}
-            </span>
-          )}
         </label>
 
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -429,6 +415,8 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
 
           {isOpen && (
             <div
+              className="so-list-filter-suggest"
+              onWheel={(e) => e.stopPropagation()}
               style={{
                 position: 'absolute',
                 top: 'calc(100% + 4px)',
@@ -438,9 +426,11 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
                 border: '1px solid #cbd5e1',
                 borderRadius: 8,
                 boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
-                zIndex: 80,
+                zIndex: 200,
                 maxHeight: 240,
                 overflowY: 'auto',
+                overflowX: 'hidden',
+                overscrollBehavior: 'contain',
                 padding: '4px 0',
               }}
             >
@@ -491,11 +481,11 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '1.2fr 1fr 1.6fr',
+          gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.5fr)',
           gap: '10px 14px',
           alignItems: 'center',
-          paddingTop: 8,
-          borderTop: '1px dashed #f1f5f9',
+          paddingTop: 2,
+          minWidth: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -561,42 +551,52 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
             <option value="Active">Đang kinh doanh</option>
             <option value="Discontinued">Ngừng kinh doanh</option>
           </select>
-          {isFiltered && (
-            <span
-              style={{
-                fontSize: 11,
-                color: '#0f766e',
-                fontWeight: 700,
-                backgroundColor: '#ccfbf1',
-                padding: '2px 8px',
-                borderRadius: 999,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Đang lọc
-            </span>
-          )}
         </div>
 
         <div
           className="so-list-filter-actions"
-          style={{ justifyContent: 'flex-end', width: '100%', flexWrap: 'wrap', gap: 8 }}
+          style={{
+            justifyContent: 'flex-end',
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            flexWrap: 'wrap',
+            gap: 8,
+          }}
         >
           <button type="button" className="so-list-filter-search" onClick={handleSubmit}>
             <Search size={14} />
             <span>Tìm kiếm</span>
           </button>
           {onExport && (
-            <button type="button" className="so-list-filter-reset" onClick={onExport}>
+            <button type="button" className="so-list-filter-reset" onClick={onExport} disabled={excelBusy}>
               <Download size={13} />
-              <span>Xuất file</span>
+              <span>{excelBusy ? 'Đang xử lý...' : 'Xuất file'}</span>
             </button>
           )}
           {onImport && (
-            <button type="button" className="so-list-filter-reset" onClick={onImport}>
-              <Upload size={13} />
-              <span>Import</span>
-            </button>
+            <>
+              <button
+                type="button"
+                className="so-list-filter-reset"
+                onClick={() => excelFileInputRef.current?.click()}
+                disabled={excelBusy}
+              >
+                <Upload size={13} />
+                <span>Import</span>
+              </button>
+              <input
+                ref={excelFileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) onImport(file);
+                  event.target.value = '';
+                }}
+              />
+            </>
           )}
           {onPrintBarcode && (
             <button type="button" className="so-list-filter-reset" onClick={onPrintBarcode}>

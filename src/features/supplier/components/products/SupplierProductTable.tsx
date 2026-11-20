@@ -150,19 +150,19 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '3%' }} />
-      <col style={{ width: '5%' }} />
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '18%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '5%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '6%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '7%' }} />
-      <col style={{ width: '8%' }} />
+      <col style={{ width: 48 }} />
+      <col style={{ width: 64 }} />
+      <col style={{ width: 120 }} />
+      <col style={{ width: 220 }} />
+      <col style={{ width: 110 }} />
+      <col style={{ width: 190 }} />
+      <col style={{ width: 130 }} />
+      <col style={{ width: 105 }} />
+      <col style={{ width: 130 }} />
+      <col style={{ width: 100 }} />
+      <col style={{ width: 125 }} />
+      <col style={{ width: 120 }} />
+      <col style={{ width: 100 }} />
     </colgroup>
   );
 
@@ -185,11 +185,11 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table">
+        <table className="so-list-table supplier-product-data-table">
           {tableColGroup}
           <thead>
             <tr>
-              <th style={{ ...thBaseStyle, textAlign: 'center' }}>#</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>STT</th>
 
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>
                 <span>Ảnh</span>
@@ -294,7 +294,7 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
       >
-        <table className="so-list-table">
+        <table className="so-list-table supplier-product-data-table">
           {tableColGroup}
           <tbody>
             {sortedProducts.length > 0 ? (

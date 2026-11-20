@@ -83,7 +83,7 @@ describe('ProductListPage - Task T3 Server-side Table & Pagination Integration',
     render(<MemoryRouter><ProductListPage /></MemoryRouter>);
 
     // Kiểm tra header
-    expect(screen.getByRole('heading', { level: 1, name: 'Hàng hóa (Master)' })).toBeDefined();
+    expect(screen.getByRole('heading', { level: 1, name: 'Hàng hóa' })).toBeDefined();
 
     // Chờ API hoàn thành và hiển thị trên bảng
     await waitFor(() => {

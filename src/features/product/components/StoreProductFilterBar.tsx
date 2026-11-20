@@ -18,6 +18,8 @@ export interface StoreProductFilterBarProps {
   /** Import Excel — cần chọn 1 cửa hàng cụ thể */
   onImportExcel?: (storeId: string, file: File) => void;
   excelBusy?: boolean;
+  /** CH ngữ cảnh / mặc định — dùng khi chưa lọc đúng 1 mã/tên CH */
+  fallbackStoreId?: string | null;
 }
 
 type FieldKey = 'sku' | 'name' | 'storeCode' | 'storeName' | 'supplierCode' | 'supplierName';
@@ -123,6 +125,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   onExportExcel,
   onImportExcel,
   excelBusy = false,
+  fallbackStoreId = null,
 }) => {
   const [tokens, setTokens] = useState<TokenMap>(() => tokensFromFilters(initialValues));
   const [queries, setQueries] = useState<QueryMap>(EMPTY_QUERIES);
@@ -164,6 +167,13 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
       const hit = stores.find((s) => s.name.toLowerCase() === names[0].toLowerCase());
       if (hit) return hit.id;
     }
+    // Tất cả SP đang hiện cùng 1 cửa hàng
+    const productStoreIds = [...new Set(products.map((p) => p.storeId).filter(Boolean))];
+    if (productStoreIds.length === 1) return productStoreIds[0];
+
+    if (fallbackStoreId && fallbackStoreId !== 'ALL') {
+      return fallbackStoreId;
+    }
     return null;
   };
 
@@ -171,7 +181,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   const excelStoreId = resolveExcelStoreId();
   const canExcel = showExcel && Boolean(excelStoreId);
   const excelHint = canExcel
-    ? undefined
+    ? 'Xuất/Nhập Excel theo data đang hiện trên màn (nếu có lọc chip thì theo bộ lọc)'
     : 'Chọn 1 cửa hàng cụ thể (thẻ ngữ cảnh hoặc lọc đúng 1 mã/tên CH) để Xuất/Nhập Excel';
 
   useEffect(() => {
@@ -184,45 +194,52 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const executeSearch = (updatedTokens: TokenMap, currentStatus = status) => {
-    setTokens(updatedTokens);
-    setQueries(EMPTY_QUERIES);
-    setOpenField(null);
-    setSuggestions([]);
-    setFocusedIndex(-1);
-    onSearch({
-      skus: updatedTokens.sku,
-      names: updatedTokens.name,
-      storeCodes: updatedTokens.storeCode,
-      storeNames: updatedTokens.storeName,
-      supplierCodes: updatedTokens.supplierCode,
-      supplierNames: updatedTokens.supplierName,
-      storeId: initialValues.storeId || 'ALL',
-      statusFilter: currentStatus,
-      searchTerm: '',
+  /** Gộp dần danh sách SP đã tải — gợi ý không bị thu hẹp sau khi đã lọc. */
+  const productSuggestPoolRef = useRef<StoreProductItem[]>([]);
+  useEffect(() => {
+    const map = new Map(productSuggestPoolRef.current.map((p) => [p.id, p]));
+    for (const p of products) map.set(p.id, p);
+    productSuggestPoolRef.current = Array.from(map.values());
+  }, [products]);
+
+  /** Chỉ cập nhật chip local — chưa gọi API; bấm "Tìm kiếm" mới apply. */
+  const addToken = (field: FieldKey, raw: string) => {
+    const value = raw.trim();
+    if (!value) return;
+    setTokens((prev) => {
+      if (prev[field].some((t) => t.toLowerCase() === value.toLowerCase())) return prev;
+      return { ...prev, [field]: [...prev[field], value] };
     });
+    setQueries((prev) => ({ ...prev, [field]: '' }));
+    setSuggestions([]);
+    setOpenField(null);
+    setFocusedIndex(-1);
+    requestAnimationFrame(() => inputRefs.current[field]?.focus());
   };
 
   const addTokens = (field: FieldKey, newValues: string[]) => {
-    const nextTokens = {
-      ...tokens,
-      [field]: uniqueTokens([...tokens[field], ...newValues]),
-    };
-    executeSearch(nextTokens);
+    const cleaned = uniqueTokens(newValues);
+    if (!cleaned.length) return;
+    setTokens((prev) => ({
+      ...prev,
+      [field]: uniqueTokens([...prev[field], ...cleaned]),
+    }));
+    setQueries((prev) => ({ ...prev, [field]: '' }));
+    setSuggestions([]);
+    setOpenField(null);
+    setFocusedIndex(-1);
+    requestAnimationFrame(() => inputRefs.current[field]?.focus());
   };
 
   const handleSelectSuggestion = (field: FieldKey, val: string) => {
-    const nextTokens = {
-      ...tokens,
-      [field]: uniqueTokens([...tokens[field], val]),
-    };
-    executeSearch(nextTokens);
+    addToken(field, val);
   };
 
   const removeToken = (field: FieldKey, value: string) => {
-    const updated = tokens[field].filter((item) => item.toLowerCase() !== value.toLowerCase());
-    const nextTokens = { ...tokens, [field]: updated };
-    executeSearch(nextTokens);
+    setTokens((prev) => ({
+      ...prev,
+      [field]: prev[field].filter((item) => item.toLowerCase() !== value.toLowerCase()),
+    }));
   };
 
   const loadSuggestions = useCallback(
@@ -237,9 +254,11 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
       const selectedSet = new Set(selected.map((item) => item.toLowerCase()));
       const mapped: Suggestion[] = [];
       const seen = new Set<string>();
+      const skuNameSource =
+        productSuggestPoolRef.current.length > 0 ? productSuggestPoolRef.current : products;
 
       if (field === 'sku') {
-        for (const item of products) {
+        for (const item of skuNameSource) {
           const val = item.sku;
           if (!val?.trim()) continue;
           const key = val.toLowerCase();
@@ -253,7 +272,7 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           if (mapped.length >= 8) break;
         }
       } else if (field === 'name') {
-        for (const item of products) {
+        for (const item of skuNameSource) {
           const val = item.name;
           if (!val?.trim()) continue;
           const key = val.toLowerCase();
@@ -431,7 +450,9 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
         handleSelectSuggestion(field, suggestions[focusedIndex].value);
         return;
       }
-      handleSubmit();
+      if (queries[field].trim()) {
+        addToken(field, queries[field]);
+      }
       return;
     }
 
@@ -449,9 +470,11 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
   };
 
   const handleClearField = (field: FieldKey) => {
-    const nextTokens = { ...tokens, [field]: [] };
+    setTokens((prev) => ({ ...prev, [field]: [] }));
+    setQueries((prev) => ({ ...prev, [field]: '' }));
+    setSuggestions([]);
+    setOpenField(null);
     inputRefs.current[field]?.focus();
-    executeSearch(nextTokens);
   };
 
   const buildCurrentValues = (): StoreProductFilterValues => {
@@ -502,16 +525,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
     onReset();
   };
 
-  const totalActiveTokens =
-    tokens.sku.length +
-    tokens.name.length +
-    tokens.storeCode.length +
-    tokens.storeName.length +
-    tokens.supplierCode.length +
-    tokens.supplierName.length;
-
-  const isFiltered = totalActiveTokens > 0 || status !== 'ALL';
-
   const renderField = (field: typeof FIELDS[number]) => {
     const fieldTokens = tokens[field.key];
     const query = queries[field.key];
@@ -545,20 +558,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           }}
         >
           <span>{field.label}:</span>
-          {hasValues && (
-            <span
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                color: '#0f766e',
-                backgroundColor: '#ccfbf1',
-                padding: '0 5px',
-                borderRadius: 8,
-              }}
-            >
-              {fieldTokens.length}
-            </span>
-          )}
         </label>
 
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -681,6 +680,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           {/* Dropdown suggestions */}
           {isOpen && (
             <div
+              className="so-list-filter-suggest"
+              onWheel={(e) => e.stopPropagation()}
               style={{
                 position: 'absolute',
                 top: 'calc(100% + 4px)',
@@ -690,9 +691,11 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
                 border: '1px solid #cbd5e1',
                 borderRadius: 8,
                 boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
-                zIndex: 80,
+                zIndex: 200,
                 maxHeight: 240,
                 overflowY: 'auto',
+                overflowX: 'hidden',
+                overscrollBehavior: 'contain',
                 padding: '4px 0',
               }}
             >
@@ -741,24 +744,20 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
         {FIELDS.slice(0, 4).map(renderField)}
       </div>
 
-      {/* ── ROW 2: 4 cột cùng chuẩn width (Cột 1: Mã NCC, Cột 2: Nhà cung cấp, Cột 3: Trạng thái, Cột 4: Nút thao tác) ── */}
+      {/* ── ROW 2: Mã NCC | Nhà cung cấp | Trạng thái | 4 nút 1 dòng ── */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.9fr) auto',
           gap: '10px 14px',
           alignItems: 'center',
-          paddingTop: 8,
-          borderTop: '1px dashed #f1f5f9',
+          paddingTop: 2,
+          minWidth: 0,
         }}
       >
-        {/* Cột 1: Mã NCC - chuẩn width bằng Mã SKU */}
         {renderField(FIELDS[4])}
-
-        {/* Cột 2: Nhà cung cấp - chuẩn width bằng Mã SKU */}
         {renderField(FIELDS[5])}
 
-        {/* Cột 3: Trạng thái & Badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>Trạng thái:</span>
           <select
@@ -787,36 +786,38 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
             <option value="Active">Đang bán</option>
             <option value="Inactive">Tạm ngừng</option>
           </select>
-
-          {isFiltered && (
-            <span
-              style={{
-                fontSize: 11,
-                color: '#0f766e',
-                fontWeight: 700,
-                backgroundColor: '#ccfbf1',
-                padding: '2px 8px',
-                borderRadius: 999,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Đang lọc
-            </span>
-          )}
         </div>
 
-        {/* Cột 4: Nút Tìm kiếm / Excel / Đặt lại */}
         <div
           className="so-list-filter-actions"
-          style={{ justifyContent: 'flex-end', width: '100%', flexWrap: 'wrap', gap: 8 }}
+          style={{
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            width: 'max-content',
+            maxWidth: '100%',
+            flexWrap: 'nowrap',
+            gap: 8,
+            marginLeft: 0,
+          }}
         >
           <button
             type="button"
             className="so-list-filter-search"
             onClick={handleSubmit}
+            style={{ flexShrink: 0 }}
           >
             <Search size={14} />
             <span>Tìm kiếm</span>
+          </button>
+
+          <button
+            type="button"
+            className="so-list-filter-reset"
+            onClick={handleResetClick}
+            style={{ flexShrink: 0 }}
+          >
+            <RotateCcw size={13} />
+            <span>Đặt lại</span>
           </button>
 
           {showExcel && onExportExcel && (
@@ -825,8 +826,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
               className="so-list-filter-reset"
               onClick={() => excelStoreId && onExportExcel(excelStoreId)}
               disabled={!canExcel || excelBusy}
-              title={excelHint || 'Xuất Excel SP của cửa hàng (giá bán theo ĐVT)'}
-              style={{ opacity: !canExcel || excelBusy ? 0.55 : 1 }}
+              title={excelHint || 'Xuất Excel SP của cửa hàng (giá bán + MOQ)'}
+              style={{ opacity: !canExcel || excelBusy ? 0.55 : 1, flexShrink: 0 }}
             >
               <Download size={13} />
               <span>Xuất Excel</span>
@@ -840,8 +841,8 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
                 className="so-list-filter-reset"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!canExcel || excelBusy}
-                title={excelHint || 'Nhập Excel để cập nhật giá bán theo ĐVT'}
-                style={{ opacity: !canExcel || excelBusy ? 0.55 : 1 }}
+                title={excelHint || 'Nhập Excel để cập nhật giá bán'}
+                style={{ opacity: !canExcel || excelBusy ? 0.55 : 1, flexShrink: 0 }}
               >
                 <Upload size={13} />
                 <span>{excelBusy ? 'Đang nhập...' : 'Nhập Excel'}</span>
@@ -859,15 +860,6 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
               />
             </>
           )}
-
-          <button
-            type="button"
-            className="so-list-filter-reset"
-            onClick={handleResetClick}
-          >
-            <RotateCcw size={13} />
-            <span>Đặt lại</span>
-          </button>
         </div>
       </div>
     </div>
