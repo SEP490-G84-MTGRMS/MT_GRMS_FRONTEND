@@ -380,12 +380,66 @@ export const supplierProductApi = {
   },
 
   /**
-   * Xuất Excel SP đã gán NCC (giá nhập sỉ + MOQ template).
+   * Query params Excel — cùng bộ lọc màn hình với danh sách SP theo NCC.
    */
-  async exportPriceMoqExcel(supplierId: string): Promise<void> {
+  buildExcelFilterParams(filter?: SupplierProductFilterParams): Record<string, unknown> {
+    if (!filter) return {};
+    const skus = filter.skus?.filter(Boolean) ?? [];
+    const names = filter.names?.filter(Boolean) ?? [];
+    const supplierCodes = filter.supplierCodes?.filter(Boolean) ?? [];
+    const supplierNames = filter.supplierNames?.filter(Boolean) ?? [];
+    const legacyName = filter.productSearch?.trim() || filter.searchTerm?.trim() || '';
+    const legacySupplier = filter.supplierSearch?.trim() || '';
+
+    return {
+      SearchTerm: !names.length && legacyName ? legacyName : undefined,
+      SupplierSearch:
+        !supplierCodes.length && !supplierNames.length && legacySupplier ? legacySupplier : undefined,
+      Skus: skus.length ? skus : undefined,
+      Names: names.length ? names : undefined,
+      SupplierCodes: supplierCodes.length ? supplierCodes : undefined,
+      SupplierNames: supplierNames.length ? supplierNames : undefined,
+      CategoryName:
+        filter.categoryFilter && filter.categoryFilter !== 'ALL' ? filter.categoryFilter : undefined,
+      Status:
+        filter.statusFilter === 'Active'
+          ? 1
+          : filter.statusFilter === 'Inactive'
+            ? 2
+            : undefined,
+    };
+  },
+
+  serializeExcelParams(params: Record<string, unknown>): string {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item !== undefined && item !== null && String(item).trim() !== '') {
+            search.append(key, String(item));
+          }
+        });
+        return;
+      }
+      search.append(key, String(value));
+    });
+    return search.toString();
+  },
+
+  /**
+   * Xuất Excel SP đã gán NCC theo bộ lọc màn hình (giá nhập sỉ + MOQ).
+   */
+  async exportPriceMoqExcel(
+    supplierId: string,
+    filter?: SupplierProductFilterParams
+  ): Promise<void> {
     try {
+      const params = supplierProductApi.buildExcelFilterParams(filter);
       const res = await httpClient.get(`/suppliers/${supplierId}/products/export`, {
         responseType: 'blob',
+        params,
+        paramsSerializer: (p) => supplierProductApi.serializeExcelParams(p as Record<string, unknown>),
       });
       const contentType = String(res.headers?.['content-type'] || '');
       if (contentType.includes('application/json')) {
@@ -416,27 +470,52 @@ export const supplierProductApi = {
         try {
           const text = await err.response.data.text();
           const parsed = JSON.parse(text);
-          throw new Error(parsed?.message || err.message || 'Không thể xuất Excel.');
+          const msg =
+            parsed?.detail ||
+            parsed?.message ||
+            parsed?.title ||
+            err.message ||
+            'Không thể xuất Excel.';
+          if (String(parsed?.code || parsed?.errorCode || '').toUpperCase() === 'SUBSCRIPTION_REQUIRED') {
+            window.dispatchEvent(
+              new CustomEvent('subscription-required', {
+                detail: { code: 'SUBSCRIPTION_REQUIRED', message: msg },
+              })
+            );
+          }
+          throw new Error(msg);
         } catch (inner: any) {
           if (inner?.message) throw inner;
         }
       }
-      throw new Error(err?.response?.data?.message || err?.message || 'Không thể xuất Excel.');
+      const data = err?.response?.data;
+      throw new Error(
+        data?.detail || data?.message || err?.message || 'Không thể xuất Excel.'
+      );
     }
   },
 
   /**
-   * Import Excel — BE validate + override giá nhập sỉ & MOQ.
+   * Import Excel — BE validate theo bộ lọc màn hình + override giá nhập sỉ & MOQ.
    */
   async importPriceMoqExcel(
     supplierId: string,
-    file: File
+    file: File,
+    filter?: SupplierProductFilterParams
   ): Promise<SupplierProductExcelImportResult> {
     const form = new FormData();
     form.append('file', file);
+    const params = supplierProductApi.buildExcelFilterParams(filter);
     const res = await httpClient.post<ApiResponse<SupplierProductExcelImportResult>>(
       `/suppliers/${supplierId}/products/import`,
-      form
+      form,
+      {
+        params,
+        // httpClient defaults to application/json. Override it for file uploads so
+        // Axios can serialize FormData with the required multipart boundary.
+        headers: { 'Content-Type': 'multipart/form-data' },
+        paramsSerializer: (p) => supplierProductApi.serializeExcelParams(p as Record<string, unknown>),
+      }
     );
     if (res.data?.success && res.data.data) {
       return res.data.data;

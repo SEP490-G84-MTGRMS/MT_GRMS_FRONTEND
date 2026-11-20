@@ -238,12 +238,63 @@ export const storeProductApi = {
   },
 
   /**
-   * Xuất Excel SP đã gán chi nhánh (giá bán theo từng ĐVT).
+   * Query params Excel — cùng bộ lọc màn hình với danh sách SP theo CH.
    */
-  async exportUnitPriceExcel(branchId: string): Promise<void> {
+  buildExcelFilterParams(filter?: StoreProductFilterValues): Record<string, unknown> {
+    if (!filter) return {};
+    const skus = filter.skus?.filter(Boolean) ?? [];
+    const names = filter.names?.filter(Boolean) ?? [];
+    const branchCodes = filter.storeCodes?.filter(Boolean) ?? [];
+    const branchNames = filter.storeNames?.filter(Boolean) ?? [];
+    const supplierCodes = filter.supplierCodes?.filter(Boolean) ?? [];
+    const supplierNames = filter.supplierNames?.filter(Boolean) ?? [];
+
+    return {
+      SearchTerm: !names.length && filter.searchTerm?.trim() ? filter.searchTerm.trim() : undefined,
+      Skus: skus.length ? skus : undefined,
+      Names: names.length ? names : undefined,
+      BranchCodes: branchCodes.length ? branchCodes : undefined,
+      BranchNames: branchNames.length ? branchNames : undefined,
+      SupplierCodes: supplierCodes.length ? supplierCodes : undefined,
+      SupplierNames: supplierNames.length ? supplierNames : undefined,
+      Status: filter.statusFilter && filter.statusFilter !== 'ALL' ? filter.statusFilter : undefined,
+      StockAlertFilter:
+        filter.stockAlertFilter && filter.stockAlertFilter !== 'ALL'
+          ? filter.stockAlertFilter
+          : undefined,
+    };
+  },
+
+  serializeExcelParams(params: Record<string, unknown>): string {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (item !== undefined && item !== null && String(item).trim() !== '') {
+            search.append(key, String(item));
+          }
+        });
+        return;
+      }
+      search.append(key, String(value));
+    });
+    return search.toString();
+  },
+
+  /**
+   * Xuất Excel SP đã gán chi nhánh theo bộ lọc màn hình (giá bán theo từng ĐVT).
+   */
+  async exportUnitPriceExcel(
+    branchId: string,
+    filter?: StoreProductFilterValues
+  ): Promise<void> {
     try {
+      const params = storeProductApi.buildExcelFilterParams(filter);
       const res = await httpClient.get(`/branches/${branchId}/products/export`, {
         responseType: 'blob',
+        params,
+        paramsSerializer: (p) => storeProductApi.serializeExcelParams(p as Record<string, unknown>),
       });
       const contentType = String(res.headers?.['content-type'] || '');
       if (contentType.includes('application/json')) {
@@ -259,7 +310,7 @@ export const storeProductApi = {
       const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition);
       const fileName = match
         ? decodeURIComponent(match[1].replace(/"/g, ''))
-        : `CH_GiaBan_DVT_${branchId}.xlsx`;
+        : `SP_Theo_CH_${branchId}.xlsx`;
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -274,27 +325,48 @@ export const storeProductApi = {
         try {
           const text = await err.response.data.text();
           const parsed = JSON.parse(text);
-          throw new Error(parsed?.message || err.message || 'Không thể xuất Excel.');
+          const msg =
+            parsed?.detail ||
+            parsed?.message ||
+            parsed?.title ||
+            err.message ||
+            'Không thể xuất Excel.';
+          if (String(parsed?.code || parsed?.errorCode || '').toUpperCase() === 'SUBSCRIPTION_REQUIRED') {
+            window.dispatchEvent(
+              new CustomEvent('subscription-required', {
+                detail: { code: 'SUBSCRIPTION_REQUIRED', message: msg },
+              })
+            );
+          }
+          throw new Error(msg);
         } catch (inner: any) {
           if (inner?.message) throw inner;
         }
       }
-      throw new Error(err?.response?.data?.message || err?.message || 'Không thể xuất Excel.');
+      const data = err?.response?.data;
+      throw new Error(data?.detail || data?.message || err?.message || 'Không thể xuất Excel.');
     }
   },
 
   /**
-   * Import Excel — BE validate + override giá bán theo ĐVT.
+   * Import Excel — BE validate theo bộ lọc màn hình + override giá bán theo ĐVT.
    */
   async importUnitPriceExcel(
     branchId: string,
-    file: File
+    file: File,
+    filter?: StoreProductFilterValues
   ): Promise<StoreProductExcelImportResult> {
     const form = new FormData();
     form.append('file', file);
+    const params = storeProductApi.buildExcelFilterParams(filter);
     const res = await httpClient.post<ApiResponse<StoreProductExcelImportResult>>(
       `/branches/${branchId}/products/import`,
-      form
+      form,
+      {
+        params,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        paramsSerializer: (p) => storeProductApi.serializeExcelParams(p as Record<string, unknown>),
+      }
     );
     if (res.data?.success && res.data.data) {
       return res.data.data;

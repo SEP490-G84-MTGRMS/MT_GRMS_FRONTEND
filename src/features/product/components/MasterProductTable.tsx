@@ -168,35 +168,39 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
     }
   };
 
-  /** Width cố định theo % — ưu tiên cột Đơn vị / Giá bán (nội dung dài); cột hẹp không bị đè mất. */
+  /** Cột % tổng 100% — fit viewport, không ép min-width → không scroll ngang màn hình. */
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: 44 }} />
-      <col style={{ width: 52 }} />
+      <col style={{ width: '3.5%' }} />
+      <col style={{ width: '5%' }} />
       <col style={{ width: showCost ? '9%' : '10%' }} />
-      <col style={{ width: showCost ? '14%' : '16%' }} />
-      <col style={{ width: showCost ? '13%' : '15%' }} />
-      <col style={{ width: 78 }} />
-      <col style={{ width: showCost ? '20%' : '22%' }} />
-      {showCost && <col style={{ width: '10%' }} />}
-      <col style={{ width: 104 }} />
-      <col style={{ width: 96 }} />
-      <col style={{ width: 88 }} />
+      <col style={{ width: showCost ? '15%' : '17%' }} />
+      <col style={{ width: showCost ? '12%' : '14%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: showCost ? '16%' : '18%' }} />
+      {showCost && <col style={{ width: '9%' }} />}
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: showCost ? '6.5%' : '8.5%' }} />
     </colgroup>
   );
 
-  const tableMinWidth = showCost ? 1280 : 1160;
+  const tableFitStyle: CSSProperties = {
+    width: '100%',
+    minWidth: 0,
+    tableLayout: 'fixed',
+  };
 
   const colSpan = showCost ? 11 : 10;
 
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card so-list-table-card--fit">
       <div
         ref={headerRef}
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: tableMinWidth }}>
+        <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
           <thead>
             <tr>
@@ -277,7 +281,7 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
       >
-        <table className="so-list-table" style={{ minWidth: tableMinWidth }}>
+        <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
           <tbody>
             {sortedProducts.length > 0 ? (

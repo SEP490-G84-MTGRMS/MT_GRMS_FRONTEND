@@ -351,42 +351,28 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       }
     }
 
-    setUnitRows((prev) => {
-      const baseRow = prev.find((r) => r.isBaseUnit) || prev[0];
-      const baseId = baseRow?.id || 'base';
-      const updatedBase: FormUnitRow = {
-        ...baseRow,
-        id: baseId,
-        unitName: masterSuggestion.baseUnit || baseRow?.unitName || '',
-        sellingPrice:
-          masterSuggestion.suggestedRetailPrice && (!baseRow?.sellingPrice || baseRow.sellingPrice === 0)
-            ? masterSuggestion.suggestedRetailPrice
-            : (baseRow?.sellingPrice || 0),
-        isBaseUnit: true,
-        isPurchaseUnit: baseRow?.isPurchaseUnit ?? true,
+    setUnitRows((previousRows) => {
+      const currentBase = previousRows.find((row) => row.isBaseUnit)
+        ?? createUnitRow({ isBaseUnit: true, isPurchaseUnit: true });
+      const basePrice = masterSuggestion.suggestedRetailPrice && currentBase.sellingPrice === 0
+        ? masterSuggestion.suggestedRetailPrice
+        : currentBase.sellingPrice;
+      const baseRow: FormUnitRow = {
+        ...currentBase,
+        unitName: masterSuggestion.baseUnit || currentBase.unitName,
+        sellingPrice: basePrice,
       };
-
-      const extraRows: FormUnitRow[] =
-        masterSuggestion.units && masterSuggestion.units.length > 0
-          ? masterSuggestion.units.map((u, i) => {
-              const rate = u.conversionRate > 0 ? u.conversionRate : 1;
-              const price = masterSuggestion.suggestedRetailPrice
-                ? Math.round(masterSuggestion.suggestedRetailPrice * rate)
-                : updatedBase.sellingPrice * rate;
-              return createUnitRow({
-                id: `master-uom-${Date.now()}-${i}`,
-                unitName: u.unitName,
-                convertsToQty: rate,
-                convertsToId: baseId,
-                barcode: u.barcode || '',
-                sellingPrice: price,
-                isBaseUnit: false,
-                isPurchaseUnit: Boolean(u.isPurchaseUnit),
-              });
-            })
-          : prev.filter((r) => !r.isBaseUnit);
-
-      return [updatedBase, ...extraRows];
+      const suggestedUnits = (masterSuggestion.units || [])
+        .filter((unit) => unit.unitName.trim().toLowerCase() !== baseRow.unitName.trim().toLowerCase())
+        .map((unit) => createUnitRow({
+          unitName: unit.unitName,
+          convertsToQty: unit.conversionRate,
+          convertsToId: baseRow.id,
+          barcode: unit.barcode || '',
+          sellingPrice: basePrice > 0 ? Math.round(basePrice * unit.conversionRate) : 0,
+          isPurchaseUnit: Boolean(unit.isPurchaseUnit),
+        }));
+      return [baseRow, ...suggestedUnits];
     });
 
     setMasterSuggestion(null);

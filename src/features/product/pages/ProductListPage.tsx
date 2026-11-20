@@ -9,7 +9,7 @@ import {
   Store,
   Loader2,
 } from 'lucide-react';
-import type { ProductItem, Category, UomConversion } from '../types';
+import type { ProductItem, Category, UomConversion, ProductResponse } from '../types';
 import { categoryApi } from '../api/categoryApi';
 import { CategoryModal } from '../components/CategoryModal';
 import { ProductFormModal } from '../components/ProductFormModal';
@@ -35,6 +35,52 @@ const DEFAULT_PRODUCT_FILTERS: MasterProductFilterValues = {
   statusFilter: 'ALL',
 };
 
+type ExcelRecord = Record<string, unknown>;
+
+const excelCell = (row: ExcelRecord, ...headers: string[]): string => {
+  for (const header of headers) {
+    const value = row[header];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value).trim();
+    }
+  }
+  return '';
+};
+
+const excelNumber = (value: string, fallback = 0): number => {
+  if (!value) return fallback;
+  const numericText = value.trim().replace(/[^0-9,.-]/g, '');
+  if (!numericText) return fallback;
+
+  const lastComma = numericText.lastIndexOf(',');
+  const lastDot = numericText.lastIndexOf('.');
+  let normalized = numericText;
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    const decimalSeparator = lastComma > lastDot ? ',' : '.';
+    const thousandsSeparator = decimalSeparator === ',' ? '.' : ',';
+    normalized = numericText
+      .split(thousandsSeparator).join('')
+      .replace(decimalSeparator, '.');
+  } else if (lastComma >= 0 || lastDot >= 0) {
+    const separator = lastComma >= 0 ? ',' : '.';
+    const separatorIndex = numericText.lastIndexOf(separator);
+    const decimalDigits = numericText.length - separatorIndex - 1;
+    const looksLikeThousands = decimalDigits === 3 && /^-?\d{1,3}([.,]\d{3})+$/.test(numericText);
+    normalized = looksLikeThousands
+      ? numericText.split(separator).join('')
+      : numericText.replace(separator, '.');
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const excelBoolean = (value: string, fallback = false): boolean => {
+  if (!value) return fallback;
+  return ['1', 'true', 'yes', 'có', 'co', 'x'].includes(removeVietnameseTones(value));
+};
+
 // Hàm chuẩn hóa tiếng Việt loại bỏ dấu thanh & ký tự đặc biệt phục vụ tìm kiếm thông minh
 const removeVietnameseTones = (str?: string | null): string => {
   if (!str) return '';
@@ -55,6 +101,7 @@ export const ProductListPage: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(20);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [excelBusy, setExcelBusy] = useState<boolean>(false);
 
   // RBAC switch (StoreOwner vs Staff) for BR-SEC-01 verification
   const currentUser = useAuthStore((state) => state.user);
@@ -164,6 +211,9 @@ export const ProductListPage: React.FC = () => {
               baseUnit: p.baseUnit || (p as any).unitName || 'Cái',
               sellingPrice: p.sellingPrice ?? (p as any).basePrice ?? 0,
               costPrice: p.costPrice != null ? Number(p.costPrice) : null,
+              minStock: p.minStock ?? 0,
+              maxStock: p.maxStock ?? 1000,
+              vatRate: p.vatRate ?? 0,
               onHand: 0,
               committed: 0,
               status: (p.status === 'Active' ? 'Active' : 'Discontinued') as 'Active' | 'Discontinued',
@@ -178,6 +228,7 @@ export const ProductListPage: React.FC = () => {
               isFavorite: Boolean(p.isFavorite),
               hasBatches: Boolean(p.hasBatches),
               allowRepack: Boolean((p as { allowRepack?: boolean }).allowRepack),
+              sellRawByWeight: p.sellRawByWeight ?? true,
               processedSellingPricePerKg:
                 (p as { processedSellingPricePerKg?: number | null }).processedSellingPricePerKg ?? null,
               eligibleForVatReduction: Boolean((p as any).eligibleForVatReduction),
@@ -330,6 +381,9 @@ export const ProductListPage: React.FC = () => {
           barcode: data.barcode?.trim() || undefined,
           baseUnit: data.baseUnit?.trim() || productToEdit.baseUnit || 'Cái',
           costPrice: data.costPrice,
+          minStock: data.minStock ?? productToEdit.minStock ?? 0,
+          maxStock: data.maxStock ?? productToEdit.maxStock ?? 1000,
+          vatRate: data.vatRate ?? productToEdit.vatRate ?? 0,
           status: data.status || productToEdit.status,
           imageUrl: data.imageUrl,
           imageUrls: data.imageUrls || (data.imageUrl ? [data.imageUrl] : []),
@@ -343,7 +397,9 @@ export const ProductListPage: React.FC = () => {
               ? data.processedSellingPricePerKg
               : productToEdit.processedSellingPricePerKg ?? null,
           eligibleForVatReduction: data.eligibleForVatReduction ?? productToEdit.eligibleForVatReduction ?? false,
-          isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit,
+          taxCategory: data.taxCategory ?? productToEdit.taxCategory ?? 'STANDARD_1PCT',
+          sellRawByWeight: data.sellRawByWeight ?? productToEdit.sellRawByWeight ?? true,
+          isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit ?? productToEdit.isBaseUnitPurchaseUnit,
         });
 
         // 1. Xóa các đơn vị quy đổi đã bị người dùng gỡ bỏ qua DELETE /api/product-units/{id}
@@ -422,6 +478,9 @@ export const ProductListPage: React.FC = () => {
           barcode: data.barcode?.trim() || undefined,
           baseUnit: data.baseUnit?.trim() || 'Cái',
           costPrice: data.costPrice,
+          minStock: data.minStock ?? 0,
+          maxStock: data.maxStock ?? 1000,
+          vatRate: data.vatRate ?? 0,
           imageUrl: data.imageUrl,
           imageUrls: data.imageUrls || (data.imageUrl ? [data.imageUrl] : []),
           description: data.description,
@@ -431,6 +490,9 @@ export const ProductListPage: React.FC = () => {
           hasBatches: data.hasBatches ?? false,
           allowRepack: data.allowRepack ?? false,
           processedSellingPricePerKg: data.processedSellingPricePerKg ?? null,
+          eligibleForVatReduction: data.eligibleForVatReduction ?? false,
+          taxCategory: data.taxCategory ?? 'STANDARD_1PCT',
+          sellRawByWeight: data.sellRawByWeight ?? true,
           isBaseUnitPurchaseUnit: data.isBaseUnitPurchaseUnit ?? true,
         });
 
@@ -547,26 +609,48 @@ export const ProductListPage: React.FC = () => {
     }
   };
 
-  const handleToggleStatus = (product: ProductItem) => {
+  const handleToggleStatus = async (product: ProductItem) => {
     const nextStatus = product.status === 'Active' ? 'Discontinued' : 'Active';
-    setProducts(
-      products.map((p) => (p.id === product.id ? { ...p, status: nextStatus } : p))
-    );
-    showToast(
-      `Đã chuyển trạng thái sản phẩm sang: ${nextStatus === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}`
-    );
-    if (selectedProduct && selectedProduct.id === product.id) {
-      setSelectedProduct({ ...selectedProduct, status: nextStatus });
+    try {
+      await productApi.updateProduct(product.id, {
+        name: product.productName,
+        categoryId: product.categoryId,
+        sellingPrice: product.sellingPrice,
+        barcode: product.barcode?.trim() || undefined,
+        baseUnit: product.baseUnit || 'Cái',
+        costPrice: product.costPrice,
+        minStock: product.minStock ?? 0,
+        maxStock: product.maxStock ?? 1000,
+        vatRate: product.vatRate ?? 0,
+        status: nextStatus,
+        imageUrl: product.imageUrl,
+        imageUrls: product.imageUrls,
+        description: product.description,
+        internalNote: product.internalNote,
+        isFavorite: product.isFavorite ?? false,
+        hasBatches: product.hasBatches ?? false,
+        allowRepack: product.allowRepack ?? false,
+        processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
+        eligibleForVatReduction: product.eligibleForVatReduction ?? false,
+        taxCategory: product.taxCategory ?? 'STANDARD_1PCT',
+        sellRawByWeight: product.sellRawByWeight ?? true,
+        isBaseUnitPurchaseUnit: product.isBaseUnitPurchaseUnit,
+      });
+      setProducts((current) =>
+        current.map((item) => (item.id === product.id ? { ...item, status: nextStatus } : item))
+      );
+      if (selectedProduct?.id === product.id) {
+        setSelectedProduct({ ...selectedProduct, status: nextStatus });
+      }
+      showToast(
+        `Đã chuyển trạng thái sản phẩm sang: ${nextStatus === 'Active' ? 'Đang bán' : 'Ngừng kinh doanh'}`
+      );
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || err?.message || 'Không thể đổi trạng thái sản phẩm.', 'error');
     }
   };
 
   const handleToggleHasBatches = async (product: ProductItem, nextVal: boolean) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === product.id ? { ...p, hasBatches: nextVal } : p))
-    );
-    if (selectedProduct && selectedProduct.id === product.id) {
-      setSelectedProduct({ ...selectedProduct, hasBatches: nextVal });
-    }
     try {
       await productApi.updateProduct(product.id, {
         name: product.productName,
@@ -575,6 +659,9 @@ export const ProductListPage: React.FC = () => {
         barcode: product.barcode?.trim() || undefined,
         baseUnit: product.baseUnit?.trim() || 'Cái',
         costPrice: product.costPrice ?? undefined,
+        minStock: product.minStock ?? 0,
+        maxStock: product.maxStock ?? 1000,
+        vatRate: product.vatRate ?? 0,
         status: product.status,
         imageUrl: product.imageUrl,
         imageUrls: product.imageUrls || (product.imageUrl ? [product.imageUrl] : []),
@@ -582,31 +669,73 @@ export const ProductListPage: React.FC = () => {
         internalNote: product.internalNote,
         isFavorite: Boolean(product.isFavorite),
         hasBatches: nextVal,
+        allowRepack: product.allowRepack ?? false,
+        processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
         eligibleForVatReduction: Boolean(product.eligibleForVatReduction),
+        taxCategory: product.taxCategory ?? 'STANDARD_1PCT',
+        sellRawByWeight: product.sellRawByWeight ?? true,
+        isBaseUnitPurchaseUnit: product.isBaseUnitPurchaseUnit,
       });
+      setProducts((prev) =>
+        prev.map((p) => (p.id === product.id ? { ...p, hasBatches: nextVal } : p))
+      );
+      if (selectedProduct && selectedProduct.id === product.id) {
+        setSelectedProduct({ ...selectedProduct, hasBatches: nextVal });
+      }
       showToast(
         nextVal
           ? `Đã bật quản lý theo lô & HSD cho "${product.productName}"`
           : `Đã tắt quản lý theo lô & HSD cho "${product.productName}"`
       );
     } catch (err: any) {
-      console.warn('Lỗi khi cập nhật trạng thái quản lý theo lô:', err);
+      showToast(
+        err?.response?.data?.message || err?.message || 'Không thể cập nhật trạng thái quản lý theo lô.',
+        'error'
+      );
     }
   };
 
-  const handleDuplicateProduct = (product: ProductItem) => {
-    const cloned: ProductItem = {
-      ...product,
-      id: `prod-copy-${Date.now()}`,
-      productCode: `SP${Math.floor(100000 + Math.random() * 900000)}`,
-      barcode: `893${Math.floor(100000000 + Math.random() * 900000000)}`,
-      productName: `${product.productName} (Bản sao)`,
-      createdAt: new Date().toLocaleDateString('vi-VN'),
-      rawCreatedAt: new Date().toISOString(),
-    };
-    setProducts([cloned, ...products]);
-    showToast(`Đã sao chép thành công sản phẩm: ${cloned.productName}`);
-    setIsDetailModalOpen(false);
+  const handleDuplicateProduct = async (product: ProductItem) => {
+    try {
+      const created = await productApi.createProduct({
+        name: `${product.productName} (Bản sao)`,
+        categoryId: product.categoryId,
+        sellingPrice: product.sellingPrice,
+        baseUnit: product.baseUnit || 'Cái',
+        costPrice: product.costPrice,
+        minStock: product.minStock ?? 0,
+        maxStock: product.maxStock ?? 1000,
+        vatRate: product.vatRate ?? 0,
+        status: product.status,
+        imageUrl: product.imageUrl,
+        imageUrls: product.imageUrls,
+        description: product.description,
+        internalNote: product.internalNote,
+        isFavorite: product.isFavorite ?? false,
+        hasBatches: product.hasBatches ?? false,
+        allowRepack: product.allowRepack ?? false,
+        processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
+        eligibleForVatReduction: product.eligibleForVatReduction ?? false,
+        taxCategory: product.taxCategory ?? 'STANDARD_1PCT',
+        sellRawByWeight: product.sellRawByWeight ?? true,
+        isBaseUnitPurchaseUnit: product.isBaseUnitPurchaseUnit ?? true,
+      });
+      for (const unit of product.uomConversions || []) {
+        await productApi.createProductUnit(created.id, {
+          unitName: unit.unitName,
+          conversionRate: unit.conversionRate,
+          price: unit.price,
+          barcode: null,
+          isBaseUnit: false,
+          isPurchaseUnit: unit.isPurchaseUnit ?? false,
+        });
+      }
+      await fetchProducts();
+      showToast(`Đã sao chép thành công sản phẩm: ${created.name}`);
+      setIsDetailModalOpen(false);
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || err?.message || 'Không thể sao chép sản phẩm.', 'error');
+    }
   };
 
   // Lọc client theo multi-token / status (API đã lọc 1 keyword + category)
@@ -647,14 +776,275 @@ export const ProductListPage: React.FC = () => {
 
 
 
-  // Export mock
-  const handleExport = () => {
-    showToast(`Đang xuất file Excel cho ${filteredProducts.length} sản phẩm...`);
+  const buildExcelApiFilter = () => {
+    const searchBits = [
+      ...appliedFilters.skus,
+      ...appliedFilters.names,
+      ...appliedFilters.barcodes,
+    ].filter(Boolean);
+
+    return {
+      searchTerm: searchBits[0] || undefined,
+      categoryId: appliedFilters.categoryId !== 'ALL' ? appliedFilters.categoryId : undefined,
+      categoryIds: appliedFilters.categoryId !== 'ALL' ? [appliedFilters.categoryId] : undefined,
+      status: appliedFilters.statusFilter !== 'ALL' ? appliedFilters.statusFilter : undefined,
+    };
   };
 
-  // Import mock
-  const handleImport = () => {
-    showToast('Chọn file Excel (.xlsx) để import danh mục hàng hóa.');
+  const handleExport = async () => {
+    setExcelBusy(true);
+    try {
+      const XLSX = await import('xlsx-js-style');
+      const exportProducts = await productApi.getAllProducts(buildExcelApiFilter());
+      if (exportProducts.length === 0) {
+        showToast('Không có sản phẩm phù hợp để xuất Excel.', 'warning');
+        return;
+      }
+
+      const rows = exportProducts.map((product) => ({
+        'Mã hàng': product.productCode,
+        'Tên hàng (*)': product.name,
+        'Mã nhóm hàng (*)': categories.find((item) => item.id === product.categoryId)?.code || product.categoryId,
+        'Tên nhóm hàng': product.categoryName,
+        'Mã vạch': product.barcode || '',
+        'ĐVT cơ bản': product.baseUnit || 'Cái',
+        'Giá bán': product.sellingPrice ?? 0,
+        'Giá vốn': product.costPrice ?? '',
+        'Tồn tối thiểu': product.minStock ?? 0,
+        'Tồn tối đa': product.maxStock ?? 0,
+        'Trạng thái': product.status || 'Active',
+        'Quản lý lô': product.hasBatches ? 'Có' : 'Không',
+        'Cho phép đóng gói lại': product.allowRepack ? 'Có' : 'Không',
+        'Giá bán hàng đóng gói/kg': product.processedSellingPricePerKg ?? '',
+        'Mô tả': product.description || '',
+        'Ghi chú nội bộ': product.internalNote || '',
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet['!cols'] = [
+        { wch: 18 }, { wch: 32 }, { wch: 20 }, { wch: 24 }, { wch: 18 },
+        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
+        { wch: 16 }, { wch: 14 }, { wch: 22 }, { wch: 24 }, { wch: 32 }, { wch: 32 },
+      ];
+      const tableRange = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
+      const thinBorder = {
+        top: { style: 'thin', color: { rgb: 'CBD5E1' } },
+        bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+        left: { style: 'thin', color: { rgb: 'CBD5E1' } },
+        right: { style: 'thin', color: { rgb: 'CBD5E1' } },
+      };
+
+      for (let rowIndex = tableRange.s.r; rowIndex <= tableRange.e.r; rowIndex += 1) {
+        for (let columnIndex = tableRange.s.c; columnIndex <= tableRange.e.c; columnIndex += 1) {
+          const address = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+          const cell = worksheet[address];
+          if (!cell) continue;
+
+          if (rowIndex === 0) {
+            cell.s = {
+              font: { name: 'Aptos', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+              fill: { patternType: 'solid', fgColor: { rgb: '0F766E' } },
+              alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+              border: thinBorder,
+            };
+          } else {
+            const isEvenRow = rowIndex % 2 === 0;
+            cell.s = {
+              font: { name: 'Aptos', sz: 10, color: { rgb: '0F172A' } },
+              fill: {
+                patternType: 'solid',
+                fgColor: { rgb: isEvenRow ? 'F0FDFA' : 'FFFFFF' },
+              },
+              alignment: {
+                horizontal: [6, 7, 8, 9, 13].includes(columnIndex) ? 'right' : 'left',
+                vertical: 'center',
+                wrapText: [1, 3, 14, 15].includes(columnIndex),
+              },
+              border: thinBorder,
+            };
+
+            if ([6, 7, 13].includes(columnIndex) && cell.v !== '') {
+              cell.z = '#,##0 [$₫-vi-VN]';
+            } else if ([8, 9].includes(columnIndex) && cell.v !== '') {
+              cell.z = '#,##0';
+            }
+
+            if (columnIndex === 10) {
+              const active = String(cell.v).toLowerCase() === 'active';
+              cell.s.font = {
+                name: 'Aptos',
+                sz: 10,
+                bold: true,
+                color: { rgb: active ? '047857' : 'B91C1C' },
+              };
+              cell.s.alignment = { horizontal: 'center', vertical: 'center' };
+            }
+          }
+        }
+      }
+
+      worksheet['!rows'] = Array.from({ length: rows.length + 1 }, (_, index) => ({
+        hpt: index === 0 ? 34 : 24,
+      }));
+      (worksheet as typeof worksheet & { '!autofilter'?: { ref: string } })['!autofilter'] = {
+        ref: XLSX.utils.encode_range(tableRange),
+      };
+      (worksheet as typeof worksheet & { '!views'?: Array<Record<string, unknown>> })['!views'] = [
+        { state: 'frozen', xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft' },
+      ];
+      const workbook = XLSX.utils.book_new();
+      workbook.Props = {
+        Title: 'Danh mục hàng hóa',
+        Subject: 'Danh mục hàng hóa MT-GRMS',
+        Author: 'MT-GRMS',
+        CreatedDate: new Date(),
+      };
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'DanhMucHangHoa');
+      XLSX.writeFile(workbook, `DanhMucHangHoa_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast(`Đã xuất ${exportProducts.length} sản phẩm ra Excel.`, 'success');
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Không thể xuất file Excel.';
+      showToast(message, 'error');
+    } finally {
+      setExcelBusy(false);
+    }
+  };
+
+  const handleImport = async (file: File) => {
+    setExcelBusy(true);
+    try {
+      const XLSX = await import('xlsx-js-style');
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) throw new Error('File Excel không có sheet dữ liệu.');
+
+      const rows = XLSX.utils.sheet_to_json<ExcelRecord>(workbook.Sheets[firstSheetName], {
+        defval: '',
+        // Giữ giá trị số gốc; raw:false sẽ biến ô có format VNĐ thành chuỗi "12.000 ₫".
+        raw: true,
+      });
+      if (rows.length === 0) throw new Error('File Excel không có dòng sản phẩm nào.');
+
+      const existingProducts = await productApi.getAllProducts();
+      const productsByCode = new Map(
+        existingProducts.map((product) => [product.productCode.trim().toLowerCase(), product])
+      );
+      const categoriesByKey = new Map<string, Category>();
+      categories.forEach((category) => {
+        categoriesByKey.set(category.id.toLowerCase(), category);
+        if (category.code) categoriesByKey.set(category.code.trim().toLowerCase(), category);
+        categoriesByKey.set(removeVietnameseTones(category.name), category);
+      });
+
+      let successCount = 0;
+      const failures: string[] = [];
+
+      for (let index = 0; index < rows.length; index += 1) {
+        const row = rows[index];
+        const excelRow = index + 2;
+        const productCode = excelCell(row, 'Mã hàng', 'Ma hang', 'ProductCode');
+        const name = excelCell(row, 'Tên hàng (*)', 'Tên hàng', 'Ten hang', 'Name');
+        const categoryValue = excelCell(
+          row,
+          'Mã nhóm hàng (*)',
+          'Mã nhóm hàng',
+          'Tên nhóm hàng',
+          'CategoryCode',
+          'Category'
+        );
+        const category = categoriesByKey.get(categoryValue.toLowerCase())
+          || categoriesByKey.get(removeVietnameseTones(categoryValue));
+
+        if (!name) {
+          failures.push(`Dòng ${excelRow}: thiếu Tên hàng.`);
+          continue;
+        }
+        if (!category) {
+          failures.push(`Dòng ${excelRow}: nhóm hàng "${categoryValue || '(trống)'}" không tồn tại.`);
+          continue;
+        }
+
+        const existing: ProductResponse | undefined = productCode
+          ? productsByCode.get(productCode.toLowerCase())
+          : undefined;
+        const statusText = excelCell(row, 'Trạng thái', 'Status');
+        const status = statusText
+          ? (['inactive', 'discontinued', 'ngung kinh doanh'].includes(removeVietnameseTones(statusText))
+              ? 'Discontinued'
+              : 'Active')
+          : (existing?.status || 'Active');
+
+        try {
+          const commonPayload = {
+            name,
+            categoryId: category.id,
+            sellingPrice: excelNumber(excelCell(row, 'Giá bán', 'Gia ban', 'SellingPrice'), existing?.sellingPrice ?? 0),
+            barcode: excelCell(row, 'Mã vạch', 'Ma vach', 'Barcode') || existing?.barcode || undefined,
+            baseUnit: excelCell(row, 'ĐVT cơ bản', 'DVT co ban', 'BaseUnit') || existing?.baseUnit || 'Cái',
+            costPrice: excelNumber(excelCell(row, 'Giá vốn', 'Gia von', 'CostPrice'), existing?.costPrice ?? 0),
+            minStock: excelNumber(excelCell(row, 'Tồn tối thiểu', 'Ton toi thieu', 'MinStock'), existing?.minStock ?? 0),
+            maxStock: excelNumber(excelCell(row, 'Tồn tối đa', 'Ton toi da', 'MaxStock'), existing?.maxStock ?? 1000),
+            vatRate: existing?.vatRate ?? 0,
+            status,
+            description: excelCell(row, 'Mô tả', 'Mo ta', 'Description') || existing?.description || undefined,
+            internalNote: excelCell(row, 'Ghi chú nội bộ', 'Ghi chu noi bo', 'InternalNote') || existing?.internalNote || undefined,
+            hasBatches: excelBoolean(excelCell(row, 'Quản lý lô', 'Quan ly lo', 'HasBatches'), existing?.hasBatches ?? false),
+            allowRepack: excelBoolean(excelCell(row, 'Cho phép đóng gói lại', 'AllowRepack'), existing?.allowRepack ?? false),
+            processedSellingPricePerKg: excelNumber(
+              excelCell(row, 'Giá bán hàng đóng gói/kg', 'ProcessedSellingPricePerKg'),
+              existing?.processedSellingPricePerKg ?? 0
+            ) || null,
+            // Các field không có cột Excel phải được giữ nguyên khi update,
+            // tránh backend gán lại default và làm mất cấu hình hiện tại.
+            isFavorite: existing?.isFavorite ?? false,
+            eligibleForVatReduction: existing?.eligibleForVatReduction ?? false,
+            taxCategory: existing?.taxCategory ?? 'STANDARD_1PCT',
+            sellRawByWeight: existing?.sellRawByWeight ?? true,
+            isBaseUnitPurchaseUnit: existing?.isBaseUnitPurchaseUnit ?? true,
+          };
+
+          if (existing) {
+            const updated = await productApi.updateProduct(existing.id, commonPayload);
+            productsByCode.set(existing.productCode.toLowerCase(), updated);
+          } else {
+            const created = await productApi.createProduct({
+              ...commonPayload,
+              productCode: productCode || undefined,
+            });
+            productsByCode.set(created.productCode.toLowerCase(), created);
+          }
+          successCount += 1;
+        } catch (rowError: any) {
+          const message = rowError?.response?.data?.message || rowError?.message || 'Không thể lưu sản phẩm.';
+          failures.push(`Dòng ${excelRow}${productCode ? ` (${productCode})` : ''}: ${message}`);
+        }
+      }
+
+      await fetchCategories();
+      await fetchProducts();
+
+      const summary = `Import hoàn tất: ${successCount}/${rows.length} dòng thành công`;
+      setNotificationModal({
+        isOpen: true,
+        type: failures.length ? 'warning' : 'success',
+        title: failures.length ? 'Import Excel có dòng lỗi' : 'Import Excel thành công',
+        message: failures.length
+          ? `${summary}. ${failures.slice(0, 8).join(' | ')}${failures.length > 8 ? ` | Và ${failures.length - 8} lỗi khác.` : ''}`
+          : `${summary}.`,
+      });
+      showToast(summary, failures.length ? 'warning' : 'success');
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Không thể import file Excel.';
+      showToast(message, 'error');
+      setNotificationModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Import Excel thất bại',
+        message,
+      });
+    } finally {
+      setExcelBusy(false);
+    }
   };
 
   // Barcode Print mock
@@ -667,13 +1057,16 @@ export const ProductListPage: React.FC = () => {
       className="po-matrix-container"
       style={{
         width: '100%',
+        maxWidth: '100%',
         height: '100%',
         maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        minWidth: 0,
         flex: 1,
         overflow: 'hidden',
+        boxSizing: 'border-box',
       }}
     >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
@@ -682,7 +1075,7 @@ export const ProductListPage: React.FC = () => {
         <div>
           <h1 className="so-list-title">
             <Layers size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Hàng hóa (Master)</span>
+            <span>Hàng hóa</span>
             {isLoading && (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
             )}
@@ -728,7 +1121,7 @@ export const ProductListPage: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+      <div style={{ flexShrink: 0, marginBottom: 8, minWidth: 0, maxWidth: '100%' }}>
         <MasterProductFilterBar
           initialValues={appliedFilters}
           products={products}
@@ -743,6 +1136,7 @@ export const ProductListPage: React.FC = () => {
           }}
           onExport={handleExport}
           onImport={handleImport}
+          excelBusy={excelBusy}
           onPrintBarcode={handlePrintBarcode}
         />
       </div>

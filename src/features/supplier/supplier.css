@@ -93,6 +93,38 @@
   background: transparent;
 }
 
+/* Supplier-product matrix: preserve readable column widths and use horizontal
+   scrolling instead of squeezing business labels into ellipses. */
+.supplier-product-data-table {
+  min-width: 1562px !important;
+}
+
+.supplier-product-data-table thead th {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.35;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.supplier-product-data-table tbody td.so-list-td--wrap,
+.supplier-product-data-table tbody td.supplier-product-cell--wrap {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.supplier-product-data-table tbody td.so-list-td--status {
+  min-width: 120px;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
 /* Ô chip filter: cố định chiều cao, cuộn ngang khi nhiều giá trị */
 .supplier-chip-input {
   height: 32px;

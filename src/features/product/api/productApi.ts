@@ -71,6 +71,20 @@ export const productApi = {
     };
   },
 
+  /** Lấy toàn bộ danh mục theo filter, dùng cho xuất/đối chiếu Excel. */
+  async getAllProducts(filter: ProductQueryFilter = {}): Promise<ProductResponse[]> {
+    const pageSize = 200;
+    const firstPage = await this.getProductsPaged({ ...filter, pageIndex: 1, pageSize });
+    const items = [...firstPage.items];
+
+    for (let pageIndex = 2; pageIndex <= firstPage.totalPages; pageIndex += 1) {
+      const page = await this.getProductsPaged({ ...filter, pageIndex, pageSize });
+      items.push(...page.items);
+    }
+
+    return items;
+  },
+
   /**
    * Tạo mới một hàng hóa trên Backend
    * Endpoint Backend: POST /api/products

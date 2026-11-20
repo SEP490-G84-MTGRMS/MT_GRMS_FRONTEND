@@ -58,7 +58,7 @@ export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClo
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <FileSpreadsheet size={20} />
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>Kết quả import giá bán theo ĐVT</div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>Kết quả import Excel giá bán</div>
               <div style={{ fontSize: 12, opacity: 0.92 }}>
                 {result.fileName} — {result.branchCode} {result.branchName} —{' '}
                 {result.summary.successCount}/{result.summary.totalRows} thành công

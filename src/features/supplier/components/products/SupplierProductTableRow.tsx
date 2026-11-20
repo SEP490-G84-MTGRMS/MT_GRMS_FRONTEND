@@ -83,7 +83,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 3. SKU */}
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px' }}>
         <span
           style={{
             fontFamily: 'var(--font-mono, monospace)',
@@ -102,7 +102,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 4. Mã NCC */}
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px' }}>
         <span
           style={{
             fontFamily: 'var(--font-mono, monospace)',
@@ -121,7 +121,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 7. Ngành Hàng */}
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
+      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px' }}>
         <span
           style={{
             fontSize: 12,
@@ -134,14 +134,14 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 8. Đơn vị nhập */}
-      <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px', textAlign: 'center' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
           {item.deliveryUoM || item.baseUoM}
         </span>
       </td>
 
       {/* 9. Giá Nhập Sỉ */}
-      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px', textAlign: 'right' }}>
         {(() => {
           const isFromMaster = !(item.agreedPrice > 0) && (item.effectivePrice ?? 0) > 0;
           return (
@@ -161,7 +161,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 10. MOQ */}
-      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px', textAlign: 'right' }}>
         <span
           style={{
             fontFamily: 'var(--font-mono, monospace)',
@@ -174,7 +174,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 11. Thiếu cho phép */}
-      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px', textAlign: 'right' }}>
         <span
           style={{
             fontFamily: 'var(--font-mono, monospace)',
@@ -187,7 +187,11 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 12. Trạng Thái */}
-      <td style={{ textAlign: 'center' }}>
+      <td
+        className="so-list-td--status"
+        style={{ textAlign: 'center', minWidth: 96 }}
+        title={item.status === 'Active' ? 'Hoạt động' : 'Tạm ngưng'}
+      >
         <SupplierStatusBadge status={item.status} />
       </td>
 

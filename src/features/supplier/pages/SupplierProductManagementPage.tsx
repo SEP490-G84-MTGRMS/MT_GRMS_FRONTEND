@@ -268,13 +268,13 @@ export const SupplierProductManagementPage: FC = () => {
     }
     setExcelBusy(true);
     try {
-      await supplierProductApi.exportPriceMoqExcel(supplierId);
-      showToast('Đã tải file Excel giá nhập sỉ & MOQ.', 'success');
+      await supplierProductApi.exportPriceMoqExcel(supplierId, appliedFilters);
+      showToast('Đã tải file Excel theo bộ lọc màn hình (giá nhập sỉ & MOQ).', 'success');
     } catch (err: any) {
       const msg =
         err?.response?.data?.message ||
         err?.message ||
-        'Không thể xuất Excel. Kiểm tra NCC có SP Active đã gán.';
+        'Không thể xuất Excel. Kiểm tra bộ lọc / SP đã gán NCC.';
       showToast(msg, 'error');
     } finally {
       setExcelBusy(false);
@@ -288,7 +288,11 @@ export const SupplierProductManagementPage: FC = () => {
     }
     setExcelBusy(true);
     try {
-      const result = await supplierProductApi.importPriceMoqExcel(supplierId, file);
+      const result = await supplierProductApi.importPriceMoqExcel(
+        supplierId,
+        file,
+        appliedFilters
+      );
       setImportResult(result);
       setIsImportResultOpen(true);
       if (result.summary.successCount > 0) {
@@ -391,6 +395,7 @@ export const SupplierProductManagementPage: FC = () => {
           initialValues={appliedFilters}
           suppliers={suppliers}
           products={products}
+          suggestionProducts={masterProducts}
           categories={availableCategories}
           totalCount={totalCount}
           filteredCount={products.length}
@@ -399,6 +404,7 @@ export const SupplierProductManagementPage: FC = () => {
           onExportExcel={handleExportExcel}
           onImportExcel={handleImportExcel}
           excelBusy={excelBusy}
+          fallbackSupplierId={currentSupplier?.id}
         />
       </div>
 
