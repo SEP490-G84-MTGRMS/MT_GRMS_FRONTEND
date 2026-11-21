@@ -36,6 +36,7 @@ export const PosShiftPage: FC = () => {
 
   // Quay về trang gọi (Work schedule hoặc POS checkout)
   const branchFromUrl = searchParams.get('branchId');
+  const linkedShiftId = searchParams.get('shiftId');
   const returnPath = location.pathname.startsWith('/employee/pos')
     ? '/employee/pos'
     : location.pathname.startsWith('/pos')
@@ -77,6 +78,29 @@ export const PosShiftPage: FC = () => {
   const [disputeReason, setDisputeReason] = useState<string>('');
   const [isSubmittingHandover, setIsSubmittingHandover] = useState<boolean>(false);
   const isOwnerOrAdmin = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
+
+  useEffect(() => {
+    if (!linkedShiftId || !isStoreOwner) return;
+    let active = true;
+    setSelectedDetailShift(null);
+    void posShiftApi.getShiftById(linkedShiftId).then((shift) => {
+      if (active) setSelectedDetailShift(shift);
+    }).catch(() => {
+      if (active) setErrorMessage('Không thể mở ca bán hàng từ thông báo.');
+    });
+    return () => { active = false; };
+  }, [linkedShiftId, isStoreOwner]);
+
+  const closeShiftDetail = () => {
+    setSelectedDetailShift(null);
+    if (linkedShiftId) {
+      setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete('shiftId');
+        return next;
+      }, { replace: true });
+    }
+  };
 
   // Chốt doanh thu bán lẻ cuối ngày của Chủ cửa hàng (tách riêng Đơn Chủ tự bán & Duyệt ca theo Ngày nghiệp vụ)
   const [ownerUnsettled, setOwnerUnsettled] = useState<OwnerUnsettledSummaryResponse | null>(null);
@@ -1330,7 +1354,7 @@ export const PosShiftPage: FC = () => {
       {selectedDetailShift && (
         <div
           className="pos-modal-overlay"
-          onClick={() => setSelectedDetailShift(null)}
+          onClick={closeShiftDetail}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1369,7 +1393,7 @@ export const PosShiftPage: FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedDetailShift(null)}
+                onClick={closeShiftDetail}
                 style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748B' }}
               >
                 <X size={20} />
@@ -1521,7 +1545,7 @@ export const PosShiftPage: FC = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18, borderTop: '1px solid #E2E8F0', paddingTop: 12 }}>
               <button
                 type="button"
-                onClick={() => setSelectedDetailShift(null)}
+                onClick={closeShiftDetail}
                 style={{
                   padding: '8px 18px',
                   borderRadius: 6,

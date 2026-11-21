@@ -61,6 +61,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/hubs/notifications': {
+        target: 'http://localhost:5232',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   test: {

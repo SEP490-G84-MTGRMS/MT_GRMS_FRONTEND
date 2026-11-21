@@ -135,4 +135,13 @@ describe('Finance overview unified contract', () => {
     expect(pnlSpy.mock.calls[1][0].presetPeriod).toBe('THIS_YEAR');
     expect(screen.getByTestId('location').textContent).toBe('/store-owner/finance?tab=pnl');
   });
+
+  it('opens the complete reporting week from a KPI notification across all branches', async () => {
+    const pnlSpy = vi.spyOn(reportsPnlService, 'getPnlReportData');
+    renderPage('/store-owner/finance?tab=pnl&startDate=2026-10-12&endDate=2026-10-18');
+
+    await waitFor(() => expect(pnlSpy).toHaveBeenCalledWith({
+      branchId: 'ALL', presetPeriod: 'CUSTOM', startDate: '2026-10-12', endDate: '2026-10-18',
+    }));
+  });
 });

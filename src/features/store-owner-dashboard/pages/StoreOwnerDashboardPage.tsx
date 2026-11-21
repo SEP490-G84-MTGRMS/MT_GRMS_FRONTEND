@@ -70,6 +70,19 @@ export const StoreOwnerDashboardPage = () => {
     {!loading && error && <div className="owner-dash-error" role="alert"><span>{error}</span><button type="button" onClick={() => { startLoad(); setReload((value) => value + 1); }}>Thử lại</button></div>}
 
     {data && !loading && <>
+      {data.tasks && data.tasks.length > 0 && (
+        <section className="owner-dash-card">
+          <div className="owner-dash-section-heading"><h2>Việc cần xử lý</h2></div>
+          <div className="owner-dash-issue-list">
+            {data.tasks.map((task) => (
+              <div key={task.actionUrl}>
+                <Link className="owner-dash-secondary-link" to={task.actionUrl}>{task.title}<ArrowRight size={15} /></Link>
+                <b>{task.code}</b>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="owner-dash-kpis">
         <article className="owner-dash-kpi"><div className="owner-dash-kpi-icon"><ChartNoAxesCombined size={19} /></div><p>Doanh thu thuần</p><strong>{money(data.sales.netRevenue)}</strong><small>{data.sales.revenueGrowthPercent === null ? 'Chưa đủ dữ liệu so sánh' : `${data.sales.revenueGrowthPercent > 0 ? '+' : ''}${number(data.sales.revenueGrowthPercent)}% so với kỳ trước`}</small></article>
         <article className="owner-dash-kpi"><div className="owner-dash-kpi-icon"><ShoppingCart size={19} /></div><p>Hóa đơn trong kỳ</p><strong>{number(data.sales.totalOrders)}</strong><small>Trung bình {money(data.sales.averageOrderValue)} / đơn</small></article>

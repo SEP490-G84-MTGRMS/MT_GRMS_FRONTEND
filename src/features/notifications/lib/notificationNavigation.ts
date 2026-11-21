@@ -20,7 +20,7 @@ const NOTIFICATION_TYPE_URL_MAP: Record<string, string> = {
  */
 export function resolveNotificationItemUrl(item: NotificationItem): string | null {
   const rawUrl = item.actionUrl?.trim();
-  if (rawUrl) {
+  if (rawUrl?.startsWith('/') && !rawUrl.startsWith('//') && !/[\\\u0000-\u001f]/.test(rawUrl)) {
     return LEGACY_URL_MAP[rawUrl] ?? rawUrl;
   }
 
