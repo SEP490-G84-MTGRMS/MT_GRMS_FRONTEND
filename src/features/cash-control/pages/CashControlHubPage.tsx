@@ -1857,10 +1857,10 @@ export const CashControlHubPage: FC = () => {
                                   fontWeight: 600,
                                   cursor: 'pointer',
                                 }}
-                                title="Xem Z-Report in nhiệt & đối soát tiền két"
+                                title="Xem phiếu kết ca in nhiệt & đối soát tiền két"
                               >
                                 <Printer size={13} />
-                                <span>Z-Report</span>
+                                <span>Phiếu kết ca</span>
                               </button>
 
                               {/* Nút Xem Chi Tiết Giao Dịch Thu/Chi Trong Ca */}
@@ -2626,17 +2626,17 @@ export const CashControlHubPage: FC = () => {
                     gap: 6,
                   }}
                 >
-                  <BarChart3 size={16} color="#0F766E" /> Báo Cáo Kết Toán Tiền Két (Z-Report):
+                  <BarChart3 size={16} color="#0F766E" /> Báo Cáo Kết Toán Tiền Két:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                   <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Vốn đầu ca (Opening Float):</div>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Vốn đầu ca:</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
                       {formatVND(selectedDetailShift.openingFloat)}
                     </div>
                   </div>
                   <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Doanh thu chuyển khoản (VietQR):</div>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Doanh thu chuyển khoản:</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0284C7' }}>
                       {formatVND(selectedDetailShift.totalBankRevenue)}
                     </div>
@@ -2865,7 +2865,7 @@ export const CashControlHubPage: FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Printer size={18} className="text-teal-700" />
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0F172A' }}>
-                  Báo Cáo Kết Toán Ca POS (Z-Report)
+                  Báo Cáo Kết Toán Ca POS
                 </h3>
               </div>
               <button
@@ -2926,7 +2926,7 @@ export const CashControlHubPage: FC = () => {
                 }}
               >
                 <div style={{ textAlign: 'center', fontWeight: 800, fontSize: 16, letterSpacing: 0.5, color: '#0F172A' }}>
-                  PHIẾU KẾT CA POS (Z-REPORT)
+                  PHIẾU KẾT CA POS
                 </div>
                 <div style={{ textAlign: 'center', color: '#64748B', fontSize: 12, marginTop: 4 }}>
                   <b>{zReportData.shiftCode}</b> &bull; {zReportData.branchName || 'Chi nhánh POS'}
@@ -2952,9 +2952,9 @@ export const CashControlHubPage: FC = () => {
 
                 <hr style={{ border: 'none', borderTop: '1px dashed #CBD5E1', margin: '12px 0' }} />
 
-                {/* Các dòng chỉ số tài chính Z-Report */}
+                {/* Các dòng chỉ số tài chính kết ca */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <span>Tiền đầu ca (Opening Float):</span>
+                  <span>Tiền đầu ca:</span>
                   <span style={{ fontWeight: 700 }}>{formatVND(zReportData.openingFloat)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -3085,7 +3085,7 @@ export const CashControlHubPage: FC = () => {
                   }}
                 >
                   <Printer size={16} />
-                  <span>In phiếu kết ca (Z-Report)</span>
+                  <span>In phiếu kết ca</span>
                 </button>
               )}
             </div>

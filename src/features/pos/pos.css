@@ -1241,6 +1241,14 @@
   border-color: #0f766e;
 }
 
+.pos-btn-secondary:disabled {
+  background-color: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
+
 /* ==========================================================================
    MODAL FORMS & INPUTS ENHANCEMENTS
    ========================================================================== */

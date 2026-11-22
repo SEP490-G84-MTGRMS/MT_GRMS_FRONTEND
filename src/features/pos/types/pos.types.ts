@@ -61,8 +61,10 @@ export class CartItemDTO {
   isBelowCostApproved?: boolean;
   batchCode?: string;
   batchId?: string;
+  packageId?: string;
   fefoDiscountPercent?: number;
   expiryDate?: string;
+  availableQty?: number;
 
   constructor(init?: Partial<CartItemDTO>) {
     Object.assign(this, init);
@@ -202,6 +204,9 @@ export class ReceiptDataDTO {
   remainingDebt?: number;
   debtNote?: string;
   giftStockWarning?: string;
+  isPreOrder?: boolean;
+  depositAmount?: number;
+  remainingAmount?: number;
 
   constructor(init?: Partial<ReceiptDataDTO>) {
     Object.assign(this, init);

@@ -200,36 +200,42 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
       <col style={{ width: '7%' }} />
       <col style={{ width: '15%' }} />
       <col style={{ width: '4%' }} />
-      <col style={{ width: '4%' }} />
       <col style={{ width: '7%' }} />
+      <col style={{ width: '8%' }} />
       <col style={{ width: '6%' }} />
     </colgroup>
   );
 
   const thStyle: React.CSSProperties = {
     backgroundColor: '#f8fafc',
-    padding: '8px 6px',
-    fontSize: 12,
+    padding: '6px 5px',
+    fontSize: 10.5,
     fontWeight: 700,
     color: '#334155',
     textTransform: 'uppercase',
-    letterSpacing: '0.02em',
-    whiteSpace: 'normal',
-    wordBreak: 'break-word',
-    lineHeight: 1.25,
+    letterSpacing: '0.01em',
+    whiteSpace: 'nowrap',
+    lineHeight: 1.2,
     boxSizing: 'border-box',
     borderBottom: '1px solid #cbd5e1',
     userSelect: 'none',
   };
 
+  const sortIcon = (field: SortField) => (
+    <ArrowUpDown
+      size={11}
+      style={{ color: sortField === field ? '#0f766e' : '#94a3b8', flexShrink: 0 }}
+    />
+  );
+
   return (
-    <div className="so-list-table-card so-list-table-card--wrap">
+    <div className="so-list-table-card so-list-table-card--dense">
       <div
         ref={headerRef}
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: 1400, tableLayout: 'fixed' }}>
+        <table className="so-list-table" style={{ minWidth: 1280, tableLayout: 'fixed' }}>
           {tableColGroup}
           <thead>
             <tr>
@@ -238,9 +244,9 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 onClick={() => handleSort('storeCode')}
                 title="Sắp xếp theo mã cửa hàng"
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã Cửa Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'storeCode' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Mã CH</span>
+                  {sortIcon('storeCode')}
                 </div>
               </th>
 
@@ -249,9 +255,9 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 onClick={() => handleSort('storeName')}
                 title="Sắp xếp theo Cửa hàng"
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Cửa Hàng</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'storeName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Tên CH</span>
+                  {sortIcon('storeName')}
                 </div>
               </th>
 
@@ -260,9 +266,9 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 onClick={() => handleSort('sku')}
                 title="Sắp xếp theo mã SKU"
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã SKU</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'sku' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>SKU</span>
+                  {sortIcon('sku')}
                 </div>
               </th>
 
@@ -271,9 +277,9 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 onClick={() => handleSort('name')}
                 title="Sắp xếp theo tên sản phẩm"
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Sản Phẩm</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'name' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Tên SP</span>
+                  {sortIcon('name')}
                 </div>
               </th>
 
@@ -282,9 +288,9 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 onClick={() => handleSort('supplierCode')}
                 title="Sắp xếp theo mã nhà cung cấp"
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <span>Mã NCC</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'supplierCode' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                  {sortIcon('supplierCode')}
                 </div>
               </th>
 
@@ -293,9 +299,9 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 onClick={() => handleSort('supplierName')}
                 title="Sắp xếp theo nhà cung cấp"
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Nhà Cung Cấp</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'supplierName' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Tên NCC</span>
+                  {sortIcon('supplierName')}
                 </div>
               </th>
 
@@ -308,14 +314,14 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 onClick={() => handleSort('costPrice')}
                 title="Sắp xếp theo giá vốn nhập sỉ"
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, width: '100%' }}>
-                  <span>Giá Vốn (đ)</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'costPrice' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3, width: '100%' }}>
+                  <span>Giá vốn</span>
+                  {sortIcon('costPrice')}
                 </div>
               </th>
 
-              <th style={{ ...thStyle }}>
-                <span>Giá Bán Theo ĐVT</span>
+              <th style={{ ...thStyle }} title="Giá bán theo đơn vị tính">
+                <span>Giá ĐVT</span>
               </th>
 
               <th
@@ -323,41 +329,26 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                 onClick={() => handleSort('minOrderQuantity')}
                 title="Số lượng đặt hàng tối thiểu (MOQ)"
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%' }}>
                   <span>MOQ</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'minOrderQuantity' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                  {sortIcon('minOrderQuantity')}
                 </div>
               </th>
 
               <th
-                style={{
-                  ...thStyle,
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  wordBreak: 'normal',
-                }}
+                style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
                 onClick={() => handleSort('unit')}
                 title="Đơn vị nhập (DeliveryUoM / đơn vị mua hàng)"
               >
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 4,
-                    width: '100%',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  <span>DVN</span>
-                  <ArrowUpDown size={12} style={{ color: sortField === 'unit' ? '#0f766e' : '#94a3b8', flexShrink: 0 }} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 3, width: '100%' }}>
+                  <span>Đơn vị nhập</span>
+                  {sortIcon('unit')}
                 </div>
               </th>
 
-              <th style={{ ...thStyle, textAlign: 'right', paddingRight: 8 }}>Trạng Thái</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>Trạng thái</th>
 
-              <th style={{ ...thStyle, textAlign: 'right', paddingRight: 14 }}>Thao Tác</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>Thao tác</th>
             </tr>
           </thead>
         </table>
@@ -369,7 +360,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
       >
-        <table className="so-list-table" style={{ minWidth: 1400, tableLayout: 'fixed' }}>
+        <table className="so-list-table" style={{ minWidth: 1280, tableLayout: 'fixed' }}>
           {tableColGroup}
           <tbody>
             {sortedProducts.length === 0 ? (
@@ -418,7 +409,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 600,
                           color: '#334155',
                           whiteSpace: 'normal',
@@ -426,6 +417,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                           wordBreak: 'break-word',
                           display: 'inline-block',
                           maxWidth: '100%',
+                          lineHeight: 1.35,
                         }}
                         title={p.storeCode}
                       >
@@ -443,7 +435,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 600,
                           color: '#0f766e',
                           whiteSpace: 'normal',
@@ -451,6 +443,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                           wordBreak: 'break-word',
                           display: 'inline-block',
                           maxWidth: '100%',
+                          lineHeight: 1.35,
                         }}
                         title={p.sku}
                       >
@@ -468,7 +461,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 600,
                           color: '#334155',
                           whiteSpace: 'normal',
@@ -476,6 +469,7 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                           wordBreak: 'break-word',
                           display: 'inline-block',
                           maxWidth: '100%',
+                          lineHeight: 1.35,
                         }}
                         title={p.primarySupplierCode}
                       >
@@ -562,12 +556,12 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                     </td>
 
                     {/* Giá Vốn (đ) — theo NCC của dòng */}
-                    <td style={{ padding: '8px 6px', textAlign: 'right', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '5px 6px', textAlign: 'right', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
                           fontWeight: 600,
-                          fontSize: 12.5,
+                          fontSize: 11,
                           color: '#64748b',
                           whiteSpace: 'normal',
                           overflowWrap: 'anywhere',
@@ -578,12 +572,12 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                     </td>
 
                     {/* Giá bán theo ĐVT */}
-                    <td style={{ padding: '8px 6px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '5px 6px', verticalAlign: 'top', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         title={formatUnitPrices(p)}
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 600,
                           color: '#334155',
                           whiteSpace: 'normal',
@@ -599,12 +593,12 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                     </td>
 
                     {/* MOQ */}
-                    <td style={{ padding: '8px 6px', textAlign: 'center', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '5px 6px', textAlign: 'center', verticalAlign: 'top', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
                           fontWeight: 700,
-                          fontSize: 12.5,
+                          fontSize: 11,
                           color: '#0f172a',
                           whiteSpace: 'normal',
                         }}
@@ -614,10 +608,10 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                     </td>
 
                     {/* DVN — đơn vị nhập */}
-                    <td style={{ padding: '8px 4px', textAlign: 'center', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '5px 4px', textAlign: 'center', verticalAlign: 'top', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
-                          fontSize: 12.5,
+                          fontSize: 11,
                           fontWeight: 600,
                           color: '#1e293b',
                           whiteSpace: 'normal',
@@ -636,9 +630,9 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                     <td
                       className="so-list-td--status"
                       style={{
-                        textAlign: 'right',
+                        textAlign: 'center',
                         verticalAlign: 'middle',
-                        padding: '8px 8px 8px 4px',
+                        padding: '5px 6px',
                         borderBottom: '1px solid #f1f5f9',
                       }}
                     >
@@ -649,8 +643,8 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                     <td
                       className="so-list-td--actions"
                       style={{
-                        padding: '8px 14px 8px 4px',
-                        textAlign: 'right',
+                        padding: '5px 6px',
+                        textAlign: 'center',
                         verticalAlign: 'middle',
                         borderBottom: '1px solid #f1f5f9',
                       }}

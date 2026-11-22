@@ -30,14 +30,19 @@ export const SupplierTableRow: FC<Props> = ({
         e.currentTarget.style.backgroundColor = '#ffffff';
       }}
     >
-      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
+      <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9' }}>
         <span
           style={{
             fontFamily: 'var(--font-mono, monospace)',
             fontWeight: 600,
             color: '#334155',
-            fontSize: 12.5,
-            whiteSpace: 'nowrap',
+            fontSize: 11,
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+            lineHeight: 1.35,
+            display: 'inline-block',
+            maxWidth: '100%',
           }}
         >
           {supplier.code}
@@ -45,43 +50,75 @@ export const SupplierTableRow: FC<Props> = ({
       </td>
 
       <td className="so-list-td--wrap">
-        <div className="so-list-name">
-          {supplier.name}
-        </div>
+        <div className="so-list-name">{supplier.name}</div>
         {supplier.tradeName && supplier.tradeName !== supplier.name && (
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 1, lineHeight: 1.3 }}>
             ({supplier.tradeName})
           </div>
         )}
       </td>
 
-      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontFamily: 'var(--font-mono, monospace)', fontSize: 12, color: supplier.taxCode ? '#334155' : '#94a3b8' }}>
+      <td
+        style={{
+          padding: '5px 6px',
+          borderBottom: '1px solid #f1f5f9',
+          fontFamily: 'var(--font-mono, monospace)',
+          fontSize: 11,
+          color: supplier.taxCode ? '#334155' : '#94a3b8',
+          whiteSpace: 'normal',
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word',
+          lineHeight: 1.35,
+        }}
+      >
         {supplier.taxCode || '—'}
       </td>
 
-      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9' }}>
-        <div style={{ fontWeight: 600, fontSize: 12.5, color: '#1e293b', lineHeight: 1.3 }}>
+      <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9' }}>
+        <div
+          style={{
+            fontWeight: 600,
+            fontSize: 11,
+            color: '#1e293b',
+            lineHeight: 1.35,
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+          }}
+        >
           {supplier.contactPerson || '—'}
         </div>
       </td>
 
-      <td style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', fontFamily: 'var(--font-mono, monospace)', fontSize: 12.5, color: '#334155' }}>
+      <td
+        style={{
+          padding: '5px 6px',
+          borderBottom: '1px solid #f1f5f9',
+          fontFamily: 'var(--font-mono, monospace)',
+          fontSize: 11,
+          color: '#334155',
+          whiteSpace: 'normal',
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word',
+          lineHeight: 1.35,
+        }}
+      >
         {supplier.phone || '—'}
       </td>
 
       <td
         className="so-list-td--wrap"
         style={{
-          padding: '10px 12px',
+          padding: '5px 6px',
           borderBottom: '1px solid #f1f5f9',
-          verticalAlign: 'middle',
+          verticalAlign: 'top',
         }}
       >
         <div
           style={{
-            fontSize: 12.5,
+            fontSize: 11,
             color: supplier.address ? '#334155' : '#94a3b8',
-            lineHeight: 1.4,
+            lineHeight: 1.35,
             whiteSpace: 'normal',
             overflowWrap: 'anywhere',
             wordBreak: 'break-word',
@@ -91,12 +128,30 @@ export const SupplierTableRow: FC<Props> = ({
         </div>
       </td>
 
-      <td style={{ padding: '10px 12px', whiteSpace: 'nowrap', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
+      <td
+        className="so-list-td--status"
+        style={{
+          padding: '5px 6px',
+          whiteSpace: 'nowrap',
+          textAlign: 'center',
+          borderBottom: '1px solid #f1f5f9',
+          verticalAlign: 'middle',
+        }}
+      >
         <SupplierStatusBadge status={supplier.status} />
       </td>
 
-      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1px solid #f1f5f9' }}>
-        <div className="so-list-actions">
+      <td
+        className="so-list-td--actions"
+        style={{
+          padding: '5px 6px',
+          textAlign: 'center',
+          whiteSpace: 'nowrap',
+          borderBottom: '1px solid #f1f5f9',
+          verticalAlign: 'middle',
+        }}
+      >
+        <div className="so-list-actions" style={{ justifyContent: 'center' }}>
           {canEdit && (
             <button
               type="button"
@@ -104,7 +159,7 @@ export const SupplierTableRow: FC<Props> = ({
               onClick={() => onEdit(supplier)}
               title="Chỉnh sửa thông tin nhà cung cấp"
             >
-              <Edit3 size={12} />
+              <Edit3 size={11} />
             </button>
           )}
 
@@ -114,7 +169,7 @@ export const SupplierTableRow: FC<Props> = ({
             onClick={() => onViewDetail(supplier)}
             title="Xem chi tiết nhà cung cấp"
           >
-            <Eye size={12} />
+            <Eye size={11} />
             <span>Chi tiết</span>
           </button>
         </div>

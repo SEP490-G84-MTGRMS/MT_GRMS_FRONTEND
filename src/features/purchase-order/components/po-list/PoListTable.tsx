@@ -1,10 +1,9 @@
-import { useState, useMemo, useRef, useEffect, type CSSProperties, type FC } from 'react';
+import { useState, useMemo, useRef, type CSSProperties, type FC } from 'react';
 import {
   Truck,
   Printer,
   Edit3,
   ArrowUpDown,
-  FileText,
   PackageCheck,
 } from 'lucide-react';
 import type { PurchaseOrderListItem } from '../../types/po-list.types';
@@ -221,31 +220,6 @@ export const PoListTable: FC<PoListTableProps> = ({
 
   const headerRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const [hasScrollY, setHasScrollY] = useState(false);
-
-  useEffect(() => {
-    const updateScrollState = () => {
-      if (bodyRef.current) {
-        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
-      }
-    };
-
-    updateScrollState();
-
-    let observer: ResizeObserver | null = null;
-    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(() => {
-        updateScrollState();
-      });
-      observer.observe(bodyRef.current);
-    }
-
-    window.addEventListener('resize', updateScrollState);
-    return () => {
-      window.removeEventListener('resize', updateScrollState);
-      if (observer) observer.disconnect();
-    };
-  }, [sortedOrders, pageSize]);
 
   const handleBodyScroll = () => {
     if (headerRef.current && bodyRef.current) {
@@ -255,18 +229,17 @@ export const PoListTable: FC<PoListTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '10%' }} />
+      <col style={{ width: '11%' }} />
       <col style={{ width: '6%' }} />
-      <col style={{ width: '12%' }} />
+      <col style={{ width: '13%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '12%' }} />
+      <col style={{ width: '13%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '5%' }} />
       <col style={{ width: '9%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '6%' }} />
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '10%' }} />
     </colgroup>
   );
 
@@ -326,7 +299,7 @@ export const PoListTable: FC<PoListTableProps> = ({
       <div
         ref={headerRef}
         className="so-list-table-head"
-        style={{ paddingRight: hasScrollY ? 6 : 0, overflowX: 'hidden' }}
+        style={{ paddingRight: 14, overflowX: 'hidden' }}
       >
         <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
@@ -382,8 +355,6 @@ export const PoListTable: FC<PoListTableProps> = ({
                 </div>
               </th>
 
-              <th style={thBaseStyle}>Nguồn tạo</th>
-
               <th
                 onClick={() => handleSort('lastUpdated')}
                 style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
@@ -406,9 +377,16 @@ export const PoListTable: FC<PoListTableProps> = ({
 
               <th
                 onClick={() => handleSort('itemCount')}
-                style={{ ...thBaseStyle, textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+                style={{
+                  ...thBaseStyle,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  paddingLeft: 4,
+                  paddingRight: 4,
+                }}
               >
-                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 2, width: '100%' }}>
                   <span>SKU</span>
                   <ArrowUpDown size={11} color={sortField === 'itemCount' ? '#0d9488' : '#94a3b8'} />
                 </div>
@@ -434,7 +412,16 @@ export const PoListTable: FC<PoListTableProps> = ({
                 </div>
               </th>
 
-              <th style={{ ...thBaseStyle, textAlign: 'center' }}>Thao tác</th>
+              <th
+                style={{
+                  ...thBaseStyle,
+                  textAlign: 'center',
+                  paddingLeft: 8,
+                  paddingRight: 16,
+                }}
+              >
+                Thao tác
+              </th>
             </tr>
           </thead>
         </table>
@@ -444,7 +431,7 @@ export const PoListTable: FC<PoListTableProps> = ({
         ref={bodyRef}
         className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
-        style={{ overflowX: 'hidden' }}
+        style={{ overflowX: 'hidden', scrollbarGutter: 'stable' }}
       >
         <table className="so-list-table" style={tableFitStyle}>
           {tableColGroup}
@@ -452,7 +439,7 @@ export const PoListTable: FC<PoListTableProps> = ({
             {sortedOrders.length === 0 ? (
               <tr>
                 <td
-                  colSpan={12}
+                  colSpan={11}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -537,23 +524,6 @@ export const PoListTable: FC<PoListTableProps> = ({
                       </span>
                     </td>
 
-                    <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.createdSource}>
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'flex-start',
-                          gap: 4,
-                          color: '#475569',
-                          fontSize: 12,
-                          maxWidth: '100%',
-                          ...cellWrap,
-                        }}
-                      >
-                        <FileText size={12} color="#94a3b8" style={{ flexShrink: 0, marginTop: 2 }} />
-                        <span style={cellWrap}>{order.createdSource}</span>
-                      </div>
-                    </td>
-
                     <td className="so-list-td so-list-td--wrap" style={cellWrap} title={order.lastUpdated}>
                       <span style={{ fontSize: 12, color: '#64748b', ...cellWrap }}>{order.lastUpdated}</span>
                     </td>
@@ -579,9 +549,11 @@ export const PoListTable: FC<PoListTableProps> = ({
                     <td className="so-list-td" style={{ textAlign: 'center' }}>
                       <span
                         style={{
+                          display: 'inline-block',
                           fontSize: 11.5,
                           fontWeight: 700,
                           color: '#475569',
+                          minWidth: 20,
                         }}
                         title={`${order.itemCount} SKU`}
                       >
@@ -613,10 +585,24 @@ export const PoListTable: FC<PoListTableProps> = ({
 
                     <td
                       className="so-list-td so-list-td--actions"
-                      style={{ textAlign: 'center', overflow: 'visible' }}
+                      style={{
+                        textAlign: 'center',
+                        overflow: 'visible',
+                        minWidth: 118,
+                      }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                      <div
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          justifyContent: 'center',
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          paddingRight: 10,
+                        }}
+                      >
                         <button
                           type="button"
                           onClick={() => onPrintOrder(order)}

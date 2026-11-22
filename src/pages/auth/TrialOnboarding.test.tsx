@@ -279,10 +279,11 @@ describe('homepage trial onboarding UI & flows', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(/đã sử dụng gói dùng thử/i);
+      expect(screen.getByRole('button', { name: /Kích hoạt dùng thử 3 ngày/i })).toBeEnabled();
     });
     expect(onSuccess).not.toHaveBeenCalled();
 
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }); });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

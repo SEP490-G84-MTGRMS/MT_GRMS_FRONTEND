@@ -123,10 +123,10 @@ export const ShiftHistoryTable: FC<Props> = ({ shifts, onOpenZReport }) => {
                     type="button"
                     className="so-list-action-btn"
                     onClick={() => onOpenZReport(s.shiftCode)}
-                    title="Xem & in Z-Report"
+                    title="Xem & in phiếu kết ca"
                   >
                     <FileText size={13} style={{ flexShrink: 0 }} />
-                    <span>Z-Report</span>
+                    <span>Phiếu kết ca</span>
                   </button>
                 </td>
               </tr>

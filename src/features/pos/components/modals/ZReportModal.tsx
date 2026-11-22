@@ -40,7 +40,7 @@ export const ZReportModal: FC<Props> = ({
         <div className="pos-modal-header">
           <div className="flex items-center gap-2">
             <Printer size={18} className="text-teal-700" />
-            <h2 className="pos-modal-title">Báo Cáo Kết Ca Z-Report K80</h2>
+            <h2 className="pos-modal-title">Báo Cáo Kết Ca K80</h2>
           </div>
           <button type="button" className="pos-modal-close-btn" onClick={onClose}>
             <X size={18} />
@@ -55,7 +55,7 @@ export const ZReportModal: FC<Props> = ({
               <div className="text-[11.5px] text-slate-500 mt-0.5">
                 {shiftInfo.branchName} &bull; {shiftInfo.posMachine}
               </div>
-              <h3 className="font-bold text-sm tracking-wider uppercase text-teal-800 mt-2">BÁO CÁO KẾT CA (Z-REPORT)</h3>
+              <h3 className="font-bold text-sm tracking-wider uppercase text-teal-800 mt-2">BÁO CÁO KẾT CA</h3>
               <div className="text-[11.5px] font-mono text-slate-500 font-medium mt-0.5">Mã ca: #{shiftInfo.shiftCode}</div>
             </div>
 
@@ -86,7 +86,7 @@ export const ZReportModal: FC<Props> = ({
 
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between items-center gap-2 font-bold text-slate-800">
-                <span className="flex-1 min-w-0">Tiền đầu ca (Float):</span>
+                <span className="flex-1 min-w-0">Tiền đầu ca:</span>
                 <span className="font-mono tabular-nums whitespace-nowrap shrink-0" style={{ flexShrink: 0 }}>
                   {initialFloat.toLocaleString('vi-VN')} đ
                 </span>

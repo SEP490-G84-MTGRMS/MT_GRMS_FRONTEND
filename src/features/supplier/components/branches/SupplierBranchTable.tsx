@@ -141,15 +141,17 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
 
   const thBaseStyle: React.CSSProperties = {
     backgroundColor: '#f8fafc',
-    padding: '10px 14px',
-    fontSize: 12,
+    padding: '6px 5px',
+    fontSize: 10.5,
     fontWeight: 700,
     color: '#334155',
     textTransform: 'uppercase',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.01em',
     whiteSpace: 'nowrap',
+    lineHeight: 1.2,
     boxSizing: 'border-box',
     borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
   };
 
   const renderSortableHeader = (label: string, field: SortField, align: 'left' | 'center' | 'right' = 'left') => {
@@ -162,22 +164,22 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
           textAlign: align,
           color: isSorted ? '#0f766e' : '#334155',
           cursor: 'pointer',
-          userSelect: 'none',
         }}
+        title={`Sắp xếp theo ${label}`}
       >
         <div
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
+            gap: 3,
             justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
+            width: align === 'center' || align === 'right' ? '100%' : undefined,
           }}
         >
           <span>{label}</span>
           <ArrowUpDown
-            size={12}
-            color={isSorted ? '#0f766e' : '#94a3b8'}
-            style={{ opacity: isSorted ? 1 : 0.6 }}
+            size={11}
+            style={{ color: isSorted ? '#0f766e' : '#94a3b8', flexShrink: 0, opacity: isSorted ? 1 : 0.7 }}
           />
         </div>
       </th>
@@ -185,7 +187,7 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
   };
 
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card so-list-table-card--dense">
       <div
         ref={headerRef}
         className="so-list-table-head"
@@ -195,13 +197,13 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
           {tableColGroup}
           <thead>
             <tr>
-              {renderSortableHeader('Mã Cửa Hàng', 'branchCode')}
-              {renderSortableHeader('Tên Cửa Hàng / Chi Nhánh', 'branchName')}
+              {renderSortableHeader('Mã CH', 'branchCode')}
+              {renderSortableHeader('Tên CH', 'branchName')}
               {renderSortableHeader('Mã NCC', 'supplierCode')}
-              {renderSortableHeader('Tên Nhà Cung Cấp', 'supplierName')}
+              {renderSortableHeader('Tên NCC', 'supplierName')}
               {renderSortableHeader('Ngày giao', 'deliveryDays')}
-              {renderSortableHeader('Trạng Thái', 'status', 'center')}
-              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao Tác</th>
+              {renderSortableHeader('Trạng thái', 'status', 'center')}
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>Thao tác</th>
             </tr>
           </thead>
         </table>

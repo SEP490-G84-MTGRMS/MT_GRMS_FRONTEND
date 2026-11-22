@@ -28,13 +28,15 @@ export const GrnFormFooter: FC<GrnFormFooterProps> = ({
     <div
       style={{
         flexShrink: 0,
-        borderTop: '1px solid #e2e8f0',
+        marginTop: 8,
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
         backgroundColor: '#ffffff',
-        borderBottomLeftRadius: 10,
-        borderBottomRightRadius: 10,
+        overflow: 'hidden',
+        boxSizing: 'border-box',
       }}
     >
-      <div style={{ padding: '12px 16px' }}>
+      <div style={{ padding: '12px 14px' }}>
         <div
           style={{
             display: 'flex',
@@ -50,10 +52,10 @@ export const GrnFormFooter: FC<GrnFormFooterProps> = ({
             onChange={(e) => onNotesChange(e.target.value)}
             disabled={readOnly}
             placeholder="Tình trạng giao hàng, lệch số lượng..."
-            rows={3}
+            rows={2}
             style={{
               width: '100%',
-              minHeight: 72,
+              minHeight: 56,
               padding: '8px 10px',
               borderRadius: 6,
               border: '1px solid #cbd5e1',
@@ -73,13 +75,12 @@ export const GrnFormFooter: FC<GrnFormFooterProps> = ({
         style={{
           borderTop: '1px solid #e2e8f0',
           backgroundColor: '#ffffff',
-          padding: '10px 16px',
+          padding: '10px 14px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: 10,
-          boxShadow: '0 -2px 8px rgba(15, 23, 42, 0.04)',
         }}
       >
         <button

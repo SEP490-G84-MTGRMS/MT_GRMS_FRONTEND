@@ -141,6 +141,8 @@ export interface ZReportResponse {
   receiverUserId?: string | null;
   notes?: string | null;
   cashMovements: ShiftCashMovementDto[];
+  totalReturnRefunds?: number;
+  netCashSalesAfterRefunds?: number;
 }
 
 export interface CashMovementSettingsDto {
@@ -243,6 +245,8 @@ export interface BusinessDayClosingPreview {
   totalBankSales: number;
   totalCashIn: number;
   totalCashOut: number;
+  safeReturnRefunds?: number;
+  shiftReturnRefunds?: number;
   totalRetainedFloat: number;
   totalDroppedToSafe: number;
   funds: BusinessDayFundPreview[];

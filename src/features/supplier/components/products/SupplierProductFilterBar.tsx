@@ -259,8 +259,13 @@ export const SupplierProductFilterBar: FC<SupplierProductFilterBarProps> = ({
       const mapped: Suggestion[] = [];
       const seen = new Set<string>();
 
-      const skuNameSource =
-        suggestionProducts && suggestionProducts.length > 0 ? suggestionProducts : products;
+      // Gộp list NCC–SP đang hiện + master catalog (kể cả Ngừng KD) — không ưu tiên chỉ Active master.
+      const skuNameSource = [
+        ...products,
+        ...((suggestionProducts && suggestionProducts.length > 0 ? suggestionProducts : []) as Array<
+          SupplierProductItem | { sku?: string; productCode?: string; name?: string; id?: string }
+        >),
+      ];
 
       if (field === 'sku') {
         for (const item of skuNameSource) {

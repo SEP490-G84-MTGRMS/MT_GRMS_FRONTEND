@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { TaxSnapshotPage } from '../pages/TaxSnapshotPage';
 import { useTaxSnapshots } from '../hooks/useTaxSnapshots';
 import { TaxCalculationMethod, TaxPeriodType } from '../types/taxSnapshot';
@@ -73,7 +74,7 @@ beforeEach(() => {
 
 describe('TaxSnapshotPage redesign navigation', () => {
   it('keeps exactly two main tabs and moves secondary views into the action menu', () => {
-    render(<TaxSnapshotPage />);
+    render(<TaxSnapshotPage />, { wrapper: MemoryRouter });
 
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(2);
@@ -88,7 +89,7 @@ describe('TaxSnapshotPage redesign navigation', () => {
   });
 
   it('switches to the accounting books panel', () => {
-    render(<TaxSnapshotPage />);
+    render(<TaxSnapshotPage />, { wrapper: MemoryRouter });
     fireEvent.click(screen.getByRole('tab', { name: /Sổ kế toán/i }));
     expect(screen.getByTestId('accounting-books-panel')).toBeInTheDocument();
   });

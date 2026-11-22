@@ -44,6 +44,36 @@ describe('POS inventory branch scope', () => {
     expect(screen.queryByText(/An Nhiên Mart/)).toBeNull();
     expect(screen.getByText('17 Chai')).toBeTruthy();
     expect(screen.queryByText('999 Chai')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Xem khay' })).toBeNull();
+  });
+
+  it('hides package section when the product has no sellable packages', async () => {
+    vi.mocked(httpClient.get).mockImplementation((url) => Promise.resolve(url.includes('/packages')
+      ? { data: { data: { packages: [
+        { id: 'sold', status: 'SOLD' },
+        { id: 'expired', status: 'AVAILABLE', expiryDate: '2020-01-01' },
+      ] } } }
+      : response('LOT-KG')));
+    render(<PosInventoryLookupModal {...props} products={[{ ...product, baseUnit: 'Kg' }]} />);
+    scanProductBarcode('123');
+    await screen.findByText('LOT-KG');
+    await waitFor(() => expect(httpClient.get).toHaveBeenCalledWith('/branch-stocks/LOT-KG/packages'));
+    expect(screen.queryByRole('region', { name: 'Khay còn bán' })).toBeNull();
+  });
+
+  it('sells an available package even when raw BranchStock availability is zero', async () => {
+    const batch = { ...response('LOT-KG').data.data[0], availableQty: 0, quantityOnHand: 2 };
+    vi.mocked(httpClient.get).mockImplementation((url) => Promise.resolve(url.includes('/packages')
+      ? { data: { data: { packages: [{ id: 'pkg-1', internalCode: 'KHAY-1', netWeight: 2, sellingPrice: 30000, status: 'AVAILABLE' }] } } }
+      : { data: { data: [batch] } }));
+    const onSelectBatchToCart = vi.fn();
+    render(<PosInventoryLookupModal {...props} products={[{ ...product, baseUnit: 'Kg' }]} onSelectBatchToCart={onSelectBatchToCart} />);
+    scanProductBarcode('123');
+    await screen.findByText('LOT-KG');
+    expect(screen.queryByRole('button', { name: 'Chọn lô' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: 'Thêm khay KHAY-1 vào đơn' }));
+    expect(onSelectBatchToCart).toHaveBeenCalledWith(expect.anything(), 'LOT-KG', 'LOT-KG', expect.any(String), 0,
+      expect.objectContaining({ id: 'pkg-1' }), 2);
   });
 
   it('renders multiple lots as separate FEFO rows', async () => {

@@ -78,11 +78,13 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
                 <div
                   key={prod.id}
                   className="pos-product-card"
-                  onClick={() => onAddToCart(prod)}
-                  role="button"
-                  tabIndex={0}
+                  onClick={() => { if (prod.quantityOnHand > 0) onAddToCart(prod); }}
+                  role={prod.quantityOnHand > 0 ? 'button' : undefined}
+                  tabIndex={prod.quantityOnHand > 0 ? 0 : -1}
+                  aria-disabled={prod.quantityOnHand <= 0}
+                  style={prod.quantityOnHand <= 0 ? { cursor: 'not-allowed' } : undefined}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
+                    if (prod.quantityOnHand > 0 && (e.key === 'Enter' || e.key === ' ')) {
                       e.preventDefault();
                       onAddToCart(prod);
                     }
@@ -132,11 +134,13 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
                     <button
                       type="button"
                       className="pos-product-floating-add-btn"
+                      disabled={prod.quantityOnHand <= 0}
+                      style={prod.quantityOnHand <= 0 ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
                       onClick={(e) => {
                         e.stopPropagation();
                         onAddToCart(prod);
                       }}
-                      title={`Thêm ${prod.name} vào hóa đơn`}
+                      title={prod.quantityOnHand <= 0 ? 'Sản phẩm đã hết tồn' : `Thêm ${prod.name} vào hóa đơn`}
                       aria-label={`Thêm ${prod.name} vào hóa đơn`}
                     >
                       <Plus size={16} strokeWidth={2.6} />

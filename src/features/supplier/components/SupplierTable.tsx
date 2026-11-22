@@ -151,18 +151,28 @@ export const SupplierTable: FC<Props> = ({
 
   const thBaseStyle: React.CSSProperties = {
     backgroundColor: '#f8fafc',
-    padding: '10px 12px',
-    fontSize: 12,
+    padding: '6px 5px',
+    fontSize: 10.5,
     fontWeight: 700,
     color: '#334155',
     textTransform: 'uppercase',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.01em',
     whiteSpace: 'nowrap',
+    lineHeight: 1.2,
     boxSizing: 'border-box',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
   };
 
+  const sortIcon = (field: SortField) => (
+    <ArrowUpDown
+      size={11}
+      style={{ color: sortField === field ? '#0f766e' : '#94a3b8', flexShrink: 0 }}
+    />
+  );
+
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card so-list-table-card--dense">
       <div
         ref={headerRef}
         className="so-list-table-head"
@@ -174,110 +184,91 @@ export const SupplierTable: FC<Props> = ({
             <tr>
               <th
                 onClick={() => handleSort('code')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo mã NCC"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <span>Mã NCC</span>
-                  <ArrowUpDown size={12} color={sortField === 'code' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('code')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('name')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo tên NCC"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Nhà Cung Cấp</span>
-                  <ArrowUpDown size={12} color={sortField === 'name' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Tên NCC</span>
+                  {sortIcon('name')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('taxCode')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo mã số thuế"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã số thuế</span>
-                  <ArrowUpDown size={12} color={sortField === 'taxCode' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>MST</span>
+                  {sortIcon('taxCode')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('contactPerson')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo người liên hệ"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Người liên hệ</span>
-                  <ArrowUpDown size={12} color={sortField === 'contactPerson' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Người LH</span>
+                  {sortIcon('contactPerson')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('phone')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo số điện thoại"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Số điện thoại</span>
-                  <ArrowUpDown size={12} color={sortField === 'phone' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>SĐT</span>
+                  {sortIcon('phone')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('address')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo địa chỉ"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <span>Địa chỉ</span>
-                  <ArrowUpDown size={12} color={sortField === 'address' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('address')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('status')}
-                style={{
-                  ...thBaseStyle,
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, textAlign: 'center', cursor: 'pointer' }}
+                title="Sắp xếp theo trạng thái"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
                   <span>Trạng thái</span>
-                  <ArrowUpDown size={12} color={sortField === 'status' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('status')}
                 </div>
               </th>
 
-              <th
-                style={{
-                  ...thBaseStyle,
-                  textAlign: 'right',
-                }}
-              >
-                <span>Hành động</span>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>
+                <span>Thao tác</span>
               </th>
             </tr>
           </thead>

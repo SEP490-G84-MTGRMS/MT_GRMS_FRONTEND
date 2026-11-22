@@ -32,7 +32,10 @@
 .owner-dash-section-heading a:hover, .owner-dash-secondary-link:hover { color: #075b54; text-decoration: underline; }
 .owner-dash-chart { display: flex; align-items: end; gap: 7px; min-height: 220px; height: 220px; overflow-x: auto; padding: 20px 4px 0; }
 .owner-dash-bar-column { display: flex; flex: 1 0 28px; flex-direction: column; align-items: center; justify-content: end; height: 100%; min-width: 28px; }
-.owner-dash-bar { width: min(100%, 35px); min-height: 3px; border-radius: 7px 7px 0 0; background: #0f766e; }
+.owner-dash-plot { display: grid; position: relative; flex: 1; width: 100%; justify-items: center; }
+.owner-dash-plot::after { content: ''; grid-row: 2; grid-column: 1; align-self: start; width: 100%; border-top: 1px solid #cbd5e1; }
+.owner-dash-bar { grid-row: 1; grid-column: 1; align-self: end; width: min(100%, 35px); border-radius: 7px 7px 0 0; background: #0f766e; }
+.owner-dash-bar--negative { grid-row: 2; align-self: start; border-radius: 0 0 7px 7px; background: #b91c1c; }
 .owner-dash-bar-column small { min-height: 24px; padding-top: 7px; color: #718096; font-size: 10px; white-space: nowrap; }
 .owner-dash-metric { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 16px 0; border-bottom: 1px solid #e8eef2; color: #53657d; font-size: 13px; }
 .owner-dash-metric strong { color: #14253e; font-family: 'JetBrains Mono', monospace; font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; }

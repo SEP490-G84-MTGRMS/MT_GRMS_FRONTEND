@@ -53,8 +53,8 @@ interface OrderMatrixFilterBarProps {
 
   onShiftWeek?: (deltaWeeks: number) => void;
   onThisWeek?: () => void;
-  onCopyPrevWeek: () => void;
   onAutoSuggest?: () => void;
+  onClearSuggestions?: () => void;
   onExcelDownload: () => void;
   onExcelUpload: (file: File) => void;
 }
@@ -246,7 +246,9 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 4,
-                flexShrink: 0,
+                flex: '1 1 auto',
+                minWidth: 0,
+                maxWidth: '100%',
                 height: 22,
                 padding: '0 4px 0 8px',
                 borderRadius: 4,
@@ -255,10 +257,20 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
                 fontSize: 12,
                 fontWeight: 700,
                 border: '1px solid #99f6e4',
-                whiteSpace: 'nowrap',
+                boxSizing: 'border-box',
               }}
             >
-              Đã chọn
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  flex: '1 1 auto',
+                }}
+              >
+                {chipText}
+              </span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -300,7 +312,7 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
               searchMode
                 ? placeholder
                 : hasSelection
-                  ? 'Đổi'
+                  ? ''
                   : placeholder
             }
             onChange={(e) => {
@@ -310,15 +322,16 @@ const SearchableSelect: FC<SearchableSelectProps> = ({
             onFocus={enterSearchMode}
             onKeyDown={handleKeyDown}
             style={{
-              flex: searchMode || !hasSelection ? '1 1 auto' : '0 0 40px',
-              minWidth: searchMode || !hasSelection ? 48 : 40,
-              width: 0,
+              flex: searchMode || !hasSelection ? '1 1 auto' : '0 0 0px',
+              minWidth: searchMode || !hasSelection ? 48 : 0,
+              width: searchMode || !hasSelection ? 0 : 0,
               height: 24,
               border: 'none',
               outline: 'none',
               background: 'transparent',
               fontSize: 12.5,
               color: '#0f172a',
+              padding: 0,
             }}
           />
         </div>
@@ -492,84 +505,179 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
   isDirty = false,
   onShiftWeek: _onShiftWeek,
   onThisWeek: _onThisWeek,
-  onCopyPrevWeek,
   onAutoSuggest,
+  onClearSuggestions,
   onExcelDownload,
   onExcelUpload,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const branchCodeOptions: SearchOption[] = useMemo(
+  /** Một ô CN: hiển thị / tìm theo "Mã CN - Tên CN" */
+  const branchOptions: SearchOption[] = useMemo(
     () =>
       branches.map((b) => ({
         id: b.id,
-        primary: b.code,
-        secondary: b.name,
+        primary: `${b.code} - ${b.name}`,
       })),
     [branches]
   );
 
-  const branchNameOptions: SearchOption[] = useMemo(
-    () =>
-      branches.map((b) => ({
-        id: b.id,
-        primary: b.name,
-        secondary: b.code,
-      })),
-    [branches]
-  );
+  const selectedBranchLabel = selectedBranchId
+    ? (() => {
+        const b = branches.find((x) => x.id === selectedBranchId);
+        return b ? `${b.code} - ${b.name}` : undefined;
+      })()
+    : undefined;
 
-  const supplierCodeOptions = useMemo(
+  /** Một ô NCC: hiển thị / chọn theo "Mã NCC - Tên NCC" */
+  const supplierCombinedOptions = useMemo(
     () =>
       suppliers.map((s) => ({
         id: s.id,
-        value: s.code,
-        primary: s.code,
-        secondary: s.name,
+        value: `${s.code} - ${s.name}`,
+        primary: `${s.code} - ${s.name}`,
       })),
     [suppliers]
   );
 
-  const supplierNameOptions = useMemo(
-    () =>
-      suppliers.map((s) => ({
-        id: s.id,
-        value: s.name,
-        primary: s.name,
-        secondary: s.code,
-      })),
-    [suppliers]
-  );
+  const supplierCombinedTokens = useMemo(() => {
+    if (!supplierCodes.length && !supplierNames.length) return [] as string[];
+    const codeSet = new Set(supplierCodes.map((c) => c.toLowerCase()));
+    const nameSet = new Set(supplierNames.map((n) => n.toLowerCase()));
+    return suppliers
+      .filter((s) => {
+        const codeOk = !supplierCodes.length || codeSet.has((s.code || '').toLowerCase());
+        const nameOk = !supplierNames.length || nameSet.has((s.name || '').toLowerCase());
+        return codeOk && nameOk;
+      })
+      .map((s) => `${s.code} - ${s.name}`);
+  }, [suppliers, supplierCodes, supplierNames]);
 
-  const productSkuOptions = useMemo(() => {
+  const handleSupplierCombinedChange = (tokens: string[]) => {
+    const codes: string[] = [];
+    const names: string[] = [];
     const seen = new Set<string>();
-    const list: { id: string; value: string; primary: string; secondary?: string }[] = [];
+
+    for (const raw of tokens) {
+      const token = raw.trim();
+      if (!token) continue;
+
+      const matched = suppliers.find((s) => {
+        const label = `${s.code} - ${s.name}`;
+        return (
+          label.toLowerCase() === token.toLowerCase() ||
+          s.id.toLowerCase() === token.toLowerCase() ||
+          s.code.toLowerCase() === token.toLowerCase() ||
+          s.name.toLowerCase() === token.toLowerCase()
+        );
+      });
+
+      if (matched) {
+        const key = matched.id.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (matched.code?.trim()) codes.push(matched.code.trim());
+        if (matched.name?.trim()) names.push(matched.name.trim());
+        continue;
+      }
+
+      const sep = token.indexOf(' - ');
+      if (sep >= 0) {
+        const code = token.slice(0, sep).trim();
+        const name = token.slice(sep + 3).trim();
+        if (code) codes.push(code);
+        if (name) names.push(name);
+      } else {
+        codes.push(token);
+        names.push(token);
+      }
+    }
+
+    onSupplierCodesChange(codes);
+    onSupplierNamesChange(names);
+  };
+
+  /** Một ô SP: hiển thị / chọn theo "Mã SP - Tên SP" */
+  const productCombinedOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { id: string; value: string; primary: string }[] = [];
     for (const p of products) {
       const sku = (p.sku || '').trim();
-      if (!sku) continue;
-      const key = sku.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      list.push({ id: p.id, value: sku, primary: sku, secondary: p.name });
-    }
-    return list;
-  }, [products]);
-
-  const productNameOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const list: { id: string; value: string; primary: string; secondary?: string }[] = [];
-    for (const p of products) {
       const name = (p.name || '').trim();
-      if (!name) continue;
-      const key = name.toLowerCase();
+      if (!sku && !name) continue;
+      const label = `${sku || '—'} - ${name || '—'}`;
+      const key = label.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      list.push({ id: `${p.id}-${name}`, value: name, primary: name, secondary: p.sku });
+      list.push({ id: p.id, value: label, primary: label });
     }
     return list;
   }, [products]);
 
-  const selectedBranch = branches.find((b) => b.id === selectedBranchId);
+  const productCombinedTokens = useMemo(() => {
+    if (!productSkus.length && !productNames.length) return [] as string[];
+    const skuSet = new Set(productSkus.map((s) => s.toLowerCase()));
+    const nameSet = new Set(productNames.map((n) => n.toLowerCase()));
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const p of products) {
+      const sku = (p.sku || '').trim();
+      const name = (p.name || '').trim();
+      const skuOk = !productSkus.length || skuSet.has(sku.toLowerCase());
+      const nameOk = !productNames.length || nameSet.has(name.toLowerCase());
+      if (!skuOk || !nameOk) continue;
+      const label = `${sku || '—'} - ${name || '—'}`;
+      const key = label.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(label);
+    }
+    return out;
+  }, [products, productSkus, productNames]);
+
+  const handleProductCombinedChange = (tokens: string[]) => {
+    const skus: string[] = [];
+    const names: string[] = [];
+    const seen = new Set<string>();
+
+    for (const raw of tokens) {
+      const token = raw.trim();
+      if (!token) continue;
+
+      const matched = products.find((p) => {
+        const label = `${(p.sku || '').trim() || '—'} - ${(p.name || '').trim() || '—'}`;
+        return (
+          label.toLowerCase() === token.toLowerCase() ||
+          p.id.toLowerCase() === token.toLowerCase() ||
+          (p.sku || '').toLowerCase() === token.toLowerCase() ||
+          (p.name || '').toLowerCase() === token.toLowerCase()
+        );
+      });
+
+      if (matched) {
+        const key = matched.id.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (matched.sku?.trim()) skus.push(matched.sku.trim());
+        if (matched.name?.trim()) names.push(matched.name.trim());
+        continue;
+      }
+
+      const sep = token.indexOf(' - ');
+      if (sep >= 0) {
+        const sku = token.slice(0, sep).trim();
+        const name = token.slice(sep + 3).trim();
+        if (sku && sku !== '—') skus.push(sku);
+        if (name && name !== '—') names.push(name);
+      } else {
+        skus.push(token);
+        names.push(token);
+      }
+    }
+
+    onProductSkusChange(skus);
+    onProductNamesChange(names);
+  };
 
   const handleBranchChange = (newId: string) => {
     if (newId === selectedBranchId) return true;
@@ -591,32 +699,20 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
 
   return (
     <div className="po-filter-box">
-      {/* ── DÒNG 1: Phạm vi CN / NCC / khung ngày / khoảng ngày ── */}
+      {/* ── DÒNG 1: CN (gộp) / NCC / khung ngày / khoảng ngày + actions ── */}
       <div className="po-filter-row">
         <div className="po-filter-row-left">
           {!hideBranchSelect && (
-            <>
-              <SearchableSelect
-                label="Mã CN:"
-                placeholder="Mã CN..."
-                options={branchCodeOptions}
-                selectedId={selectedBranchId}
-                selectedLabel={selectedBranch?.code}
-                width={120}
-                matchPrimaryOnly
-                onSelect={handleBranchChange}
-              />
-              <SearchableSelect
-                label="Tên CN:"
-                placeholder="Tên CN..."
-                options={branchNameOptions}
-                selectedId={selectedBranchId}
-                selectedLabel={selectedBranch?.name}
-                width={200}
-                matchPrimaryOnly
-                onSelect={handleBranchChange}
-              />
-            </>
+            <SearchableSelect
+              label="Chi Nhánh:"
+              placeholder="Mã CN - Tên CN..."
+              options={branchOptions}
+              selectedId={selectedBranchId}
+              selectedLabel={selectedBranchLabel}
+              width={280}
+              matchPrimaryOnly={false}
+              onSelect={handleBranchChange}
+            />
           )}
 
           {hideBranchSelect && (
@@ -626,7 +722,8 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                width: 200,
+                maxWidth: 300,
+                minWidth: 200,
                 padding: '0 12px',
                 height: CTRL_H,
                 background: '#f1f5f9',
@@ -637,32 +734,32 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                 boxSizing: 'border-box',
                 overflow: 'hidden',
               }}
-              title={`Chi nhánh phân công: ${fixedBranchLabel || 'Chi nhánh làm việc'}`}
+              title={`Chi nhánh phân công: ${fixedBranchLabel || selectedBranchLabel || 'Chi nhánh làm việc'}`}
             >
-              <span style={{ color: '#64748b', fontWeight: 500, flexShrink: 0 }}>CN:</span>
-              <span style={{ color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                Đã chọn
+              <span style={{ color: '#64748b', fontWeight: 500, flexShrink: 0 }}>Chi Nhánh:</span>
+              <span
+                style={{
+                  color: '#0f172a',
+                  fontWeight: 700,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                }}
+              >
+                {fixedBranchLabel || selectedBranchLabel || 'Đã chọn'}
               </span>
             </div>
           )}
 
           <MatrixTokenFilter
-            label="Mã NCC:"
-            placeholder="Mã NCC..."
-            width={140}
-            tokens={supplierCodes}
-            options={supplierCodeOptions}
-            onChange={onSupplierCodesChange}
-            matchPrimaryOnly
-          />
-          <MatrixTokenFilter
-            label="Tên NCC:"
-            placeholder="Tên NCC..."
-            width={180}
-            tokens={supplierNames}
-            options={supplierNameOptions}
-            onChange={onSupplierNamesChange}
-            matchPrimaryOnly
+            label="Nhà Cung Cấp:"
+            placeholder="Mã NCC - Tên NCC..."
+            width={300}
+            tokens={supplierCombinedTokens}
+            options={supplierCombinedOptions}
+            onChange={handleSupplierCombinedChange}
+            matchPrimaryOnly={false}
           />
 
           <div className="po-bar-divider" />
@@ -682,7 +779,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
                       title={`Xem ma trận ${d} ngày`}
                       style={{
                         height: CTRL_H,
-                        padding: '0 8px',
+                        padding: '0 7px',
                         fontSize: 11,
                         fontWeight: active ? 700 : 500,
                         backgroundColor: active ? '#eff6ff' : '#ffffff',
@@ -717,35 +814,39 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               value={dateTo}
               onChange={(e) => onDateToChange(e.target.value)}
             />
-            <button
-              type="button"
-              className="po-ctrl-btn-apply"
-              onClick={handleApply}
-              title="Áp dụng khoảng ngày và tìm kiếm sản phẩm"
-              style={{ padding: '0 10px', height: CTRL_H, fontSize: 12, fontWeight: 600 }}
-            >
-              Áp dụng
-            </button>
-            <button
-              type="button"
-              className="po-icon-btn"
-              onClick={handleReset}
-              title="Đặt lại các bộ lọc"
-              style={{
-                height: CTRL_H,
-                padding: '0 8px',
-                fontSize: 12,
-                fontWeight: 600,
-                color: '#64748b',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <RotateCcw size={12} />
-              <span>Đặt lại</span>
-            </button>
           </div>
+        </div>
+
+        <div className="po-filter-row-right">
+          <button
+            type="button"
+            className="po-ctrl-btn-apply"
+            onClick={handleApply}
+            title="Áp dụng khoảng ngày và tìm kiếm sản phẩm"
+            style={{ padding: '0 10px', height: CTRL_H, fontSize: 12, fontWeight: 600, flexShrink: 0 }}
+          >
+            Áp dụng
+          </button>
+          <button
+            type="button"
+            className="po-icon-btn"
+            onClick={handleReset}
+            title="Đặt lại các bộ lọc"
+            style={{
+              height: CTRL_H,
+              padding: '0 8px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#64748b',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              flexShrink: 0,
+            }}
+          >
+            <RotateCcw size={12} />
+            <span>Đặt lại</span>
+          </button>
         </div>
       </div>
 
@@ -753,22 +854,13 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
       <div className="po-filter-row">
         <div className="po-filter-row-left">
           <MatrixTokenFilter
-            label="Mã SP:"
-            placeholder="SKU..."
-            width={140}
-            tokens={productSkus}
-            options={productSkuOptions}
-            onChange={onProductSkusChange}
-            matchPrimaryOnly
-          />
-          <MatrixTokenFilter
-            label="Tên SP:"
-            placeholder="Tên SP..."
-            width={200}
-            tokens={productNames}
-            options={productNameOptions}
-            onChange={onProductNamesChange}
-            matchPrimaryOnly
+            label="Sản Phẩm:"
+            placeholder="Mã SP - Tên SP..."
+            width={300}
+            tokens={productCombinedTokens}
+            options={productCombinedOptions}
+            onChange={handleProductCombinedChange}
+            matchPrimaryOnly={false}
           />
 
           <div className="po-bar-divider" />
@@ -850,7 +942,7 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
               type="button"
               className="po-icon-btn"
               onClick={onAutoSuggest}
-              title="Tự động tính toán số lượng đề xuất dựa trên Tồn kho SOH & Tốc độ bán"
+              title="Tự động tính số lượng đề xuất cho mọi ngày giao editable trong phạm vi đã chọn"
               style={{
                 color: '#0d9488',
                 borderColor: '#99f6e4',
@@ -865,22 +957,25 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
             </button>
           )}
 
-          <button
-            type="button"
-            className="po-icon-btn"
-            onClick={onCopyPrevWeek}
-            title="Sao chép số lượng tuần trước sang tuần này"
-            style={{
-              color: 'var(--blue-primary)',
-              borderColor: 'var(--blue-border)',
-              padding: '0 8px',
-              height: CTRL_H,
-              fontSize: 11,
-              fontWeight: 600,
-            }}
-          >
-            <span>Sao chép tuần</span>
-          </button>
+          {onClearSuggestions && (
+            <button
+              type="button"
+              className="po-icon-btn"
+              onClick={onClearSuggestions}
+              title="Xóa các ô đang mang số lượng gợi ý tự động"
+              style={{
+                color: '#b45309',
+                borderColor: '#fcd34d',
+                backgroundColor: '#fffbeb',
+                padding: '0 8px',
+                height: CTRL_H,
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            >
+              <span>Bỏ gợi ý</span>
+            </button>
+          )}
 
           <button
             type="button"

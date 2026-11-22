@@ -332,6 +332,52 @@
   text-overflow: unset;
 }
 
+/* Bảng SP cửa hàng: chữ nhỏ hơn; header 1 dòng; nội dung dài xuống dòng (không …) */
+.so-list-table-card--dense .so-list-table thead th {
+  font-size: 10.5px !important;
+  padding: 6px 5px !important;
+  white-space: nowrap !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.2 !important;
+}
+
+.so-list-table-card--dense .so-list-table tbody td {
+  font-size: 11px !important;
+  padding: 5px 6px !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.35 !important;
+  vertical-align: top !important;
+}
+
+.so-list-table-card--dense .so-list-name {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+.so-list-table-card--dense .so-list-table tbody td.so-list-td--actions,
+.so-list-table-card--dense .so-list-table tbody td.so-list-td--status {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+}
+
+.so-list-table-card--dense .so-list-table thead th:nth-last-child(1),
+.so-list-table-card--dense .so-list-table thead th:nth-last-child(2) {
+  text-align: center !important;
+}
+
 /* Bảng lô: không cắt ba chấm — nội dung xuống dòng */
 .so-list-table-card--wrap .so-list-table thead th {
   white-space: normal !important;

@@ -71,7 +71,7 @@ export const ShiftHandoverForm: FC<Props> = ({
         </div>
 
         <div className="handover-field">
-          <label className="handover-label">Tiền để lại két ca sau (Float):</label>
+          <label className="handover-label">Tiền để lại két ca sau:</label>
           <input
             type="number"
             value={floatRetained === 0 ? '' : floatRetained}
@@ -114,7 +114,7 @@ export const ShiftHandoverForm: FC<Props> = ({
           style={{ height: '34px', fontSize: '12px' }}
         >
           <Printer size={14} />
-          <span>In Báo Cáo Z-Report</span>
+          <span>In Báo Cáo Kết Ca</span>
         </button>
         <button
           type="submit"

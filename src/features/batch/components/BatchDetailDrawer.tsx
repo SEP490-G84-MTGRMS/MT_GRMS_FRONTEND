@@ -5,6 +5,7 @@ import {
   Calendar,
   Building2,
   ClipboardCheck,
+  Tag,
 } from 'lucide-react';
 import type { BatchItem } from '../types/batch.types';
 
@@ -74,7 +75,7 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
   batch,
   onClose,
   onUpdateLocation: _onUpdateLocation,
-  onDiscountClick: _onDiscountClick,
+  onDiscountClick,
   onWriteOffClick: _onWriteOffClick,
   onViewGrn,
   onStocktakeClick,
@@ -354,7 +355,7 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Action Toolbar — ẩn sửa kệ / markdown / xuất hủy stub */}
+          {/* Action Toolbar */}
           <div
             style={{
               display: 'flex',
@@ -365,9 +366,9 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
               backgroundColor: '#f8fafc',
               borderRadius: 8,
               border: '1px solid #e2e8f0',
+              flexWrap: 'wrap',
             }}
           >
-
             <button
               type="button"
               onClick={() => onViewGrn(batch.originalGrnNo)}
@@ -390,6 +391,31 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
               <FileText size={13} />
               <span>Xem GRN gốc: {batch.originalGrnNo}</span>
             </button>
+
+            {batch.status !== 'Expired' && (
+              <button
+                type="button"
+                onClick={() => onDiscountClick(batch)}
+                style={{
+                  height: 32,
+                  padding: '0 12px',
+                  borderRadius: 6,
+                  border: '1px solid #bfdbfe',
+                  backgroundColor: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+                title="Áp dụng giảm giá FEFO kích cầu xả hàng cận date"
+              >
+                <Tag size={13} />
+                <span>Giảm giá FEFO</span>
+              </button>
+            )}
 
             {onStocktakeClick && (
               <button

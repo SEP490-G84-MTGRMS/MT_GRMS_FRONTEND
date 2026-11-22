@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import type { CSSProperties, FC } from 'react';
 import type { SupplierProductItem } from '../../types/supplier.types';
 import { SupplierStatusBadge } from '../SupplierStatusBadge';
 import { Edit2 } from 'lucide-react';
@@ -12,6 +12,18 @@ interface SupplierProductTableRowProps {
   onToggleStatus?: (item: SupplierProductItem) => void;
   onSetPrimary?: (item: SupplierProductItem) => void;
 }
+
+const monoCell: CSSProperties = {
+  fontFamily: 'var(--font-mono, monospace)',
+  fontSize: 11,
+  fontWeight: 600,
+  whiteSpace: 'normal',
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
+  display: 'inline-block',
+  maxWidth: '100%',
+  lineHeight: 1.35,
+};
 
 export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
   index,
@@ -29,30 +41,52 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       className="so-list-row"
       style={{
         borderBottom: '1px solid #f1f5f9',
-        backgroundColor: '#ffffff',
-        opacity: item.status === 'Inactive' ? 0.65 : 1,
+        backgroundColor: item.isMasterProductActive === false ? '#f8fafc' : '#ffffff',
+        opacity: item.status === 'Inactive' || item.isMasterProductActive === false ? 0.7 : 1,
       }}
+      title={
+        item.isMasterProductActive === false
+          ? 'Sản phẩm master đang Ngừng KD — vẫn giữ liên kết NCC, không cho đặt hàng mới'
+          : undefined
+      }
       onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = '#f8fafc';
+        e.currentTarget.style.backgroundColor = '#f1f5f9';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = '#ffffff';
+        e.currentTarget.style.backgroundColor =
+          item.isMasterProductActive === false ? '#f8fafc' : '#ffffff';
       }}
     >
       {/* 1. STT */}
-      <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>
+      <td
+        style={{
+          padding: '5px 6px',
+          textAlign: 'center',
+          fontSize: 11,
+          color: '#94a3b8',
+          verticalAlign: 'middle',
+          borderBottom: '1px solid #f1f5f9',
+        }}
+      >
         {index}
       </td>
 
       {/* 2. Ảnh */}
-      <td style={{ padding: '8px 10px', textAlign: 'center', verticalAlign: 'middle' }}>
+      <td
+        style={{
+          padding: '5px 4px',
+          textAlign: 'center',
+          verticalAlign: 'middle',
+          borderBottom: '1px solid #f1f5f9',
+        }}
+      >
         {item.imageUrl ? (
           <img
             src={item.imageUrl}
             alt={item.name}
             style={{
-              width: 36,
-              height: 36,
+              width: 32,
+              height: 32,
               objectFit: 'cover',
               borderRadius: 6,
               border: '1px solid #e2e8f0',
@@ -64,8 +98,8 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         ) : (
           <div
             style={{
-              width: 36,
-              height: 36,
+              width: 32,
+              height: 32,
               borderRadius: 6,
               border: '1px dashed #cbd5e1',
               background: '#f8fafc',
@@ -73,7 +107,7 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 10,
+              fontSize: 9,
               color: '#94a3b8',
             }}
           >
@@ -83,33 +117,29 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 3. SKU */}
-      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px' }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#0f766e',
-          }}
-        >
+      <td className="supplier-product-cell--wrap" style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9' }}>
+        <span style={{ ...monoCell, color: '#0f766e' }} title={item.sku}>
           {item.sku}
         </span>
       </td>
 
       {/* 4. Tên Sản Phẩm */}
       <td className="so-list-td--wrap">
-        <div className="so-list-name">{item.name}</div>
+        <div className="so-list-name" title={item.name}>
+          {item.name}
+        </div>
+        {item.isMasterProductActive === false ? (
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: '#b45309', marginTop: 2 }}>
+            Master: Ngừng KD
+          </div>
+        ) : null}
       </td>
 
-      {/* 4. Mã NCC */}
-      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px' }}>
+      {/* 5. Mã NCC */}
+      <td className="supplier-product-cell--wrap" style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9' }}>
         <span
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#475569',
-          }}
+          style={{ ...monoCell, color: '#334155' }}
+          title={supplierCode || item.supplierCode || item.supplierId}
         >
           {supplierCode || item.supplierCode || item.supplierId}
         </span>
@@ -117,16 +147,22 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
 
       {/* 6. Tên Nhà Cung Cấp */}
       <td className="so-list-td--wrap">
-        <div className="so-list-name">{supplierName || item.supplierName || '---'}</div>
+        <div className="so-list-name" title={supplierName || item.supplierName || '---'}>
+          {supplierName || item.supplierName || '---'}
+        </div>
       </td>
 
       {/* 7. Ngành Hàng */}
-      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px' }}>
+      <td className="supplier-product-cell--wrap" style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9' }}>
         <span
           style={{
-            fontSize: 12,
+            fontSize: 11,
             color: '#475569',
             fontWeight: 500,
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+            lineHeight: 1.35,
           }}
         >
           {item.categoryName || 'Chung'}
@@ -134,21 +170,41 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 8. Đơn vị nhập */}
-      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px', textAlign: 'center' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>
+      <td
+        className="supplier-product-cell--wrap"
+        style={{
+          padding: '5px 4px',
+          textAlign: 'center',
+          borderBottom: '1px solid #f1f5f9',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: '#1e293b',
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+            display: 'inline-block',
+            maxWidth: '100%',
+          }}
+        >
           {item.deliveryUoM || item.baseUoM}
         </span>
       </td>
 
       {/* 9. Giá Nhập Sỉ */}
-      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px', textAlign: 'right' }}>
+      <td
+        className="supplier-product-cell--wrap"
+        style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}
+      >
         {(() => {
           const isFromMaster = !(item.agreedPrice > 0) && (item.effectivePrice ?? 0) > 0;
           return (
             <span
               style={{
-                fontFamily: 'var(--font-mono, monospace)',
-                fontSize: 12.5,
+                ...monoCell,
                 fontWeight: 700,
                 color: isFromMaster ? '#94a3b8' : '#0f766e',
               }}
@@ -161,27 +217,21 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       </td>
 
       {/* 10. MOQ */}
-      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px', textAlign: 'right' }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 12,
-            color: '#475569',
-          }}
-        >
+      <td
+        className="supplier-product-cell--wrap"
+        style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}
+      >
+        <span style={{ ...monoCell, fontWeight: 700, color: '#0f172a' }}>
           {item.moq} {item.deliveryUoM || item.baseUoM}
         </span>
       </td>
 
       {/* 11. Thiếu cho phép */}
-      <td className="supplier-product-cell--wrap" style={{ padding: '10px 12px', textAlign: 'right' }}>
-        <span
-          style={{
-            fontFamily: 'var(--font-mono, monospace)',
-            fontSize: 12,
-            color: '#475569',
-          }}
-        >
+      <td
+        className="supplier-product-cell--wrap"
+        style={{ padding: '5px 6px', textAlign: 'right', borderBottom: '1px solid #f1f5f9' }}
+      >
+        <span style={{ ...monoCell, color: '#475569' }}>
           {item.allowedShortageQty ?? 0} {item.deliveryUoM || item.baseUoM}
         </span>
       </td>
@@ -189,22 +239,35 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       {/* 12. Trạng Thái */}
       <td
         className="so-list-td--status"
-        style={{ textAlign: 'center', minWidth: 96 }}
+        style={{
+          textAlign: 'center',
+          verticalAlign: 'middle',
+          padding: '5px 6px',
+          borderBottom: '1px solid #f1f5f9',
+        }}
         title={item.status === 'Active' ? 'Hoạt động' : 'Tạm ngưng'}
       >
         <SupplierStatusBadge status={item.status} />
       </td>
 
-      {/* 12. Thao Tác */}
-      <td style={{ textAlign: 'right' }}>
-        <div className="so-list-actions">
+      {/* 13. Thao Tác */}
+      <td
+        className="so-list-td--actions"
+        style={{
+          padding: '5px 6px',
+          textAlign: 'center',
+          verticalAlign: 'middle',
+          borderBottom: '1px solid #f1f5f9',
+        }}
+      >
+        <div className="so-list-actions" style={{ justifyContent: 'center' }}>
           <button
             type="button"
             className="so-list-action-btn"
             onClick={() => onEdit(item)}
             title="Sửa điều khoản cung ứng"
           >
-            <Edit2 size={12} /> Sửa
+            <Edit2 size={11} /> Sửa
           </button>
         </div>
       </td>

@@ -351,73 +351,205 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
           </div>
 
           {/* Result Body */}
-          <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
-            {/* Stat Summary Cards */}
-            <div
+          <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1 }}>
+            {/* Tóm tắt 1 dòng */}
+            <p
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 1fr)',
-                gap: 12,
-                marginBottom: 20,
+                margin: '0 0 14px',
+                fontSize: 14,
+                color: '#334155',
+                lineHeight: 1.5,
               }}
             >
+              PO tạo mới: <strong style={{ color: '#15803d' }}>{createdCount}</strong>
+              <span style={{ color: '#cbd5e1', margin: '0 8px' }}>·</span>
+              PO cập nhật: <strong style={{ color: '#1d4ed8' }}>{amendedCount}</strong>
+              <span style={{ color: '#cbd5e1', margin: '0 8px' }}>·</span>
+              Thất bại: <strong style={{ color: '#b91c1c' }}>{batchResult.failedCount}</strong>
+              <span style={{ color: '#cbd5e1', margin: '0 8px' }}>·</span>
+              Đã khóa / không đổi:{' '}
+              <strong style={{ color: '#475569' }}>
+                {(batchResult.alreadyFinalizedCount || 0) + noChangesCount}
+              </strong>
+            </p>
+
+            {/* Excel + Email — gọn, 2 cột */}
+            {livePackage && (
               <div
                 style={{
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: 8,
-                  padding: '12px 14px',
-                  textAlign: 'center',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 8,
+                  marginBottom: 14,
                 }}
               >
-                <div style={{ fontSize: 11.5, color: '#166534', fontWeight: 700 }}>PO TẠO MỚI</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#15803d', marginTop: 2 }}>
-                  {createdCount}
+                <div
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 6,
+                    padding: '8px 10px',
+                    background: '#f8fafc',
+                    minWidth: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 12,
+                      marginBottom: 4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      color: '#0f172a',
+                    }}
+                  >
+                    <Package size={12} /> Excel
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: '#475569',
+                      lineHeight: 1.35,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={
+                      livePackage.generationStatus === 'GENERATED' && livePackage.fileName
+                        ? livePackage.fileName
+                        : undefined
+                    }
+                  >
+                    {livePackage.generationStatus === 'PENDING' ||
+                    livePackage.generationStatus === 'GENERATING'
+                      ? 'Đang tạo file...'
+                      : livePackage.generationStatus === 'GENERATED'
+                        ? livePackage.fileName || 'Tạo file thành công'
+                        : `Thất bại${livePackage.lastError ? `: ${livePackage.lastError}` : ''}`}
+                  </div>
+                  {livePackage.canDownload && (
+                    <button
+                      type="button"
+                      className="po-btn po-btn-secondary"
+                      style={{ marginTop: 6, height: 26, fontSize: 11, padding: '0 8px' }}
+                      disabled={packageBusy}
+                      onClick={() => {
+                        setPackageBusy(true);
+                        void dispatchHubApi
+                          .downloadDispatchPackage(livePackage.id)
+                          .then((blob) => {
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = livePackage.fileName || 'don-hang.xlsx';
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          })
+                          .finally(() => setPackageBusy(false));
+                      }}
+                    >
+                      <Download size={11} /> Tải Excel
+                    </button>
+                  )}
+                </div>
+                <div
+                  style={{
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 6,
+                    padding: '8px 10px',
+                    background: '#f8fafc',
+                    minWidth: 0,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 12,
+                      marginBottom: 4,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      color: '#0f172a',
+                    }}
+                  >
+                    <Mail size={12} /> Email
+                  </div>
+                  <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.35 }}>
+                    {livePackage.emailStatus === 'PENDING' && 'Đang chuẩn bị gửi...'}
+                    {livePackage.emailStatus === 'SCHEDULED' &&
+                      `Hẹn giờ: ${
+                        livePackage.scheduledSendAtUtc
+                          ? new Date(livePackage.scheduledSendAtUtc).toLocaleString('vi-VN')
+                          : '—'
+                      }`}
+                    {livePackage.emailStatus === 'SENDING' && 'Đang gửi...'}
+                    {livePackage.emailStatus === 'SENT' &&
+                      `Đã gửi${
+                        livePackage.sentAtUtc
+                          ? ` · ${new Date(livePackage.sentAtUtc).toLocaleString('vi-VN')}`
+                          : ''
+                      }`}
+                    {livePackage.emailStatus === 'FAILED' &&
+                      `Thất bại${livePackage.lastError ? `: ${livePackage.lastError}` : ''}`}
+                    {livePackage.emailStatus === 'CANCELLED' && 'Đã hủy lịch gửi'}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#94a3b8',
+                      marginTop: 2,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={`To: ${livePackage.emailTo}${
+                      livePackage.emailCc?.length ? ` · CC: ${livePackage.emailCc.join(', ')}` : ''
+                    }`}
+                  >
+                    To: {livePackage.emailTo}
+                    {livePackage.emailCc?.length ? ` · CC: ${livePackage.emailCc.join(', ')}` : ''}
+                  </div>
+                  {(livePackage.canCancelSchedule || livePackage.canRetryEmail) && (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      {livePackage.canCancelSchedule && (
+                        <button
+                          type="button"
+                          className="po-btn po-btn-secondary"
+                          style={{ height: 26, fontSize: 11, padding: '0 8px' }}
+                          disabled={packageBusy}
+                          onClick={() => {
+                            setPackageBusy(true);
+                            void dispatchHubApi
+                              .cancelPackageSchedule(livePackage.id)
+                              .then(setLivePackage)
+                              .finally(() => setPackageBusy(false));
+                          }}
+                        >
+                          <Clock size={11} /> Hủy lịch
+                        </button>
+                      )}
+                      {livePackage.canRetryEmail && (
+                        <button
+                          type="button"
+                          className="po-btn po-btn-secondary"
+                          style={{ height: 26, fontSize: 11, padding: '0 8px' }}
+                          disabled={packageBusy}
+                          onClick={() => {
+                            setPackageBusy(true);
+                            void dispatchHubApi
+                              .retryPackageEmail(livePackage.id)
+                              .then(setLivePackage)
+                              .finally(() => setPackageBusy(false));
+                          }}
+                        >
+                          <RotateCcw size={11} /> Gửi lại
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div
-                style={{
-                  background: '#eff6ff',
-                  border: '1px solid #bfdbfe',
-                  borderRadius: 8,
-                  padding: '12px 14px',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 11.5, color: '#1d4ed8', fontWeight: 700 }}>PO CẬP NHẬT</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#1d4ed8', marginTop: 2 }}>
-                  {amendedCount}
-                </div>
-              </div>
-              <div
-                style={{
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  borderRadius: 8,
-                  padding: '12px 14px',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 11.5, color: '#991b1b', fontWeight: 700 }}>PO THẤT BẠI</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#b91c1c', marginTop: 2 }}>
-                  {batchResult.failedCount}
-                </div>
-              </div>
-              <div
-                style={{
-                  background: '#f1f5f9',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: 8,
-                  padding: '12px 14px',
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 11.5, color: '#334155', fontWeight: 700 }}>ĐÃ KHÓA / KHÔNG ĐỔI</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#475569', marginTop: 2 }}>
-                  {(batchResult.alreadyFinalizedCount || 0) + noChangesCount}
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* List results by group */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -544,108 +676,6 @@ export const DispatchConfirmModal: FC<DispatchConfirmModalProps> = ({
               })}
             </div>
           </div>
-
-          {/* Excel + Email package status */}
-          {livePackage && (
-            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#fff' }}>
-                <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Package size={14} /> Excel
-                </div>
-                <div style={{ fontSize: 13, color: '#334155' }}>
-                  {livePackage.generationStatus === 'PENDING' || livePackage.generationStatus === 'GENERATING'
-                    ? 'Đang tạo file Excel...'
-                    : livePackage.generationStatus === 'GENERATED'
-                      ? `Tạo file thành công${livePackage.fileName ? `: ${livePackage.fileName}` : ''}`
-                      : `Tạo file thất bại${livePackage.lastError ? `: ${livePackage.lastError}` : ''}`}
-                </div>
-                {livePackage.canDownload && (
-                  <button
-                    type="button"
-                    className="po-btn po-btn-secondary"
-                    style={{ marginTop: 8, height: 32, fontSize: 12 }}
-                    disabled={packageBusy}
-                    onClick={() => {
-                      setPackageBusy(true);
-                      void dispatchHubApi
-                        .downloadDispatchPackage(livePackage.id)
-                        .then((blob) => {
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = livePackage.fileName || 'don-hang.xlsx';
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        })
-                        .finally(() => setPackageBusy(false));
-                    }}
-                  >
-                    <Download size={13} /> Tải Excel
-                  </button>
-                )}
-              </div>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, background: '#fff' }}>
-                <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Mail size={14} /> Email
-                </div>
-                <div style={{ fontSize: 13, color: '#334155' }}>
-                  {livePackage.emailStatus === 'PENDING' && 'Đang chờ gửi / chuẩn bị gửi email NCC...'}
-                  {livePackage.emailStatus === 'SCHEDULED' &&
-                    `Đã lên lịch gửi lúc ${
-                      livePackage.scheduledSendAtUtc
-                        ? new Date(livePackage.scheduledSendAtUtc).toLocaleString('vi-VN')
-                        : '—'
-                    }`}
-                  {livePackage.emailStatus === 'SENDING' && 'Đang gửi email...'}
-                  {livePackage.emailStatus === 'SENT' &&
-                    `Đã gửi${livePackage.sentAtUtc ? ` lúc ${new Date(livePackage.sentAtUtc).toLocaleString('vi-VN')}` : ''}`}
-                  {livePackage.emailStatus === 'FAILED' &&
-                    `Gửi thất bại${livePackage.lastError ? `: ${livePackage.lastError}` : ''}`}
-                  {livePackage.emailStatus === 'CANCELLED' && 'Đã hủy lịch gửi email'}
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
-                  To: {livePackage.emailTo}
-                  {livePackage.emailCc?.length ? ` · CC: ${livePackage.emailCc.join(', ')}` : ''}
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                  {livePackage.canCancelSchedule && (
-                    <button
-                      type="button"
-                      className="po-btn po-btn-secondary"
-                      style={{ height: 32, fontSize: 12 }}
-                      disabled={packageBusy}
-                      onClick={() => {
-                        setPackageBusy(true);
-                        void dispatchHubApi
-                          .cancelPackageSchedule(livePackage.id)
-                          .then(setLivePackage)
-                          .finally(() => setPackageBusy(false));
-                      }}
-                    >
-                      <Clock size={13} /> Hủy lịch gửi
-                    </button>
-                  )}
-                  {livePackage.canRetryEmail && (
-                    <button
-                      type="button"
-                      className="po-btn po-btn-secondary"
-                      style={{ height: 32, fontSize: 12 }}
-                      disabled={packageBusy}
-                      onClick={() => {
-                        setPackageBusy(true);
-                        void dispatchHubApi
-                          .retryPackageEmail(livePackage.id)
-                          .then(setLivePackage)
-                          .finally(() => setPackageBusy(false));
-                      }}
-                    >
-                      <RotateCcw size={13} /> Gửi lại email
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Result Footer */}
           <div

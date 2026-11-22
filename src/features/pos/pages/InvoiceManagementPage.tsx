@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { generateUuidV7 } from '../../../utils/uuid';
 import type { FC } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
@@ -36,8 +37,9 @@ import type { InvoiceDTO, PreOrderDTO } from '../types/inventory.types';
 import { ReturnExchangeModal } from '../components/modals/ReturnExchangeModal';
 import { CreatePreOrderModal } from '../components/modals/CreatePreOrderModal';
 import { FulfillPreOrderModal } from '../components/modals/FulfillPreOrderModal';
+import { PosReceiptModal } from '../components/PosReceiptModal';
 import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
-import type { Product, Customer } from '../types/pos.types';
+import type { Product, Customer, ReceiptData } from '../types/pos.types';
 import { posOrderApi } from '../api/posOrderApi';
 import { posShiftApi } from '../api/posShiftApi';
 import { employeeApi } from '../../employee/api/employeeApi';
@@ -94,6 +96,23 @@ const parsePreOrderPickupAndNotes = (rawNote?: string | null) => {
   };
 };
 
+type ReturnRecord = { code: string; createdAt: string; returnedAmount: number; newGoodsAmount: number };
+
+const collectReturnRecords = (orders: any[]): Record<string, ReturnRecord[]> => {
+  const records: Record<string, ReturnRecord[]> = {};
+  orders.filter((order) => order.orderCode?.startsWith('DT')).forEach((order) => {
+    const originalCode = order.note?.match(/Đổi\/Trả từ đơn '([^']+)'/)?.[1];
+    if (!originalCode) return;
+    (records[originalCode] ??= []).push({
+      code: order.orderCode,
+      createdAt: order.orderDate ? new Date(order.orderDate).toLocaleString('vi-VN') : '',
+      returnedAmount: order.returnedAmount || 0,
+      newGoodsAmount: order.totalAmount || 0,
+    });
+  });
+  return records;
+};
+
 export const InvoiceManagementPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -116,7 +135,8 @@ export const InvoiceManagementPage: FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [timePreset, setTimePreset] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH' | 'DEBT' | 'CREDIT'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'DEBT' | 'PENDING_PAYMENT'>(showPendingPayments ? 'PENDING_PAYMENT' : 'ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'PENDING_PAYMENT'>(showPendingPayments ? 'PENDING_PAYMENT' : 'ALL');
+  const [returnRecordsByOrder, setReturnRecordsByOrder] = useState<Record<string, ReturnRecord[]>>({});
 
   // Danh sách hóa đơn có thể hủy / cập nhật trạng thái (Phân lập theo Cửa Hàng / Tenant)
   const { user } = useAuthStore();
@@ -194,6 +214,7 @@ export const InvoiceManagementPage: FC = () => {
   const [invoices, setInvoices] = useState<InvoiceDTO[]>(getInitialInvoices);
   const [preOrders, setPreOrders] = useState<PreOrderDTO[]>(getInitialPreOrders);
   const [activeShiftCash, setActiveShiftCash] = useState<number | undefined>(undefined);
+  const returnRequestRef = useRef<{ signature: string; key: string } | null>(null);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [catalogCustomers, setCatalogCustomers] = useState<Customer[]>([]);
   const [exchangeBranchProducts, setExchangeBranchProducts] = useState<Product[]>([]);
@@ -281,12 +302,14 @@ export const InvoiceManagementPage: FC = () => {
       debtAmount: isDebtMethod ? Math.max(0, (o.finalAmount || 0) - (o.depositAmount || 0)) : 0,
       paidDebtAmount: isDebtMethod ? (o.depositAmount || 0) : 0,
       debtPaymentRecords: [],
-      status: o.status === 'Cancelled' ? 'CANCELLED' : o.status === 'PendingPayment' ? 'PENDING_PAYMENT' : isDebtMethod ? 'DEBT' : 'COMPLETED',
-      statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : o.status === 'PendingPayment' ? 'Chờ chuyển khoản' : isDebtMethod ? 'Ghi nợ' : 'Hoàn thành',
+      status: o.status === 'Cancelled' ? 'CANCELLED' : o.status === 'PendingPayment' ? 'PENDING_PAYMENT' : 'COMPLETED',
+      statusLabel: o.status === 'Cancelled' ? 'Đã hủy' : o.status === 'PendingPayment' ? 'Chờ chuyển khoản' : 'Hoàn thành',
       isPreOrder: isPreOrderFlag,
       orderOrigin: isPreOrderFlag ? 'PRE_ORDER' : 'RETAIL',
       items: (o.items || []).map((it: any) => ({
         itemId: it.id,
+        batchId: it.batchId || it.BatchId || '',
+        stockAllocations: it.stockAllocations || it.StockAllocations || [],
         productId: it.productId,
         productName: it.productName,
         sku: it.barcode || '',
@@ -302,11 +325,40 @@ export const InvoiceManagementPage: FC = () => {
     };
   };
 
+  const mapPreOrderToInvoice = (pre: PreOrderDTO): InvoiceDTO => {
+    return {
+      orderUuid: pre.orderUuid,
+      invoiceId: pre.preOrderId,
+      createdAt: pre.createdAt,
+      branchId: pre.branchId,
+      branchName: pre.branchName,
+      cashierId: '',
+      cashierName: pre.fulfilledByCashierName || pre.cashierName || 'Thu ngân POS',
+      customerName: pre.customerName || 'Khách đặt trước',
+      customerPhone: pre.customerPhone,
+      note: pre.notes || '',
+      totalMerchandiseAmount: pre.totalMerchandiseAmount || pre.totalOrderAmount,
+      totalDiscount: pre.discountAmount || 0,
+      finalPaidAmount: pre.totalOrderAmount,
+      debtAmount: 0,
+      paidDebtAmount: 0,
+      debtPaymentRecords: [],
+      paymentMethod: 'CASH',
+      paymentMethodLabel: 'Tiền mặt',
+      status: pre.status === 'CANCELLED' ? 'CANCELLED' : 'COMPLETED',
+      statusLabel: pre.status === 'CANCELLED' ? 'Đã hủy' : 'Hoàn thành',
+      isPreOrder: true,
+      orderOrigin: 'PRE_ORDER',
+      items: pre.items || [],
+    };
+  };
+
   // Nạp tiền mặt trong két ca làm việc đang mở của chi nhánh
   useEffect(() => {
     const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? (dbBranches[0]?.id || assignedBranch.id) : assignedBranch.id);
+    setActiveShiftCash(undefined);
     posShiftApi.getCurrentShift(targetBranchId).then((s) => {
-      if (s) setActiveShiftCash(s.expectedCash);
+      setActiveShiftCash(s?.expectedCash);
     }).catch(() => { });
   }, [branchFilter, assignedBranch.id]);
 
@@ -324,14 +376,21 @@ export const InvoiceManagementPage: FC = () => {
       .then((res) => {
         if (!isMounted) return;
         if (!res || !res.items || res.items.length === 0) {
+          setReturnRecordsByOrder({});
           setInvoices(showPendingPayments ? [] : getInitialInvoices());
           setPreOrders(getInitialPreOrders());
           return;
         }
 
-        // 1. Phân loại và nạp danh sách Hóa đơn bán lẻ (không đẩy đơn đang chờ nhận PendingPickup vào tab bán lẻ)
+        // 1. Phân loại và nạp danh sách Hóa đơn bán lẻ (tách biệt hoàn toàn, không lẫn đơn đặt trước PO/PRE)
+        setReturnRecordsByOrder(collectReturnRecords(res.items));
         const invoiceOrders = res.items.filter(
-          (o: any) => o.status !== 'PreOrder' && o.status !== 'PendingPickup'
+          (o: any) =>
+            !o.orderCode?.startsWith('DT') &&
+            !o.orderCode?.startsWith('PO') &&
+            !o.orderCode?.startsWith('PRE-') &&
+            o.status !== 'PreOrder' &&
+            o.status !== 'PendingPickup'
         );
         const mappedInvoices: InvoiceDTO[] = invoiceOrders.map(mapBackendOrderToInvoice);
 
@@ -339,7 +398,7 @@ export const InvoiceManagementPage: FC = () => {
         const combinedInvoices = [...mappedInvoices];
         const existingCodes = new Set(mappedInvoices.map((i) => i.invoiceId));
         if (!showPendingPayments) getInitialInvoices().forEach((initInv) => {
-          if (!existingCodes.has(initInv.invoiceId)) {
+          if (!existingCodes.has(initInv.invoiceId) && !initInv.invoiceId.startsWith('DT') && !initInv.invoiceId.startsWith('PO') && !initInv.invoiceId.startsWith('PRE-')) {
             combinedInvoices.push(initInv);
           }
         });
@@ -394,6 +453,8 @@ export const InvoiceManagementPage: FC = () => {
                     : 'Đang giữ kho',
               items: (o.items || []).map((it: any) => ({
                 itemId: it.id,
+                batchId: it.batchId || '',
+                stockAllocations: it.stockAllocations || [],
                 productId: it.productId,
                 productName: it.productName,
                 sku: it.barcode || '',
@@ -489,8 +550,61 @@ export const InvoiceManagementPage: FC = () => {
     setExpandedPreOrderId((prev) => (prev === preOrderId ? null : preOrderId));
   };
 
-  // Modal In bill nhiệt K80
+  // Modal In bill nhiệt POS-58
   const [printingInvoice, setPrintingInvoice] = useState<InvoiceDTO | null>(null);
+
+  const printReceiptData: ReceiptData | null = useMemo(() => {
+    if (!printingInvoice) return null;
+    const isPre = Boolean(
+      printingInvoice.isPreOrder ||
+      printingInvoice.invoiceId?.startsWith('DH') ||
+      printingInvoice.invoiceId?.startsWith('PO') ||
+      printingInvoice.orderOrigin === 'PRE_ORDER'
+    );
+    return {
+      orderId: printingInvoice.orderUuid,
+      storeName: printingInvoice.branchName || assignedBranch.name || 'SIÊU THỊ THỰC PHẨM',
+      storeAddress: (assignedBranch as any).address || 'Hà Nội',
+      storePhone: (assignedBranch as any).phone || '024 3822 9988',
+      hotline: (assignedBranch as any).phone || '024 3822 9988',
+      orderCode: printingInvoice.invoiceId,
+      createdAt: printingInvoice.createdAt,
+      cashierName: printingInvoice.cashierName,
+      posMachine: 'Quầy #01',
+      branchName: printingInvoice.branchName || assignedBranch.name || '',
+      isPreOrder: isPre,
+      customer: printingInvoice.customerName ? {
+        name: printingInvoice.customerName,
+        phone: printingInvoice.customerPhone || '',
+        address: '',
+        loyaltyPoints: 0,
+      } : null,
+      items: printingInvoice.items.map((it, idx) => ({
+        stt: idx + 1,
+        name: it.productName,
+        quantity: it.quantity,
+        unitPrice: it.isGift ? 0 : it.unitPrice,
+        totalPrice: it.isGift ? 0 : it.totalAmount,
+        totalAmount: it.isGift ? 0 : it.totalAmount,
+        isGift: Boolean(it.isGift),
+      })),
+      totalItemAmount: printingInvoice.totalMerchandiseAmount,
+      itemDiscountAmount: 0,
+      orderDiscountAmount: printingInvoice.totalDiscount,
+      voucherDiscountAmount: printingInvoice.voucherDiscountAmount || undefined,
+      appliedVoucherCode: printingInvoice.appliedVoucherCode || undefined,
+      appliedPromotionSummary: printingInvoice.appliedPromotionSummary || undefined,
+      pointsDiscountAmount: printingInvoice.pointsDiscountAmount || 0,
+      pointsRedeemed: printingInvoice.pointsRedeemed || undefined,
+      vatAmount: 0,
+      finalAmount: printingInvoice.finalPaidAmount,
+      finalAmountInWords: '',
+      paymentMethodText: printingInvoice.paymentMethodLabel || 'Tiền mặt',
+      cashTendered: printingInvoice.finalPaidAmount,
+      debtAmount: printingInvoice.debtAmount || undefined,
+      earnedPoints: 0,
+    };
+  }, [printingInvoice, assignedBranch]);
 
   // Phân trang Hóa đơn (TablePagination)
   const [invoicePage, setInvoicePage] = useState(1);
@@ -560,6 +674,7 @@ export const InvoiceManagementPage: FC = () => {
       )
     );
     showToast(`Đã hủy thành công hóa đơn ${cancelModalInvoice.invoiceId} (${cancelReason})!`);
+    window.dispatchEvent(new Event('mtgrms:customer-debt-changed'));
     setCancelModalInvoice(null);
     setCancelNote('');
   };
@@ -612,18 +727,29 @@ export const InvoiceManagementPage: FC = () => {
     settlementMethod: string;
     reason?: string;
     note?: string;
+    cashFundSource?: 'SHIFT' | 'SAFE';
   }) => {
     if (!returnExchangeModalInvoice) return;
     try {
       const targetOrderId = returnExchangeModalInvoice.orderUuid || returnExchangeModalInvoice.invoiceId;
-      const res = await posOrderApi.returnExchangeOrder(targetOrderId, data);
-      showToast(`Đã xử lý đổi/trả hàng thành công cho hóa đơn ${returnExchangeModalInvoice.invoiceId}! (Mã đơn mới: ${res?.orderCode || 'Đã ghi nhận'})`);
+      const signature = JSON.stringify({ targetOrderId, data });
+      if (returnRequestRef.current?.signature !== signature)
+        returnRequestRef.current = { signature, key: generateUuidV7() };
+      const res = await posOrderApi.returnExchangeOrder(targetOrderId, data, returnRequestRef.current.key);
+      returnRequestRef.current = null;
+      showToast(`Đã ghi nhận đổi/trả cho hóa đơn ${returnExchangeModalInvoice.invoiceId}. Mã phiếu đổi/trả: ${res?.orderCode || 'Đã ghi nhận'}`);
 
-      // Nạp lại danh sách từ API
+      // Nạp lại danh sách từ API (chỉ lấy hóa đơn bán lẻ)
       posOrderApi.getOrders().then((orderRes) => {
         if (orderRes && orderRes.items) {
+          setReturnRecordsByOrder(collectReturnRecords(orderRes.items));
           const invoiceOrders = orderRes.items.filter(
-            (o: any) => o.status !== 'PreOrder' && o.status !== 'PendingPickup'
+            (o: any) =>
+              !o.orderCode?.startsWith('DT') &&
+              !o.orderCode?.startsWith('PO') &&
+              !o.orderCode?.startsWith('PRE-') &&
+              o.status !== 'PreOrder' &&
+              o.status !== 'PendingPickup'
           );
           setInvoices(invoiceOrders.map(mapBackendOrderToInvoice));
         }
@@ -1139,9 +1265,8 @@ export const InvoiceManagementPage: FC = () => {
                     onChange={(e) => setStatusFilter(e.target.value as any)}
                   >
                     <option value="ALL">Tất cả trạng thái</option>
-                    <option value="COMPLETED">Đã thanh toán 100%</option>
+                    <option value="COMPLETED">Hoàn thành</option>
                     <option value="PENDING_PAYMENT">Chờ chuyển khoản</option>
-                    <option value="DEBT">Đơn bán nợ</option>
                     <option value="CANCELLED">Đã hủy / Đổi trả</option>
                   </select>
                 </div>
@@ -1169,7 +1294,7 @@ export const InvoiceManagementPage: FC = () => {
                     <span>Danh Sách Hóa Đơn Bán Hàng</span>
                   </h3>
                   <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
-                    Hiển thị <b>{paginatedInvoices.length}</b> trên <b>{filteredInvoices.length}</b> hóa đơn &bull; Tổng tiền: <b style={{ color: '#15803d' }}>{filteredInvoices.reduce((s, i) => s + (i.status === 'COMPLETED' ? i.finalPaidAmount : 0), 0).toLocaleString('vi-VN')} đ</b>
+                    Hiển thị <b>{paginatedInvoices.length}</b> trên <b>{filteredInvoices.length}</b> hóa đơn &bull; Doanh thu: <b style={{ color: '#15803d' }}>{filteredInvoices.reduce((s, i) => s + (i.status === 'COMPLETED' ? i.finalPaidAmount + (i.debtAmount || 0) : 0), 0).toLocaleString('vi-VN')} đ</b>
                   </div>
                 </div>
 
@@ -1193,9 +1318,9 @@ export const InvoiceManagementPage: FC = () => {
                   </thead>
                   {paginatedInvoices.map((inv) => {
                     const isExpanded = expandedInvoiceId === inv.invoiceId;
-                    const isDebt = (inv.debtAmount !== undefined && inv.debtAmount > 0) || (inv.status === 'DEBT' && (!inv.debtAmount || inv.debtAmount > 0));
+                    const isDebt = inv.status !== 'CANCELLED' && ((inv.debtAmount !== undefined && inv.debtAmount > 0) || (inv.status === 'DEBT' && (!inv.debtAmount || inv.debtAmount > 0)));
                     const isDebtMethod = inv.paymentMethod === 'DEBT' || inv.paymentMethod === 'CREDIT';
-                    const isCompleted = inv.status !== 'PENDING_PAYMENT' && !isDebt && (inv.status === 'COMPLETED' || (isDebtMethod && (inv.debtAmount || 0) <= 0));
+                    const isCompleted = inv.status === 'COMPLETED';
 
                     return (
                       <tbody key={inv.invoiceId}>
@@ -1332,7 +1457,7 @@ export const InvoiceManagementPage: FC = () => {
                             style={{
                               textAlign: 'left',
                               fontWeight: 700,
-                              color: isCompleted ? '#15803d' : isDebt ? '#d97706' : '#dc2626',
+                              color: isCompleted && !isDebt ? '#15803d' : isDebt ? '#d97706' : '#dc2626',
                               fontVariantNumeric: 'tabular-nums',
                             }}
                           >
@@ -1360,13 +1485,8 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td style={{ textAlign: 'left' }}>
                             <span
-                              className={`pos-status-pill ${isCompleted ? 'completed' : isDebt || inv.status === 'PENDING_PAYMENT' ? 'debt' : 'cancelled'
+                              className={`pos-status-pill ${isCompleted ? 'completed' : inv.status === 'PENDING_PAYMENT' ? 'debt' : 'cancelled'
                                 }`}
-                              style={
-                                isDebt
-                                  ? { backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }
-                                  : undefined
-                              }
                             >
                               {isCompleted ? (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -1476,6 +1596,17 @@ export const InvoiceManagementPage: FC = () => {
                                   </div>
 
                                 </div>
+
+                                {(returnRecordsByOrder[inv.invoiceId] || []).length > 0 && (
+                                  <div style={{ marginBottom: 10, padding: '8px 12px', border: '1px solid #bfdbfe', borderRadius: 6, background: '#eff6ff', fontSize: 12 }}>
+                                    <b>Lịch sử đổi/trả:</b>
+                                    {returnRecordsByOrder[inv.invoiceId].map((record) => (
+                                      <div key={record.code} style={{ marginTop: 4 }}>
+                                        Phiếu {record.code} · {record.createdAt} · Hàng trả {record.returnedAmount.toLocaleString('vi-VN')} đ · Hàng đổi mới {record.newGoodsAmount.toLocaleString('vi-VN')} đ
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
 
                                 {/* CHI TIẾT KHUYẾN MÃI / MÃ VOUCHER / ĐIỂM THƯỞNG (REQ-ORD-PROMO-01) */}
                                 {(inv.totalDiscount > 0 ||
@@ -1664,7 +1795,7 @@ export const InvoiceManagementPage: FC = () => {
                       <th style={{ width: 95, textAlign: 'left' }}>Còn phải thu</th>
                       <th style={{ width: 110, textAlign: 'left' }}>Giữ kho</th>
                       <th style={{ width: 108, textAlign: 'left' }}>Trạng thái</th>
-                      <th style={{ width: 155, textAlign: 'left' }}>Thao tác</th>
+                      <th style={{ width: 280, minWidth: 280, textAlign: 'left' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1802,30 +1933,55 @@ export const InvoiceManagementPage: FC = () => {
                                 {pre.statusLabel}
                               </span>
                             </td>
-                            <td style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 6 }}>
+                            <td style={{ textAlign: 'left', minWidth: 280, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 6, flexWrap: 'nowrap' }}>
                                 <button
                                   type="button"
                                   className="pos-btn-secondary-pill"
-                                  style={{ height: 26, padding: '0 8px', fontSize: 11 }}
+                                  style={{ height: 26, padding: '0 8px', fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}
                                   onClick={() => toggleExpandPreOrder(pre.preOrderId)}
                                 >
                                   {isExpanded ? 'Đóng' : 'Chi tiết'}
                                 </button>
                                 {pre.status === 'CANCELLED' ? (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 11, fontWeight: 600 }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
                                     <XCircle size={12} /> Đã hủy
                                   </span>
                                 ) : pre.status === 'COMPLETED' ? (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#ecfdf5', color: '#047857', fontSize: 11, fontWeight: 600 }}>
+                                  <>
+<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#ecfdf5', color: '#047857', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
                                     <CheckCircle2 size={12} /> Đã giao
                                   </span>
+                                  <button
+                                    type="button"
+                                    className="pos-btn-secondary-pill"
+                                    style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#0f766e', color: '#0f766e', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                    title="In lại hóa đơn giao hàng K80"
+                                    onClick={(e) => handleOpenPrintModal(mapPreOrderToInvoice(pre), e)}
+                                  >
+                                    <Printer size={12} />
+                                    <span>In bill</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="pos-btn-secondary-pill"
+                                    style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#059669', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                    title="Đổi hoặc trả hàng đã giao"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setReturnExchangeModalInvoice(mapPreOrderToInvoice(pre));
+                                    }}
+                                  >
+                                    <RotateCcw size={12} />
+                                    <span>Đổi/Trả</span>
+                                  </button>
+                                  </>
                                 ) : (
                                   <>
                                     <button
                                       type="button"
                                       className="pos-btn-primary-pill"
-                                      style={{ height: 26, padding: '0 8px', fontSize: 11, backgroundColor: '#0f766e' }}
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, backgroundColor: '#0f766e', whiteSpace: 'nowrap', flexShrink: 0 }}
                                       onClick={() => setFulfillModalPreOrder(pre)}
                                       title="Thanh toán nốt số tiền còn lại và bàn giao hàng cho khách tại quầy"
                                     >
@@ -1834,7 +1990,7 @@ export const InvoiceManagementPage: FC = () => {
                                     </button>
                                     <button
                                       type="button"
-                                      style={{ height: 26, padding: '0 6px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 500 }}
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}
                                       onClick={() => handleCancelPreOrder(pre)}
                                       title="Hủy đơn đặt trước và hoàn lại tồn kho đã giữ"
                                     >
@@ -2054,200 +2210,12 @@ export const InvoiceManagementPage: FC = () => {
         </div>
       </main>
 
-      {/* MODAL IN HÓA ĐƠN NHIỆT KHỔ K80 - CHUẨN POS MODAL */}
-      {printingInvoice && (
-        <div className="pos-modal-overlay" onClick={() => setPrintingInvoice(null)}>
-          <div
-            className="pos-modal-dialog"
-            style={{ maxWidth: '420px' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="pos-modal-header">
-              <div className="flex items-center gap-2">
-                <Printer size={18} className="text-teal-700" />
-                <h2 className="pos-modal-title">Xem Trước Hóa Đơn Khổ K80</h2>
-              </div>
-              <button
-                type="button"
-                className="pos-modal-close-btn"
-                onClick={() => setPrintingInvoice(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="pos-modal-body">
-              {/* KHỔ GIẤY IN NHIỆT K80 ĐỒNG BỘ Z-REPORT-PAPER */}
-              <div className="pos-k80-paper">
-                <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 14 }}>
-                  SIÊU THỊ TIỆN LỢI MT-GRMS
-                </div>
-                <div style={{ textAlign: 'center', fontSize: 11, color: '#64748b', marginBottom: 8 }}>
-                  18 Tràng Tiền, Hoàn Kiếm, Hà Nội<br />
-                  Hotline: 1900 8888 &bull; MST: 0109988776
-                </div>
-
-                <div className="z-report-divider" />
-
-                <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: 13, margin: '4px 0' }}>
-                  HÓA ĐƠN THANH TOÁN BÁN LẺ
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                  <span>Số HD: <b>{printingInvoice.invoiceId}</b></span>
-                  <span>{printingInvoice.createdAt}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
-                  <span>Thu ngân: {printingInvoice.cashierName}</span>
-                  <span>Quầy #01</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 6 }}>
-                  <span>Khách: {printingInvoice.customerName}</span>
-                  <span>{printingInvoice.customerPhone || 'Khách lẻ'}</span>
-                </div>
-
-                <div className="z-report-divider" />
-
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px dashed #cbd5e1' }}>
-                      <th style={{ textAlign: 'left', padding: '3px 0' }}>Mặt hàng</th>
-                      <th style={{ textAlign: 'center', padding: '3px 0' }}>SL</th>
-                      <th style={{ textAlign: 'right', padding: '3px 0' }}>Đ.Giá</th>
-                      <th style={{ textAlign: 'right', padding: '3px 0' }}>T.Tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {printingInvoice.items.map((it) => (
-                      <tr key={it.itemId}>
-                        <td style={{ padding: '3px 0' }}>
-                          {it.isGift ? `[Quà KM] ${it.productName}` : it.productName}
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '3px 0' }}>{it.quantity}</td>
-                        <td style={{ textAlign: 'right', padding: '3px 0' }}>
-                          {it.isGift ? '0' : it.unitPrice.toLocaleString('vi-VN')}
-                        </td>
-                        <td style={{ textAlign: 'right', padding: '3px 0', fontWeight: 600 }}>
-                          {it.isGift ? '0' : it.totalAmount.toLocaleString('vi-VN')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div className="z-report-divider" />
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                  <span>Tổng tiền hàng:</span>
-                  <span>{printingInvoice.totalMerchandiseAmount.toLocaleString('vi-VN')} đ</span>
-                </div>
-                {printingInvoice.appliedPromotionSummary && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#0f766e' }}>
-                    <span>CTKM ({printingInvoice.appliedPromotionSummary}):</span>
-                    <span>-{(printingInvoice.promotionDiscountAmount || 0).toLocaleString('vi-VN')} đ</span>
-                  </div>
-                )}
-                {printingInvoice.appliedVoucherCode && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#4338ca' }}>
-                    <span>Voucher ({printingInvoice.appliedVoucherCode}):</span>
-                    <span>-{(printingInvoice.voucherDiscountAmount || 0).toLocaleString('vi-VN')} đ</span>
-                  </div>
-                )}
-                {Boolean(printingInvoice.pointsRedeemed && printingInvoice.pointsRedeemed > 0) && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#047857' }}>
-                    <span>Đổi điểm ({printingInvoice.pointsRedeemed} điểm):</span>
-                    <span>-{(printingInvoice.pointsDiscountAmount || 0).toLocaleString('vi-VN')} đ</span>
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                  <span>Tổng giảm giá:</span>
-                  <span>-{printingInvoice.totalDiscount.toLocaleString('vi-VN')} đ</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 'bold', marginTop: 4 }}>
-                  <span>KHÁCH ĐÃ TRẢ:</span>
-                  <span style={{ color: '#15803d' }}>{printingInvoice.finalPaidAmount.toLocaleString('vi-VN')} đ</span>
-                </div>
-                {printingInvoice.debtAmount !== undefined && (
-                  <div style={{ padding: '6px 8px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 4, marginTop: 4 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                      <span style={{ color: '#b45309', fontWeight: 600 }}>Tiền nợ còn lại:</span>
-                      <strong style={{ color: printingInvoice.debtAmount > 0 ? '#dc2626' : '#16a34a' }}>
-                        {printingInvoice.debtAmount.toLocaleString('vi-VN')} đ
-                      </strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 2 }}>
-                      <span style={{ color: '#64748b' }}>Đã trả trước đó:</span>
-                      <strong style={{ color: '#16a34a' }}>
-                        {(printingInvoice.paidDebtAmount || 0).toLocaleString('vi-VN')} đ
-                      </strong>
-                    </div>
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginTop: 4 }}>
-                  <span>Phương thức:</span>
-                  <span>{printingInvoice.paymentMethodLabel}</span>
-                </div>
-                {printingInvoice.referenceCode && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                    <span>Mã GD:</span>
-                    <span>{printingInvoice.referenceCode}</span>
-                  </div>
-                )}
-
-                <div className="z-report-divider" />
-
-                <div style={{ textAlign: 'center', fontSize: 11, color: '#64748b', marginTop: 10 }}>
-                  Cảm ơn Quý khách &amp; Hẹn gặp lại!<br />
-                  (Hóa đơn điện tử khởi tạo từ máy tính tiền)
-                </div>
-              </div>
-            </div>
-
-            <div className="pos-modal-footer">
-              <button
-                type="button"
-                className="pos-btn-secondary-pill"
-                onClick={() => setPrintingInvoice(null)}
-              >
-                Đóng
-              </button>
-              <button
-                type="button"
-                className="pos-btn-primary-pill"
-                onClick={() => {
-                  if (printingInvoice) {
-                    posOrderApi.printDirect({
-                      storeName: 'SIÊU THỊ MINI MT-GROCERY',
-                      storeAddress: '123 Xuân Thủy, Cầu Giấy, Hà Nội',
-                      storePhone: '0987.654.321',
-                      orderCode: printingInvoice.invoiceId,
-                      cashierName: printingInvoice.cashierName,
-                      customer: { name: printingInvoice.customerName, phone: printingInvoice.customerPhone },
-                      createdAt: printingInvoice.createdAt,
-                      items: printingInvoice.items.map((it) => ({
-                        name: it.productName,
-                        quantity: it.quantity,
-                        unitPrice: it.isGift ? 0 : it.unitPrice,
-                        totalPrice: it.isGift ? 0 : it.totalAmount,
-                        isGift: Boolean(it.isGift),
-                      })),
-                      totalItemAmount: printingInvoice.totalMerchandiseAmount,
-                      orderDiscountAmount: printingInvoice.totalDiscount,
-                      vatAmount: 0,
-                      finalAmount: printingInvoice.finalPaidAmount,
-                      cashTendered: printingInvoice.finalPaidAmount,
-                    });
-                  }
-                  showToast('Đang gửi lệnh in hóa đơn K80 ra máy in nhiệt quầy...');
-                }}
-              >
-                <Printer size={14} />
-                <span>In Hóa Đơn (POS-58)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MODAL IN NHIỆT POS-58 ĐỒNG BỘ CHUẨN VỚI MÀN HÌNH BÁN HÀNG */}
+      <PosReceiptModal
+        isOpen={Boolean(printingInvoice)}
+        receiptData={printReceiptData}
+        onClose={() => setPrintingInvoice(null)}
+      />
 
       {/* MODAL XÁC NHẬN HỦY HÓA ĐƠN & HOÀN TIỀN QUẦY */}
       {cancelModalInvoice && (

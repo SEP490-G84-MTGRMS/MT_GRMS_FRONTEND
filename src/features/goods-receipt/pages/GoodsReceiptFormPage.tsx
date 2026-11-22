@@ -278,12 +278,12 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       if (paramPoCode) {
         setPoReference(paramPoCode);
         showToast(
-          `Không tìm thấy PO ${paramPoCode} đủ điều kiện nhập kho (đã có phiếu DRAFT/COMPLETED hoặc trạng thái chưa cho phép).`,
+          `Không tìm thấy đơn mua hàng ${paramPoCode} đủ điều kiện nhập kho (đã có phiếu nháp/hoàn tất hoặc trạng thái chưa cho phép).`,
           'error'
         );
       }
     } catch (err: any) {
-      showToast(err.message || 'Không thể tải danh sách PO.', 'error');
+      showToast(err.message || 'Không thể tải danh sách đơn mua hàng.', 'error');
     }
   }, [isCreateMode, role, employeeBranchId, searchParams]);
 
@@ -396,7 +396,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
           })
         );
       } catch (err: any) {
-        showToast(err.response?.data?.message || err.message || 'Không thể tải chi tiết PO.', 'error');
+        showToast(err.response?.data?.message || err.message || 'Không thể tải chi tiết đơn mua hàng.', 'error');
       }
     };
 
@@ -490,7 +490,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       next.splice(idx + 1, 0, newRow);
       return next;
     });
-    showToast('Đã thêm dòng lô cùng SKU. Điều chỉnh SL từng dòng (tổng ≤ SL đặt).', 'success');
+    showToast('Đã thêm dòng lô cùng mã hàng. Điều chỉnh SL từng dòng (tổng ≤ SL đặt).', 'success');
   };
 
   const handleRemoveRow = (itemId: string) => {
@@ -502,7 +502,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         (it) => String(it.purchaseOrderDetailId || it.productId || it.productCode) === key
       );
       if (siblings.length <= 1) {
-        showToast('Không thể xóa dòng gốc từ PO. Chỉ xóa được dòng tách lô.', 'error');
+        showToast('Không thể xóa dòng gốc từ đơn mua hàng. Chỉ xóa được dòng tách lô.', 'error');
         return prev;
       }
       return prev.filter((it) => it.id !== itemId);
@@ -523,7 +523,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
 
   const validateForm = (): boolean => {
     if (!selectedPoId || !poReference) {
-      showToast('Vui lòng chọn Đơn đặt hàng PO nguồn trước khi hoàn tất!', 'error');
+      showToast('Vui lòng chọn đơn mua hàng nguồn trước khi hoàn tất!', 'error');
       return false;
     }
     if (!branchId) {
@@ -573,11 +573,11 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
       const isBatch = Boolean(it.hasBatches ?? it.manageBatch);
       if (isBatch && (it.receivedQty || 0) > 0) {
         if (!it.manufactureDate?.trim()) {
-          showToast(`${it.productCode}: đang quản lý batch — bắt buộc Ngày SX (MFG).`, 'error');
+          showToast(`${it.productCode}: đang quản lý theo lô — bắt buộc Ngày sản xuất.`, 'error');
           return false;
         }
         if (!it.expiryDate?.trim()) {
-          showToast(`${it.productCode}: đang quản lý batch — bắt buộc Hạn SD (EXP).`, 'error');
+          showToast(`${it.productCode}: đang quản lý theo lô — bắt buộc Hạn sử dụng.`, 'error');
           return false;
         }
       }
@@ -720,14 +720,14 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
   return (
     <div
       style={{
-        padding: '16px 24px 24px',
-        backgroundColor: '#f8fafc',
+        padding: '8px 12px 10px',
+        backgroundColor: '#ffffff',
         height: 'calc(100vh - 60px)',
         maxHeight: 'calc(100vh - 60px)',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: 8,
         overflow: 'hidden',
       }}
     >
@@ -773,7 +773,7 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
                 : isEditMode
                   ? `Sửa phiếu nhập kho ${grnNo}`
                   : isCreateMode
-                    ? 'Lập phiếu nhập kho từ đơn PO (Goods Receipt Note)'
+                    ? 'Lập phiếu nhập kho từ đơn mua hàng'
                     : `Chi tiết phiếu nhập kho ${grnNo}`}
             </span>
             {isSaving && <Loader2 size={16} className="animate-spin" color="#0d9488" />}
@@ -781,20 +781,19 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
         </div>
       </div>
 
+      {/* Header + bảng + footer trang: chỉ bảng mặt hàng scroll dọc */}
       <div
         style={{
           flex: 1,
           minHeight: 0,
           backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: 10,
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          gap: 0,
         }}
       >
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flexShrink: 0 }}>
           <GrnFormHeaderCard
             grnNo={grnNo}
             branchId={branchId}
@@ -817,15 +816,15 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             onPaymentTermChange={setPaymentTerm}
             onPaymentMethodChange={setPaymentMethod}
           />
-
-          <GrnProductEntryTable
-            items={items}
-            readOnly={isReadOnly}
-            onItemChange={handleItemChange}
-            onRemoveRow={handleRemoveRow}
-            onSplitLot={handleSplitLot}
-          />
         </div>
+
+        <GrnProductEntryTable
+          items={items}
+          readOnly={isReadOnly}
+          onItemChange={handleItemChange}
+          onRemoveRow={handleRemoveRow}
+          onSplitLot={handleSplitLot}
+        />
 
         <GrnFormFooter
           notes={notes}
