@@ -7,6 +7,7 @@ export interface PackageDto {
   productId: string;
   branchId: string;
   internalCode: string;
+  name?: string | null;
   barcode?: string | null;
   netWeight: number;
   sellingPrice: number;
@@ -20,6 +21,13 @@ export interface PackageDto {
   repackOrderCode?: string | null;
   soldAt?: string | null;
   createdAt: string;
+}
+
+export interface PackageScanDto {
+  package: PackageDto;
+  productName: string;
+  batchCode: string;
+  batchExpiryDate?: string | null;
 }
 
 export interface BranchStockPackageSummary {
@@ -48,6 +56,7 @@ export interface PackageLineInput {
   manufactureDate?: string | null;
   expiryDate?: string | null;
   barcode?: string | null;
+  name?: string | null;
 }
 
 export interface CreateRepackOrderInput {
@@ -86,6 +95,17 @@ export const repackApi = {
       `/branch-stocks/${branchStockId}/packages`
     );
     return unwrap(res, 'Không tải được khay của lô.');
+  },
+
+  searchSellablePackages: async (
+    branchId: string,
+    q: string,
+    limit = 20
+  ): Promise<PackageScanDto[]> => {
+    const res = await httpClient.get<ApiResponse<PackageScanDto[]>>('/packages/search', {
+      params: { branchId, q, limit },
+    });
+    return unwrap(res, 'Không tìm được khay.');
   },
 
   createRepackOrder: async (body: CreateRepackOrderInput): Promise<RepackOrderDto> => {

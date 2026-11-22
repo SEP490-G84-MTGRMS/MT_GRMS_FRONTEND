@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { Package, Plus } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import type { Product, Category } from '../types/pos.types';
+import { formatPosStockLabel } from '../api/posOrderApi';
 
 interface Props {
   products: Product[];
@@ -119,14 +120,14 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
                       <span className="pos-product-fallback-text">{prod.baseUnit}</span>
                     </div>
 
-                    {/* Badge tồn kho */}
+                    {/* Badge tồn kho — ĐVT nhập, chỉ lô còn hạn (giống màn Lô) */}
                     {prod.quantityOnHand <= 15 ? (
                       <span className="pos-product-stock-tag low" title="Tồn kho thấp">
-                        Còn {prod.quantityOnHand}
+                        Còn {formatPosStockLabel(prod)}
                       </span>
                     ) : (
                       <span className="pos-product-stock-tag" title="Số lượng tồn kho">
-                        Tồn {prod.quantityOnHand}
+                        Tồn {formatPosStockLabel(prod)}
                       </span>
                     )}
 

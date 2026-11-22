@@ -26,6 +26,17 @@ type DraftLine = {
   expiryDate: string | null;
 };
 
+/** Tên khay tự gen: "{Tên SP} {khối lượng} KG|G" */
+const buildPackageName = (productName: string, kg: number) => {
+  const base = (productName || 'Khay').trim() || 'Khay';
+  if (!(kg > 0)) return `${base} —`;
+  if (kg > 0 && kg < 1) {
+    return `${base} ${Math.round(kg * 1000)} G`;
+  }
+  const kgText = Number(kg.toFixed(3)).toString();
+  return `${base} ${kgText} KG`;
+};
+
 const todayIsoDate = () => {
   const d = new Date();
   const y = d.getFullYear();
@@ -239,6 +250,7 @@ export const BatchRepackModal: FC<BatchRepackModalProps> = ({ batch, onClose, on
         wasteNote: wasteNote.trim() || null,
         defaultUnitPricePerKg: suggestPerKg || null,
         packages: lines.map((l) => ({
+          name: buildPackageName(batch.productName, lineKg(l)),
           netWeight: lineKg(l),
           sellingPrice: linePrice(l),
           manufactureDate: l.manufactureDate || todayIsoDate(),
@@ -398,7 +410,7 @@ export const BatchRepackModal: FC<BatchRepackModalProps> = ({ batch, onClose, on
                     }}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                   >
-                    <Printer size={12} /> #{i + 1} {p.internalCode}
+                    <Printer size={12} /> #{i + 1} {p.name || p.internalCode}
                   </button>
                 ))}
               </div>
@@ -634,6 +646,7 @@ export const BatchRepackModal: FC<BatchRepackModalProps> = ({ batch, onClose, on
                   <thead>
                     <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
                       <th style={{ padding: 8, width: 48 }}>STT</th>
+                      <th style={{ padding: 8, minWidth: 140 }}>Tên khay</th>
                       <th style={{ padding: 8 }}>Khối lượng khay</th>
                       <th style={{ padding: 8, width: 88 }}>ĐVT</th>
                       <th style={{ padding: 8 }}>Giá bán</th>
@@ -649,6 +662,17 @@ export const BatchRepackModal: FC<BatchRepackModalProps> = ({ batch, onClose, on
                       return (
                         <tr key={l.key} style={{ borderTop: '1px solid #e2e8f0' }}>
                           <td style={{ padding: 8, fontWeight: 700, color: '#64748b' }}>{idx + 1}</td>
+                          <td
+                            style={{
+                              padding: 8,
+                              fontWeight: 600,
+                              color: kg > 0 ? '#0f172a' : '#94a3b8',
+                              minWidth: 140,
+                            }}
+                            title="Tự gen: tên sản phẩm + khối lượng"
+                          >
+                            {buildPackageName(batch.productName, kg)}
+                          </td>
                           <td style={{ padding: 8 }}>
                             <input
                               type="number"

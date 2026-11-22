@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { OrderTab, Product } from '../types/pos.types';
 import type { ShiftDetailResponse } from '../types/posShift.types';
+import type { PackageScanDto } from '../../batch/api/repackApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface Props {
@@ -25,6 +26,8 @@ interface Props {
   onBarcodeSubmit?: (e?: React.FormEvent) => void;
   products?: Product[];
   onSelectProduct?: (product: Product) => void;
+  packageHits?: PackageScanDto[];
+  onSelectPackage?: (hit: PackageScanDto) => void;
   tabs?: OrderTab[];
   activeTabId?: number;
   onSelectTab?: (id: number) => void;
@@ -51,6 +54,8 @@ export const PosHeader: FC<Props> = ({
   onBarcodeSubmit,
   products = [],
   onSelectProduct,
+  packageHits = [],
+  onSelectPackage,
   tabs = [],
   activeTabId = 1,
   onSelectTab,
@@ -94,7 +99,7 @@ export const PosHeader: FC<Props> = ({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
-  // Lọc sản phẩm theo từ khóa tìm kiếm
+  // Lọc sản phẩm theo từ khóa tìm kiếm + khay chế biến (từ API)
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const matchingProducts = trimmedQuery
     ? products.filter(
@@ -104,6 +109,14 @@ export const PosHeader: FC<Props> = ({
         p.barcode.toLowerCase().includes(trimmedQuery)
     )
     : [];
+  type SearchHit =
+    | { kind: 'product'; product: Product }
+    | { kind: 'package'; hit: PackageScanDto };
+  const searchHits: SearchHit[] = [
+    ...matchingProducts.map((product) => ({ kind: 'product' as const, product })),
+    ...packageHits.map((hit) => ({ kind: 'package' as const, hit })),
+  ];
+  const totalHitCount = searchHits.length;
 
   const checkScrollable = useCallback(() => {
     if (tabsScrollRef.current) {
@@ -200,18 +213,30 @@ export const PosHeader: FC<Props> = ({
     setHighlightedIndex(-1);
   };
 
+  const handleSelectPackageItem = (hit: PackageScanDto) => {
+    onSelectPackage?.(hit);
+    onSearchChange?.('');
+    setIsSearchDropdownOpen(false);
+    setHighlightedIndex(-1);
+  };
+
+  const handleSelectHit = (hit: SearchHit) => {
+    if (hit.kind === 'product') handleSelectProductItem(hit.product);
+    else handleSelectPackageItem(hit.hit);
+  };
+
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setIsSearchDropdownOpen(true);
       setHighlightedIndex((prev) =>
-        prev < matchingProducts.length - 1 ? prev + 1 : 0
+        totalHitCount === 0 ? -1 : prev < totalHitCount - 1 ? prev + 1 : 0
       );
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setIsSearchDropdownOpen(true);
       setHighlightedIndex((prev) =>
-        prev > 0 ? prev - 1 : matchingProducts.length - 1
+        totalHitCount === 0 ? -1 : prev > 0 ? prev - 1 : totalHitCount - 1
       );
     } else if (e.key === 'Escape') {
       setIsSearchDropdownOpen(false);
@@ -220,7 +245,7 @@ export const PosHeader: FC<Props> = ({
       const q = searchQuery.trim().toLowerCase();
       if (!q) return;
 
-      // 1. Kiểm tra nếu là Barcode scanner bắn chính xác hoặc SKU chính xác 100%
+      // 1. Barcode/SKU sản phẩm khớp chính xác
       const exactMatch = products.find(
         (p) => p.barcode.toLowerCase() === q || p.sku.toLowerCase() === q
       );
@@ -229,21 +254,31 @@ export const PosHeader: FC<Props> = ({
         return;
       }
 
-      // 2. Nếu người dùng đang dùng phím mũi tên highlight 1 món
-      if (highlightedIndex >= 0 && highlightedIndex < matchingProducts.length) {
-        handleSelectProductItem(matchingProducts[highlightedIndex]);
+      // 1b. Mã khay khớp chính xác
+      const exactPackage = packageHits.find(
+        (h) =>
+          h.package.internalCode.toLowerCase() === q ||
+          (h.package.barcode || '').toLowerCase() === q
+      );
+      if (exactPackage) {
+        handleSelectPackageItem(exactPackage);
         return;
       }
 
-      // 3. Nếu chỉ có đúng 1 món duy nhất khớp kết quả
-      if (matchingProducts.length === 1) {
-        handleSelectProductItem(matchingProducts[0]);
+      // 2. Đang highlight 1 dòng
+      if (highlightedIndex >= 0 && highlightedIndex < totalHitCount) {
+        handleSelectHit(searchHits[highlightedIndex]);
         return;
       }
 
-      // 4. Nếu có nhiều hơn 1 kết quả (vd: gõ "nước mắm"), KHÔNG tự động chọn bừa món đầu tiên,
-      // mà mở dropdown để người dùng nhìn thấy danh sách và chủ động chọn!
-      if (matchingProducts.length > 1) {
+      // 3. Đúng 1 kết quả (sản phẩm hoặc khay)
+      if (totalHitCount === 1) {
+        handleSelectHit(searchHits[0]);
+        return;
+      }
+
+      // 4. Nhiều kết quả → mở dropdown, không chọn bừa
+      if (totalHitCount > 1) {
         setIsSearchDropdownOpen(true);
         if (highlightedIndex === -1) {
           setHighlightedIndex(0);
@@ -251,10 +286,8 @@ export const PosHeader: FC<Props> = ({
         return;
       }
 
-      // 5. Nếu không có món nào khớp
-      if (matchingProducts.length === 0) {
-        onBarcodeSubmit?.();
-      }
+      // 5. Không có kết quả local → thử submit (scan mã khay / API)
+      onBarcodeSubmit?.();
     }
   };
 
@@ -334,9 +367,9 @@ export const PosHeader: FC<Props> = ({
               type="button"
               className="pos-barcode-submit-btn"
               onClick={() => {
-                if (matchingProducts.length === 1) {
-                  handleSelectProductItem(matchingProducts[0]);
-                } else if (matchingProducts.length > 1) {
+                if (totalHitCount === 1) {
+                  handleSelectHit(searchHits[0]);
+                } else if (totalHitCount > 1) {
                   setIsSearchDropdownOpen(true);
                 } else {
                   onBarcodeSubmit?.();
@@ -347,47 +380,89 @@ export const PosHeader: FC<Props> = ({
             </button>
           </form>
 
-          {/* Autocomplete Dropdown hiển thị các sản phẩm gợi ý */}
+          {/* Autocomplete: sản phẩm bán lẻ + khay chế biến */}
           {isSearchDropdownOpen && searchQuery.trim().length > 0 && (
             <div className="pos-search-dropdown">
               <div className="pos-search-dropdown-header">
-                <span>Kết quả tìm kiếm ({matchingProducts.length} mặt hàng)</span>
+                <span>
+                  Kết quả tìm kiếm ({matchingProducts.length} SP
+                  {packageHits.length > 0 ? `, ${packageHits.length} khay` : ''})
+                </span>
               </div>
 
-              {matchingProducts.length > 0 ? (
+              {totalHitCount > 0 ? (
                 <div className="pos-search-dropdown-list">
-                  {matchingProducts.map((p, index) => (
-                    <div
-                      key={p.id}
-                      className={`pos-search-dropdown-item ${highlightedIndex === index ? 'active' : ''}`}
-                      onClick={() => handleSelectProductItem(p)}
-                      onMouseEnter={() => setHighlightedIndex(index)}
-                    >
-                      {p.imageUrl ? (
-                        <img src={p.imageUrl} alt={p.name} className="pos-search-item-thumb" />
-                      ) : (
+                  {searchHits.map((hit, index) => {
+                    if (hit.kind === 'product') {
+                      const p = hit.product;
+                      return (
+                        <div
+                          key={`p-${p.id}`}
+                          className={`pos-search-dropdown-item ${highlightedIndex === index ? 'active' : ''}`}
+                          onClick={() => handleSelectProductItem(p)}
+                          onMouseEnter={() => setHighlightedIndex(index)}
+                        >
+                          {p.imageUrl ? (
+                            <img src={p.imageUrl} alt={p.name} className="pos-search-item-thumb" />
+                          ) : (
+                            <div className="pos-search-item-thumb-placeholder">
+                              <Package size={20} />
+                            </div>
+                          )}
+
+                          <div className="pos-search-item-details">
+                            <div className="pos-search-item-name">{p.name}</div>
+                            <div className="pos-search-item-meta">
+                              <span className="badge-sku">Mã: {p.barcode || p.sku}</span>
+                              <span>&bull;</span>
+                              <span className={`badge-stock ${p.quantityOnHand <= 0 ? 'out' : ''}`}>
+                                {p.quantityOnHand > 0 ? `Tồn: ${p.quantityOnHand} ${p.baseUnit}` : 'Hết hàng'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="pos-search-item-price-col">
+                            <div className="pos-search-item-price">{p.basePrice.toLocaleString('vi-VN')} đ</div>
+                            <div className="pos-search-item-unit">/{p.baseUnit}</div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    const pkg = hit.hit.package;
+                    return (
+                      <div
+                        key={`k-${pkg.id}`}
+                        className={`pos-search-dropdown-item ${highlightedIndex === index ? 'active' : ''}`}
+                        onClick={() => handleSelectPackageItem(hit.hit)}
+                        onMouseEnter={() => setHighlightedIndex(index)}
+                      >
                         <div className="pos-search-item-thumb-placeholder">
                           <Package size={20} />
                         </div>
-                      )}
-
-                      <div className="pos-search-item-details">
-                        <div className="pos-search-item-name">{p.name}</div>
-                        <div className="pos-search-item-meta">
-                          <span className="badge-sku">Mã: {p.barcode || p.sku}</span>
-                          <span>&bull;</span>
-                          <span className={`badge-stock ${p.quantityOnHand <= 0 ? 'out' : ''}`}>
-                            {p.quantityOnHand > 0 ? `Tồn: ${p.quantityOnHand} ${p.baseUnit}` : 'Hết hàng'}
-                          </span>
+                        <div className="pos-search-item-details">
+                          <div className="pos-search-item-name">
+                            {pkg.name?.trim() || `Khay · ${hit.hit.productName}`}
+                          </div>
+                          <div className="pos-search-item-meta">
+                            <span className="badge-sku">
+                              Mã: {pkg.internalCode || pkg.barcode || '—'}
+                            </span>
+                            <span>&bull;</span>
+                            <span className="badge-stock">
+                              {pkg.netWeight} KG · {hit.hit.productName} · Lô {hit.hit.batchCode || '—'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="pos-search-item-price-col">
+                          <div className="pos-search-item-price">
+                            {pkg.sellingPrice.toLocaleString('vi-VN')} đ
+                          </div>
+                          <div className="pos-search-item-unit">/khay</div>
                         </div>
                       </div>
-
-                      <div className="pos-search-item-price-col">
-                        <div className="pos-search-item-price">{p.basePrice.toLocaleString('vi-VN')} đ</div>
-                        <div className="pos-search-item-unit">/{p.baseUnit}</div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="pos-search-empty-state">

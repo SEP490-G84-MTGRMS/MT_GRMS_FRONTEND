@@ -27,7 +27,6 @@ export interface BackendGoodsReceiptDto {
   cancelledAtUtc?: string;
   cancellationReason?: string;
   subTotal: number;
-  freightFee: number;
   discountAmount: number;
   vatPercent: number;
   vatAmount: number;
@@ -64,10 +63,9 @@ export interface BackendGoodsReceiptDto {
     manufactureDate?: string;
     expiryDate?: string;
     isNearExpiry: boolean;
-    freightAllocated: number;
     discountAllocated: number;
     vatAllocated: number;
-    landedUnitCost: number;
+    purchaseUnitCost: number;
     qualityStatus: string;
     rejectionReason?: string;
     rejectionNote?: string;
