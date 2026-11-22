@@ -21,7 +21,7 @@ export interface ProductResponse {
   maxStock: number;
   vatRate?: number;
   productType?: string;
-  status: string; // "Active" | "Discontinued"
+  status: string; // BE: "Active" | "Inactive" — FE UI có thể map Inactive → Discontinued
   imageUrl?: string | null;
   imageUrls?: string[];
   description?: string | null;

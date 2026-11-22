@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, Package, Store, Plus, Loader2, Download } from 'lucide-react';
+import { Building2, Package, Store, Plus, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
@@ -291,16 +291,6 @@ export const SupplierListPage: FC = () => {
             <Store size={14} />
             <span>Gán NCC với Cửa hàng</span>
           </Link>
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            onClick={handleExportExcel}
-            disabled={isExporting || isLoading}
-            title="Xuất danh sách nhà cung cấp ra Excel"
-          >
-            {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            <span>Xuất Excel</span>
-          </button>
           {isStoreOwner && (
             <button
               type="button"
@@ -320,6 +310,8 @@ export const SupplierListPage: FC = () => {
           filters={appliedFilters}
           onSearch={handleSearch}
           onReset={handleReset}
+          onExportExcel={handleExportExcel}
+          excelBusy={isExporting || isLoading}
         />
       </div>
 

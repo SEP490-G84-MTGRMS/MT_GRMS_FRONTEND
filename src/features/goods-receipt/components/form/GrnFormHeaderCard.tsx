@@ -112,7 +112,15 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
   };
 
   return (
-    <div style={{ padding: '12px 16px 10px', borderBottom: '1px solid #e2e8f0' }}>
+    <div
+      style={{
+        padding: '12px 14px',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        backgroundColor: '#ffffff',
+        boxSizing: 'border-box',
+      }}
+    >
       <div
         style={{
           fontSize: 12,
@@ -122,7 +130,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
         }}
       >
         Thông tin phiếu nhập kho
-        <span style={{ fontWeight: 500, color: '#64748b' }}> · Nhập từ PO</span>
+        <span style={{ fontWeight: 500, color: '#64748b' }}> · Nhập từ đơn mua hàng</span>
       </div>
 
       <div
@@ -156,7 +164,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           )}
         </FieldCol>
 
-        <FieldCol label="Mã phiếu GRN">
+        <FieldCol label="Mã phiếu nhập kho">
           <input
             type="text"
             value={grnNo}
@@ -171,7 +179,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
           />
         </FieldCol>
 
-        <FieldCol label="Đơn mua hàng PO">
+        <FieldCol label="Đơn mua hàng">
           <div
             style={{
               ...readOnlyBox,
@@ -179,7 +187,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               fontWeight: 700,
               color: poReference ? '#0284c7' : '#94a3b8',
             }}
-            title="PO gốc cố định theo đơn được chọn để nhập kho"
+            title="Đơn mua hàng gốc cố định theo đơn được chọn để nhập kho"
           >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {poReference || '—'}
@@ -198,7 +206,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
         <FieldCol label="Tên nhà cung cấp" span={2}>
           <div style={readOnlyBox} title={supplierName || undefined}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {supplierName || '— Chưa chọn PO —'}
+              {supplierName || '— Chưa chọn đơn mua hàng —'}
             </span>
           </div>
         </FieldCol>
@@ -228,7 +236,7 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
             value={invoiceNo}
             onChange={(e) => onInvoiceNoChange(e.target.value)}
             disabled={readOnly}
-            placeholder="VD: INV-998822"
+            placeholder="VD: HD-998822"
             style={{
               ...controlBase,
               color: '#0f172a',
@@ -249,13 +257,13 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               cursor: readOnly ? 'default' : 'pointer',
             }}
           >
-            <option value="30">30 Ngày (Công nợ AP)</option>
+            <option value="30">30 Ngày (Công nợ)</option>
             <option value="15">15 Ngày</option>
             <option value="0">Thanh toán ngay (0 Ngày)</option>
           </select>
         </FieldCol>
 
-        <FieldCol label="Hình thức TT" span={2}>
+        <FieldCol label="Hình thức thanh toán" span={2}>
           <select
             value={paymentMethod}
             onChange={(e) => onPaymentMethodChange(e.target.value as PaymentMethod)}
@@ -267,9 +275,9 @@ export const GrnFormHeaderCard: FC<GrnFormHeaderCardProps> = ({
               cursor: readOnly ? 'default' : 'pointer',
             }}
           >
-            <option value="Credit">Công nợ (Credit AP)</option>
-            <option value="Cash">Tiền mặt (Cash)</option>
-            <option value="Bank">Chuyển khoản (Bank Transfer)</option>
+            <option value="Credit">Công nợ</option>
+            <option value="Cash">Tiền mặt</option>
+            <option value="Bank">Chuyển khoản</option>
           </select>
         </FieldCol>
       </div>

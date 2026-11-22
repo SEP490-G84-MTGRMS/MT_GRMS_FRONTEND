@@ -238,8 +238,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     expect(result.scopeStatus.supplierMatched).toBe(false);
   });
 
-  it('Scenario 4: Ô ngày hôm nay / quá khứ -> LEAD_TIME_NOT_MET', async () => {
-    // If baseDate is 2026-11-04 (same day as delivery date), leadTimeDays = 0 < 1 day!
+  it('Scenario 4: Ô ngày giao quá khứ -> CUTOFF_PASSED', async () => {
     const wsData = [
       ['Header info'],
       [`Mã CN: ${mockBranch.id}`],
@@ -254,7 +253,7 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
       file,
       currentBranchId: mockBranch.id,
       currentSupplierId: mockSupplier.id,
-      baseDate: '2026-11-04', // Today is the delivery date!
+      baseDate: '2026-11-05', // Ngày giao 04/11 đã qua
       matrixProducts: mockProducts,
       dayColumns: mockDays,
       cellMap: mockCellMap,
@@ -262,8 +261,8 @@ describe('Purchase Order Matrix — Excel Export & Import Engine (CISCA Specific
     });
 
     expect(result.valid).toBe(false);
-    const leadErr = result.errors.find((e) => e.code === 'LEAD_TIME_NOT_MET');
-    expect(leadErr).toBeDefined();
+    const pastErr = result.errors.find((e) => e.code === 'CUTOFF_PASSED');
+    expect(pastErr).toBeDefined();
   });
 
   it('Scenario 5: Ô LOCKED / PO_GENERATED mà đổi SL -> BLOCKED_CELL_MODIFIED / CUTOFF_PASSED', async () => {

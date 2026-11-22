@@ -13,6 +13,15 @@ import type {
   ProductPriceHistoryPagedResult,
 } from '../types';
 
+/** BE enum ProductStatus = Active | Inactive. FE UI dùng Discontinued = Inactive. */
+function toBackendProductStatus(status?: string | null): string | undefined {
+  if (status == null || String(status).trim() === '') return undefined;
+  const s = String(status).trim();
+  if (s === 'Discontinued' || s === 'Inactive') return 'Inactive';
+  if (s === 'Active') return 'Active';
+  return s;
+}
+
 export const productApi = {
   /**
    * Lấy danh sách sản phẩm có phân trang, tìm kiếm đa tiêu chí và lọc theo danh mục
@@ -35,7 +44,7 @@ export const productApi = {
     }
 
     if (filter.status && filter.status.trim() !== '' && filter.status !== 'all') {
-      params.Status = filter.status;
+      params.Status = toBackendProductStatus(filter.status) ?? filter.status;
     }
 
     const res = await httpClient.get<ApiResponse<PagedResult<ProductResponse>>>('/products', {
@@ -90,7 +99,11 @@ export const productApi = {
    * Endpoint Backend: POST /api/products
    */
   async createProduct(payload: ProductCreatePayload): Promise<ProductResponse> {
-    const res = await httpClient.post<ApiResponse<ProductResponse>>('/products', payload);
+    const body = {
+      ...payload,
+      status: toBackendProductStatus(payload.status) ?? payload.status ?? 'Active',
+    };
+    const res = await httpClient.post<ApiResponse<ProductResponse>>('/products', body);
     if (res.data?.success && res.data.data) {
       return res.data.data;
     }
@@ -102,7 +115,11 @@ export const productApi = {
    * Endpoint Backend: PUT /api/products/{id}
    */
   async updateProduct(id: string, payload: ProductUpdatePayload): Promise<ProductResponse> {
-    const res = await httpClient.put<ApiResponse<ProductResponse>>(`/products/${id}`, payload);
+    const body = {
+      ...payload,
+      status: toBackendProductStatus(payload.status) ?? payload.status,
+    };
+    const res = await httpClient.put<ApiResponse<ProductResponse>>(`/products/${id}`, body);
     if (res.data?.success && res.data.data) {
       return res.data.data;
     }

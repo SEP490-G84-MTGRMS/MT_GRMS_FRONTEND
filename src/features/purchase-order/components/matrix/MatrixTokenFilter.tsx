@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FC, KeyboardEvent } from 'react';
-import { ChevronsUpDown, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export type MatrixTokenOption = {
   id: string;
@@ -69,9 +69,7 @@ function uniqueCaseInsensitive(values: string[]): string[] {
 }
 
 /**
- * Multi-token filter — width cố định.
- * Ô đóng: hiện tóm tắt "N đã chọn" (không cắt chữ bằng …).
- * Dropdown: liệt kê đủ nội dung đã chọn + gợi ý.
+ * Multi-token filter — chip highlight ngay trong ô input (không dùng "N đã chọn").
  */
 export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
   label,
@@ -87,6 +85,7 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const chipBoxRef = useRef<HTMLDivElement>(null);
 
   const tokenSet = useMemo(
     () => new Set(tokens.map((t) => t.toLowerCase())),
@@ -122,6 +121,12 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
     setFocusedIndex(0);
   }, [query, open]);
 
+  useEffect(() => {
+    const el = chipBoxRef.current;
+    if (!el) return;
+    el.scrollLeft = el.scrollWidth;
+  }, [tokens]);
+
   const addToken = (value: string) => {
     const next = uniqueCaseInsensitive([...tokens, value]);
     onChange(next);
@@ -132,6 +137,13 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
 
   const removeToken = (value: string) => {
     onChange(tokens.filter((t) => t.toLowerCase() !== value.toLowerCase()));
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const clearAll = () => {
+    onChange([]);
+    setQuery('');
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -167,7 +179,6 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
   };
 
   const hasTokens = tokens.length > 0;
-  const summaryTitle = hasTokens ? tokens.join(', ') : undefined;
   const panelWidth = Math.max(width, 320);
 
   return (
@@ -175,6 +186,8 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
       <label className="po-filter-label">{label}</label>
       <div style={{ position: 'relative', width, flexShrink: 0 }}>
         <div
+          ref={chipBoxRef}
+          className="supplier-chip-input"
           onClick={() => {
             setOpen(true);
             requestAnimationFrame(() => inputRef.current?.focus());
@@ -186,43 +199,77 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
             gap: 4,
             width,
             height: CTRL_H,
-            padding: '0 26px 0 6px',
+            padding: hasTokens || query ? '0 28px 0 6px' : '0 10px 0 6px',
             borderRadius: 6,
             border: open || hasTokens ? '1px solid #0d9488' : '1px solid #cbd5e1',
             backgroundColor: hasTokens ? '#f0fdfa' : '#ffffff',
             boxShadow: open ? '0 0 0 3px rgba(13, 148, 136, 0.12)' : 'none',
             boxSizing: 'border-box',
             cursor: 'text',
-            overflow: 'hidden',
+            overflowX: 'auto',
+            overflowY: 'hidden',
           }}
         >
-          {hasTokens && !open && !query && (
+          {tokens.map((token) => (
             <span
-              title={summaryTitle}
+              key={token}
+              title={token}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 4,
+                gap: 3,
+                flexShrink: 0,
+                maxWidth: Math.max(120, width - 80),
                 height: 22,
-                padding: '0 8px',
+                padding: '0 4px 0 8px',
                 borderRadius: 4,
                 backgroundColor: '#ccfbf1',
                 color: '#0f766e',
                 fontSize: 12,
                 fontWeight: 700,
                 border: '1px solid #99f6e4',
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
               }}
             >
-              {tokens.length} đã chọn
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
+                }}
+              >
+                {token}
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeToken(token);
+                }}
+                title="Xóa"
+                style={{
+                  width: 14,
+                  height: 14,
+                  flexShrink: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#0f766e',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
+              >
+                <X size={10} />
+              </button>
             </span>
-          )}
+          ))}
           <input
             ref={inputRef}
             type="text"
             value={query}
-            placeholder={hasTokens ? (open ? placeholder : '') : placeholder}
+            placeholder={hasTokens ? 'Thêm...' : placeholder}
             onChange={(e) => {
               setQuery(e.target.value);
               setOpen(true);
@@ -230,9 +277,8 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
             onFocus={() => setOpen(true)}
             onKeyDown={handleKeyDown}
             style={{
-              flex: '1 1 48px',
-              minWidth: 40,
-              width: 0,
+              flex: '1 1 60px',
+              minWidth: 50,
               height: 24,
               border: 'none',
               outline: 'none',
@@ -242,10 +288,33 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
             }}
           />
         </div>
-        <ChevronsUpDown
-          size={13}
-          style={{ position: 'absolute', right: 8, top: 9, color: '#94a3b8', pointerEvents: 'none' }}
-        />
+
+        {hasTokens || query ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              clearAll();
+            }}
+            title="Xóa toàn bộ"
+            style={{
+              position: 'absolute',
+              right: 4,
+              top: 5,
+              width: 22,
+              height: 22,
+              border: 'none',
+              background: 'transparent',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <X size={13} />
+          </button>
+        ) : null}
 
         {open && (
           <div
@@ -260,77 +329,11 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
               borderRadius: 8,
               boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
               zIndex: 90,
-              maxHeight: 320,
+              maxHeight: 280,
               overflowY: 'auto',
               padding: '4px 0',
             }}
           >
-            {hasTokens && (
-              <div style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 4, marginBottom: 4 }}>
-                <div
-                  style={{
-                    padding: '6px 12px 4px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#64748b',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.3,
-                  }}
-                >
-                  Đã chọn ({tokens.length})
-                </div>
-                {tokens.map((t) => (
-                  <div
-                    key={t}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 8,
-                      padding: '6px 10px 6px 12px',
-                      backgroundColor: '#f0fdfa',
-                    }}
-                  >
-                    <span
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#0f172a',
-                        whiteSpace: 'normal',
-                        wordBreak: 'break-word',
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      {t}
-                    </span>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => removeToken(t)}
-                      title="Gỡ"
-                      style={{
-                        flexShrink: 0,
-                        width: 22,
-                        height: 22,
-                        border: '1px solid #99f6e4',
-                        borderRadius: 4,
-                        background: '#ccfbf1',
-                        color: '#0f766e',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: 0,
-                      }}
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
             {filtered.length === 0 ? (
               <div style={{ padding: '10px 12px', fontSize: 12.5, color: '#64748b' }}>
                 {query.trim()
@@ -371,20 +374,6 @@ export const MatrixTokenFilter: FC<MatrixTokenFilterProps> = ({
                     >
                       {highlightMatch(item.primary, query)}
                     </div>
-                    {item.secondary && (
-                      <div
-                        style={{
-                          fontSize: 11.5,
-                          color: '#64748b',
-                          marginTop: 2,
-                          whiteSpace: 'normal',
-                          wordBreak: 'break-word',
-                          lineHeight: 1.35,
-                        }}
-                      >
-                        {highlightMatch(item.secondary, query)}
-                      </div>
-                    )}
                   </button>
                 );
               })
