@@ -536,7 +536,7 @@ export const PosPaymentPanel: FC<Props> = ({
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                   <span>Tổng tiền từng mua nợ:</span>
-                  <span>{(customer.totalDebtPurchased || customer.currentDebt).toLocaleString('vi-VN')} đ</span>
+                  <span>{(customer.totalDebtPurchased ?? 0).toLocaleString('vi-VN')} đ</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
                   <span>Số tiền đang nợ hiện tại:</span>
@@ -544,6 +544,11 @@ export const PosPaymentPanel: FC<Props> = ({
                     {customer.currentDebt.toLocaleString('vi-VN')} đ
                   </strong>
                 </div>
+                {customer.currentDebt > 0 && (customer.debtCount ?? 0) === 0 && (
+                  <div style={{ color: '#b45309', fontWeight: 600 }}>
+                    Dư nợ có sẵn nhưng không có đơn mua nợ còn hiệu lực; cần đối soát dữ liệu cũ.
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: 5, color: '#1e293b' }}>
                   <span>Tổng nợ sau đơn này:</span>
                   <strong style={{ color: '#b45309', fontSize: 13 }}>
@@ -551,7 +556,7 @@ export const PosPaymentPanel: FC<Props> = ({
                   </strong>
                 </div>
                 <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 4, backgroundColor: '#ecfdf5', color: '#047857', fontSize: 11.5 }}>
-                  ✓ Đơn hàng <b>{finalAmount.toLocaleString('vi-VN')} đ</b> sẽ được cộng dồn vào sổ nợ của khách.
+                  {finalAmount > 0 ? <>✓ Đơn hàng <b>{finalAmount.toLocaleString('vi-VN')} đ</b> sẽ được cộng dồn vào sổ nợ của khách.</> : 'Đơn 0 đ không làm tăng công nợ.'}
                 </div>
               </div>
             )}

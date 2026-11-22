@@ -11,6 +11,7 @@ import {
   Edit2,
   Trash2,
   RotateCw,
+  Printer,
 } from 'lucide-react';
 import type {
   VoucherBatchItem,
@@ -21,6 +22,7 @@ import type {
 } from '../../types/promotion.types';
 import { TablePagination } from '../../../../components/common';
 import { promotionApi } from '../../api/promotionApi';
+import { VoucherPrintModal } from './VoucherPrintModal';
 
 interface VoucherBatchTableProps {
   batches: VoucherBatchItem[];
@@ -43,6 +45,35 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   const [pageSize, setPageSize] = useState(15);
   const [batchCodesMap, setBatchCodesMap] = useState<Record<string, VoucherCodeItem[]>>({});
   const [loadingCodesMap, setLoadingCodesMap] = useState<Record<string, boolean>>({});
+  const [printModalState, setPrintModalState] = useState<{
+    isOpen: boolean;
+    batch: VoucherBatchItem | null;
+    selectedCode: VoucherCodeItem | null;
+  }>({
+    isOpen: false,
+    batch: null,
+    selectedCode: null,
+  });
+
+  const handleOpenPrintSingle = (batch: VoucherBatchItem, code: VoucherCodeItem) => {
+    setPrintModalState({
+      isOpen: true,
+      batch,
+      selectedCode: code,
+    });
+  };
+
+  const handleOpenPrintBatch = (batch: VoucherBatchItem) => {
+    setPrintModalState({
+      isOpen: true,
+      batch,
+      selectedCode: null,
+    });
+  };
+
+  const handleClosePrintModal = () => {
+    setPrintModalState((prev) => ({ ...prev, isOpen: false }));
+  };
 
   const fetchCodesForBatch = async (batchId: string) => {
     setLoadingCodesMap((prev) => ({ ...prev, [batchId]: true }));
@@ -399,9 +430,34 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                                     <RotateCw size={13} className={isLoadingCodes ? 'animate-spin' : ''} />
                                   </button>
                                 </div>
-                                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                  Tiền tố mã (Prefix): <strong style={{ fontFamily: 'monospace', color: '#0F766E' }}>{batch.prefix}</strong>
-                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                    Tiền tố mã: <strong style={{ fontFamily: 'monospace', color: '#0F766E' }}>{batch.prefix}</strong>
+                                  </span>
+                                  {codes.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenPrintBatch(batch)}
+                                      className="btn-secondary-pill"
+                                      style={{
+                                        padding: '3px 10px',
+                                        fontSize: '11.5px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                        backgroundColor: '#f0fdfa',
+                                        borderColor: '#0F766E',
+                                        color: '#0F766E',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                      }}
+                                      title="In nhanh phiếu voucher ra máy in nhiệt POS-58"
+                                    >
+                                      <Printer size={13} />
+                                      <span>In phiếu (POS-58)</span>
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               {isLoadingCodes ? (
@@ -423,7 +479,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                                         <th style={{ textAlign: 'left' }}>Khách hàng sử dụng</th>
                                         <th style={{ textAlign: 'left' }}>Hóa đơn áp dụng</th>
                                         <th style={{ textAlign: 'left' }}>Thời điểm sử dụng</th>
-                                        <th style={{ textAlign: 'right' }}>Sao chép</th>
+                                        <th style={{ textAlign: 'right' }}>Thao tác</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -456,23 +512,43 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                                           </td>
                                           <td style={{ padding: '10px 14px', color: '#475569' }}>{c.usedAt || '—'}</td>
                                           <td style={{ padding: '10px 14px', textAlign: 'right' }}>
-                                            <button
-                                              onClick={() => handleCopy(c.code)}
-                                              className="btn-copy-mini"
-                                              title="Sao chép mã"
-                                            >
-                                              {copiedCode === c.code ? (
-                                                <>
-                                                  <Check size={13} color="#059669" />
-                                                  <span style={{ color: '#059669' }}>Đã chép</span>
-                                                </>
-                                              ) : (
-                                                <>
-                                                  <Copy size={13} />
-                                                  <span>Chép</span>
-                                                </>
-                                              )}
-                                            </button>
+                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleOpenPrintSingle(batch, c)}
+                                                className="btn-copy-mini"
+                                                style={{
+                                                  color: '#0F766E',
+                                                  borderColor: '#ccfbf1',
+                                                  backgroundColor: '#f0fdfa',
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: 4,
+                                                }}
+                                                title="In phiếu voucher này ra máy in nhiệt POS-58"
+                                              >
+                                                <Printer size={13} />
+                                                <span>In</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleCopy(c.code)}
+                                                className="btn-copy-mini"
+                                                title="Sao chép mã"
+                                              >
+                                                {copiedCode === c.code ? (
+                                                  <>
+                                                    <Check size={13} color="#059669" />
+                                                    <span style={{ color: '#059669' }}>Đã chép</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <Copy size={13} />
+                                                    <span>Chép</span>
+                                                  </>
+                                                )}
+                                              </button>
+                                            </div>
                                           </td>
                                         </tr>
                                       ))}
@@ -506,6 +582,17 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
           setCurrentPage(1);
         }}
       />
+
+      {/* ── Modal In Phiếu Voucher POS-58 ── */}
+      {printModalState.isOpen && printModalState.batch && (
+        <VoucherPrintModal
+          isOpen={printModalState.isOpen}
+          onClose={handleClosePrintModal}
+          batch={printModalState.batch}
+          initialCode={printModalState.selectedCode}
+          availableCodes={batchCodesMap[printModalState.batch.id] ?? printModalState.batch.codes ?? []}
+        />
+      )}
     </div>
   );
 };

@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ClipboardCheck,
   ChefHat,
+  Tag,
 } from 'lucide-react';
 import type { BatchItem, BatchStatus } from '../types/batch.types';
 import { TablePagination } from '../../../components/common';
@@ -86,7 +87,7 @@ export const BatchTable: FC<BatchTableProps> = ({
   onPageChange,
   onPageSizeChange,
   onSelectBatch,
-  onDiscountClick: _onDiscountClick,
+  onDiscountClick,
   onWriteOffClick: _onWriteOffClick,
   onResetFilters,
 }) => {
@@ -614,6 +615,22 @@ export const BatchTable: FC<BatchTableProps> = ({
                         >
                           <Eye size={13} />
                         </button>
+                        {row.status !== 'Expired' && (
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--icon"
+                            onClick={() => onDiscountClick(row)}
+                            title="Giảm giá FEFO"
+                            aria-label="Giảm giá FEFO"
+                            style={{
+                              color: '#1d4ed8',
+                              borderColor: '#bfdbfe',
+                              background: '#eff6ff',
+                            }}
+                          >
+                            <Tag size={14} />
+                          </button>
+                        )}
                         {onQuickStocktake && (
                           <button
                             type="button"

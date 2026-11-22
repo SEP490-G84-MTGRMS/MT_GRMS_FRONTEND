@@ -224,7 +224,7 @@ export interface ProductItem {
   sellRawByWeight?: boolean;
   processedSellingPricePerKg?: number | null;
   isCombo?: boolean;
-  status: 'Active' | 'Discontinued';
+  status: 'Active' | 'Discontinued' | 'Inactive';
   createdAt: string;
   rawCreatedAt?: string;
   updatedAt: string;

@@ -139,6 +139,7 @@ export class InvoiceItemDTO {
   productName: string = '';
   sku: string = '';
   batchId?: string = '';
+  stockAllocations?: Array<{ branchStockId: string; batchCode?: string; quantityBase: number; returnedBase: number; costPerBase?: number }> = [];
   unitName: string = 'Hộp';
   quantity: number = 1;
   unitPrice: number = 0;
