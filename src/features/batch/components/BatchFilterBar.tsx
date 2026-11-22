@@ -63,17 +63,39 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
     if (e.key === 'Enter') onSearch();
   };
 
-  const selectActive = (active: boolean) =>
-    active
-      ? { borderColor: '#0d9488', color: '#0f766e', backgroundColor: '#f0fdfa' }
-      : undefined;
+  const hasActiveFilters = Boolean(
+    filterInputs.productName.trim() ||
+      filterInputs.sku.trim() ||
+      filterInputs.batchCode.trim() ||
+      filterInputs.supplierName.trim() ||
+      filterInputs.keyword.trim() ||
+      filterInputs.branchId !== 'ALL' ||
+      filterInputs.status !== 'ALL'
+  );
 
   return (
     <div className="so-list-filter">
-      <div className="so-list-filter-row">
-        <div className="so-list-filter-field">
-          <label className="so-list-filter-label" htmlFor="batch-product-name">
-            Tên sản phẩm:
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          gap: '10px 14px',
+          marginBottom: 10,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <label
+            htmlFor="batch-product-name"
+            style={{
+              width: 88,
+              flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#475569',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Tên SP:
           </label>
           <input
             id="batch-product-name"
@@ -82,14 +104,24 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
             value={filterInputs.productName}
             onChange={(e) => onFilterChange('productName', e.target.value)}
             onKeyDown={onEnter}
-            placeholder="VD: Sữa Vinamilk..."
-            style={{ width: 200 }}
+            placeholder="Nhập tên sản phẩm..."
+            style={{ flex: 1, minWidth: 0, height: 32 }}
           />
         </div>
 
-        <div className="so-list-filter-field">
-          <label className="so-list-filter-label" htmlFor="batch-sku">
-            Mã SKU:
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <label
+            htmlFor="batch-sku"
+            style={{
+              width: 72,
+              flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#475569',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Mã hàng:
           </label>
           <input
             id="batch-sku"
@@ -98,13 +130,23 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
             value={filterInputs.sku}
             onChange={(e) => onFilterChange('sku', e.target.value)}
             onKeyDown={onEnter}
-            placeholder="VD: DY-SUA-01..."
-            style={{ width: 140, fontFamily: 'var(--font-mono, monospace)' }}
+            placeholder="Nhập mã hàng..."
+            style={{ flex: 1, minWidth: 0, height: 32, fontFamily: 'var(--font-mono, monospace)' }}
           />
         </div>
 
-        <div className="so-list-filter-field">
-          <label className="so-list-filter-label" htmlFor="batch-code">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <label
+            htmlFor="batch-code"
+            style={{
+              width: 56,
+              flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#475569',
+              whiteSpace: 'nowrap',
+            }}
+          >
             Mã lô:
           </label>
           <input
@@ -114,14 +156,24 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
             value={filterInputs.batchCode}
             onChange={(e) => onFilterChange('batchCode', e.target.value)}
             onKeyDown={onEnter}
-            placeholder="VD: BAT-202608-03..."
-            style={{ width: 160, fontFamily: 'var(--font-mono, monospace)' }}
+            placeholder="Nhập mã lô / phiếu nhập..."
+            style={{ flex: 1, minWidth: 0, height: 32, fontFamily: 'var(--font-mono, monospace)' }}
           />
         </div>
 
-        <div className="so-list-filter-field">
-          <label className="so-list-filter-label" htmlFor="batch-supplier">
-            Nhà cung cấp:
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <label
+            htmlFor="batch-supplier"
+            style={{
+              width: 72,
+              flexShrink: 0,
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#475569',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            NCC:
           </label>
           <input
             id="batch-supplier"
@@ -130,20 +182,38 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
             value={filterInputs.supplierName}
             onChange={(e) => onFilterChange('supplierName', e.target.value)}
             onKeyDown={onEnter}
-            placeholder="VD: Tươi Sạch..."
-            style={{ width: 180 }}
+            placeholder="Nhập tên nhà cung cấp..."
+            style={{ flex: 1, minWidth: 0, height: 32 }}
           />
         </div>
       </div>
 
-      <div className="so-list-filter-row so-list-filter-row--footer">
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
-          <div className="so-list-filter-field">
-            <label className="so-list-filter-label" htmlFor="batch-branch">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <Building2 size={13} color="#64748b" />
-                Chi nhánh:
-              </span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+          minWidth: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <label
+              htmlFor="batch-branch"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#475569',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Building2 size={13} color="#64748b" />
+              Chi nhánh:
             </label>
             {isEmployee ? (
               <div
@@ -151,9 +221,11 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 6,
+                  height: 32,
+                  padding: '0 10px',
                   backgroundColor: '#f1f5f9',
                   fontWeight: 700,
+                  fontSize: 12.5,
                   minWidth: 140,
                 }}
                 title="Nhân viên chỉ xem dữ liệu chi nhánh được phân công"
@@ -163,10 +235,10 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
             ) : (
               <select
                 id="batch-branch"
-                className="so-list-filter-select"
+                className={`so-list-filter-select ${filterInputs.branchId !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
                 value={filterInputs.branchId}
                 onChange={(e) => onFilterChange('branchId', e.target.value)}
-                style={selectActive(filterInputs.branchId !== 'ALL')}
+                style={{ height: 32, minWidth: 160, fontSize: 12.5, fontWeight: 600 }}
               >
                 <option value="ALL">-- Tất cả chi nhánh --</option>
                 {branches.map((b) => (
@@ -178,19 +250,28 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
             )}
           </div>
 
-          <div className="so-list-filter-field">
-            <label className="so-list-filter-label" htmlFor="batch-status">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <Filter size={13} color="#64748b" />
-                Trạng thái:
-              </span>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <label
+              htmlFor="batch-status"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#475569',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Filter size={13} color="#64748b" />
+              Trạng thái:
             </label>
             <select
               id="batch-status"
-              className="so-list-filter-select"
+              className={`so-list-filter-select ${filterInputs.status !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
               value={filterInputs.status}
               onChange={(e) => onFilterChange('status', e.target.value as 'ALL' | BatchStatus)}
-              style={selectActive(filterInputs.status !== 'ALL')}
+              style={{ height: 32, minWidth: 160, fontSize: 12.5, fontWeight: 600 }}
             >
               <option value="ALL">-- Tất cả --</option>
               <option value="Expired">Quá hạn (≤ 0 ngày)</option>
@@ -199,18 +280,29 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
               <option value="Normal">An toàn (&gt; 30 ngày)</option>
             </select>
           </div>
+
+          {hasActiveFilters && <span className="so-list-filter-badge">Đang lọc</span>}
         </div>
 
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <button type="button" className="po-btn po-btn-primary" onClick={onSearch}>
+        <div
+          className="so-list-filter-actions"
+          style={{
+            justifyContent: 'flex-end',
+            width: 'max-content',
+            flexWrap: 'nowrap',
+            gap: 8,
+            marginLeft: 0,
+          }}
+        >
+          <button type="button" className="so-list-filter-search" onClick={onSearch}>
             <Search size={14} />
             <span>Tìm kiếm</span>
           </button>
-          <button type="button" className="po-btn po-btn-secondary" onClick={onReset}>
+          <button type="button" className="so-list-filter-reset" onClick={onReset}>
             <RotateCcw size={13} />
             <span>Đặt lại</span>
           </button>
-          <button type="button" className="po-btn po-btn-secondary" onClick={onPrint}>
+          <button type="button" className="so-list-filter-reset" onClick={onPrint} title="In báo cáo">
             <Printer size={14} />
             <span>In báo cáo</span>
           </button>

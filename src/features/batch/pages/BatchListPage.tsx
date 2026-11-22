@@ -27,6 +27,7 @@ import {
 } from '../components/BatchExpiryAlertModal';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
+import '../../supplier/supplier.css';
 
 const DEFAULT_FILTERS: BatchFilterState = {
   keyword: '',
@@ -103,12 +104,18 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   useEffect(() => {
     const skuFromUrl = searchParams.get('sku');
     const batchParam = searchParams.get('batch');
+    const keywordParam = searchParams.get('keyword') || searchParams.get('grn') || '';
     const statusParam = searchParams.get('status') as BatchStatus | null;
     const branchParam = searchParams.get('branch');
 
     const updated = { ...DEFAULT_FILTERS };
     if (skuFromUrl) updated.sku = skuFromUrl;
     if (batchParam && !skuFromUrl) updated.batchCode = batchParam;
+    // ?keyword=GRN-... / mã lô → ô Mã lô (và keyword BE)
+    if (keywordParam && !batchParam && !skuFromUrl) {
+      updated.batchCode = keywordParam;
+      updated.keyword = keywordParam;
+    }
 
     if (statusParam && ['Expired', 'Critical', 'Warning', 'Normal'].includes(statusParam)) {
       updated.status = statusParam;
@@ -265,12 +272,12 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
             )}
             <Package size={22} color="var(--blue-primary, #0f766e)" />
             <span>
-              {skuParam ? 'Chi tiết lô & hạn sử dụng' : 'Quản lý Lô & Hạn sử dụng (FEFO)'}
+              {skuParam ? 'Chi tiết lô & hạn sử dụng' : 'Quản lý lô & hạn sử dụng'}
             </span>
           </h1>
           {skuParam && (
-            <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4, marginLeft: 30 }}>
-              {focusedProduct?.productName || skuParam} · SKU {skuParam} · {totalCount} lô
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, marginLeft: 30 }}>
+              {focusedProduct?.productName || skuParam} · Mã hàng {skuParam} · {totalCount} lô
               {isLoading ? ' · Đang tải…' : ''}
             </div>
           )}

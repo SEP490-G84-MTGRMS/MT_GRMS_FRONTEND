@@ -280,7 +280,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
         <div>
           <h1 className="so-list-title">
             <PackageCheck size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Danh sách phiếu nhập kho (GRN)</span>
+            <span>Danh sách phiếu nhập kho</span>
             {isLoading && (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
             )}
@@ -357,7 +357,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
               )
             }
             className="po-btn po-btn-primary"
-            title="Lập phiếu nhập kho từ đơn PO"
+            title="Lập phiếu nhập kho từ đơn mua hàng"
           >
             <Plus size={14} />
             <span>Lập phiếu nhập kho</span>
