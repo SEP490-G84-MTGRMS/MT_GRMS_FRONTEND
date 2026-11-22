@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FC, FormEvent, KeyboardEvent } from 'react';
 import type { BranchFilterState } from '../../types/po.types';
 import { branchApi } from '../../api/branchApi';
-import { Search, RotateCcw, X, Loader2 } from 'lucide-react';
+import { Search, RotateCcw, X } from 'lucide-react';
 
 type FieldKey = 'code' | 'name' | 'address' | 'phone';
 type TokenMap = Record<FieldKey, string[]>;
@@ -19,14 +19,13 @@ interface FieldConfig {
   key: FieldKey;
   label: string;
   placeholder: string;
-  minWidth: number;
 }
 
 const FIELDS: FieldConfig[] = [
-  { key: 'code', label: 'Mã chi nhánh', placeholder: 'Nhập mã, Enter để thêm...', minWidth: 220 },
-  { key: 'name', label: 'Tên chi nhánh', placeholder: 'Nhập tên, Enter để thêm...', minWidth: 280 },
-  { key: 'address', label: 'Địa chỉ', placeholder: 'Nhập địa chỉ, Enter để thêm...', minWidth: 280 },
-  { key: 'phone', label: 'Số điện thoại', placeholder: 'Nhập SĐT, Enter để thêm...', minWidth: 220 },
+  { key: 'code', label: 'Mã CN', placeholder: 'Nhập mã, Enter để thêm...' },
+  { key: 'name', label: 'Tên CN', placeholder: 'Nhập tên, Enter để thêm...' },
+  { key: 'address', label: 'Địa chỉ', placeholder: 'Nhập địa chỉ, Enter để thêm...' },
+  { key: 'phone', label: 'SĐT', placeholder: 'Nhập SĐT, Enter để thêm...' },
 ];
 
 const EMPTY_TOKENS: TokenMap = { code: [], name: [], address: [], phone: [] };
@@ -113,8 +112,6 @@ export const BranchFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => {
   const inputRefs = useRef<Partial<Record<FieldKey, HTMLInputElement | null>>>({});
   const chipBoxRefs = useRef<Partial<Record<FieldKey, HTMLDivElement | null>>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragRef = useRef<{ field: FieldKey; startX: number; startScroll: number; moved: boolean } | null>(null);
-  const skipFocusRef = useRef(false);
 
   const scrollChipBoxToEnd = (field: FieldKey) => {
     requestAnimationFrame(() => {
@@ -195,7 +192,7 @@ export const BranchFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => {
         addresses: field === 'address' ? [trimmed] : undefined,
         phones: field === 'phone' ? [trimmed] : undefined,
         pageIndex: 1,
-        pageSize: 8,
+        pageSize: 25,
         status: '',
       });
 
@@ -216,6 +213,7 @@ export const BranchFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => {
         if (!value?.trim()) continue;
         const key = value.toLowerCase();
         if (selectedSet.has(key) || seen.has(key)) continue;
+        if (!key.includes(trimmed.toLowerCase())) continue;
         seen.add(key);
         mapped.push({
           id: `${field}-${item.id}-${value}`,
@@ -225,9 +223,17 @@ export const BranchFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => {
         });
       }
 
-      setSuggestions(mapped);
-      setOpenField(mapped.length > 0 ? field : null);
-      setFocusedIndex(mapped.length > 0 ? 0 : -1);
+      mapped.sort((a, b) => {
+        const aStarts = a.primary.toLowerCase().startsWith(trimmed.toLowerCase()) ? 0 : 1;
+        const bStarts = b.primary.toLowerCase().startsWith(trimmed.toLowerCase()) ? 0 : 1;
+        if (aStarts !== bStarts) return aStarts - bStarts;
+        return a.primary.localeCompare(b.primary, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      const list = mapped.slice(0, 25);
+      setSuggestions(list);
+      setOpenField(list.length > 0 ? field : null);
+      setFocusedIndex(list.length > 0 ? 0 : -1);
     } catch {
       setSuggestions([]);
       setOpenField(null);
@@ -323,22 +329,34 @@ export const BranchFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => {
     phone: uniqueTokens([...tokens.phone, queries.phone]),
   });
 
+  const buildSearchPayload = (nextTokens: TokenMap, statusOverride?: string): BranchFilterState => ({
+    ...draftFilters,
+    keyword: '',
+    branchCode: '',
+    branchCodes: nextTokens.code,
+    branchNames: nextTokens.name,
+    addresses: nextTokens.address,
+    phones: nextTokens.phone,
+    status: statusOverride !== undefined ? statusOverride : draftFilters.status,
+    pageIndex: 1,
+  });
+
   const handleSubmit = (e?: FormEvent) => {
     if (e) e.preventDefault();
     const next = collectTokens();
     setTokens(next);
     setQueries(EMPTY_QUERIES);
     setOpenField(null);
-    onSearch({
-      ...draftFilters,
-      keyword: '',
-      branchCode: '',
-      branchCodes: next.code,
-      branchNames: next.name,
-      addresses: next.address,
-      phones: next.phone,
-      pageIndex: 1,
-    });
+    onSearch(buildSearchPayload(next));
+  };
+
+  const handleStatusChange = (nextStatus: string) => {
+    setDraftFilters((prev) => ({ ...prev, status: nextStatus }));
+    const next = collectTokens();
+    setTokens(next);
+    setQueries(EMPTY_QUERIES);
+    setOpenField(null);
+    onSearch(buildSearchPayload(next, nextStatus));
   };
 
   const handleResetClick = () => {
@@ -361,349 +379,292 @@ export const BranchFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => {
     onReset();
   };
 
-  const hasActiveFilters = Boolean(
-    tokens.code.length ||
-      tokens.name.length ||
-      tokens.address.length ||
-      tokens.phone.length ||
-      queries.code.trim() ||
-      queries.name.trim() ||
-      queries.address.trim() ||
-      queries.phone.trim() ||
-      draftFilters.status
-  );
+  const renderField = (field: FieldConfig) => {
+    const fieldTokens = tokens[field.key];
+    const query = queries[field.key];
+    const isOpen = openField === field.key && suggestions.length > 0;
+    const hasValues = fieldTokens.length > 0;
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: 12.5,
-    fontWeight: 600,
-    color: '#475569',
-    whiteSpace: 'nowrap',
-    userSelect: 'none',
+    return (
+      <div
+        key={field.key}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          position: 'relative',
+          minWidth: 0,
+          flex: 1,
+        }}
+      >
+        <label
+          style={{
+            width: 72,
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#475569',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            userSelect: 'none',
+          }}
+        >
+          <span>{field.label}:</span>
+        </label>
+
+        <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+          <div
+            ref={(el) => {
+              chipBoxRefs.current[field.key] = el;
+            }}
+            className="supplier-chip-input so-list-chip-box"
+            onClick={() => inputRefs.current[field.key]?.focus()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'nowrap',
+              gap: 4,
+              padding: '0 28px 0 6px',
+              borderRadius: 6,
+              border: hasValues || isOpen ? '1px solid #0d9488' : '1px solid #cbd5e1',
+              backgroundColor: hasValues ? '#f0fdfa' : '#ffffff',
+              cursor: 'text',
+              boxSizing: 'border-box',
+              height: 32,
+              overflowX: 'auto',
+            }}
+          >
+            {fieldTokens.map((token) => (
+              <span
+                key={token}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  backgroundColor: '#ccfbf1',
+                  color: '#0f766e',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  border: '1px solid #99f6e4',
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    maxWidth: 150,
+                  }}
+                  title={token}
+                >
+                  {token}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeToken(field.key, token);
+                  }}
+                  title="Xóa giá trị"
+                  style={{
+                    width: 14,
+                    height: 14,
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#0f766e',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                  }}
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            <input
+              ref={(el) => {
+                inputRefs.current[field.key] = el;
+              }}
+              type="text"
+              value={query}
+              placeholder={fieldTokens.length ? 'Thêm...' : field.placeholder}
+              onChange={(e) => handleFieldChange(field.key, e.target.value)}
+              onFocus={() => {
+                if (query.trim()) scheduleSuggestions(field.key, query, fieldTokens);
+              }}
+              onKeyDown={(e) => handleKeyDown(field.key, e)}
+              style={{
+                flex: '1 1 60px',
+                minWidth: 50,
+                height: 24,
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                fontSize: 12.5,
+                color: '#0f172a',
+              }}
+            />
+          </div>
+          {hasValues || query ? (
+            <button
+              type="button"
+              onClick={() => handleClearField(field.key)}
+              title="Xóa toàn bộ giá trị của ô này"
+              style={{
+                position: 'absolute',
+                right: 4,
+                top: 5,
+                width: 22,
+                height: 22,
+                border: 'none',
+                background: 'transparent',
+                color: '#94a3b8',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <X size={13} />
+            </button>
+          ) : null}
+
+          {isOpen && (
+            <div
+              className="so-list-filter-suggest"
+              onWheel={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                left: 0,
+                right: 0,
+                backgroundColor: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: 8,
+                boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
+                zIndex: 200,
+                maxHeight: 240,
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                overscrollBehavior: 'contain',
+                padding: '4px 0',
+              }}
+            >
+              {loadingField === field.key ? (
+                <div style={{ padding: '10px 12px', fontSize: 12, color: '#64748b' }}>Đang tải...</div>
+              ) : (
+                suggestions.map((item, index) => {
+                  const active = index === focusedIndex;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onMouseEnter={() => setFocusedIndex(index)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleSelect(field.key, item.value)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '8px 12px',
+                        backgroundColor: active ? '#f0fdfa' : 'transparent',
+                      }}
+                    >
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                        {highlightMatch(item.primary, query)}
+                      </div>
+                      {item.secondary ? (
+                        <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                          {highlightMatch(item.secondary, query)}
+                        </div>
+                      ) : null}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
-
-  const selectStyle = (isActive: boolean): React.CSSProperties => ({
-    height: 32,
-    padding: '0 10px',
-    borderRadius: 6,
-    border: isActive ? '1px solid #0d9488' : '1px solid #cbd5e1',
-    fontSize: 12.5,
-    fontWeight: 600,
-    color: isActive ? '#0f766e' : '#334155',
-    backgroundColor: isActive ? '#f0fdfa' : '#ffffff',
-    cursor: 'pointer',
-    outline: 'none',
-  });
 
   return (
     <div ref={barRef} className="so-list-filter">
       <div
         style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          gap: '10px 20px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '10px 14px',
+          marginBottom: 10,
         }}
       >
-        {FIELDS.map((field) => {
-          const query = queries[field.key];
-          const fieldTokens = tokens[field.key];
-          const hasValues = fieldTokens.length > 0;
-          const isOpen = openField === field.key && suggestions.length > 0;
-
-          return (
-            <div
-              key={field.key}
-              style={{
-                position: 'relative',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                flex: '1 1 320px',
-                minWidth: field.minWidth,
-                maxWidth: 520,
-              }}
-            >
-              <label style={labelStyle}>{field.label}:</label>
-              <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-                <div
-                  ref={(el) => {
-                    chipBoxRefs.current[field.key] = el;
-                  }}
-                  className="supplier-chip-input"
-                  onClick={() => {
-                    if (skipFocusRef.current) {
-                      skipFocusRef.current = false;
-                      return;
-                    }
-                    inputRefs.current[field.key]?.focus();
-                  }}
-                  onWheel={(e) => {
-                    const el = chipBoxRefs.current[field.key];
-                    if (!el || el.scrollWidth <= el.clientWidth) return;
-                    e.preventDefault();
-                    el.scrollLeft += e.deltaY + e.deltaX;
-                  }}
-                  onPointerDown={(e) => {
-                    if ((e.target as HTMLElement).closest('button, input')) return;
-                    const el = chipBoxRefs.current[field.key];
-                    if (!el) return;
-                    dragRef.current = {
-                      field: field.key,
-                      startX: e.clientX,
-                      startScroll: el.scrollLeft,
-                      moved: false,
-                    };
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  }}
-                  onPointerMove={(e) => {
-                    const drag = dragRef.current;
-                    if (!drag || drag.field !== field.key) return;
-                    const el = chipBoxRefs.current[field.key];
-                    if (!el) return;
-                    const dx = e.clientX - drag.startX;
-                    if (Math.abs(dx) > 3) drag.moved = true;
-                    el.scrollLeft = drag.startScroll - dx;
-                  }}
-                  onPointerUp={() => {
-                    if (dragRef.current?.moved) skipFocusRef.current = true;
-                    dragRef.current = null;
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    flexWrap: 'nowrap',
-                    gap: 4,
-                    height: 32,
-                    maxHeight: 32,
-                    overflowX: 'auto',
-                    overflowY: 'hidden',
-                    padding: '0 28px 0 6px',
-                    borderRadius: 6,
-                    border: hasValues || isOpen ? '1px solid #0d9488' : '1px solid #cbd5e1',
-                    backgroundColor: hasValues ? '#f0fdfa' : '#ffffff',
-                    boxSizing: 'border-box',
-                    boxShadow: isOpen ? '0 0 0 3px rgba(13, 148, 136, 0.12)' : 'none',
-                    cursor: 'text',
-                    userSelect: 'none',
-                  }}
-                >
-                  {fieldTokens.map((token) => (
-                    <span
-                      key={`${field.key}-${token}`}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        flexShrink: 0,
-                        gap: 4,
-                        height: 22,
-                        padding: '0 4px 0 8px',
-                        borderRadius: 4,
-                        backgroundColor: '#ccfbf1',
-                        color: '#0f766e',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        border: '1px solid #99f6e4',
-                      }}
-                    >
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          maxWidth: 160,
-                        }}
-                        title={token}
-                      >
-                        {token}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeToken(field.key, token);
-                        }}
-                        title="Xóa giá trị"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#0f766e',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: 0,
-                        }}
-                      >
-                        <X size={11} />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    ref={(el) => {
-                      inputRefs.current[field.key] = el;
-                    }}
-                    type="text"
-                    value={query}
-                    placeholder={fieldTokens.length ? 'Thêm giá trị...' : field.placeholder}
-                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                    onFocus={() => {
-                      if (query.trim()) {
-                        loadSuggestions(field.key, query, fieldTokens);
-                      }
-                    }}
-                    onKeyDown={(e) => handleKeyDown(field.key, e)}
-                    style={{
-                      flex: '0 0 auto',
-                      minWidth: 72,
-                      width: fieldTokens.length ? 88 : '100%',
-                      height: 24,
-                      border: 'none',
-                      outline: 'none',
-                      background: 'transparent',
-                      fontSize: 12.5,
-                      color: '#0f172a',
-                    }}
-                  />
-                </div>
-                {loadingField === field.key ? (
-                  <Loader2
-                    size={13}
-                    className="animate-spin"
-                    style={{ position: 'absolute', right: 8, top: 9, color: '#0f766e' }}
-                  />
-                ) : hasValues || query ? (
-                  <button
-                    type="button"
-                    onClick={() => handleClearField(field.key)}
-                    title="Xóa toàn bộ giá trị của ô này"
-                    style={{
-                      position: 'absolute',
-                      right: 4,
-                      top: 4,
-                      width: 24,
-                      height: 24,
-                      border: 'none',
-                      background: 'transparent',
-                      color: '#94a3b8',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <X size={13} />
-                  </button>
-                ) : null}
-
-                {isOpen && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: 0,
-                      minWidth: '100%',
-                      width: Math.max(field.minWidth, 240),
-                      marginTop: 4,
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: 8,
-                      boxShadow: '0 10px 25px -5px rgba(15, 23, 42, 0.12)',
-                      zIndex: 80,
-                      maxHeight: 260,
-                      overflowY: 'auto',
-                      padding: '4px 0',
-                    }}
-                  >
-                    {suggestions.map((item, index) => {
-                      const active = index === focusedIndex;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onMouseEnter={() => setFocusedIndex(index)}
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => handleSelect(field.key, item.value)}
-                          style={{
-                            width: '100%',
-                            textAlign: 'left',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '8px 12px',
-                            backgroundColor: active ? '#f0fdfa' : 'transparent',
-                          }}
-                        >
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
-                            {highlightMatch(item.primary, query)}
-                          </div>
-                          {item.secondary && (
-                            <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
-                              {highlightMatch(item.secondary, query)}
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {FIELDS.map(renderField)}
       </div>
 
       <div
         style={{
-          display: 'flex',
-          flexWrap: 'wrap',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '10px 14px',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          paddingTop: 8,
-          borderTop: '1px dashed #f1f5f9',
+          paddingTop: 2,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <label style={labelStyle}>Trạng thái:</label>
-            <select
-              value={draftFilters.status || ''}
-              onChange={(e) => setDraftFilters((prev) => ({ ...prev, status: e.target.value }))}
-              style={{ ...selectStyle(Boolean(draftFilters.status)), minWidth: 150 }}
-            >
-              <option value="">-- Tất cả trạng thái --</option>
-              <option value="Active">Hoạt động</option>
-              <option value="Inactive">Tạm ngưng</option>
-            </select>
-          </div>
-
-          {hasActiveFilters && (
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '3px 10px',
-                borderRadius: 4,
-                backgroundColor: '#f0fdfa',
-                color: '#0f766e',
-                fontSize: 12,
-                fontWeight: 600,
-                border: '1px solid #ccfbf1',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Đang áp dụng bộ lọc
-            </span>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', whiteSpace: 'nowrap' }}>
+            Trạng thái:
+          </span>
+          <select
+            value={draftFilters.status || ''}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            style={{
+              height: 32,
+              flex: 1,
+              padding: '0 8px',
+              borderRadius: 6,
+              border: draftFilters.status ? '1px solid #0d9488' : '1px solid #cbd5e1',
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: draftFilters.status ? '#0f766e' : '#1e293b',
+              backgroundColor: draftFilters.status ? '#f0fdfa' : '#ffffff',
+              cursor: 'pointer',
+              minWidth: 0,
+            }}
+          >
+            <option value="">-- Tất cả trạng thái --</option>
+            <option value="Active">Hoạt động</option>
+            <option value="Inactive">Tạm ngưng</option>
+          </select>
         </div>
 
-        <div className="so-list-filter-actions">
+        <div />
+
+        <div
+          className="so-list-filter-actions"
+          style={{
+            gridColumn: '3 / span 2',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            width: '100%',
+            flexWrap: 'nowrap',
+            gap: 8,
+            minWidth: 0,
+          }}
+        >
           <button
             type="button"
             className="so-list-filter-search"
-            onClick={() => handleSubmit()}
-            title="Áp dụng bộ lọc tìm kiếm"
+            onClick={handleSubmit}
+            style={{ flexShrink: 0 }}
           >
             <Search size={14} />
             <span>Tìm kiếm</span>
@@ -713,7 +674,7 @@ export const BranchFilterBar: FC<Props> = ({ filters, onSearch, onReset }) => {
             type="button"
             className="so-list-filter-reset"
             onClick={handleResetClick}
-            title="Đặt lại toàn bộ tiêu chí lọc"
+            style={{ flexShrink: 0 }}
           >
             <RotateCcw size={13} />
             <span>Đặt lại</span>

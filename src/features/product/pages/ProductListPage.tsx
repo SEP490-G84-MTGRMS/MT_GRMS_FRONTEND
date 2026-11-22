@@ -18,6 +18,7 @@ import { ProductDeleteConfirmModal } from '../components/ProductDeleteConfirmMod
 import {
   MasterProductFilterBar,
   type MasterProductFilterValues,
+  type MasterProductSuggestionSource,
 } from '../components/MasterProductFilterBar';
 import { MasterProductTable } from '../components/MasterProductTable';
 import { NotificationModal } from '../../../components/common';
@@ -124,6 +125,8 @@ export const ProductListPage: React.FC = () => {
   // Filter state (chip-token — layout giống Sản phẩm theo NCC)
   const [appliedFilters, setAppliedFilters] =
     useState<MasterProductFilterValues>(DEFAULT_PRODUCT_FILTERS);
+  /** Nguồn gợi ý filter — toàn bộ SP, không phụ thuộc trang bảng */
+  const [suggestionProducts, setSuggestionProducts] = useState<MasterProductSuggestionSource[]>([]);
 
   // 1. Tải danh mục thực tế từ backend
   const fetchCategories = useCallback(async () => {
@@ -143,9 +146,26 @@ export const ProductListPage: React.FC = () => {
     }
   }, []);
 
+  const fetchSuggestionProducts = useCallback(async () => {
+    try {
+      const all = await productApi.getAllProducts();
+      setSuggestionProducts(
+        all.map((p) => ({
+          id: p.id,
+          productCode: p.productCode || (p as { sku?: string }).sku || p.barcode || '',
+          productName: p.name || (p as { productName?: string }).productName || '',
+          barcode: p.barcode || '',
+        }))
+      );
+    } catch (err) {
+      console.error('Lỗi khi tải danh sách gợi ý filter sản phẩm:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    void fetchSuggestionProducts();
+  }, [fetchCategories, fetchSuggestionProducts]);
 
   // 2. Tải danh sách sản phẩm thực tế từ backend
   const fetchProducts = useCallback(async () => {
@@ -384,7 +404,7 @@ export const ProductListPage: React.FC = () => {
           minStock: data.minStock ?? productToEdit.minStock ?? 0,
           maxStock: data.maxStock ?? productToEdit.maxStock ?? 1000,
           vatRate: data.vatRate ?? productToEdit.vatRate ?? 0,
-          status: data.status || productToEdit.status,
+          status: data.status ?? productToEdit.status,
           imageUrl: data.imageUrl,
           imageUrls: data.imageUrls || (data.imageUrl ? [data.imageUrl] : []),
           description: data.description,
@@ -522,6 +542,7 @@ export const ProductListPage: React.FC = () => {
       // Làm mới danh mục và danh sách sản phẩm từ backend
       await fetchCategories();
       await fetchProducts();
+      await fetchSuggestionProducts();
 
       if (saveAndAddNew) {
         setProductToEdit(null);
@@ -565,6 +586,7 @@ export const ProductListPage: React.FC = () => {
       setProductToDelete(null);
       await fetchCategories();
       await fetchProducts();
+      await fetchSuggestionProducts();
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa hàng hóa.';
       showToast(msg, 'error');
@@ -601,6 +623,7 @@ export const ProductListPage: React.FC = () => {
       }
       await fetchCategories();
       await fetchProducts();
+      await fetchSuggestionProducts();
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi xóa hàng hóa đã chọn.';
       showToast(msg, 'error');
@@ -731,6 +754,7 @@ export const ProductListPage: React.FC = () => {
         });
       }
       await fetchProducts();
+      await fetchSuggestionProducts();
       showToast(`Đã sao chép thành công sản phẩm: ${created.name}`);
       setIsDetailModalOpen(false);
     } catch (err: any) {
@@ -767,10 +791,12 @@ export const ProductListPage: React.FC = () => {
         return true;
       })
       .sort((a, b) => {
-        const timeA = a.rawCreatedAt ? new Date(a.rawCreatedAt).getTime() : 0;
-        const timeB = b.rawCreatedAt ? new Date(b.rawCreatedAt).getTime() : 0;
-        if (timeB !== timeA) return timeB - timeA;
-        return (b.id || '').localeCompare(a.id || '');
+        const codeCmp = (a.productCode || '').localeCompare(b.productCode || '', undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        });
+        if (codeCmp !== 0) return codeCmp;
+        return (a.productName || '').localeCompare(b.productName || '', 'vi', { sensitivity: 'base' });
       });
   }, [products, appliedFilters]);
 
@@ -1022,6 +1048,7 @@ export const ProductListPage: React.FC = () => {
 
       await fetchCategories();
       await fetchProducts();
+      await fetchSuggestionProducts();
 
       const summary = `Import hoàn tất: ${successCount}/${rows.length} dòng thành công`;
       setNotificationModal({
@@ -1125,6 +1152,7 @@ export const ProductListPage: React.FC = () => {
         <MasterProductFilterBar
           initialValues={appliedFilters}
           products={products}
+          suggestionProducts={suggestionProducts}
           categories={categories}
           onSearch={(values) => {
             setAppliedFilters(values);

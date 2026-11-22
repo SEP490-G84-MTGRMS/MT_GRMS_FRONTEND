@@ -11,9 +11,19 @@ export interface MasterProductFilterValues {
   statusFilter: 'ALL' | 'Active' | 'Discontinued' | string;
 }
 
+/** Nguồn gợi ý chip — đủ SKU/tên/barcode, không phụ thuộc trang bảng đang mở */
+export type MasterProductSuggestionSource = {
+  id: string;
+  productCode?: string;
+  productName?: string;
+  barcode?: string;
+};
+
 interface MasterProductFilterBarProps {
   initialValues: MasterProductFilterValues;
   products: ProductItem[];
+  /** Danh sách đầy đủ để gợi ý filter (ưu tiên hơn `products` trang hiện tại) */
+  suggestionProducts?: MasterProductSuggestionSource[];
   categories: Category[];
   onSearch: (values: MasterProductFilterValues) => void;
   onReset: () => void;
@@ -22,6 +32,8 @@ interface MasterProductFilterBarProps {
   excelBusy?: boolean;
   onPrintBarcode?: () => void;
 }
+
+const SUGGESTION_LIMIT = 25;
 
 type FieldKey = 'sku' | 'name' | 'barcode';
 type TokenMap = Record<FieldKey, string[]>;
@@ -93,6 +105,7 @@ function highlightMatch(text: string, query: string) {
 export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
   initialValues,
   products,
+  suggestionProducts,
   categories,
   onSearch,
   onReset,
@@ -141,10 +154,13 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
         setSuggestions([]);
         return;
       }
+      const source =
+        suggestionProducts && suggestionProducts.length > 0 ? suggestionProducts : products;
       const excludeSet = new Set(exclude.map((x) => x.toLowerCase()));
       const seen = new Set<string>();
-      const list: Suggestion[] = [];
-      for (const p of products) {
+      const scored: Array<Suggestion & { rank: number }> = [];
+
+      for (const p of source) {
         let value = '';
         if (key === 'sku') value = p.productCode || '';
         if (key === 'name') value = p.productName || '';
@@ -155,13 +171,29 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
         if (excludeSet.has(lower) || seen.has(lower)) continue;
         if (!lower.includes(q)) continue;
         seen.add(lower);
-        list.push({ id: `${key}-${p.id}-${v}`, value: v, primary: v });
-        if (list.length >= 8) break;
+        scored.push({
+          id: `${key}-${p.id}-${v}`,
+          value: v,
+          primary: v,
+          // ưu tiên khớp đầu chuỗi, rồi sắp theo mã (001 trước 014)
+          rank: lower.startsWith(q) ? 0 : 1,
+        });
       }
+
+      scored.sort((a, b) => {
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        return a.value.localeCompare(b.value, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+      const list = scored.slice(0, SUGGESTION_LIMIT).map(({ id, value, primary }) => ({
+        id,
+        value,
+        primary,
+      }));
       setSuggestions(list);
       setFocusedIndex(list.length ? 0 : -1);
     },
-    [products]
+    [products, suggestionProducts]
   );
 
   const addToken = (key: FieldKey, raw: string) => {
@@ -481,11 +513,10 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr) minmax(0, 1.5fr)',
+          gridTemplateColumns: 'repeat(4, 1fr)',
           gap: '10px 14px',
           alignItems: 'center',
           paddingTop: 2,
-          minWidth: 0,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -547,7 +578,7 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
               minWidth: 0,
             }}
           >
-            <option value="ALL">-- Tất cả --</option>
+            <option value="ALL">-- Tất cả trạng thái --</option>
             <option value="Active">Đang kinh doanh</option>
             <option value="Discontinued">Ngừng kinh doanh</option>
           </select>
@@ -556,22 +587,25 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
         <div
           className="so-list-filter-actions"
           style={{
+            gridColumn: '3 / span 2',
             justifyContent: 'flex-end',
+            alignItems: 'center',
             width: '100%',
-            maxWidth: '100%',
-            minWidth: 0,
-            flexWrap: 'wrap',
+            flexWrap: 'nowrap',
             gap: 8,
+            minWidth: 0,
           }}
         >
-          <button type="button" className="so-list-filter-search" onClick={handleSubmit}>
-            <Search size={14} />
-            <span>Tìm kiếm</span>
-          </button>
           {onExport && (
-            <button type="button" className="so-list-filter-reset" onClick={onExport} disabled={excelBusy}>
+            <button
+              type="button"
+              className="so-list-filter-reset"
+              onClick={onExport}
+              disabled={excelBusy}
+              style={{ opacity: excelBusy ? 0.55 : 1, flexShrink: 0 }}
+            >
               <Download size={13} />
-              <span>{excelBusy ? 'Đang xử lý...' : 'Xuất file'}</span>
+              <span>{excelBusy ? 'Đang xuất...' : 'Xuất Excel'}</span>
             </button>
           )}
           {onImport && (
@@ -581,9 +615,10 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
                 className="so-list-filter-reset"
                 onClick={() => excelFileInputRef.current?.click()}
                 disabled={excelBusy}
+                style={{ opacity: excelBusy ? 0.55 : 1, flexShrink: 0 }}
               >
                 <Upload size={13} />
-                <span>Import</span>
+                <span>{excelBusy ? 'Đang nhập...' : 'Nhập Excel'}</span>
               </button>
               <input
                 ref={excelFileInputRef}
@@ -599,12 +634,31 @@ export const MasterProductFilterBar: FC<MasterProductFilterBarProps> = ({
             </>
           )}
           {onPrintBarcode && (
-            <button type="button" className="so-list-filter-reset" onClick={onPrintBarcode}>
+            <button
+              type="button"
+              className="so-list-filter-reset"
+              onClick={onPrintBarcode}
+              style={{ flexShrink: 0 }}
+            >
               <Printer size={13} />
               <span>In mã vạch</span>
             </button>
           )}
-          <button type="button" className="so-list-filter-reset" onClick={handleResetClick}>
+          <button
+            type="button"
+            className="so-list-filter-search"
+            onClick={handleSubmit}
+            style={{ flexShrink: 0 }}
+          >
+            <Search size={14} />
+            <span>Tìm kiếm</span>
+          </button>
+          <button
+            type="button"
+            className="so-list-filter-reset"
+            onClick={handleResetClick}
+            style={{ flexShrink: 0 }}
+          >
             <RotateCcw size={13} />
             <span>Đặt lại</span>
           </button>

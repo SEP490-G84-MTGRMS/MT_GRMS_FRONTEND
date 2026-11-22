@@ -9,7 +9,12 @@ import type {
   EmailSendMode,
   DispatchPendingChangeLine,
 } from '../types/po.types';
-import { DispatchFilterBar, type DispatchTabType } from '../components/dispatch/DispatchFilterBar';
+import {
+  DispatchFilterBar,
+  DEFAULT_DISPATCH_FILTERS,
+  type DispatchFilterValues,
+  type DispatchTabType,
+} from '../components/dispatch/DispatchFilterBar';
 import { SupplierDispatchTable } from '../components/dispatch/SupplierDispatchTable';
 import { DispatchConfirmModal } from '../components/dispatch/DispatchConfirmModal';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -24,6 +29,17 @@ const EMPTY_COUNTS: Record<DispatchTabType, number> = {
   completed: 0,
   pending_changes: 0,
 };
+
+/** Giống OrderMatrix / Store products: OR trong cùng field, AND giữa các field. */
+function tokenMatches(value: string | undefined, tokens: string[]): boolean {
+  if (!tokens.length) return true;
+  const hay = (value || '').toLowerCase();
+  return tokens.some((t) => {
+    const needle = t.trim().toLowerCase();
+    if (!needle) return true;
+    return hay === needle || hay.includes(needle);
+  });
+}
 
 const PENDING_CHANGE_MSG =
   'Nhà cung cấp có số lượng trên ma trận khác PO đã chốt — nhấn Cập nhật & gửi mail để amend PO và gửi lại email NCC (trước giờ cutoff).';
@@ -76,8 +92,8 @@ export const SupplierOrderDispatchHubPage: FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<DispatchTabType>('all');
-  const [keyword, setKeyword] = useState('');
+  /** Bộ lọc đã apply (bấm Tìm kiếm / đổi trạng thái) — giống StoreProductManagementPage. */
+  const [appliedFilters, setAppliedFilters] = useState<DispatchFilterValues>(DEFAULT_DISPATCH_FILTERS);
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pendingDetailsOpen, setPendingDetailsOpen] = useState(false);
@@ -123,10 +139,8 @@ export const SupplierOrderDispatchHubPage: FC = () => {
   const fetchHub = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Luôn lấy full list (theo keyword) — urgency / pending_changes lọc client-side
-      const hub = await dispatchHubApi.getSupplierHub({
-        keyword: keyword.trim() || undefined,
-      });
+      // Full list — lọc chip/trạng thái hoàn toàn client-side (giống stores/products)
+      const hub = await dispatchHubApi.getSupplierHub({});
       const list = hub.suppliers || [];
       const pendingCount = list.filter((s) => s.hasPendingChanges && s.status !== 'dispatched').length;
       setSuppliers(list);
@@ -145,14 +159,11 @@ export const SupplierOrderDispatchHubPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [keyword]);
+  }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      void fetchHub();
-    }, keyword ? 300 : 0);
-    return () => clearTimeout(t);
-  }, [fetchHub, keyword]);
+    void fetchHub();
+  }, [fetchHub]);
 
   const loadPreview = useCallback(
     async (supplierId: string, targetScope: DispatchScope, weekMonday?: string) => {
@@ -292,26 +303,40 @@ export const SupplierOrderDispatchHubPage: FC = () => {
   };
 
   const filteredSuppliers = useMemo(() => {
-    switch (activeTab) {
-      case 'pending_changes':
-        return suppliers.filter((s) => s.hasPendingChanges && s.status !== 'dispatched');
-      case 'critical':
-        return suppliers.filter((s) => s.status !== 'dispatched' && s.urgency === 'critical' && (s.branchesWithQty ?? 0) > 0);
-      case 'today':
-        return suppliers.filter(
-          (s) =>
+    const { codes, names, branchCodes, branchNames, urgency } = appliedFilters;
+
+    return suppliers.filter((s) => {
+      if (!tokenMatches(s.code, codes)) return false;
+      if (!tokenMatches(s.name, names)) return false;
+
+      if (branchCodes.length || branchNames.length) {
+        const branches = s.branches || [];
+        const hit = branches.some(
+          (b) => tokenMatches(b.branchCode, branchCodes) && tokenMatches(b.branchName, branchNames)
+        );
+        if (!hit) return false;
+      }
+
+      switch (urgency) {
+        case 'pending_changes':
+          return Boolean(s.hasPendingChanges && s.status !== 'dispatched');
+        case 'critical':
+          return s.status !== 'dispatched' && s.urgency === 'critical' && (s.branchesWithQty ?? 0) > 0;
+        case 'today':
+          return (
             s.status !== 'dispatched' &&
             (s.urgency === 'today' || s.urgency === 'critical') &&
             (s.branchesWithQty ?? 0) > 0
-        );
-      case 'later':
-        return suppliers.filter((s) => s.status !== 'dispatched' && s.urgency === 'later' && (s.branchesWithQty ?? 0) > 0);
-      case 'completed':
-        return suppliers.filter((s) => s.status === 'dispatched');
-      default:
-        return suppliers;
-    }
-  }, [suppliers, activeTab]);
+          );
+        case 'later':
+          return s.status !== 'dispatched' && s.urgency === 'later' && (s.branchesWithQty ?? 0) > 0;
+        case 'completed':
+          return s.status === 'dispatched';
+        default:
+          return true;
+      }
+    });
+  }, [suppliers, appliedFilters]);
 
   const pagedSuppliers = useMemo(() => {
     const start = (pageIndex - 1) * pageSize;
@@ -370,20 +395,15 @@ export const SupplierOrderDispatchHubPage: FC = () => {
 
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <DispatchFilterBar
-          activeTab={activeTab}
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-            setPageIndex(1);
-          }}
+          initialValues={appliedFilters}
+          suppliers={suppliers}
           counts={tabCounts}
-          keyword={keyword}
-          onKeywordChange={(kw) => {
-            setKeyword(kw);
+          onSearch={(next) => {
+            setAppliedFilters(next);
             setPageIndex(1);
           }}
-          onResetFilters={() => {
-            setActiveTab('all');
-            setKeyword('');
+          onReset={() => {
+            setAppliedFilters(DEFAULT_DISPATCH_FILTERS);
             setPageIndex(1);
           }}
           pendingChangeCount={pendingSupplierCount}

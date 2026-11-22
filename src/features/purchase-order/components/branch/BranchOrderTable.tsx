@@ -1,10 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import type { FC } from 'react';
-import {
-  Building2,
-  ShoppingCart,
-  ArrowUpDown,
-} from 'lucide-react';
+import type { CSSProperties, FC } from 'react';
+import { Building2, ShoppingCart, ArrowUpDown } from 'lucide-react';
 import type { BranchListItem } from '../../types/po.types';
 import { TablePagination } from '../../../../components/common';
 import '../../../../styles/so-list-page.css';
@@ -146,236 +142,161 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
     </colgroup>
   );
 
-  const thBaseStyle: React.CSSProperties = {
+  const thBaseStyle: CSSProperties = {
     backgroundColor: '#f8fafc',
-    padding: '10px 12px',
-    fontSize: 12,
+    padding: '6px 5px',
+    fontSize: 10.5,
     fontWeight: 700,
     color: '#334155',
     textTransform: 'uppercase',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.01em',
     whiteSpace: 'nowrap',
+    lineHeight: 1.2,
     boxSizing: 'border-box',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
   };
 
+  const sortIcon = (field: SortField) => (
+    <ArrowUpDown
+      size={11}
+      style={{ color: sortField === field ? '#0f766e' : '#94a3b8', flexShrink: 0 }}
+    />
+  );
+
   const renderStatusBadge = (status: BranchListItem['status']) => {
-    if (status === 'active') {
-      return (
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '3px 10px',
-            borderRadius: 9999,
-            fontSize: 11.5,
-            fontWeight: 600,
-            backgroundColor: '#f0fdf4',
-            color: '#15803d',
-            border: '1px solid #bbf7d0',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <span>Hoạt động</span>
-        </span>
-      );
-    }
+    const isActive = status === 'active';
     return (
       <span
         style={{
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '3px 10px',
+          padding: '2px 8px',
           borderRadius: 9999,
-          fontSize: 11.5,
+          fontSize: 10.5,
           fontWeight: 600,
-          backgroundColor: '#f8fafc',
-          color: '#64748b',
-          border: '1px solid #e2e8f0',
+          backgroundColor: isActive ? '#f0fdf4' : '#f8fafc',
+          color: isActive ? '#15803d' : '#64748b',
+          border: isActive ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
           whiteSpace: 'nowrap',
         }}
       >
-        <span>Ngừng hoạt động</span>
+        {isActive ? 'Hoạt động' : 'Tạm ngưng'}
       </span>
     );
   };
 
   return (
-    <div
-      style={{
-        backgroundColor: '#ffffff',
-        borderRadius: 8,
-        border: '1px solid #e2e8f0',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        flex: 1,
-        minHeight: 0,
-        width: '100%',
-      }}
-    >
-      {/* ── Table Header (Fixed at top, strictly outside vertical scroll) ── */}
+    <div className="so-list-table-card so-list-table-card--dense">
       <div
         ref={headerRef}
-        style={{
-          width: '100%',
-          overflowX: 'hidden',
-          backgroundColor: '#f8fafc',
-          borderBottom: '1px solid #cbd5e1',
-          flexShrink: 0,
-          boxSizing: 'border-box',
-          paddingRight: hasScrollY ? 6 : 0,
-        }}
+        className="so-list-table-head"
+        style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table
-          style={{
-            width: '100%',
-            minWidth: 1080,
-            tableLayout: 'fixed',
-            borderCollapse: 'separate',
-            borderSpacing: 0,
-            textAlign: 'left',
-            fontSize: 12.5,
-          }}
-        >
+        <table className="so-list-table" style={{ minWidth: 1080, tableLayout: 'fixed' }}>
           {tableColGroup}
           <thead>
             <tr>
               <th
                 onClick={() => handleSort('code')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo mã chi nhánh"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <span>Mã CN</span>
-                  <ArrowUpDown size={12} color={sortField === 'code' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('code')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('name')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo tên chi nhánh"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Chi Nhánh</span>
-                  <ArrowUpDown size={12} color={sortField === 'name' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Tên CN</span>
+                  {sortIcon('name')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('managerName')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo người quản lý"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Người Quản Lý</span>
-                  <ArrowUpDown size={12} color={sortField === 'managerName' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Người QL</span>
+                  {sortIcon('managerName')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('matrixProductCount')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Số sản phẩm đã gán bán tại chi nhánh"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <span>SP cửa hàng</span>
-                  <ArrowUpDown
-                    size={12}
-                    color={sortField === 'matrixProductCount' ? '#0f766e' : '#94a3b8'}
-                  />
+                  {sortIcon('matrixProductCount')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('pendingCount')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Số đơn PO đang chờ"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Đơn PO Đang Chờ</span>
-                  <ArrowUpDown size={12} color={sortField === 'pendingCount' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>PO chờ</span>
+                  {sortIcon('pendingCount')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('lastUpdated')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo cập nhật cuối"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Cập Nhật Cuối</span>
-                  <ArrowUpDown size={12} color={sortField === 'lastUpdated' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Cập nhật</span>
+                  {sortIcon('lastUpdated')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('status')}
-                style={{
-                  ...thBaseStyle,
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
+                style={{ ...thBaseStyle, textAlign: 'center', cursor: 'pointer' }}
+                title="Sắp xếp theo trạng thái"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Trạng Thái</span>
-                  <ArrowUpDown size={12} color={sortField === 'status' ? '#0f766e' : '#94a3b8'} />
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
+                  <span>Trạng thái</span>
+                  {sortIcon('status')}
                 </div>
               </th>
 
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>
-                <span>Thao Tác</span>
+                <span>Thao tác</span>
               </th>
             </tr>
           </thead>
         </table>
       </div>
 
-      {/* ── Table Body Scroll Container (Sleek scrollbar matching SupplierTable) ── */}
       <div
         ref={bodyRef}
-        className="supplier-table-scroll-container"
+        className="so-list-table-body supplier-table-scroll-container"
         onScroll={handleBodyScroll}
-        style={{
-          width: '100%',
-          flex: '1 1 auto',
-          overflowY: 'auto',
-          overflowX: 'auto',
-          minHeight: 0,
-        }}
       >
-        <table
-          style={{
-            width: '100%',
-            minWidth: 1080,
-            tableLayout: 'fixed',
-            borderCollapse: 'separate',
-            borderSpacing: 0,
-            textAlign: 'left',
-            fontSize: 12.5,
-          }}
-        >
+        <table className="so-list-table" style={{ minWidth: 1080, tableLayout: 'fixed' }}>
           {tableColGroup}
           <tbody>
             {sortedBranches.length === 0 ? (
@@ -401,10 +322,10 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
               sortedBranches.map((b) => (
                 <tr
                   key={b.id}
+                  className="so-list-row"
                   style={{
                     borderBottom: '1px solid #f1f5f9',
                     backgroundColor: '#ffffff',
-                    transition: 'background-color 0.12s ease',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = '#f8fafc';
@@ -413,99 +334,91 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                     e.currentTarget.style.backgroundColor = '#ffffff';
                   }}
                 >
-                  {/* 1. Mã CN */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'top' }}>
                     <span
                       style={{
                         fontFamily: 'var(--font-mono, monospace)',
                         fontWeight: 700,
                         color: '#0f766e',
                         backgroundColor: '#f0fdfa',
-                        padding: '3px 8px',
+                        padding: '1px 6px',
                         borderRadius: 4,
                         border: '1px solid #ccfbf1',
-                        fontSize: 12,
-                        whiteSpace: 'nowrap',
+                        fontSize: 11,
+                        whiteSpace: 'normal',
+                        overflowWrap: 'anywhere',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.35,
+                        display: 'inline-block',
+                        maxWidth: '100%',
                       }}
+                      title={b.code}
                     >
                       {b.code}
                     </span>
                   </td>
 
-                  {/* 2. Tên chi nhánh */}
-                  <td
-                    style={{
-                      padding: '10px 12px',
-                      verticalAlign: 'middle',
-                      borderBottom: '1px solid #f1f5f9',
-                      fontWeight: 600,
-                      color: '#0f172a',
-                      fontSize: 13,
-                      lineHeight: 1.35,
-                      whiteSpace: 'normal',
-                      wordBreak: 'break-word',
-                    }}
-                    title={b.name}
-                  >
-                    {b.name}
+                  <td className="so-list-td--wrap">
+                    <div className="so-list-name" title={b.name}>
+                      {b.name}
+                    </div>
                   </td>
 
-                  {/* 3. Người quản lý */}
                   <td
                     style={{
-                      padding: '10px 12px',
-                      verticalAlign: 'middle',
+                      padding: '5px 6px',
                       borderBottom: '1px solid #f1f5f9',
                       fontWeight: 600,
                       color: '#1e293b',
-                      fontSize: 12.5,
+                      fontSize: 11,
                       whiteSpace: 'normal',
+                      overflowWrap: 'anywhere',
                       wordBreak: 'break-word',
+                      lineHeight: 1.35,
+                      verticalAlign: 'top',
                     }}
                   >
                     {b.managerName || '—'}
                   </td>
 
-                  {/* 4. SP đã gán bán tại cửa hàng (BranchProducts) — khớp /stores/products */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          minWidth: 26,
-                          height: 22,
-                          padding: '0 8px',
-                          borderRadius: 11,
-                          fontSize: 12,
+                          minWidth: 22,
+                          height: 20,
+                          padding: '0 6px',
+                          borderRadius: 10,
+                          fontSize: 11,
                           fontWeight: 700,
                           backgroundColor: (b.matrixProductCount ?? 0) > 0 ? '#ecfdf5' : '#f1f5f9',
                           color: (b.matrixProductCount ?? 0) > 0 ? '#047857' : '#64748b',
                           border:
                             (b.matrixProductCount ?? 0) > 0 ? '1px solid #a7f3d0' : '1px solid #e2e8f0',
                         }}
-                        title="Số sản phẩm đã gán bán tại chi nhánh (giống màn Sản phẩm cửa hàng)"
+                        title="Số sản phẩm đã gán bán tại chi nhánh"
                       >
                         {b.matrixProductCount ?? 0}
                       </span>
-                      <span style={{ fontSize: 11.5, color: '#64748b' }}>SP</span>
+                      <span style={{ fontSize: 10.5, color: '#64748b' }}>SP</span>
                     </div>
                   </td>
 
-                  {/* 5. Đơn PO đang chờ */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9', verticalAlign: 'middle' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          minWidth: 26,
-                          height: 22,
-                          padding: '0 8px',
-                          borderRadius: 11,
-                          fontSize: 12,
+                          minWidth: 22,
+                          height: 20,
+                          padding: '0 6px',
+                          borderRadius: 10,
+                          fontSize: 11,
                           fontWeight: 700,
                           backgroundColor: (b.pendingCount ?? 0) > 0 ? '#fef3c7' : '#f1f5f9',
                           color: (b.pendingCount ?? 0) > 0 ? '#b45309' : '#64748b',
@@ -514,39 +427,55 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                       >
                         {b.pendingCount ?? 0}
                       </span>
-                      <span style={{ fontSize: 11.5, color: '#64748b' }}>đơn chờ</span>
+                      <span style={{ fontSize: 10.5, color: '#64748b' }}>đơn</span>
                     </div>
                   </td>
 
-                  {/* 5. Cập nhật cuối */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', color: '#64748b', fontSize: 12, borderBottom: '1px solid #f1f5f9' }}>
+                  <td
+                    style={{
+                      padding: '5px 6px',
+                      borderBottom: '1px solid #f1f5f9',
+                      color: '#64748b',
+                      fontSize: 11,
+                      whiteSpace: 'normal',
+                      overflowWrap: 'anywhere',
+                      wordBreak: 'break-word',
+                      lineHeight: 1.35,
+                      verticalAlign: 'top',
+                    }}
+                  >
                     {b.lastUpdated || '—'}
                   </td>
 
-                  {/* 6. Trạng thái */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
+                  <td
+                    className="so-list-td--status"
+                    style={{
+                      padding: '5px 6px',
+                      borderBottom: '1px solid #f1f5f9',
+                      textAlign: 'center',
+                      verticalAlign: 'middle',
+                    }}
+                  >
                     {renderStatusBadge(b.status)}
                   </td>
 
-                  {/* 7. Thao tác */}
-                  <td style={{ padding: '10px 12px', verticalAlign: 'middle', textAlign: 'center', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'nowrap' }}>
+                  <td
+                    className="so-list-td--actions"
+                    style={{
+                      padding: '5px 6px',
+                      borderBottom: '1px solid #f1f5f9',
+                      textAlign: 'center',
+                      verticalAlign: 'middle',
+                    }}
+                  >
+                    <div className="so-list-actions" style={{ justifyContent: 'center' }}>
                       <button
                         type="button"
                         onClick={() => onOrder(b.id)}
-                        className="po-btn po-btn-primary"
-                        style={{
-                          height: 28,
-                          padding: '0 10px',
-                          fontSize: 11.5,
-                          gap: 4,
-                          whiteSpace: 'nowrap',
-                          flexShrink: 0,
-                          boxShadow: '0 1px 2px rgba(15, 118, 110, 0.15)',
-                        }}
+                        className="so-list-action-btn"
                         title="Tạo ma trận đặt hàng cho chi nhánh này"
                       >
-                        <ShoppingCart size={12} style={{ flexShrink: 0 }} />
+                        <ShoppingCart size={11} />
                         <span>Đặt hàng</span>
                       </button>
                     </div>
@@ -558,7 +487,6 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
         </table>
       </div>
 
-      {/* ── Footer Phân trang chuẩn 1, 2, 3... ── */}
       <TablePagination
         currentPage={pageIndex}
         pageSize={pageSize}

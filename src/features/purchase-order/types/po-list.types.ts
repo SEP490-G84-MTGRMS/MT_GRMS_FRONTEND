@@ -51,13 +51,29 @@ export interface PurchaseOrderListItem {
   items: PurchaseOrderItemDetail[];
 }
 
+/** Chip filter — OR trong field, AND giữa các field (giống stores/products & dispatch-hub). */
 export interface PoListFilterState {
-  branchId: string;            // 'all' | ID cụ thể
-  supplierId: string;          // 'all' | ID cụ thể
+  poCodes: string[];
+  supplierCodes: string[];
+  supplierNames: string[];
+  branchCodes: string[];
+  branchNames: string[];
   status: 'all' | PurchaseOrderStatus;
   dateFrom: string;            // YYYY-MM-DD
   dateTo: string;              // YYYY-MM-DD
-  keyword: string;
   pageIndex: number;
   pageSize: number;
 }
+
+export const DEFAULT_PO_LIST_FILTERS: PoListFilterState = {
+  poCodes: [],
+  supplierCodes: [],
+  supplierNames: [],
+  branchCodes: [],
+  branchNames: [],
+  status: 'all',
+  dateFrom: '',
+  dateTo: '',
+  pageIndex: 1,
+  pageSize: 10,
+};

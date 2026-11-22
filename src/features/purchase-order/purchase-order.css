@@ -98,25 +98,22 @@
 }
 
 .po-filter-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: nowrap !important;
+  column-gap: 10px;
+  row-gap: 8px;
   width: 100%;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-.po-filter-row::-webkit-scrollbar {
-  display: none;
+  min-width: 0;
+  overflow: visible;
 }
 
 .po-filter-row-left {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .po-filter-row-right {
@@ -124,8 +121,9 @@
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap;
-  margin-left: auto;
   flex-shrink: 0;
+  justify-self: end;
+  align-self: center;
 }
 
 .po-filter-field {
