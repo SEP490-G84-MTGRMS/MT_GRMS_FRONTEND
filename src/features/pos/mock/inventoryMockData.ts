@@ -347,8 +347,8 @@ export const mockInvoicesList: InvoiceDTO[] = [
     paidDebtAmount: 0,
     paymentMethod: 'DEBT',
     paymentMethodLabel: 'Ghi nợ (Bán nợ)',
-    status: 'DEBT',
-    statusLabel: 'Ghi nợ (Còn nợ 450.000 đ)',
+    status: 'COMPLETED',
+    statusLabel: 'Hoàn thành',
     debtPaymentRecords: [],
     items: [
       new InvoiceItemDTO({
@@ -395,8 +395,8 @@ export const mockInvoicesList: InvoiceDTO[] = [
     paidDebtAmount: 250000,
     paymentMethod: 'DEBT',
     paymentMethodLabel: 'Ghi nợ (Bán nợ)',
-    status: 'DEBT',
-    statusLabel: 'Ghi nợ (Còn nợ 250.000 đ)',
+    status: 'COMPLETED',
+    statusLabel: 'Hoàn thành',
     debtPaymentRecords: [
       new DebtPaymentRecordDTO({
         paymentId: 'DEBT-PAY-01',

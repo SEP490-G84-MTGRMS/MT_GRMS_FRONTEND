@@ -39,12 +39,18 @@ import '../cashbook.css';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { posOrderApi, type OwnerUnsettledSummaryResponse } from '../../pos/api/posOrderApi';
 import { formatMoney } from '../../finance/utils/formatters';
+import { financeHttpClient } from '../../../api/financeHttpClient';
+import { generateUuidV7 } from '../../../utils/uuid';
 
 export const CashbookPage: FC = () => {
   const { user } = useAuthStore();
   const isEmployee = user?.role !== 'STORE_OWNER';
   const [ownerUnsettled, setOwnerUnsettled] = useState<OwnerUnsettledSummaryResponse | null>(null);
   const [isOwnerEodModalOpen, setIsOwnerEodModalOpen] = useState(false);
+  const [isOwnerDepositOpen, setIsOwnerDepositOpen] = useState(false);
+  const [ownerDepositAmount, setOwnerDepositAmount] = useState('');
+  const [ownerDepositNote, setOwnerDepositNote] = useState('');
+  const [isDepositingOwnerCash, setIsDepositingOwnerCash] = useState(false);
   const [ownerEodNote, setOwnerEodNote] = useState('');
   const [isSettlingOwnerEod, setIsSettlingOwnerEod] = useState(false);
   const [operationBranch, setOperationBranch] = useState<{ id: string; code?: string; name: string }>(() => {
@@ -296,6 +302,33 @@ export const CashbookPage: FC = () => {
       void loadData();
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Lỗi khi lập phiếu thu', 'error');
+    }
+  };
+
+  const handleOwnerSafeDeposit = async () => {
+    const amount = Number(ownerDepositAmount.replace(/\D/g, ''));
+    if (operationBranch.id === 'ALL') {
+      showToast('Vui lòng chọn một chi nhánh để nộp tiền vào két.', 'error');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast('Vui lòng nhập số tiền lớn hơn 0.', 'error');
+      return;
+    }
+    try {
+      setIsDepositingOwnerCash(true);
+      await financeHttpClient.post('/cashbook/owner-safe-deposits', {
+        branchId: operationBranch.id, amount, note: ownerDepositNote.trim() || 'Chủ bổ sung tiền vào két sắt',
+      }, { headers: { 'Idempotency-Key': generateUuidV7() } });
+      setIsOwnerDepositOpen(false);
+      setOwnerDepositAmount('');
+      setOwnerDepositNote('');
+      showToast('Đã nộp tiền vào két sắt chi nhánh.', 'success');
+      void loadData();
+    } catch (error: any) {
+      showToast(error?.response?.data?.message || 'Không thể nộp tiền vào két.', 'error');
+    } finally {
+      setIsDepositingOwnerCash(false);
     }
   };
 
@@ -564,6 +597,10 @@ export const CashbookPage: FC = () => {
             <Plus size={14} />
             <span>Thu tiền</span>
           </button>
+          {!isEmployee && <button type="button" className="po-btn po-btn-secondary"
+            onClick={() => setIsOwnerDepositOpen(true)} title="Chủ bổ sung tiền mặt vào két sắt chi nhánh">
+            <Wallet size={14} /><span>Nộp tiền vào két</span>
+          </button>}
         </div>
       </div>
 
@@ -624,7 +661,7 @@ export const CashbookPage: FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>
-                    Chốt Doanh Thu Bán Lẻ Cuối Ngày (Chủ Tiệm)
+                    Chốt Doanh Thu Bán Lẻ Cuối Ngày
                   </h3>
                   <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>
                     Gộp toàn bộ đơn bán trực tiếp của Chủ cửa hàng thành 1 bút toán tổng vào Két sắt &amp; Ngân hàng
@@ -644,11 +681,11 @@ export const CashbookPage: FC = () => {
                     <strong style={{ color: '#0f172a' }}>{ownerUnsettled?.unsettledOrdersCount || 0} đơn hàng</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#065f46' }}>Doanh thu Tiền mặt (gộp vào Két sắt):</span>
+                    <span style={{ color: '#065f46' }}>Doanh thu tiền mặt:</span>
                     <strong style={{ color: '#059669' }}>+{formatMoney(ownerUnsettled?.cashRevenue || 0)}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#1e40af' }}>Doanh thu Chuyển khoản / VietQR (gộp vào Ngân hàng):</span>
+                    <span style={{ color: '#1e40af' }}>Doanh thu chuyển khoản:</span>
                     <strong style={{ color: '#2563eb' }}>+{formatMoney(ownerUnsettled?.bankRevenue || 0)}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px dashed #cbd5e1', fontSize: 14 }}>
@@ -719,6 +756,30 @@ export const CashbookPage: FC = () => {
             </div>
           </div>
         )}
+
+      {isOwnerDepositOpen && <div className="cb-modal-backdrop" onClick={() => setIsOwnerDepositOpen(false)}>
+        <div className="cb-modal-container" role="dialog" aria-modal="true" aria-label="Nộp tiền vào két sắt"
+          onClick={(event) => event.stopPropagation()}>
+          <div className="cb-modal-header cb-modal-header--receipt"><div className="cb-modal-heading">
+            <div><h2 className="cb-modal-title">Nộp tiền vào két sắt</h2>
+              <p className="cb-modal-subtitle">{operationBranch.name} · Chủ bổ sung tiền mặt, không tính doanh thu bán hàng</p></div>
+          </div></div>
+          <div className="cb-modal-body">
+            <label className="cb-form-label" htmlFor="owner-deposit-amount">Số tiền (đ) *</label>
+            <input id="owner-deposit-amount" className="cb-form-input" inputMode="numeric"
+              value={ownerDepositAmount} onChange={(event) => setOwnerDepositAmount(event.target.value)}
+              placeholder="Nhập số tiền" />
+            <label className="cb-form-label" htmlFor="owner-deposit-note">Ghi chú</label>
+            <input id="owner-deposit-note" className="cb-form-input" value={ownerDepositNote}
+              onChange={(event) => setOwnerDepositNote(event.target.value)} placeholder="Nguồn tiền nộp vào két" />
+          </div>
+          <div className="cb-modal-footer">
+            <button type="button" className="po-btn po-btn-secondary" onClick={() => setIsOwnerDepositOpen(false)}>Hủy</button>
+            <button type="button" className="po-btn po-btn-primary" disabled={isDepositingOwnerCash}
+              onClick={handleOwnerSafeDeposit}>{isDepositingOwnerCash ? 'Đang ghi nhận...' : 'Xác nhận nộp tiền'}</button>
+          </div>
+        </div>
+      </div>}
 
       <CreateReceiptModal
         isOpen={isReceiptModalOpen}

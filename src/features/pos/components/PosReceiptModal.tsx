@@ -17,6 +17,12 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
     return localStorage.getItem('mtgrms_pos_auto_print') === 'true';
   });
 
+  const isPreOrder = Boolean(
+    receiptData?.isPreOrder ||
+    receiptData?.orderCode?.startsWith('DH') ||
+    receiptData?.orderCode?.startsWith('PO')
+  );
+
   if (!isOpen || !receiptData) return null;
 
   const handleThermalPrintRaw = async () => {
@@ -57,7 +63,11 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
         <div className="pos-modal-header">
           <div className="flex items-center gap-2">
             <Receipt size={18} className="text-teal-700" />
-            <h2 className="pos-modal-title">Hóa Đơn Bán Lẻ Siêu Thị Mini (POS-58 / 43mm)</h2>
+            <h2 className="pos-modal-title">
+              {isPreOrder
+                ? 'Phiếu Đặt Hàng Trước (POS-58 / 43mm)'
+                : 'Hóa Đơn Bán Lẻ Siêu Thị Mini (POS-58 / 43mm)'}
+            </h2>
           </div>
           <button type="button" className="pos-modal-close-btn" onClick={onClose}>
             <X size={18} />
@@ -102,17 +112,17 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
               </div>
 
               <h3 className="font-bold text-base tracking-wider uppercase text-slate-900 mt-2.5 mb-1">
-                HÓA ĐƠN BÁN LẺ
+                {isPreOrder ? 'PHIẾU ĐẶT HÀNG TRƯỚC / GIAO HÀNG' : 'HÓA ĐƠN BÁN LẺ'}
               </h3>
               <div className="text-[11.5px] font-mono text-slate-600">
-                HĐ: {receiptData.orderCode}
+                {isPreOrder ? 'MÃ ĐẶT: ' : 'HĐ: '}{receiptData.orderCode}
               </div>
             </div>
 
             {/* 2. Thông tin ngày bán & Thu ngân */}
             <div className="space-y-1 text-xs border-b border-dashed border-slate-300 pb-2 mb-2">
               <div className="flex justify-between items-center text-slate-700">
-                <span>Ngày bán:</span>
+                <span>{isPreOrder ? 'Ngày tạo:' : 'Ngày bán:'}</span>
                 <span className="font-mono text-slate-800">{receiptData.createdAt}</span>
               </div>
               <div className="flex justify-between items-center text-slate-700">
@@ -369,7 +379,11 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
               ) : (
                 <>
                   <Printer size={15} />
-                  <span>In lại hóa đơn (POS-58 1-Click)</span>
+                  <span>
+                    {isPreOrder
+                      ? 'In phiếu đặt hàng (POS-58 1-Click)'
+                      : 'In lại hóa đơn (POS-58 1-Click)'}
+                  </span>
                 </>
               )}
             </button>

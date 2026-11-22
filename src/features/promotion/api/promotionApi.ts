@@ -314,6 +314,101 @@ export const promotionApi = {
     return res.data?.data;
   },
 
+  async printVoucherDirect(payload: {
+    voucherCode: string;
+    batchName: string;
+    discountType: 'FIXED_AMOUNT' | 'PERCENT';
+    discountValue: number;
+    minOrderValue: number;
+    maxDiscountAmount?: number;
+    startDate: string;
+    endDate: string;
+    status: string;
+    storeName?: string;
+    branchName?: string;
+    appliedBranches?: string;
+    storeAddress?: string;
+    storePhone?: string;
+    customerName?: string;
+    customerPhone?: string;
+    orderCode?: string;
+    usedAt?: string;
+    printerName?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    // 1. Thử gửi qua Local Print Server (port 3300 của start.bat)
+    try {
+      const res3300 = await fetch('http://localhost:3300/api/print-direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'VOUCHER',
+          storeName: payload.storeName || '',
+          branchName: payload.branchName || '',
+          appliedBranches: payload.appliedBranches || '',
+          address: payload.storeAddress || '',
+          phone: payload.storePhone || '',
+          voucherCode: payload.voucherCode,
+          batchName: payload.batchName,
+          discountType: payload.discountType,
+          discountValue: payload.discountValue,
+          minOrderValue: payload.minOrderValue,
+          maxDiscountAmount: payload.maxDiscountAmount,
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+          status: payload.status,
+          customerName: payload.customerName,
+          customerPhone: payload.customerPhone,
+          orderCode: payload.orderCode,
+          usedAt: payload.usedAt,
+          printerName: payload.printerName || 'POS-58',
+        }),
+      });
+      if (res3300.ok) {
+        const data = await res3300.json();
+        if (data.success) {
+          return { success: true, message: `Đã in trực tiếp phiếu voucher [${payload.voucherCode}] ra máy POS-58!` };
+        }
+      }
+    } catch {
+      // Local port 3300 chưa bật
+    }
+
+    // 2. Thử gọi Backend API MT_GRMS .NET
+    try {
+      const backendRes = await httpClient.post<{ success: boolean; data: { success: boolean; message: string } }>('/vouchers/print', {
+        voucherCode: payload.voucherCode,
+        batchName: payload.batchName,
+        discountType: payload.discountType,
+        discountValue: payload.discountValue,
+        minOrderValue: payload.minOrderValue,
+        maxDiscountAmount: payload.maxDiscountAmount,
+        startDate: payload.startDate,
+        endDate: payload.endDate,
+        status: payload.status,
+        storeName: payload.storeName,
+        branchName: payload.branchName,
+        appliedBranches: payload.appliedBranches,
+        storeAddress: payload.storeAddress,
+        storePhone: payload.storePhone,
+        customerName: payload.customerName,
+        customerPhone: payload.customerPhone,
+        orderCode: payload.orderCode,
+        usedAt: payload.usedAt,
+        printerName: payload.printerName || 'POS-58',
+      });
+      if (backendRes.data?.data) {
+        return backendRes.data.data;
+      }
+    } catch (err: any) {
+      console.warn('Backend voucher print error:', err);
+    }
+
+    return {
+      success: false,
+      message: 'Máy in chưa sẵn sàng: Hãy nhấp đúp file start.bat (port 3300) hoặc kiểm tra cáp máy in POS-58 nhé!',
+    };
+  },
+
   // 3. Loyalty Configuration
   async getLoyaltyConfig() {
     const res = await httpClient.get<{ success: boolean; data: LoyaltyConfigDto }>('/loyalty-config');

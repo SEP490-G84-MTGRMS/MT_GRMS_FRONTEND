@@ -1032,7 +1032,7 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
                 >
                   <span>ℹ️</span>
                   <span>
-                    <strong>Báo sự cố Check-out:</strong> Áp dụng khi bạn đã đóng ca POS Z-Report nhưng không thể quét FaceID ra về hoặc quên chấm công ra. Đơn sẽ được gửi cho Chủ duyệt để chốt giờ làm thực tế.
+                    <strong>Báo sự cố Check-out:</strong> Áp dụng khi bạn đã đóng ca POS nhưng không thể quét FaceID ra về hoặc quên chấm công ra. Đơn sẽ được gửi cho Chủ duyệt để chốt giờ làm thực tế.
                   </span>
                 </div>
               </div>

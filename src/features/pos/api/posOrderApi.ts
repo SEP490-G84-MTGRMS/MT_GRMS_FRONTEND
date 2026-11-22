@@ -13,6 +13,7 @@ export interface OrderItemCreateDto {
   isGift?: boolean;
   promotionId?: string | null;
   batchId?: string | null;
+  packageId?: string | null;
 }
 
 export interface OrderCreateRequest {
@@ -72,6 +73,8 @@ export interface OrderItemResponse {
   actualPrice: number;
   totalLineAmount: number;
   batchCode?: string;
+  batchId?: string | null;
+  stockAllocations?: Array<{ branchStockId: string; batchCode?: string; quantityBase: number; returnedBase: number; costPerBase?: number }>;
   isGift?: boolean;
   promotionId?: string | null;
 }
@@ -152,7 +155,6 @@ export const posOrderApi = {
         basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
         costPrice: p.costPrice || 0,
         quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
-        batchCode: 'LÔ-FEFO',
         unitPrices: Array.isArray(p.unitPrices)
           ? p.unitPrices.map((u: any) => ({
             unitId: u.unitId || u.id,
@@ -196,7 +198,6 @@ export const posOrderApi = {
       basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
       costPrice: p.costPrice || 0,
       quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
-      batchCode: 'LÔ-FEFO',
       unitPrices: Array.isArray(p.unitPrices)
         ? p.unitPrices.map((u: any) => ({
           unitId: u.unitId || u.id,
@@ -235,6 +236,8 @@ export const posOrderApi = {
       loyaltyPoints: c.loyaltyPoints ?? c.rewardPoints ?? 0,
       membershipTier: c.membershipTier || 'Standard',
       currentDebt: c.currentDebtAR ?? c.currentDebt ?? c.totalDebt ?? 0,
+      debtCount: c.debtOrderCount ?? 0,
+      totalDebtPurchased: c.totalDebtPurchased ?? 0,
       note: c.note || '',
     }));
   },
@@ -422,14 +425,17 @@ export const posOrderApi = {
       unitName?: string;
       condition?: 'Restock' | 'Damaged';
       orderDetailId?: string;
+      batchId?: string;
       isGift?: boolean;
     }>;
     newItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; discountAmount?: number }>;
     settlementMethod: string;
     reason?: string;
     note?: string;
-  }): Promise<any> => {
-    const res = await httpClient.post(`/orders/${orderId}/return-exchange`, data);
+    cashFundSource?: 'SHIFT' | 'SAFE';
+  }, idempotencyKey?: string): Promise<any> => {
+    const res = await httpClient.post(`/orders/${orderId}/return-exchange`, data,
+      { headers: { 'Idempotency-Key': idempotencyKey || generateUuidV7() } });
     return res.data;
   },
 };

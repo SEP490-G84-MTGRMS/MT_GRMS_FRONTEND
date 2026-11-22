@@ -1253,7 +1253,7 @@ export const InventoryLookupPage: FC = () => {
                   ) : (
                     currentBatches.map((batch) => {
                       const daysLeft = batch.daysRemaining;
-                      const isExpired = daysLeft !== null && daysLeft <= 0;
+                      const isExpired = daysLeft !== null && daysLeft < 0;
                       const isUrgent = !isExpired && batch.expiryRiskLevel === 'urgent';
                       const isNear = !isExpired && batch.expiryRiskLevel === 'near_expiry';
                       const isClearance = !isExpired && batch.expiryRiskLevel === 'clearance_priority';
