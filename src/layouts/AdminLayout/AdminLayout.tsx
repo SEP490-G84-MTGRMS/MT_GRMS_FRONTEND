@@ -7,17 +7,6 @@ import { useAuthStore } from '../../stores/useAuthStore';
 export const AdminLayout: FC = () => {
   const { user, isAuthenticated } = useAuthStore();
 
-  // Kiểm tra quyền: nếu chưa đăng nhập -> chuyển về màn hình đăng nhập
-  if (!isAuthenticated || !user) {
-    return <Navigate to="/auth/login" replace />;
-  }
-
-  // Nếu không phải Admin (isAdmin !== true và role !== 'ADMIN') -> chỉ được truy cập màn hình Chủ cửa hàng
-  const isAdmin = Boolean(user.isAdmin || user.role === 'ADMIN');
-  if (!isAdmin) {
-    return <Navigate to="/store-owner/dashboard" replace />;
-  }
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     try {
       const saved = localStorage.getItem('ui_sidebar_open') ?? localStorage.getItem('admin_sidebar_open');
@@ -26,6 +15,13 @@ export const AdminLayout: FC = () => {
       return true;
     }
   });
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/auth/login" replace />;
+  }
+  if (!(user.isAdmin || user.role === 'ADMIN')) {
+    return <Navigate to="/store-owner/dashboard" replace />;
+  }
 
   const handleToggleSidebar = () => {
     setIsSidebarOpen((prev) => {

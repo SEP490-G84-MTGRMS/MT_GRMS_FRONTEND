@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import type { FC } from 'react';
+import { useEffect, useRef, type FC } from 'react';
 import { X, FileCheck, CheckCircle2, Download, Receipt, ArrowRight, Layers, Calendar, Hash, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
 import { formatTaxPeriodLabel, type TaxSnapshot, type TaxSnapshotStatus } from '../types/taxSnapshot';
 import { TaxSnapshotStatusBadge } from './TaxSnapshotStatusBadge';
@@ -43,6 +43,37 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
 
   const { user } = useAuthStore();
   const canManageTax = user?.role === 'STORE_OWNER';
+  const filingStatus = String(snapshot?.status ?? '').toLowerCase();
+  const filingId = isOpen && canManageTax && (filingStatus === 'finalized' || filingStatus === '1') ? snapshot?.id : undefined;
+  const filingRequest = useRef<AbortController | null>(null);
+  const [filing, setFiling] = useState<{ id: string; confirmedAt?: string | null; error?: string; saving?: boolean }>();
+
+  useEffect(() => {
+    if (!filingId) return;
+    const controller = new AbortController();
+    filingRequest.current = controller;
+    setFiling({ id: filingId });
+    void taxSnapshotApi.getFilingConfirmation(filingId, controller.signal).then((confirmedAt) => {
+      if (!controller.signal.aborted) setFiling({ id: filingId, confirmedAt });
+    }).catch(() => {
+      if (!controller.signal.aborted) setFiling({ id: filingId, error: 'Không tải được trạng thái nộp hồ sơ.' });
+    });
+    return () => controller.abort();
+  }, [filingId]);
+
+  const confirmFiling = async () => {
+    if (!filingId || !filingRequest.current) return;
+    const { signal } = filingRequest.current;
+    setFiling({ id: filingId, saving: true });
+    try {
+      const confirmedAt = await taxSnapshotApi.confirmFiling(filingId, signal);
+      if (!signal.aborted) setFiling({ id: filingId, confirmedAt });
+    } catch {
+      if (!signal.aborted) setFiling({ id: filingId, error: 'Không thể ghi nhận đã nộp hồ sơ. Vui lòng thử lại.' });
+    }
+  };
+
+  const filingState = filing?.id === filingId ? filing : undefined;
 
   if (!isOpen || !snapshot) return null;
 
@@ -415,16 +446,23 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
                 </button>
               )}
 
-              {snapshot.status === 'Finalized' && (
-                <button
-                  disabled={isUpdating}
-                  onClick={() => handleStatusChangeInternal('Submitted')}
-                  className="btn-primary-pill"
-                >
-                  <span>Đánh dấu Đã nộp tờ khai</span>
-                  <ArrowRight size={16} />
-                </button>
-              )}
+              {filingId && (filingState?.confirmedAt ? (
+                <span title={new Date(filingState.confirmedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}>
+                  Đã ghi nhận nộp hồ sơ
+                </span>
+              ) : (
+                <div>
+                  <button
+                    disabled={!filingState || (filingState.confirmedAt === undefined && !filingState.error) || filingState.saving}
+                    onClick={() => void confirmFiling()}
+                    className="btn-primary-pill"
+                  >
+                    <span>{filingState?.saving ? 'Đang ghi nhận…' : 'Đánh dấu đã nộp hồ sơ'}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                  {filingState?.error && <div role="alert">{filingState.error}</div>}
+                </div>
+              ))}
 
               {snapshot.status === 'Submitted' && (
                 <button

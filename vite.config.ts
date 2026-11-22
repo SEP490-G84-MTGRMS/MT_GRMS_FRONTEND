@@ -64,6 +64,11 @@ export default defineConfig({
         proxyTimeout: 120_000,
         ws: true,
       },
+      '/hubs/notifications': {
+        target: 'http://localhost:5232',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   test: {

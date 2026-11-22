@@ -49,7 +49,9 @@ export const StoreOwnerDashboardPage = () => {
 
   const periodLabel = periods.find((option) => option.value === period)?.label ?? 'Hôm nay';
   const hourlyTrend = period === 'today' || period === 'yesterday';
-  const maxRevenue = Math.max(1, ...(data?.sales.trend.map((point) => point.revenue) ?? []));
+  const revenues = data?.sales.trend.map((point) => point.revenue) ?? [];
+  const positiveExtent = Math.max(0, ...revenues);
+  const negativeExtent = Math.abs(Math.min(0, ...revenues));
 
   return <main className="owner-dash">
     <header className="owner-dash-header">
@@ -70,6 +72,19 @@ export const StoreOwnerDashboardPage = () => {
     {!loading && error && <div className="owner-dash-error" role="alert"><span>{error}</span><button type="button" onClick={() => { startLoad(); setReload((value) => value + 1); }}>Thử lại</button></div>}
 
     {data && !loading && <>
+      {data.tasks && data.tasks.length > 0 && (
+        <section className="owner-dash-card">
+          <div className="owner-dash-section-heading"><h2>Việc cần xử lý</h2></div>
+          <div className="owner-dash-issue-list">
+            {data.tasks.map((task) => (
+              <div key={task.actionUrl}>
+                <Link className="owner-dash-secondary-link" to={task.actionUrl}>{task.title}<ArrowRight size={15} /></Link>
+                <b>{task.code}</b>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="owner-dash-kpis">
         <article className="owner-dash-kpi"><div className="owner-dash-kpi-icon"><ChartNoAxesCombined size={19} /></div><p>Doanh thu thuần</p><strong>{money(data.sales.netRevenue)}</strong><small>{data.sales.revenueGrowthPercent === null ? 'Chưa đủ dữ liệu so sánh' : `${data.sales.revenueGrowthPercent > 0 ? '+' : ''}${number(data.sales.revenueGrowthPercent)}% so với kỳ trước`}</small></article>
         <article className="owner-dash-kpi"><div className="owner-dash-kpi-icon"><ShoppingCart size={19} /></div><p>Hóa đơn trong kỳ</p><strong>{number(data.sales.totalOrders)}</strong><small>Trung bình {money(data.sales.averageOrderValue)} / đơn</small></article>
@@ -81,7 +96,18 @@ export const StoreOwnerDashboardPage = () => {
         <section className="owner-dash-card owner-dash-chart-card"><SectionTitle title={hourlyTrend ? 'Doanh thu theo giờ' : 'Doanh thu theo ngày'} to="/store-owner/finance?tab=pnl" action="Báo cáo P&L" />
           {data.sales.trend.length === 0 || data.sales.trend.every((point) => point.revenue === 0)
             ? <div className="owner-dash-empty">Chưa có doanh thu trong kỳ này.</div>
-            : <div className="owner-dash-chart" aria-label={hourlyTrend ? 'Biểu đồ doanh thu theo giờ' : 'Biểu đồ doanh thu theo ngày'}>{data.sales.trend.map((point, index) => <div className="owner-dash-bar-column" key={`${point.date}-${index}`} title={`${hourlyTrend ? hourLabel(point.date) : shortDate(point.date)}: ${money(point.revenue)}`}><span className="owner-dash-bar" style={{ height: point.revenue > 0 ? `${Math.max(4, point.revenue / maxRevenue * 100)}%` : 0, visibility: point.revenue > 0 ? 'visible' : 'hidden' }} /><small>{hourlyTrend ? (index % 3 === 0 ? hourLabel(point.date) : '') : shortDate(point.date)}</small></div>)}</div>}</section>
+            : <div className="owner-dash-chart" aria-label={hourlyTrend ? 'Biểu đồ doanh thu theo giờ' : 'Biểu đồ doanh thu theo ngày'}>
+                {data.sales.trend.map((point, index) => {
+                  const isNegative = point.revenue < 0;
+                  const extent = isNegative ? negativeExtent : positiveExtent;
+                  return <div className="owner-dash-bar-column" key={`${point.date}-${index}`} title={`${hourlyTrend ? hourLabel(point.date) : shortDate(point.date)}: ${money(point.revenue)}`}>
+                    <div className="owner-dash-plot" style={{ gridTemplateRows: `minmax(0, ${positiveExtent}fr) minmax(0, ${negativeExtent}fr)` }}>
+                      {point.revenue !== 0 && <span className={`owner-dash-bar${isNegative ? ' owner-dash-bar--negative' : ''}`} style={{ height: `${Math.abs(point.revenue) / extent * 100}%` }} />}
+                    </div>
+                    <small>{hourlyTrend ? (index % 3 === 0 ? hourLabel(point.date) : '') : shortDate(point.date)}</small>
+                  </div>;
+                })}
+              </div>}</section>
         <section className="owner-dash-card"><SectionTitle title="Tài chính" to="/store-owner/finance?tab=pnl" />
           <div className="owner-dash-metric"><span>Lợi nhuận gộp</span><strong>{money(data.finance.grossProfit)}</strong></div>
           <div className="owner-dash-metric"><span>Chi phí vận hành</span><strong>{money(data.finance.operatingExpenses)}</strong></div>

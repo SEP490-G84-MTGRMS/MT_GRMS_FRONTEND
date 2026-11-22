@@ -107,165 +107,64 @@ describe('customerApi Live Neon Integration Tests', () => {
   });
 
   describe('collectDebt', () => {
-    it('should reject invalid non-positive collection amount', async () => {
-      await expect(
-        customerApi.collectDebt({
-          customerId: '11111111-aaaa-aaaa-aaaa-111111111111',
-          amount: 0,
-          method: 'Cash',
-        })
-      ).rejects.toThrow('Số tiền thu nợ phải lớn hơn 0 VNĐ');
+    const input = {
+      customerId: 'customer-1',
+      amount: 500000,
+      method: 'Cash' as const,
+      targetAccountId: 'till-1',
+    };
+    const getKey = () => 'repayment-key';
+
+    it('rejects a non-positive amount before posting', async () => {
+      await expect(customerApi.collectDebt({ ...input, amount: 0 }, getKey))
+        .rejects.toThrow('Số tiền thu nợ phải lớn hơn 0 VNĐ');
+      expect(financeHttpClient.post).not.toHaveBeenCalled();
     });
 
-    it('should send Cash repayment with PaymentSourceType=1 (Till) and Idempotency Header', async () => {
-      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
-        data: {
-          success: true,
-          data: {
-            debtEntryId: '01a19c24-ea9e-717c-97e4-8c7d64b9b0dd',
-            remainingDebt: 0,
-          },
-        },
-      } as any);
+    it('completes from the repayment receipt without requesting the customer again', async () => {
+      const receipt = { debtEntryId: 'receipt-1', remainingDebt: 0 };
+      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({ data: { success: true, data: receipt } });
 
-      const updatedCustomer = {
-        id: '11111111-aaaa-aaaa-aaaa-111111111111',
-        fullName: 'Nguyễn Văn An',
-        currentDebtAR: 0,
-      };
-
-      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
-        data: { success: true, data: updatedCustomer },
-      } as any);
-
-      const result = await customerApi.collectDebt({
-        customerId: '11111111-aaaa-aaaa-aaaa-111111111111',
-        amount: 3000000,
-        method: 'Cash',
-        note: 'Trả hết nợ còn lại',
-      });
-
-      expect(financeHttpClient.post).toHaveBeenCalledWith(
-        '/customers/debt/repay',
-        expect.objectContaining({
-          customerId: '11111111-aaaa-aaaa-aaaa-111111111111',
-          amount: 3000000,
-          paymentSourceType: 1, // BranchTill
-          notes: 'Trả hết nợ còn lại',
-        }),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            'Idempotency-Key': expect.any(String),
-          }),
-        })
-      );
-
-      expect(result).toEqual(updatedCustomer);
-    });
-
-    it('should send VietQR repayment with PaymentSourceType=3 (Bank)', async () => {
-      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
-        data: {
-          success: true,
-          data: { remainingDebt: 1000000 },
-        },
-      } as any);
-
-      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
-        data: {
-          success: true,
-          data: { id: '22222222-aaaa-aaaa-aaaa-222222222222', currentDebtAR: 1000000 },
-        },
-      } as any);
-
-      await customerApi.collectDebt({
-        customerId: '22222222-aaaa-aaaa-aaaa-222222222222',
-        amount: 2000000,
-        method: 'VietQR',
-      });
-
-      expect(financeHttpClient.post).toHaveBeenCalledWith(
-        '/customers/debt/repay',
-        expect.objectContaining({
-          paymentSourceType: 3, // TenantBank
-        }),
-        expect.anything()
+      await expect(customerApi.collectDebt(input, getKey)).resolves.toEqual(receipt);
+      expect(financeHttpClient.get).not.toHaveBeenCalled();
+      expect(financeHttpClient.post).toHaveBeenCalledWith('/customers/debt/repay',
+        expect.objectContaining({ paymentSourceType: 1, paymentSourceAccountId: 'till-1' }),
+        { headers: { 'Idempotency-Key': 'repayment-key' } },
       );
     });
 
-    it('TC-DEBT-BAD-01: should throw error when backend returns failure message during repayment', async () => {
-      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
-        data: {
-          success: false,
-          message: 'Khách hàng đang ở trạng thái Khóa (Inactive), không thể thu nợ.',
-        },
-      } as any);
+    it('reuses the exact repayment payload and key after an ambiguous failure', async () => {
+      vi.mocked(financeHttpClient.post)
+        .mockRejectedValueOnce(new Error('Connection lost'))
+        .mockResolvedValueOnce({ data: { success: true, data: { remainingDebt: 1000000 } } });
 
-      await expect(
-        customerApi.collectDebt({
-          customerId: 'cust-inactive-id',
-          amount: 500000,
-          method: 'Cash',
-        })
-      ).rejects.toThrow('Khách hàng đang ở trạng thái Khóa (Inactive), không thể thu nợ.');
+      await expect(customerApi.collectDebt(input, getKey)).rejects.toThrow('Connection lost');
+      await expect(customerApi.collectDebt(input, getKey)).resolves.toEqual({ remainingDebt: 1000000 });
+      expect(financeHttpClient.post).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(financeHttpClient.post).mock.calls[1])
+        .toEqual(vi.mocked(financeHttpClient.post).mock.calls[0]);
     });
 
-    it('TC-DEBT-EDGE-01: should handle edge case of collecting exactly 1 VND', async () => {
-      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
-        data: { success: true },
-      } as any);
-
-      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
-        data: {
-          success: true,
-          data: { id: 'cust-1', currentDebtAR: 999999 },
-        },
-      } as any);
-
-      const res = await customerApi.collectDebt({
-        customerId: 'cust-1',
-        amount: 1,
-        method: 'Cash',
-        targetAccountId: 'till-acc-01',
-      });
-
-      expect(res.currentDebtAR).toBe(999999);
-      expect(financeHttpClient.post).toHaveBeenCalledWith(
-        '/customers/debt/repay',
-        expect.objectContaining({
-          amount: 1,
-          customerId: 'cust-1',
-        }),
-        expect.anything()
+    it('sends the confirmed bank reference for a VietQR repayment', async () => {
+      vi.mocked(financeHttpClient.post).mockResolvedValueOnce({ data: { success: true, data: { remainingDebt: 1 } } });
+      await customerApi.collectDebt({ ...input, method: 'VietQR', targetAccountId: 'bank-1', transactionRef: '  FT-01 ' }, getKey);
+      expect(financeHttpClient.post).toHaveBeenCalledWith('/customers/debt/repay',
+        expect.objectContaining({ paymentSourceType: 3, paymentSourceAccountId: 'bank-1', referenceCode: 'FT-01' }),
+        expect.anything(),
       );
     });
 
-    it('TC-DEBT-EDGE-02: should resolve dynamic account from cashbookService when targetAccountId is not provided', async () => {
+    it('reports rejection by the repayment endpoint', async () => {
       vi.mocked(financeHttpClient.post).mockResolvedValueOnce({
-        data: { success: true },
-      } as any);
-
-      vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
-        data: {
-          success: true,
-          data: { id: 'cust-1', currentDebtAR: 0 },
-        },
-      } as any);
-
-      await customerApi.collectDebt({
-        customerId: 'cust-1',
-        amount: 500000,
-        method: 'Cash',
+        data: { success: false, message: 'Số tiền thu vượt quá dư nợ.' },
       });
+      await expect(customerApi.collectDebt(input, getKey)).rejects.toThrow('Số tiền thu vượt quá dư nợ.');
+    });
 
-      expect(financeHttpClient.post).toHaveBeenCalledWith(
-        '/customers/debt/repay',
-        expect.objectContaining({
-          customerId: 'cust-1',
-          paymentSourceType: 1, // BranchTill
-        }),
-        expect.anything()
-      );
+    it('does not post a repayment without a selected account', async () => {
+      await expect(customerApi.collectDebt({ ...input, targetAccountId: undefined }, getKey))
+        .rejects.toThrow('Vui lòng chọn tài khoản nhận tiền đang hoạt động.');
+      expect(financeHttpClient.post).not.toHaveBeenCalled();
     });
   });
 

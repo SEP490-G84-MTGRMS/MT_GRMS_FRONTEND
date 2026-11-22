@@ -6,6 +6,7 @@ import {
   CloseIcon,
 } from '../../admin/components';
 import type { ExpenseStatus } from '../types/expense.types';
+import { getVietnamTodayIso } from '../../employee/lib/vietnamTime';
 
 /**
  * Tính toán chênh lệch ngày so với hạn thanh toán theo thời gian thực tế hệ thống (new Date()),
@@ -14,14 +15,8 @@ import type { ExpenseStatus } from '../types/expense.types';
  * = 0: Hạn hôm nay
  * < 0: Còn |X| ngày đến hạn
  */
-const calculateRealDaysDiff = (dueDate: string | Date): number => {
-  const now = new Date();
-  const due = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
-  const utcNow = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const utcDue = Date.UTC(due.getFullYear(), due.getMonth(), due.getDate());
-  const diffTime = utcNow - utcDue;
-  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
-};
+const calculateRealDaysDiff = (dueDate: string): number =>
+  (Date.parse(getVietnamTodayIso()) - Date.parse(dueDate)) / 86_400_000;
 
 interface ExpenseStatusBadgeProps {
   status: ExpenseStatus;
