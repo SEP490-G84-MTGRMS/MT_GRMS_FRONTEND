@@ -710,7 +710,7 @@ export const SupplierOrderDispatchHubPage: FC = () => {
                     color: '#fff',
                   }}
                   onClick={() => {
-                    setActiveTab('pending_changes');
+                    setAppliedFilters((prev) => ({ ...prev, urgency: 'pending_changes' }));
                     setPageIndex(1);
                     setPendingDetailsOpen(false);
                   }}

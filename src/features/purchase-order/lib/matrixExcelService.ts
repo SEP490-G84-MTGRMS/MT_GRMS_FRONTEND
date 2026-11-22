@@ -734,7 +734,6 @@ export async function validateMatrixExcelFile(
     dayColumns,
     cellMap,
     qtyMap,
-    supplierConfigs,
     isCellEditable,
   } = context;
 

@@ -9,6 +9,7 @@ interface Props {
   invoice: InvoiceDTO | null;
   availableProducts: Product[];
   currentDrawerCash?: number;
+  isStoreOwner?: boolean;
   refundSourceLabel?: string;
   onClose: () => void;
   onConfirm: (data: {
@@ -49,13 +50,19 @@ export const ReturnExchangeModal: React.FC<Props> = ({
   invoice,
   availableProducts,
   currentDrawerCash,
+  isStoreOwner: _isStoreOwner = false,
   refundSourceLabel,
   onClose,
   onConfirm,
 }) => {
   // 1. Quản lý số lượng và tình trạng hàng trả cho từng món trong hóa đơn gốc
   const [returnQtys, setReturnQtys] = useState<Record<string, number>>({});
+  const [returnLotQtys, setReturnLotQtys] = useState<Record<string, number>>({});
   const [returnConditions, setReturnConditions] = useState<Record<string, 'Restock' | 'Damaged'>>({});
+
+  const getAllocations = (item: NonNullable<InvoiceDTO['items']>[number]) =>
+    item.stockAllocations || [];
+  const lotExpiryDates: Record<string, string> = {};
 
   // 2. Quản lý danh sách hàng khách lấy mới kèm đơn vị tính quy đổi
   const [newItems, setNewItems] = useState<
@@ -90,6 +97,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
   React.useEffect(() => {
     if (isOpen && invoice) {
       setReturnQtys({});
+      setReturnLotQtys({});
       setReturnConditions({});
       setNewItems([]);
       setSettlementMethod('CASH');
@@ -152,7 +160,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
     if (item) {
       const allocations = getAllocations(item);
       if (allocations.length === 1) {
-        setReturnLotQtys((prev) => ({
+        setReturnLotQtys((prev: Record<string, number>) => ({
           ...prev,
           [`${lineKey}:${allocations[0].branchStockId}`]: validQty,
         }));
@@ -166,7 +174,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
           newLotQtys[`${lineKey}:${a.branchStockId}`] = allocQty;
           remainingToAllocate -= allocQty;
         }
-        setReturnLotQtys((prev) => ({
+        setReturnLotQtys((prev: Record<string, number>) => ({
           ...prev,
           ...newLotQtys,
         }));
@@ -538,7 +546,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                                         aria-label={`Số lượng hoàn lô ${a.batchCode || a.branchStockId}`}
                                         value={returnLotQtys[lotKey] || 0}
                                         onChange={(e) =>
-                                          setReturnLotQtys((prev) => ({
+                                          setReturnLotQtys((prev: Record<string, number>) => ({
                                             ...prev,
                                             [lotKey]: Math.max(0, Math.min(maxQty, Number(e.target.value) || 0)),
                                           }))
