@@ -7,46 +7,29 @@ import { generateUuidV7 } from '../utils/uuid';
  * Tự động đổi key mới khi người dùng chỉnh sửa dữ liệu biểu mẫu (tránh lỗi 409 IDEMPOTENCY_PAYLOAD_MISMATCH)
  */
 export function useIdempotentAction() {
-  const currentKeyRef = useRef<string>(generateUuidV7());
-  const lastPayloadHashRef = useRef<string>('');
-
-  /**
-   * Tính mã băm đơn giản của payload để so khớp thay đổi
-   */
-  const computeSimpleHash = (payload: unknown): string => {
-    try {
-      return JSON.stringify(payload);
-    } catch {
-      return String(Date.now());
-    }
-  };
+  const actionRef = useRef<{ key: string; payload: string } | null>(null);
 
   /**
    * Lấy Idempotency-Key phù hợp với payload hiện tại
    */
   const getOrRotateKey = useCallback((payload: unknown): string => {
-    const newHash = computeSimpleHash(payload);
-
-    // Nếu payload thay đổi so với lần submit trước -> sinh key mới
-    if (newHash !== lastPayloadHashRef.current) {
-      currentKeyRef.current = generateUuidV7();
-      lastPayloadHashRef.current = newHash;
+    const serialized = JSON.stringify(payload);
+    if (!actionRef.current || actionRef.current.payload !== serialized) {
+      actionRef.current = { key: generateUuidV7(), payload: serialized };
     }
 
-    return currentKeyRef.current;
+    return actionRef.current.key;
   }, []);
 
   /**
    * Cưỡng chế làm mới key (sau khi giao dịch đã thành công hoàn toàn)
    */
   const resetKey = useCallback(() => {
-    currentKeyRef.current = generateUuidV7();
-    lastPayloadHashRef.current = '';
+    actionRef.current = null;
   }, []);
 
   return {
     getOrRotateKey,
     resetKey,
-    currentKey: currentKeyRef.current,
   };
 }
