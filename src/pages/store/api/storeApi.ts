@@ -29,6 +29,8 @@ export interface BackendTenantStoreResponse {
   staffCount: number;
   maxStaff: number;
   walletBalance?: number;
+  staffManagementLocked?: boolean;
+  canPurchaseStaffManagementAddon?: boolean;
 }
 
 export interface UpdateStoreInfoPayload {
@@ -104,6 +106,8 @@ export const mapBackendStoreToFrontend = (
     branchesCount: backend.branchCount,
     industry: 'Tạp hóa & Siêu thị',
     walletBalance: backend.walletBalance !== undefined ? backend.walletBalance : existingWalletBalance,
+    staffManagementLocked: backend.staffManagementLocked,
+    canPurchaseStaffManagementAddon: backend.canPurchaseStaffManagementAddon,
   };
 };
 
@@ -211,7 +215,28 @@ export const storeApi = {
     const res = await httpClient.post<ApiResponse<BranchAddonQuote>>('/tenant/branch-addon/purchase', { extraBranches, requestId });
     return res.data;
   },
+
+  async getStaffAddonQuote(): Promise<ApiResponse<StaffAddonQuote>> {
+    const res = await httpClient.get<ApiResponse<StaffAddonQuote>>('/tenant/subscriptions/staff-addon/quote');
+    return res.data;
+  },
+
+  async purchaseStaffAddon(quote: StaffAddonQuote, requestId: string): Promise<ApiResponse<{ walletBalance: number }>> {
+    const res = await httpClient.post<ApiResponse<{ walletBalance: number }>>('/tenant/subscriptions/staff-addon/purchase', {
+      requestId,
+      total: quote.total,
+      expiresAt: quote.expiresAt,
+    });
+    return res.data;
+  },
 };
+
+export interface StaffAddonQuote {
+  subtotal: number;
+  vat: number;
+  total: number;
+  expiresAt: string;
+}
 
 export interface StorageUsage {
   usedBytes: number;

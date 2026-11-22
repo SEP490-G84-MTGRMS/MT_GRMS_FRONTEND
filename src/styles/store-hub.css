@@ -390,6 +390,42 @@
 }
 
 /* Modal Backdrop & Dialog */
+.store-modal-dialog.staff-addon-dialog {
+  margin: auto;
+  padding: 0;
+  border: 0;
+  width: min(520px, calc(100% - 32px));
+}
+
+.staff-addon-dialog:not([open]) {
+  display: none;
+}
+
+.staff-addon-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.staff-addon-dialog .store-modal-footer {
+  flex-wrap: wrap;
+}
+
+.staff-addon-dialog .store-modal-title,
+.staff-addon-dialog .store-modal-body p,
+.staff-addon-quote,
+.staff-addon-quote dd {
+  margin: 0;
+}
+
+.staff-addon-quote {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+}
+
+.staff-addon-quote dd {
+  text-align: right;
+}
+
 .store-modal-backdrop {
   position: fixed;
   inset: 0;

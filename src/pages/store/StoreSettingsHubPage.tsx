@@ -23,6 +23,7 @@ import { BranchManagementTab } from "./components/BranchManagementTab";
 import { storeApi, mapBackendStoreToFrontend, type TrialStatus } from "./api/storeApi";
 import { StorageAddonCard } from "./components/StorageAddonCard";
 import { BranchAddonModal } from "./components/BranchAddonModal";
+import { StaffAddonModal } from "./components/StaffAddonModal";
 import { TrialStatusBanner } from "./components/TrialStatusBanner";
 import { FinanceAccountsSettingsPage } from "../../features/finance-accounts/pages/FinanceAccountsSettingsPage";
 
@@ -64,6 +65,7 @@ export const StoreSettingsHubPage: FC = () => {
     useState<SubscriptionPlanItem | null>(null);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
   const [showBranchAddonModal, setShowBranchAddonModal] = useState<boolean>(false);
+  const [showStaffAddonModal, setShowStaffAddonModal] = useState(false);
   const isEligibleNoPlan = trialStatus?.state === "ELIGIBLE";
   const effectiveStoreInfo: StoreInfo = isEligibleNoPlan
     ? {
@@ -253,6 +255,8 @@ export const StoreSettingsHubPage: FC = () => {
               onSelectPlan={(plan) => setSelectedPlanForCheckout(plan)}
               currentPlanName={effectiveStoreInfo.currentPlan}
               trialState={trialStatus?.state ?? null}
+              onBuyStaffAddon={effectiveStoreInfo.canPurchaseStaffManagementAddon ? () => setShowStaffAddonModal(true) : undefined}
+              hasStaffAddon={isStandardPlan && effectiveStoreInfo.staffManagementLocked === false}
             />
           </div>
         )}
@@ -329,6 +333,19 @@ export const StoreSettingsHubPage: FC = () => {
           onPurchased={(amount) => {
             setStoreInfo((prev) => ({ ...prev, walletBalance: Math.max(0, prev.walletBalance - amount) }));
             setWalletRefreshKey((key) => key + 1);
+          }}
+        />
+      )}
+
+      {showStaffAddonModal && (
+        <StaffAddonModal
+          onClose={() => setShowStaffAddonModal(false)}
+          onPurchased={(walletBalance) => {
+            setStoreInfo((prev) => ({
+              ...prev, walletBalance, staffManagementLocked: false, canPurchaseStaffManagementAddon: false,
+            }));
+            setWalletRefreshKey((key) => key + 1);
+            setShowStaffAddonModal(false);
           }}
         />
       )}

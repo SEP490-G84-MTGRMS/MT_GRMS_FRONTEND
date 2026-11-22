@@ -112,6 +112,7 @@ import { CashbookPage } from '../features/cashbook';
 import { TaxSnapshotPage } from '../features/tax-snapshot';
 import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPage';
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
+import { StaffManagementGate } from '../pages/store/components/StaffManagementGate';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { CashControlHubPage } from '../features/cash-control';
@@ -608,7 +609,7 @@ export const router = createBrowserRouter([
         path: 'employees',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <EmployeeListPage />
+            <StaffManagementGate><EmployeeListPage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
@@ -616,7 +617,7 @@ export const router = createBrowserRouter([
         path: 'employees/schedule',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <WorkSchedulePage />
+            <StaffManagementGate><WorkSchedulePage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
@@ -640,7 +641,7 @@ export const router = createBrowserRouter([
         path: 'employees/payroll',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <PayslipManagementPage />
+            <StaffManagementGate><PayslipManagementPage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
@@ -766,13 +767,13 @@ export const router = createBrowserRouter([
       },
       {
         path: 'employees',
-        element: <EmployeeListPage />,
+        element: <StaffManagementGate><EmployeeListPage /></StaffManagementGate>,
       },
       {
         path: 'employees/schedule',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <WorkSchedulePage />
+            <StaffManagementGate><WorkSchedulePage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
@@ -790,7 +791,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'employees/payroll',
-        element: <PayslipManagementPage />,
+        element: <StaffManagementGate><PayslipManagementPage /></StaffManagementGate>,
       },
       {
         path: 'promotions',
@@ -881,13 +882,13 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <EmployeeListPage />,
+        element: <StaffManagementGate><EmployeeListPage /></StaffManagementGate>,
       },
       {
         path: 'schedule',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <WorkSchedulePage />
+            <StaffManagementGate><WorkSchedulePage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
@@ -901,7 +902,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'payroll',
-        element: <PayslipManagementPage />,
+        element: <StaffManagementGate><PayslipManagementPage /></StaffManagementGate>,
       },
       {
         path: 'stocktakes',

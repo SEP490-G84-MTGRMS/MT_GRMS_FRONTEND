@@ -18,6 +18,8 @@ export interface StoreInfo {
   branchesCount: number;
   industry: string;
   walletBalance: number;
+  staffManagementLocked?: boolean;
+  canPurchaseStaffManagementAddon?: boolean;
 }
 
 export interface UserProfile {

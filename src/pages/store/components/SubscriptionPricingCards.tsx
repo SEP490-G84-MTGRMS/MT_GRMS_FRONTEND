@@ -11,6 +11,8 @@ import { storeApi, type BackendPricingPlanResponse } from "../api/storeApi";
 interface SubscriptionPricingCardsProps {
   onSelectPlan: (plan: SubscriptionPlanItem) => void;
   currentPlanName?: string;
+  onBuyStaffAddon?: () => void;
+  hasStaffAddon?: boolean;
   trialState?: 'ELIGIBLE' | 'ACTIVE' | 'EXPIRED' | 'PAID' | 'REVIEW_REQUIRED' | null;
 }
 
@@ -122,6 +124,8 @@ export const mapBackendPlanToCardItem = (
 export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   onSelectPlan,
   currentPlanName,
+  onBuyStaffAddon,
+  hasStaffAddon,
   trialState,
 }) => {
   const [plans, setPlans] =
@@ -562,6 +566,16 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
                     ? "Gia hạn gói ngay"
                     : "Nâng cấp ngay"}
               </button>
+            )}
+            {isActiveCurrentPlan && plan.code === "STANDARD" && onBuyStaffAddon && (
+              <button type="button" className="store-btn-primary" style={{ marginTop: 10 }} onClick={onBuyStaffAddon}>
+                Mua thêm Quản lý nhân viên
+              </button>
+            )}
+            {isActiveCurrentPlan && plan.code === "STANDARD" && hasStaffAddon && (
+              <p style={{ margin: "10px 0 0", textAlign: "center", color: "#047857", fontSize: 13 }}>
+                Đã mở khóa Quản lý nhân viên
+              </p>
             )}
           </div>
         );
