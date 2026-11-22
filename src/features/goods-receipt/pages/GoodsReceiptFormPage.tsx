@@ -591,7 +591,6 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
     supplierId,
     branchId,
     invoiceNo: invoiceNo || undefined,
-    freightFee: 0,
     discountAmount,
     vatPercent,
     paymentMethod: mapPaymentMethod(paymentMethod),

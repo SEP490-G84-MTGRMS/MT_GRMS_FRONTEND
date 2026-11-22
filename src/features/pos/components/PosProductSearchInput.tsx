@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FC, KeyboardEvent } from 'react';
 import { Package } from 'lucide-react';
 import type { Product } from '../types/pos.types';
+import { formatPosStockLabel } from '../api/posOrderApi';
 
 interface Props {
   products: Product[];
@@ -181,7 +182,9 @@ export const PosProductSearchInput: FC<Props> = ({
                       <span className="badge-sku">Mã: {p.barcode || p.sku}</span>
                       <span>&bull;</span>
                       <span className={`badge-stock ${p.quantityOnHand <= 0 ? 'out' : ''}`}>
-                        {p.quantityOnHand > 0 ? `Tồn: ${p.quantityOnHand} ${p.baseUnit}` : 'Hết hàng'}
+                        {p.quantityOnHand > 0
+                          ? `Tồn: ${formatPosStockLabel(p)}`
+                          : 'Hết hàng'}
                       </span>
                     </div>
                   </div>

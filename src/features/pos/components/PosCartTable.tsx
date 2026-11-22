@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Tag, ShoppingBag, Trash2 } from 'lucide-react';
 import type { CartItem } from '../types/pos.types';
+import { formatPosStockLabel } from '../api/posOrderApi';
 
 interface Props {
   cart: CartItem[];
@@ -82,8 +83,14 @@ export const PosCartTable: FC<Props> = ({
                       <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span>
                           &#10003; {item.batchId ? 'Tồn lô:' : 'Tồn khả dụng:'}{' '}
-                          {item.batchId && item.availableQty != null ? item.availableQty : item.product.quantityOnHand}{' '}
-                          {item.unit || item.product.baseUnit || ''}
+                          {item.batchId && item.availableQty != null
+                            ? formatPosStockLabel({
+                                quantityOnHand: item.availableQty,
+                                baseUnit: item.product.baseUnit,
+                                stockDisplayUnit: item.product.stockDisplayUnit,
+                                purchaseToStockRate: item.product.purchaseToStockRate,
+                              })
+                            : formatPosStockLabel(item.product)}
                         </span>
                       </div>
                       {item.batchId && item.batchCode ? (

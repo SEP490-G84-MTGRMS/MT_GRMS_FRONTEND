@@ -205,29 +205,28 @@ export const BatchTable: FC<BatchTableProps> = ({
     }
   };
 
-  const tableMinWidth = 1480;
   const tableFitStyle: CSSProperties = {
-    minWidth: tableMinWidth,
+    // Giữ nhịp đọc ổn định ở màn hình nhỏ; màn hình rộng sẽ phân bổ theo colgroup.
+    minWidth: 1680,
     width: '100%',
     tableLayout: 'fixed',
   };
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: 148 }} />
-      <col style={{ width: 200 }} />
-      <col style={{ width: 110 }} />
-      <col style={{ width: 80 }} />
-      <col style={{ width: 130 }} />
-      <col style={{ width: 160 }} />
-      <col style={{ width: 90 }} />
-      <col style={{ width: 90 }} />
-      <col style={{ width: 84 }} />
-      <col style={{ width: 120 }} />
-      <col style={{ width: 140 }} />
-      <col style={{ width: 100 }} />
-      <col style={{ width: 92 }} />
-      <col style={{ width: 128 }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '7%' }} />
     </colgroup>
   );
 
@@ -331,7 +330,7 @@ export const BatchTable: FC<BatchTableProps> = ({
   );
 
   return (
-    <div className="so-list-table-card so-list-table-card--dense so-list-table-card--wrap">
+    <div className="so-list-table-card so-list-table-card--dense so-list-table-card--wrap so-list-table-card--fit">
       <div
         ref={headerRef}
         className="so-list-table-head"
@@ -346,7 +345,6 @@ export const BatchTable: FC<BatchTableProps> = ({
               <SortTh field="batchCode" label="Mã lô" />
               <th style={thBaseStyle}>Vị trí kệ</th>
               <th style={thBaseStyle}>Chi nhánh</th>
-              <th style={thBaseStyle}>Nhà cung cấp</th>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>Ngày SX</th>
               <SortTh field="expiryDate" label="Hạn dùng" align="center" />
               <SortTh field="daysLeft" label="Còn (ngày)" align="right" />
@@ -363,7 +361,7 @@ export const BatchTable: FC<BatchTableProps> = ({
               />
               <SortTh field="costPrice" label="Giá vốn" align="right" />
               <SortTh field="status" label="Trạng thái" align="center" />
-              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>Thao tác</th>
             </tr>
           </thead>
         </table>
@@ -380,7 +378,7 @@ export const BatchTable: FC<BatchTableProps> = ({
             {sortedBatches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={13}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -487,12 +485,6 @@ export const BatchTable: FC<BatchTableProps> = ({
 
                     <td style={{ color: '#475569', fontSize: 11, lineHeight: 1.35 }}>
                       {row.branchName}
-                    </td>
-
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name" style={{ fontWeight: 500 }}>
-                        {row.supplierName}
-                      </div>
                     </td>
 
                     <td style={{ textAlign: 'center', fontWeight: 500, color: row.mfgDate === '—' ? '#94a3b8' : '#334155' }}>
@@ -604,8 +596,19 @@ export const BatchTable: FC<BatchTableProps> = ({
                       {renderStatusBadge(row.status)}
                     </td>
 
-                    <td className="so-list-td--actions" style={{ textAlign: 'center' }}>
-                      <div className="so-list-actions" style={{ justifyContent: 'center', gap: 4 }}>
+                    <td
+                      className="so-list-td--actions"
+                      style={{
+                        textAlign: 'center',
+                        overflow: 'visible',
+                        paddingLeft: 4,
+                        paddingRight: 4,
+                      }}
+                    >
+                      <div
+                        className="so-list-actions"
+                        style={{ justifyContent: 'center', gap: 4, flexWrap: 'nowrap' }}
+                      >
                         <button
                           type="button"
                           className="so-list-action-btn so-list-action-btn--icon so-list-action-btn--success"

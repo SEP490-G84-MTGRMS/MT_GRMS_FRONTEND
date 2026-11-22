@@ -20,9 +20,15 @@ export class ProductDTO {
   spec?: string;
   category: string = '';
   categoryName?: string;
+  /** ĐVT tồn gốc (base) — quantityOnHand tính theo đơn vị này. */
   baseUnit: string = '';
+  /** ĐVT nhập — hiển thị tồn giống màn Lô (vd Thùng). */
+  stockDisplayUnit?: string;
+  /** 1 ĐVT nhập = N ĐVT tồn. */
+  purchaseToStockRate?: number;
   basePrice: number = 0;
   costPrice: number = 0;
+  /** Tồn khả dụng bán (RULE-01) theo ĐVT tồn gốc — chỉ lô còn hạn. */
   quantityOnHand: number = 0;
   allocatedQty?: number;
   batchCode?: string;
