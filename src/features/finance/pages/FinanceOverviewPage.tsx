@@ -49,6 +49,17 @@ function createInitialPnlFilter(): PnlFilterParams {
   };
 }
 
+function getLinkedPnlFilter(startDate: string | null, endDate: string | null): PnlFilterParams | undefined {
+  const isCalendarDate = (value: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}T00:00:00Z`);
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  };
+  if (!startDate || !endDate || !isCalendarDate(startDate) || !isCalendarDate(endDate) || startDate > endDate)
+    return undefined;
+  return { branchId: 'ALL', startDate, endDate, presetPeriod: 'CUSTOM' };
+}
+
 function useOverviewToast() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,9 +95,18 @@ const OverviewErrorBanner: React.FC<{ onRetry: () => void }> = ({ onRetry }) => 
 export const FinanceOverviewPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab: FinanceTabKey = searchParams.get('tab') === 'pnl' ? 'pnl' : 'overview';
+  const linkedStartDate = searchParams.get('startDate');
+  const linkedEndDate = searchParams.get('endDate');
   const [overviewFilter, setOverviewFilter] = useState<FinanceOverviewFilter>(createInitialOverviewFilter);
-  const [pnlFilter, setPnlFilter] = useState<PnlFilterParams>(createInitialPnlFilter);
+  const [pnlFilter, setPnlFilter] = useState<PnlFilterParams>(() =>
+    getLinkedPnlFilter(linkedStartDate, linkedEndDate) ?? createInitialPnlFilter(),
+  );
   const { toast, showToast, dismissToast } = useOverviewToast();
+
+  useEffect(() => {
+    const linkedFilter = getLinkedPnlFilter(linkedStartDate, linkedEndDate);
+    if (linkedFilter) setPnlFilter(linkedFilter);
+  }, [linkedStartDate, linkedEndDate]);
 
   useEffect(() => {
     if (!searchParams.has('tab')) {

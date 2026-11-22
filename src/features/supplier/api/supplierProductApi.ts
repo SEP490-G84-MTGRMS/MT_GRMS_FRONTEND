@@ -128,6 +128,11 @@ export const supplierProductApi = {
         supplierProductCode: item.supplierProductCode || undefined,
         effectiveDate: item.createdAt ? item.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
         status: item.status === 'Active' || item.status === 1 ? 'Active' : 'Inactive',
+        masterProductStatus: item.masterProductStatus || 'Active',
+        isMasterProductActive:
+          item.isMasterProductActive !== false &&
+          item.masterProductStatus !== 'Inactive' &&
+          item.masterProductStatus !== 2,
       }));
 
       return { items, total: paged.totalItems };
@@ -140,8 +145,9 @@ export const supplierProductApi = {
    * Lấy danh sách Master Products từ Backend Catalog API để gán cho NCC
    */
   async getMasterProducts(): Promise<any[]> {
+    // Không lọc Status=Active: SP Ngừng KD vẫn hiện trong gợi ý filter / dòng NCC–SP đã gán.
     const res = await httpClient.get<ApiResponse<PagedResult<any> | any[]>>('/products', {
-      params: { PageIndex: 1, PageSize: 500, Status: 'Active' },
+      params: { PageIndex: 1, PageSize: 500 },
     });
 
     if (!res.data?.success || !res.data.data) {
@@ -184,6 +190,11 @@ export const supplierProductApi = {
         ? 1
         : Number(purchaseUnitRow?.conversionRate ?? purchaseUnitRow?.ConversionRate ?? 1) || 1;
       const importPrice = baseCost > 0 ? baseCost * purchaseRate : 0;
+      const rawStatus = String(p.status ?? p.Status ?? 'Active');
+      const status =
+        rawStatus === 'Inactive' || rawStatus === 'Discontinued' || rawStatus === '2'
+          ? 'Inactive'
+          : 'Active';
 
       return {
         id: p.id,
@@ -195,6 +206,8 @@ export const supplierProductApi = {
         defaultWholesalePrice: importPrice,
         defaultMoq: 1,
         imageUrl: p.imageUrl || (Array.isArray(p.imageUrls) ? p.imageUrls[0] : undefined) || undefined,
+        status,
+        isActive: status === 'Active',
       };
     });
   },

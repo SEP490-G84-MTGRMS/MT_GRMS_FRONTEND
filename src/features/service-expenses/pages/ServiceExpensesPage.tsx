@@ -26,6 +26,7 @@ import {
   type ServiceExpenseDto,
 } from '../types/expense.types';
 import { calculatePeriodRange } from '../utils/datePeriodUtils';
+import { getVietnamTodayIso } from '../../employee/lib/vietnamTime';
 import '../../purchase-order/purchase-order.css';
 import '../../../styles/so-list-page.css';
 import '../service-expenses.css';
@@ -53,6 +54,7 @@ export const ServiceExpensesPage: FC = () => {
   const user = useAuthStore((state) => state.user);
   const canManageExpenses = user?.role === 'STORE_OWNER';
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
+  const urlBranchId = searchParams.get('branchId');
   const initialRange = calculatePeriodRange('this-month');
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
   const [isExporting, setIsExporting] = useState(false);
@@ -60,7 +62,7 @@ export const ServiceExpensesPage: FC = () => {
     return {
       page: 1,
       pageSize: 10,
-      branchId: getInitialActiveBranchId(user?.branchId),
+      branchId: urlBranchId === 'ALL' ? '' : (urlBranchId || getInitialActiveBranchId(user?.branchId)),
       category: '',
       status: '',
       quickStatus: 'ALL',
@@ -85,6 +87,7 @@ export const ServiceExpensesPage: FC = () => {
 
   // Đồng bộ chi nhánh đang chọn từ TopNav (mtgrms_active_branch & event mtgrms:branch-changed)
   useEffect(() => {
+    if (urlBranchId !== null) return;
     const handleGlobalBranchChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ id?: string }>;
       const branch = customEvent.detail;
@@ -102,7 +105,7 @@ export const ServiceExpensesPage: FC = () => {
     return () => {
       window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
     };
-  }, []);
+  }, [urlBranchId]);
 
   // Keep filters in sync when navigation query parameters change
   useEffect(() => {
@@ -110,12 +113,13 @@ export const ServiceExpensesPage: FC = () => {
       setFilters((prev) => ({
         ...prev,
         keyword: urlSearch,
+        ...(urlBranchId !== null ? { branchId: urlBranchId === 'ALL' ? '' : urlBranchId, status: '', category: '', quickStatus: 'ALL' } : {}),
         fromDate: undefined,
         toDate: undefined,
         page: 1,
       }));
     }
-  }, [urlSearch]);
+  }, [urlSearch, urlBranchId]);
 
   // Modals state
   const [payingItem, setPayingItem] = useState<ServiceExpenseDto | null>(null);
@@ -250,7 +254,7 @@ export const ServiceExpensesPage: FC = () => {
     }
   };
 
-  const todayIso = new Date().toISOString().substring(0, 10);
+  const todayIso = getVietnamTodayIso();
   const clientOverdueCount = expensesData?.items
     ? expensesData.items.filter(
         (i) => i.status === 'Pending' && Boolean(i.dueDate) && i.dueDate < todayIso

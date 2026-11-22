@@ -87,6 +87,7 @@ export interface CollectDebtInput {
   method: 'Cash' | 'VietQR';
   targetAccountId?: string;
   note?: string;
+  transactionRef?: string;
 }
 
 export interface CustomerDebtLedgerDto {

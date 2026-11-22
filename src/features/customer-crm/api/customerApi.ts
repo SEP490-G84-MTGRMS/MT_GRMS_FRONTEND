@@ -1,7 +1,5 @@
 import { financeHttpClient } from '../../../api/financeHttpClient';
 import type { ApiResponse } from '../../../api/types';
-import { cashbookService } from '../../cashbook/services/cashbookService';
-import { generateUuidV7 } from '../../../utils/uuid';
 import type {
   CustomerDto,
   CreateCustomerInput,
@@ -13,8 +11,9 @@ import type {
   CustomerDebtLedgerDto,
 } from '../types/customer.types';
 
-const DEFAULT_TILL_ID = '01a19664-6210-7b12-a9eb-6fa16ca5b9db';
-const DEFAULT_BANK_ID = '01a19664-6741-7f3d-9be7-cb4c7b876559';
+interface DebtRepaymentResult {
+  remainingDebt: number;
+}
 
 interface BackendCustomerDebtLedgerItem {
   id: string;
@@ -116,39 +115,32 @@ export const customerApi = {
   /**
    * Collect against the customer's total debt and generate a cashbook receipt.
    */
-  async collectDebt(input: CollectDebtInput): Promise<CustomerDto> {
+  async collectDebt(input: CollectDebtInput, getIdempotencyKey: (payload: object) => string): Promise<DebtRepaymentResult> {
     if (input.amount <= 0) {
       throw new Error('Số tiền thu nợ phải lớn hơn 0 VNĐ');
     }
 
     const isCash = input.method === 'Cash';
     const paymentSourceType = isCash ? 1 : 3; // 1 = BranchTill, 3 = TenantBank
-    let paymentSourceAccountId = input.targetAccountId;
+    const paymentSourceAccountId = input.targetAccountId;
     if (!paymentSourceAccountId) {
-      try {
-        const accounts = await cashbookService.getCashAccounts();
-        const matched = accounts.find((a) =>
-          isCash ? a.accountType === 'CASH' : a.accountType === 'BANK'
-        );
-        paymentSourceAccountId = matched?.id;
-      } catch {
-        // fallback
-      }
+      throw new Error('Vui lòng chọn tài khoản nhận tiền đang hoạt động.');
     }
-    if (!paymentSourceAccountId) {
-      paymentSourceAccountId = isCash ? DEFAULT_TILL_ID : DEFAULT_BANK_ID;
-    }
-    const idempotencyKey = generateUuidV7();
+    const payload = {
+      customerId: input.customerId,
+      amount: input.amount,
+      paymentSourceType,
+      paymentSourceAccountId,
+      notes: input.note || `Thu hồi công nợ khách hàng (${input.method})`,
+      referenceCode: input.transactionRef?.trim() || undefined,
+    };
+    const idempotencyKey = getIdempotencyKey(payload);
 
-    const res = await financeHttpClient.post<ApiResponse<unknown>>(
+    const res = await financeHttpClient.post<ApiResponse<DebtRepaymentResult>>(
       '/customers/debt/repay',
       {
-        customerId: input.customerId,
-        amount: input.amount,
-        paymentSourceType,
-        paymentSourceAccountId,
-        referenceCode: `REC-${Date.now().toString().slice(-6)}`,
-        notes: input.note || `Thu hồi công nợ khách hàng (${input.method})`,
+        ...payload,
+        referenceCode: payload.referenceCode || `REC-${idempotencyKey}`,
       },
       {
         headers: {
@@ -157,17 +149,11 @@ export const customerApi = {
       }
     );
 
-    if (!res.data.success) {
+    if (!res.data.success || !res.data.data) {
       throw new Error(res.data.message || 'Giao dịch thu nợ không thành công');
     }
 
-    // Refresh and return latest customer state
-    const updated = await this.getCustomerById(input.customerId);
-    if (!updated) {
-      throw new Error('Đã thu nợ thành công nhưng không thể làm mới dữ liệu khách hàng');
-    }
-
-    return updated;
+    return res.data.data;
   },
 
   /**

@@ -36,6 +36,7 @@ export interface StoreOwnerDashboardData {
     expiringBatches: DashboardExpiryItem[];
   };
   employees: { totalCount: number; activeCount: number };
+  tasks?: { title: string; code: string; actionUrl: string }[];
 }
 
 export async function getStoreOwnerDashboard(period: DashboardPeriod, branchId: string | null, signal?: AbortSignal): Promise<StoreOwnerDashboardData> {

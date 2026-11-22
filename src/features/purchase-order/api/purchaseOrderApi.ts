@@ -103,6 +103,24 @@ export interface OrderMatrixApiResult {
   status: string;
 }
 
+export interface OrderMatrixSuggestion {
+  productId: string;
+  supplierId: string;
+  deliveryDate: string;
+  suggestedQty: number;
+  avg7: number;
+  avg30: number;
+  salesPerDay: number;
+  coverageDays: number;
+  forecastDemand: number;
+  availableStock: number;
+  incomingQty: number;
+  safetyStock: number;
+  rawSuggested: number;
+  moq: number;
+  orderMultiple: number;
+}
+
 function toDateKey(value: string): string {
   return value.slice(0, 10);
 }
@@ -312,8 +330,43 @@ export const purchaseOrderApi = {
       }
       throw new Error(res.data?.message || 'Không tải được ma trận đặt hàng.');
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      throw new Error(e.response?.data?.message || e.message || 'Không tải được ma trận đặt hàng.');
+      const e = err as { response?: { data?: { message?: string; detail?: string } }; message?: string };
+      throw new Error(
+        e.response?.data?.message ||
+          e.response?.data?.detail ||
+          e.message ||
+          'Không tải được ma trận đặt hàng.'
+      );
+    }
+  },
+
+  /** Tính gợi ý đặt hàng tại backend từ doanh số, tồn khả dụng và hàng đang về. */
+  async getOrderMatrixSuggestions(params: {
+    branchId: string;
+    supplierId?: string;
+    viewFrom: string;
+    durationDays: number;
+  }): Promise<OrderMatrixSuggestion[]> {
+    try {
+      const res = await httpClient.post<ApiResponse<OrderMatrixSuggestion[]>>(
+        '/purchase-orders/matrix/suggestions',
+        {
+          branchId: params.branchId,
+          supplierId: params.supplierId && params.supplierId !== 'ALL' ? params.supplierId : null,
+          viewFrom: params.viewFrom,
+          durationDays: params.durationDays,
+        }
+      );
+      if (res.data?.success && res.data.data) return res.data.data;
+      throw new Error(res.data?.message || 'Không tính được số lượng gợi ý đặt hàng.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string; detail?: string } }; message?: string };
+      throw new Error(
+        e.response?.data?.message ||
+          e.response?.data?.detail ||
+          e.message ||
+          'Không tính được số lượng gợi ý đặt hàng.'
+      );
     }
   },
 

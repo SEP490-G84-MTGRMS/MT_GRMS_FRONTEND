@@ -169,13 +169,15 @@ export const CashbookPage: FC = () => {
       setFilters((prev) => ({
         ...prev,
         searchQuery: urlSearch,
+        ...(urlBranchId ? { branchId: urlBranchId } : {}),
+        ...(urlAccountId !== 'ALL' ? { accountId: urlAccountId, transactionType: 'ALL', status: 'ALL' } : {}),
         datePeriod: 'all',
         startDate: undefined,
         endDate: undefined,
       }));
       setCurrentPage(1);
     }
-  }, [urlSearch]);
+  }, [urlSearch, urlAccountId, urlBranchId]);
 
   const handleFilterChange = (updated: Partial<CashbookFilterParams>) => {
     if (updated.searchQuery !== undefined) {

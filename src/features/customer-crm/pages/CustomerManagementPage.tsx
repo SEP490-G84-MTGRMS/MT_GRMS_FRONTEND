@@ -11,7 +11,7 @@ import { CustomerDrawerDetail } from '../components/CustomerDrawerDetail';
 import { CustomerFormModal } from '../components/CustomerFormModal';
 import { DebtCollectionModal } from '../components/DebtCollectionModal';
 import { CustomerDebtLedgerDrawer } from '../components/CustomerDebtLedgerDrawer';
-import type { CreateCustomerInput, UpdateCustomerInput, DebtFilterStatus } from '../types/customer.types';
+import type { CollectDebtInput, CreateCustomerInput, UpdateCustomerInput, DebtFilterStatus } from '../types/customer.types';
 import '../../purchase-order/purchase-order.css';
 import '../../../styles/so-list-page.css';
 import '../customer-crm.css';
@@ -133,7 +133,7 @@ export const CustomerManagementPage: FC = () => {
     }
   };
 
-  const handleCollectDebtConfirm = async (data: any) => {
+  const handleCollectDebtConfirm = async (data: CollectDebtInput) => {
     try {
       await collectDebtMutation.mutateAsync(data);
       showToast(
@@ -141,9 +141,8 @@ export const CustomerManagementPage: FC = () => {
           data.method === 'VietQR' ? 'VietQR' : 'Tiền mặt'
         } và đồng bộ Sổ quỹ thành công!`
       );
-    } catch (err: any) {
-      showToast(err.message || 'Lỗi khi thu nợ', 'error');
-      throw err;
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Lỗi khi thu nợ', 'error');
     }
   };
 

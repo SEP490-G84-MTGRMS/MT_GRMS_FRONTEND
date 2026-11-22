@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Calculator,
   History,
@@ -42,6 +43,8 @@ type ActiveTaxTab = 'declaration' | 'books';
 type AuxiliaryView = 'history' | 'analytics' | null;
 
 export const TaxSnapshotPage: FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedSnapshotId = searchParams.get('snapshotId');
   const [activeTab, setActiveTab] = useState<ActiveTaxTab>('declaration');
   const [auxiliaryView, setAuxiliaryView] = useState<AuxiliaryView>(null);
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
@@ -94,6 +97,21 @@ export const TaxSnapshotPage: FC = () => {
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!linkedSnapshotId || !canManageTax) return;
+    const controller = new AbortController();
+    setIsDrawerOpen(false);
+    setSelectedSnapshot(null);
+    void taxSnapshotApi.getSnapshot(linkedSnapshotId, controller.signal).then((snapshot) => {
+      if (controller.signal.aborted) return;
+      setSelectedSnapshot(snapshot);
+      setIsDrawerOpen(true);
+    }).catch(() => {
+      if (!controller.signal.aborted) setToast({ id: `toast-${Date.now()}`, type: 'error', message: 'Không thể mở hồ sơ chốt kỳ từ thông báo.' });
+    });
+    return () => controller.abort();
+  }, [linkedSnapshotId, canManageTax]);
 
   useDialogFocusTrap(Boolean(auxiliaryView), auxiliaryDialogRef, () => setAuxiliaryView(null));
 
@@ -603,6 +621,13 @@ export const TaxSnapshotPage: FC = () => {
         onClose={() => {
           setIsDrawerOpen(false);
           setSelectedSnapshot(null);
+          if (linkedSnapshotId) {
+            setSearchParams((previous) => {
+              const next = new URLSearchParams(previous);
+              next.delete('snapshotId');
+              return next;
+            }, { replace: true });
+          }
         }}
         snapshot={selectedSnapshot}
         onExport={(snap) => {

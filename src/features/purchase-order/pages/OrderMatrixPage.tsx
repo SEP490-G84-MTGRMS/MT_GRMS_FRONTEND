@@ -111,7 +111,6 @@ const REASON_LABELS: Record<string, string> = {
   BRANCH_PRODUCT_INACTIVE: 'Chi nhánh không kinh doanh sản phẩm này',
   NOT_DELIVERY_DAY: 'Không phải ngày giao của NCC',
   HOLIDAY_BLACKOUT: 'Ngày nghỉ/blackout của NCC',
-  LEAD_TIME_VIOLATION: 'Lead time tối thiểu 1 ngày — không đặt giao hôm nay',
   PAST_DELIVERY_DATE: 'Ngày giao đã qua',
   CUTOFF_PASSED: 'Đã đến hoặc qua giờ chốt đơn',
   PO_ALREADY_COMMITTED: 'Ngày này đã chốt PO',
@@ -177,8 +176,7 @@ function computeDayColumns(
   const list: DayColInfo[] = [];
   const isAll = supplierId === 'ALL';
   const supConfig = supplierConfigs?.find((sc) => sc.supplierId === supplierId);
-  // Lead time ≥ 1 ngày: ngày giao sớm nhất = ngày mai
-  const earliestAllowed = fmtDateStr(addDaysToDate(parseDateStr(today), 1));
+  const now = new Date();
 
   for (let i = 0; i < durationDays; i++) {
     const d = addDaysToDate(viewFrom, i);
@@ -251,9 +249,7 @@ function computeDayColumns(
         isLocked = false;
       }
     } else {
-      // Fallback local khi chưa có DayStatuses
-      // Áp dụng cả khi xem ALL (fallback): hôm nay luôn bị chặn lead time
-      const isLeadBlocked = k < earliestAllowed;
+      // Fallback local khi chưa có DayStatuses — khóa theo cutoff NCC (offset + giờ)
       let isDayOff = false;
       let isHoliday = false;
       let isSupplierInactive = false;
@@ -274,21 +270,31 @@ function computeDayColumns(
         isDayOff = !DEFAULT_DELIVERY.activeDeliveryDays.includes(dow);
       }
 
-      isOff = isSupplierInactive || isSupplierNotAssigned || isLeadBlocked || isDayOff || isHoliday;
+      isOff = isSupplierInactive || isSupplierNotAssigned || isDayOff || isHoliday;
       if (!offReason) {
-        if (isLeadBlocked) offReason = REASON_LABELS.LEAD_TIME_VIOLATION;
-        else if (isDayOff) offReason = REASON_LABELS.NOT_DELIVERY_DAY;
+        if (isDayOff) offReason = REASON_LABELS.NOT_DELIVERY_DAY;
         else if (isHoliday) offReason = REASON_LABELS.HOLIDAY_BLACKOUT;
       }
 
+      const cutoffOffset = Math.max(0, Number(supConfig?.cutoffDayOffset ?? 1));
+      const cutoffAt = (() => {
+        const cutoffDay = addDaysToDate(d, -cutoffOffset);
+        const [hh, mm] = (supConfig?.cutoffTime || DEFAULT_DELIVERY.cutoffHour).split(':').map(Number);
+        cutoffDay.setHours(hh || 0, mm || 0, 0, 0);
+        return cutoffDay;
+      })();
+
       const isAlreadyPo = lockedDates.has(k);
       const isPastLocked = !isOff && k < today;
-      isLocked = isAlreadyPo || isPastLocked;
+      const isCutoffPassed = !isOff && !isPastLocked && now.getTime() >= cutoffAt.getTime();
+      isLocked = isAlreadyPo || isPastLocked || isCutoffPassed;
       if (isAlreadyPo) cutoffStatus = 'PO_GENERATED';
-      else if (isPastLocked) cutoffStatus = 'LOCKED';
-      else if (!isOff && k <= fmtDateStr(addDaysToDate(parseDateStr(today), 1))) cutoffStatus = 'CUTOFF_DUE';
+      else if (isPastLocked || isCutoffPassed) cutoffStatus = 'LOCKED';
+      else if (!isOff && cutoffAt.getTime() - now.getTime() <= 24 * 60 * 60 * 1000) cutoffStatus = 'CUTOFF_DUE';
       else cutoffStatus = 'OPEN';
       if (isAlreadyPo) poCode = `PO-${k.replace(/-/g, '')}-GEN`;
+      if (isCutoffPassed && !offReason) offReason = REASON_LABELS.CUTOFF_PASSED;
+      if (isPastLocked && !offReason) offReason = REASON_LABELS.PAST_DELIVERY_DATE;
     }
 
     // lockedDates (FINALIZED) chỉ dùng fallback khi chưa có DayStatuses từ BE.
@@ -420,6 +426,9 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         if (st === 'PO_GENERATED' || st === 'LOCKED' || st === 'SUPPLIER_OFF') return false;
         return true; // OPEN / CUTOFF_DUE kể cả đã có PO (amend trước cutoff)
       }
+      // Đã có DayStatuses từ BE nhưng thiếu bản ghi ngày×NCC này → không cho nhập
+      // (tránh ô trắng không bao giờ nhận được gợi ý).
+      if (product.supplierId) return false;
     }
 
     if (d.isOff || d.isLocked) return false;
@@ -897,146 +906,138 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     showToast(`Đã áp dụng khoảng thời gian ${diff} ngày (từ ${dateFromInput} đến ${dateToInput})`, 'success');
   };
 
-  // Auto-Suggest — chỉ ghi đúng trường theo role (OpenSpec §3 / §11.4)
-  const handleAutoSuggest = () => {
-    const newMap = { ...cellMap };
-    let suggestedCount = 0;
-    let skippedOwner = 0;
+  // Auto-Suggest — ghi mọi ngày editable trong phạm vi; chỉ đúng trường theo role (OpenSpec §3 / §11.4)
+  const handleAutoSuggest = async () => {
+    if (!GUID_RE.test(selectedBranchId)) return;
+    try {
+      const suggestions = await purchaseOrderApi.getOrderMatrixSuggestions({
+        branchId: selectedBranchId,
+        supplierId: selectedSupplierId,
+        viewFrom: fmtDateStr(viewFrom),
+        durationDays,
+      });
+      const visibleRows = new Set(filteredProducts.map((p) => `${p.id}__${p.supplierId}`));
+      const newMap = { ...cellMap };
+      let suggestedCount = 0;
+      let skippedOwner = 0;
+      let skippedFilled = 0;
+      const daysCovered = new Set<string>();
 
-    filteredProducts.forEach((p) => {
-      if (p.isRowDisabled) return;
-      const rk = `${p.id}__${p.supplierId || 'none'}`;
-      if (!newMap[rk]) newMap[rk] = {};
-      dayColumns.forEach((d) => {
-        if (!isCellEditable(d, p)) return;
-        const currentCell = newMap[rk][d.dateKey] || {
+      suggestions.forEach((suggestion) => {
+        if (suggestion.suggestedQty <= 0) return;
+        const rk = `${suggestion.productId}__${suggestion.supplierId}`;
+        if (!visibleRows.has(rk)) return;
+        const product = filteredProducts.find(
+          (p) => p.id === suggestion.productId && p.supplierId === suggestion.supplierId
+        );
+        const dateKey = suggestion.deliveryDate.slice(0, 10);
+        const day = dayColumns.find((d) => d.dateKey === dateKey);
+        if (!product || !day || !isCellEditable(day, product)) return;
+
+        if (!newMap[rk]) newMap[rk] = {};
+        const currentCell = newMap[rk][dateKey] || {
           employeeQty: 0,
           storeQty: null,
           finalQty: 0,
           isOwnerAdjusted: false,
         };
-
-        // Không tự ghi đè Owner override nếu Employee thao tác
-        if (!isStoreOwner && (currentCell.isOwnerAdjusted || currentCell.storeQty !== null)) {
+        if (currentCell.isOwnerAdjusted || currentCell.storeQty !== null) {
           skippedOwner++;
           return;
         }
-        if ((currentCell.finalQty || 0) > 0) return;
-
-        const forecastSales = (p.sales || 0) * 2.5;
-        const targetStock = forecastSales + (p.safetyStock || 5);
-        const rawSuggested = Math.max(0, targetStock - (p.soh || 0));
-        const multiple = p.orderMultiple && p.orderMultiple > 0 ? p.orderMultiple : 1;
-        let finalSuggested = Math.max(p.moq || 0, Math.ceil(rawSuggested / multiple) * multiple);
-
-        if (isStoreOwner) {
-          newMap[rk][d.dateKey] = {
-            ...currentCell,
-            storeQty: finalSuggested,
-            isOwnerAdjusted: true,
-            isOwnerOverridden: true,
-            finalQty: finalSuggested,
-            suggestedQty: finalSuggested,
-            modifiedBy: 'store_owner',
-            modifiedAt: new Date().toISOString(),
-          };
-        } else {
-          newMap[rk][d.dateKey] = {
-            ...currentCell,
-            employeeQty: finalSuggested,
-            storeQty: null,
-            isOwnerAdjusted: false,
-            isOwnerOverridden: false,
-            finalQty: finalSuggested,
-            suggestedQty: finalSuggested,
-            modifiedBy: 'employee',
-            modifiedAt: new Date().toISOString(),
-          };
-        }
-        suggestedCount++;
-      });
-    });
-
-    setCellMap(newMap);
-    setIsDirty(true);
-    const extra = skippedOwner > 0 ? ` (bỏ qua ${skippedOwner} ô đã có Owner override)` : '';
-    showToast(
-      suggestedCount > 0
-        ? `Đã áp dụng Suggested Qty cho ${suggestedCount} ô${extra}.`
-        : 'Không có ô EDITABLE trống để áp dụng gợi ý.',
-      suggestedCount > 0 ? 'success' : 'info'
-    );
-  };
-
-  // Copy tuần trước — chỉ cập nhật trường theo role, chỉ ô EDITABLE
-  const handleCopyPrevWeek = () => {
-    const newMap = { ...cellMap };
-    let copyCount = 0;
-    let skipped = 0;
-    const relevantProducts =
-      !matchedSupplierIds
-        ? matrixProducts
-        : matrixProducts.filter((p) => matchedSupplierIds.includes(p.supplierId));
-
-    relevantProducts.forEach((p) => {
-      if (p.isRowDisabled) return;
-      const rk = `${p.id}__${p.supplierId || 'none'}`;
-      if (!newMap[rk]) newMap[rk] = {};
-      dayColumns.forEach((d) => {
-        if (!isCellEditable(d, p)) {
-          skipped++;
+        if ((currentCell.finalQty || 0) > 0) {
+          skippedFilled++;
           return;
         }
-        const prevKey = fmtDateStr(addDaysToDate(d.date, -7));
-        const prevCell = cellMap[rk]?.[prevKey];
-        if (!prevCell || prevCell.finalQty <= 0) return;
 
-        const currentCell = newMap[rk][d.dateKey] || {
-          employeeQty: 0,
-          storeQty: null,
-          finalQty: 0,
-          isOwnerAdjusted: false,
-        };
-
-        if (isStoreOwner) {
-          const qty = prevCell.storeQty ?? prevCell.finalQty;
-          newMap[rk][d.dateKey] = {
-            ...currentCell,
-            storeQty: qty,
-            isOwnerAdjusted: true,
-            isOwnerOverridden: true,
-            finalQty: qty,
-            modifiedBy: 'store_owner',
-            modifiedAt: new Date().toISOString(),
-          };
-        } else {
-          if (currentCell.isOwnerAdjusted || currentCell.storeQty !== null) {
-            skipped++;
-            return;
-          }
-          newMap[rk][d.dateKey] = {
-            ...currentCell,
-            employeeQty: prevCell.employeeQty || prevCell.finalQty,
-            storeQty: null,
-            isOwnerAdjusted: false,
-            isOwnerOverridden: false,
-            finalQty: prevCell.employeeQty || prevCell.finalQty,
-            modifiedBy: 'employee',
-            modifiedAt: new Date().toISOString(),
-          };
-        }
-        copyCount++;
+        const finalSuggested = suggestion.suggestedQty;
+        newMap[rk][dateKey] = isStoreOwner
+          ? {
+              ...currentCell,
+              storeQty: finalSuggested,
+              isOwnerAdjusted: true,
+              isOwnerOverridden: true,
+              finalQty: finalSuggested,
+              suggestedQty: finalSuggested,
+              modifiedBy: 'store_owner',
+              modifiedAt: new Date().toISOString(),
+            }
+          : {
+              ...currentCell,
+              employeeQty: finalSuggested,
+              storeQty: null,
+              isOwnerAdjusted: false,
+              isOwnerOverridden: false,
+              finalQty: finalSuggested,
+              suggestedQty: finalSuggested,
+              modifiedBy: 'employee',
+              modifiedAt: new Date().toISOString(),
+            };
+        suggestedCount++;
+        daysCovered.add(dateKey);
       });
+
+      if (suggestedCount > 0) {
+        setCellMap(newMap);
+        setIsDirty(true);
+      }
+      const extras: string[] = [];
+      if (daysCovered.size > 0) extras.push(`${daysCovered.size} ngày giao`);
+      if (skippedOwner > 0) extras.push(`bỏ qua ${skippedOwner} ô Owner đã chỉnh`);
+      if (skippedFilled > 0) extras.push(`giữ ${skippedFilled} ô đã có SL`);
+      const extra = extras.length > 0 ? ` (${extras.join('; ')})` : '';
+      showToast(
+        suggestedCount > 0
+          ? `Đã áp dụng gợi ý cho ${suggestedCount} ô trong phạm vi ${durationDays} ngày${extra}.`
+          : 'Không có nhu cầu nhập thêm hoặc không có ô EDITABLE trống trong phạm vi đã chọn.',
+        suggestedCount > 0 ? 'success' : 'info'
+      );
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không tính được số lượng gợi ý.', 'error');
+    }
+  };
+
+  /** Xóa các ô đang mang số lượng từ Gợi ý SL (giữ ô đã chỉnh tay khác suggestedQty). */
+  const handleClearSuggestions = () => {
+    const newMap: MatrixCellMap = { ...cellMap };
+    let cleared = 0;
+
+    Object.keys(newMap).forEach((rk) => {
+      const row = { ...newMap[rk] };
+      let rowChanged = false;
+      Object.keys(row).forEach((dateKey) => {
+        const cell = row[dateKey];
+        if (!cell || cell.suggestedQty == null || cell.suggestedQty <= 0) return;
+        // Chỉ xóa khi SL hiện tại vẫn đúng bằng SL gợi ý (chưa bị sửa tay lệch đi)
+        if ((cell.finalQty || 0) !== cell.suggestedQty) return;
+        const product = filteredProducts.find((p) => `${p.id}__${p.supplierId}` === rk);
+        const day = dayColumns.find((d) => d.dateKey === dateKey);
+        if (!product || !day || !isCellEditable(day, product)) return;
+
+        row[dateKey] = {
+          ...cell,
+          employeeQty: isStoreOwner ? cell.employeeQty || 0 : 0,
+          storeQty: null,
+          isOwnerAdjusted: false,
+          isOwnerOverridden: false,
+          finalQty: 0,
+          suggestedQty: undefined,
+          modifiedBy: isStoreOwner ? 'store_owner' : 'employee',
+          modifiedAt: new Date().toISOString(),
+        };
+        cleared++;
+        rowChanged = true;
+      });
+      if (rowChanged) newMap[rk] = row;
     });
 
-    setCellMap(newMap);
-    setIsDirty(true);
-    showToast(
-      copyCount > 0
-        ? `Đã sao chép ${copyCount} ô từ tuần trước${skipped ? `, bỏ qua ${skipped} ô không hợp lệ` : ''}.`
-        : 'Không tìm thấy dữ liệu tuần trước để sao chép vào ô EDITABLE.',
-      copyCount > 0 ? 'success' : 'warning'
-    );
+    if (cleared > 0) {
+      setCellMap(newMap);
+      setIsDirty(true);
+      showToast(`Đã bỏ gợi ý trên ${cleared} ô.`, 'success');
+    } else {
+      showToast('Không có ô gợi ý nào để xóa.', 'info');
+    }
   };
 
   const buildSupplierCodeById = () => {
@@ -1148,9 +1149,16 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         exportedBy: isStoreOwner ? 'Store Owner' : 'Nhân viên chi nhánh',
         isStoreOwner,
         supplierCodeById: buildSupplierCodeById(),
+        dayStatuses,
         isCellEditable,
       });
-      showToast('Đã xuất file bảng ma trận đặt hàng (.xlsx) theo bộ lọc hiện tại!', 'success');
+      const nccCount = new Set(filteredProducts.map((p) => p.supplierId)).size;
+      showToast(
+        nccCount > 1
+          ? `Đã xuất Excel: ${nccCount} sheet (mỗi nhà cung cấp một sheet)!`
+          : 'Đã xuất file bảng ma trận đặt hàng (.xlsx) theo bộ lọc hiện tại!',
+        'success'
+      );
     } catch (err: any) {
       showToast('Xuất file Excel thất bại: ' + (err?.message || err), 'error');
     }
@@ -1497,7 +1505,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           isReadOnly
             ? `Chi Tiết Đơn Đặt Hàng — ${branches.find((b) => b.id === selectedBranchId)?.name || ''}`
             : isStoreOwner
-            ? '👑 Tạo Đơn Mua Hàng (Chủ Cửa Hàng Duyệt & Tách PO)'
+            ? '👑 Tạo Đơn Mua Hàng'
             : '👤 Đặt Hàng Theo Ma Trận (Nhân Viên Đề Xuất)'
         }
         onSwitchScreen={handleSwitchScreen}
@@ -1572,8 +1580,8 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
         isDirty={isDirty}
         onShiftWeek={handleShiftWeek}
         onThisWeek={handleThisWeek}
-        onCopyPrevWeek={handleCopyPrevWeek}
         onAutoSuggest={handleAutoSuggest}
+        onClearSuggestions={handleClearSuggestions}
         onExcelDownload={handleExcelDownload}
         onExcelUpload={handleExcelUpload}
       />

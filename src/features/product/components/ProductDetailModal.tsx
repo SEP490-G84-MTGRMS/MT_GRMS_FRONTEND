@@ -95,7 +95,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   if (!isOpen || !product) return null;
 
-  const isDiscontinued = product.status === 'Discontinued';
+  const isDiscontinued = product.status === 'Discontinued' || product.status === 'Inactive';
 
   const formatVND = (num?: number | null) => {
     if (num === undefined || num === null) return '—';
