@@ -67,6 +67,28 @@ const mapBranchProductToPos = (p: any): Product => {
   };
 };
 
+/**
+ * Endpoint sản phẩm theo chi nhánh có thể trả nhiều dòng cho cùng một sản phẩm
+ * (mỗi dòng tương ứng một nguồn NCC). POS chỉ bán theo ProductId, vì vậy phải
+ * gom lại trước khi hiển thị để ô tìm kiếm và danh mục Bán thường không bị lặp.
+ *
+ * Backend đã sắp xếp nguồn nhập theo giá hiệu lực tăng dần; giữ dòng đầu tiên
+ * giúp kết quả ổn định mà không làm thay đổi giá bán/tồn kho của sản phẩm.
+ */
+export const mapUniqueBranchProductsToPos = (items: any[]): Product[] => {
+  const uniqueProducts = new Map<string, Product>();
+
+  for (const item of items) {
+    const product = mapBranchProductToPos(item);
+    const key = String(product.id || product.sku || product.barcode).trim().toLowerCase();
+    if (key && !uniqueProducts.has(key)) {
+      uniqueProducts.set(key, product);
+    }
+  }
+
+  return Array.from(uniqueProducts.values());
+};
+
 export interface OrderItemCreateDto {
   productId: string;
   quantity: number;
@@ -197,7 +219,7 @@ export const posOrderApi = {
             ? res.data
             : [];
 
-      return items.map(mapBranchProductToPos);
+      return mapUniqueBranchProductsToPos(items);
     }
 
     return [];
@@ -217,7 +239,7 @@ export const posOrderApi = {
           ? res.data
           : [];
 
-    return items.map(mapBranchProductToPos);
+    return mapUniqueBranchProductsToPos(items);
   },
 
   /**

@@ -444,13 +444,12 @@ export const PosHeader: FC<Props> = ({
                           <div className="pos-search-item-name">
                             {pkg.name?.trim() || `Khay · ${hit.hit.productName}`}
                           </div>
-                          <div className="pos-search-item-meta">
+                          <div className="pos-search-item-meta" style={{ display: 'grid', gap: 2 }}>
                             <span className="badge-sku">
                               Mã: {pkg.internalCode || pkg.barcode || '—'}
                             </span>
-                            <span>&bull;</span>
-                            <span className="badge-stock">
-                              {pkg.netWeight} KG · {hit.hit.productName} · Lô {hit.hit.batchCode || '—'}
+                            <span className="badge-stock" style={{ whiteSpace: 'nowrap' }}>
+                              {pkg.netWeight} kg &bull; Lô {hit.hit.batchCode || '—'}
                             </span>
                           </div>
                         </div>

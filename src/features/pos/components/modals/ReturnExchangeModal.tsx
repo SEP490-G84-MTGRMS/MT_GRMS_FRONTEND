@@ -3,6 +3,7 @@ import type { InvoiceDTO } from '../../types/inventory.types';
 import type { Product } from '../../types/pos.types';
 import { PosProductSearchInput } from '../PosProductSearchInput';
 import { ArrowLeftRight, RotateCcw, Plus, Trash2, AlertTriangle, AlertCircle, PackageCheck, Gift, TrendingDown, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { httpClient } from '../../../../api/httpClient';
 
 interface Props {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface Props {
   availableProducts: Product[];
   currentDrawerCash?: number;
   isStoreOwner?: boolean;
+  cashFundSource?: 'SHIFT' | 'SAFE';
   refundSourceLabel?: string;
   onClose: () => void;
   onConfirm: (data: {
@@ -20,6 +22,7 @@ interface Props {
       unitName?: string;
       condition?: 'Restock' | 'Damaged';
       orderDetailId?: string;
+      batchId?: string;
       isGift?: boolean;
     }>;
     newItems: Array<{
@@ -34,11 +37,12 @@ interface Props {
     settlementMethod: string;
     reason?: string;
     note?: string;
+    cashFundSource?: 'SHIFT' | 'SAFE';
   }) => Promise<void>;
 }
 
 export const RETURN_REASON_OPTIONS = [
-  { value: 'DEFECTIVE', label: 'Lỗi do Nhà Sản Xuất (bao bì rách, móp, biến chất, lỗi kỹ thuật)' },
+  { value: 'DEFECTIVE', label: 'Lỗi do nhà sản xuất' },
   { value: 'WRONG_ITEM', label: 'Khách / Thu ngân chọn nhầm sản phẩm hoặc đơn vị tính' },
   { value: 'CHANGE_MIND', label: 'Khách đổi ý (chỉ áp dụng Đổi sang sản phẩm khác)' },
   { value: 'EXPIRED_NEAR_DATE', label: 'Sản phẩm cận hạn hoặc quá hạn sử dụng trên kệ' },
@@ -50,7 +54,8 @@ export const ReturnExchangeModal: React.FC<Props> = ({
   invoice,
   availableProducts,
   currentDrawerCash,
-  isStoreOwner: _isStoreOwner = false,
+  isStoreOwner = false,
+  cashFundSource,
   refundSourceLabel,
   onClose,
   onConfirm,
@@ -62,7 +67,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
 
   const getAllocations = (item: NonNullable<InvoiceDTO['items']>[number]) =>
     item.stockAllocations || [];
-  const lotExpiryDates: Record<string, string> = {};
+  const [lotExpiryDates, setLotExpiryDates] = useState<Record<string, string>>({});
 
   // 2. Quản lý danh sách hàng khách lấy mới kèm đơn vị tính quy đổi
   const [newItems, setNewItems] = useState<
@@ -100,10 +105,36 @@ export const ReturnExchangeModal: React.FC<Props> = ({
       setReturnLotQtys({});
       setReturnConditions({});
       setNewItems([]);
-      setSettlementMethod('CASH');
+      setSettlementMethod(invoice.paymentMethod === 'CREDIT' ? 'REDUCE_DEBT' : 'CASH');
       setReturnReason('DEFECTIVE');
       setNote('');
     }
+  }, [isOpen, invoice]);
+
+  React.useEffect(() => {
+    if (!isOpen || !invoice?.branchId) {
+      setLotExpiryDates({});
+      return;
+    }
+    const soldLotIds = new Set(
+      (invoice.items || []).flatMap((item) => (item.stockAllocations || []).map((a) => a.branchStockId))
+    );
+    if (soldLotIds.size === 0) return;
+    let cancelled = false;
+    httpClient.get('/inventory/batches', { params: { branchId: invoice.branchId, pageSize: 500 } })
+      .then((response) => {
+        if (cancelled) return;
+        const raw = response.data?.data?.items ?? response.data?.data ?? response.data ?? [];
+        const rows = Array.isArray(raw) ? raw : [];
+        const next: Record<string, string> = {};
+        for (const row of rows) {
+          const id = row.batchId || row.branchStockId || row.id;
+          if (id && soldLotIds.has(id) && row.expiryDate) next[id] = row.expiryDate;
+        }
+        setLotExpiryDates(next);
+      })
+      .catch(() => setLotExpiryDates({}));
+    return () => { cancelled = true; };
   }, [isOpen, invoice]);
 
   if (!isOpen || !invoice) return null;
@@ -135,10 +166,12 @@ export const ReturnExchangeModal: React.FC<Props> = ({
   // Chênh lệch Net Amount (> 0: khách bù thêm, < 0: shop hoàn lại)
   const netAmount = totalNewAmount - totalReturnAmount;
   const refundAmount = Math.max(0, -netAmount);
+  const isCreditReturn = invoice.paymentMethod === 'CREDIT';
 
   // Kiểm tra két quầy có đủ tiền mặt để hoàn trả không (REQ-POS-RETURN-UNIT-CONVERSION-04)
   const isDrawerCashInsufficient =
     netAmount < 0 &&
+    !isCreditReturn &&
     currentDrawerCash !== undefined &&
     refundAmount > currentDrawerCash;
 
@@ -187,6 +220,29 @@ export const ReturnExchangeModal: React.FC<Props> = ({
         ...prev,
         [lineKey]: 'Restock',
       }));
+    }
+  };
+
+  const handleReturnLotQtyChange = (
+    lineKey: string,
+    branchStockId: string,
+    maxQty: number,
+    value: number,
+    allocations: Array<{ branchStockId: string }>
+  ) => {
+    const lotKey = `${lineKey}:${branchStockId}`;
+    const validQty = Math.max(0, Math.min(maxQty, Number(value) || 0));
+    setReturnLotQtys((prev) => {
+      const next = { ...prev, [lotKey]: validQty };
+      const total = allocations.reduce(
+        (sum, allocation) => sum + (next[`${lineKey}:${allocation.branchStockId}`] || 0),
+        0
+      );
+      setReturnQtys((qtys) => ({ ...qtys, [lineKey]: total }));
+      return next;
+    });
+    if (validQty > 0 && !returnConditions[lineKey]) {
+      setReturnConditions((prev) => ({ ...prev, [lineKey]: 'Restock' }));
     }
   };
 
@@ -260,22 +316,30 @@ export const ReturnExchangeModal: React.FC<Props> = ({
       return;
     }
     const returnedItemsList = (invoice.items || [])
-      .map((originalItem, idx) => {
+      .flatMap((originalItem, idx) => {
         const key = getLineKey(originalItem, idx);
         const qty = returnQtys[key] || 0;
-        if (qty <= 0) return null;
+        if (qty <= 0) return [];
         const refundableUnit = originalItem.isGift ? 0 : (originalItem.actualPrice ?? originalItem.unitPrice);
-        return {
+        const baseItem = {
           productId: originalItem.productId,
-          quantity: qty,
           unitPrice: refundableUnit,
           unitName: originalItem.unitName,
           condition: returnConditions[key] || ('Restock' as const),
           orderDetailId: originalItem.itemId || undefined,
           isGift: Boolean(originalItem.isGift),
         };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
+        const allocations = getAllocations(originalItem);
+        if (allocations.length > 0) {
+          return allocations.flatMap((allocation) => {
+            const lotQty = returnLotQtys[`${key}:${allocation.branchStockId}`] || 0;
+            return lotQty > 0
+              ? [{ ...baseItem, quantity: lotQty, batchId: allocation.branchStockId }]
+              : [];
+          });
+        }
+        return [{ ...baseItem, quantity: qty, batchId: originalItem.batchId || undefined }];
+      });
 
     const newItemsList = newItems.map((item) => {
       const units = getEffectiveUnitPrices(item.product);
@@ -300,11 +364,19 @@ export const ReturnExchangeModal: React.FC<Props> = ({
       return;
     }
 
+    const expiredRestock = returnedItemsList.some((item) =>
+      item.condition === 'Restock' && item.batchId && lotExpiryDates[item.batchId] &&
+      new Date(lotExpiryDates[item.batchId]).getTime() < new Date().setHours(0, 0, 0, 0)
+    );
+    if (expiredRestock) {
+      alert('Lô đã hết hạn sử dụng, không thể nhập lại kho bán. Vui lòng chọn tình trạng Hàng lỗi/hỏng.');
+      return;
+    }
+
     // Ràng buộc đơn đặt trước
     if (isPreOrderExchangeOnlyBlocked) {
       alert(
-        'Đơn đặt trước đã bàn giao chỉ hỗ trợ ĐỔI SẢN PHẨM KHÁC (Exchange), không áp dụng trả hàng lấy lại tiền mặt trừ khi có lỗi từ Nhà Sản Xuất!\n' +
-        'Vui lòng chọn sản phẩm đổi mới tương đương hoặc chọn lý do "Lỗi do Nhà Sản Xuất".'
+        'Chọn sản phẩm đổi có giá trị tương đương. Đơn đặt trước chỉ được hoàn tiền mặt khi có lỗi do nhà sản xuất.'
       );
       return;
     }
@@ -325,13 +397,14 @@ export const ReturnExchangeModal: React.FC<Props> = ({
       await onConfirm({
         returnedItems: returnedItemsList,
         newItems: newItemsList,
-        settlementMethod: netAmount < 0 ? 'CASH' : settlementMethod,
+        settlementMethod: netAmount < 0 && invoice.paymentMethod !== 'CREDIT' ? 'CASH' : settlementMethod,
         reason: returnReason,
         note,
+        cashFundSource: cashFundSource ?? (isStoreOwner ? 'SAFE' : 'SHIFT'),
       });
       onClose();
     } catch (e: any) {
-      alert(`Lỗi khi xử lý đổi/trả hàng: ${e?.message || 'Không thể kết nối máy chủ'}`);
+      alert(`Lỗi khi xử lý đổi/trả hàng: ${e?.response?.data?.message || e?.response?.data?.detail || e?.message || 'Không thể kết nối máy chủ'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -339,7 +412,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
 
   return (
     <div className="pos-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pos-modal-dialog" style={{ maxWidth: 920, width: '95%' }}>
+      <div className="pos-modal-dialog" style={{ maxWidth: 1040, width: '95%' }}>
         {/* Header */}
         <div className="pos-modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
@@ -397,8 +470,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
             >
               <AlertCircle size={16} className="text-amber-600 shrink-0" />
               <div>
-                <b>Chính sách Đơn Đặt Trước:</b> Khách hàng chỉ được <b>ĐỔI SANG SẢN PHẨM KHÁC (Exchange)</b>,
-                tuyệt đối <b>không hoàn tiền mặt</b> nếu khách đổi ý / trả ngang. Chỉ hoàn tiền mặt khi sản phẩm có <b>Lỗi do Nhà Sản Xuất (NSX)</b>.
+                Đơn đặt trước được đổi sang sản phẩm khác. Chỉ hoàn tiền mặt khi có lỗi do nhà sản xuất.
               </div>
             </div>
           )}
@@ -414,8 +486,8 @@ export const ReturnExchangeModal: React.FC<Props> = ({
               </span>
             </div>
 
-            <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-              <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflowX: 'auto' }}>
+              <table style={{ width: '100%', minWidth: 900, fontSize: 12.5, borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                   <tr>
                     <th style={{ padding: '8px 10px' }}>Sản phẩm</th>
@@ -423,8 +495,9 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                     <th style={{ padding: '8px 10px', textAlign: 'right', width: 95 }}>Giá mua</th>
                     <th style={{ padding: '8px 10px', textAlign: 'center', width: 70 }}>Đã mua</th>
                     <th style={{ padding: '8px 10px', textAlign: 'center', width: 95 }}>SL trả</th>
-                    <th style={{ padding: '8px 10px', width: 175 }}>Tình trạng hàng trả</th>
-                    <th style={{ padding: '8px 10px', textAlign: 'right', width: 110 }}>Tiền hoàn trả</th>
+                    <th scope="col" style={{ padding: '8px 10px', minWidth: 170 }}>Lô hàng</th>
+                    <th scope="col" style={{ padding: '8px 10px', minWidth: 112 }}>Tình trạng</th>
+                    <th scope="col" style={{ padding: '8px 10px', textAlign: 'right', whiteSpace: 'nowrap', minWidth: 104 }}>Tiền hoàn</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -545,12 +618,13 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                                         step="any"
                                         aria-label={`Số lượng hoàn lô ${a.batchCode || a.branchStockId}`}
                                         value={returnLotQtys[lotKey] || 0}
-                                        onChange={(e) =>
-                                          setReturnLotQtys((prev: Record<string, number>) => ({
-                                            ...prev,
-                                            [lotKey]: Math.max(0, Math.min(maxQty, Number(e.target.value) || 0)),
-                                          }))
-                                        }
+                                        onChange={(e) => handleReturnLotQtyChange(
+                                          lineKey,
+                                          a.branchStockId,
+                                          maxQty,
+                                          Number(e.target.value),
+                                          allocations
+                                        )}
                                         style={{ width: 55, padding: '3px' }}
                                       />
                                     </label>
@@ -562,7 +636,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                         </td>
                         <td style={{ padding: '8px 10px' }}>
                           <select
-                            disabled={currentQty === 0}
+                            aria-label={`Tình trạng hàng trả ${item.productName}`}
                             value={condition}
                             onChange={(e) =>
                               setReturnConditions((prev) => ({
@@ -579,15 +653,14 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                               border: condition === 'Restock' ? '1px solid #86efac' : '1px solid #fca5a5',
                               backgroundColor: condition === 'Restock' ? '#f0fdf4' : '#fef2f2',
                               color: condition === 'Restock' ? '#166534' : '#991b1b',
-                              cursor: currentQty > 0 ? 'pointer' : 'not-allowed',
-                              opacity: currentQty > 0 ? 1 : 0.5,
+                              cursor: 'pointer',
                             }}
                           >
-                            <option value="Restock">Nguyên vẹn (Nhập kho bán)</option>
-                            <option value="Damaged">Hàng lỗi/hỏng (Chờ hủy/NCC)</option>
+                            <option value="Restock">Nguyên vẹn</option>
+                            <option value="Damaged">Lỗi / hỏng</option>
                           </select>
                         </td>
-                        <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 700, color: item.isGift ? '#15803d' : currentQty > 0 ? '#b91c1c' : '#94a3b8' }}>
+                        <td style={{ padding: '8px 10px', textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, color: item.isGift ? '#15803d' : currentQty > 0 ? '#b91c1c' : '#94a3b8' }}>
                           {item.isGift ? '0 đ' : `${(currentQty * refundableUnit).toLocaleString('vi-VN')} đ`}
                         </td>
                       </tr>
@@ -618,11 +691,6 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                 buttonLabel="Thêm / Tìm"
                 resetTrigger={isOpen ? invoice.invoiceId : false}
               />
-              {newItems.length === 0 && (
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
-                  Quét mã vạch (nhấn Enter) hoặc chọn sản phẩm từ gợi ý tìm kiếm để thêm ngay; chỉnh đơn vị và số lượng trực tiếp trong bảng bên dưới.
-                </div>
-              )}
             </div>
 
             {newItems.length > 0 && (
@@ -811,7 +879,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
                     <TrendingDown size={15} color="#15803d" />
-                    Nguồn tiền hoàn trả cho khách:
+                    {isCreditReturn ? 'Trừ công nợ khách hàng:' : 'Nguồn tiền hoàn trả cho khách:'}
                   </span>
                   <span
                     style={{
@@ -827,15 +895,17 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                       border: '1px solid #86efac',
                     }}
                   >
-                    {refundSourceLabel || (currentDrawerCash !== undefined ? 'Két ca thu ngân hiện tại' : 'Két sắt chi nhánh (Sổ quỹ)')}
+                    {isCreditReturn
+                      ? 'Giảm dư nợ, không chi tiền mặt'
+                      : refundSourceLabel || (currentDrawerCash !== undefined ? 'Két ca thu ngân hiện tại' : 'Két sắt chi nhánh (Sổ quỹ)')}
                   </span>
                 </div>
 
                 <div style={{ fontSize: 12, color: '#14532d', lineHeight: 1.5 }}>
                   <div>• <b>Số tiền hoàn trả:</b> <span style={{ color: '#dc2626', fontWeight: 800, fontSize: 13 }}>{Math.abs(netAmount).toLocaleString('vi-VN')} đ</span></div>
                   <div>• <b>Tác động doanh thu:</b> Tự động <b>giảm doanh thu ca và doanh thu ngày: -{Math.abs(netAmount).toLocaleString('vi-VN')} đ</b> tương ứng theo phiếu trả hàng <b>TH...</b>.</div>
-                  <div>• <b>Dòng tiền:</b> {currentDrawerCash !== undefined ? 'Tự động tạo dòng tiền ra RETURN_REFUND trong ca, trừ trực tiếp tiền mặt bàn giao ca' : 'Tự động hạch toán phiếu chi quỹ từ két sắt chi nhánh qua Sổ quỹ'}.</div>
-                  {currentDrawerCash !== undefined && (
+                  <div>• <b>Dòng tiền:</b> {isCreditReturn ? 'Giảm trực tiếp công nợ khách hàng, không tạo phiếu chi tiền mặt' : currentDrawerCash !== undefined ? 'Tự động tạo dòng tiền ra RETURN_REFUND trong ca, trừ trực tiếp tiền mặt bàn giao ca' : 'Tự động hạch toán phiếu chi quỹ từ két sắt chi nhánh qua Sổ quỹ'}.</div>
+                  {!isCreditReturn && currentDrawerCash !== undefined && (
                     <div style={{ marginTop: 4 }}>
                       • <b>Số dư tiền mặt két ca:</b> <b>{currentDrawerCash.toLocaleString('vi-VN')} đ</b> {isDrawerCashInsufficient ? <span style={{ color: '#dc2626', fontWeight: 700 }}>— Không đủ để hoàn trả!</span> : <span style={{ color: '#15803d', fontWeight: 700 }}>— Đủ điều kiện hoàn tiền</span>}
                     </div>
@@ -904,14 +974,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
               >
                 <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />
                 <div>
-                  <b>Không thể hoàn tiền mặt cho Đơn Đặt Trước!</b>
-                  <div style={{ marginTop: 2 }}>
-                    Đơn hàng đặt trước chỉ cho phép <b>Đổi sang sản phẩm khác có giá trị tương đương</b>.
-                    Tuyệt đối không hoàn tiền mặt nếu lý do là khách đổi ý / mua nhầm.
-                  </div>
-                  <div style={{ marginTop: 4, fontStyle: 'italic', color: '#b91c1c' }}>
-                    (Ngoại lệ: Nếu sản phẩm bị hỏng do NSX, hãy chọn lý do "Lỗi do Nhà Sản Xuất" để được duyệt hoàn tiền).
-                  </div>
+                  Chọn sản phẩm đổi có giá trị tương đương, hoặc chọn lý do “Lỗi do nhà sản xuất” nếu đúng tình trạng hàng.
                 </div>
               </div>
             )}
