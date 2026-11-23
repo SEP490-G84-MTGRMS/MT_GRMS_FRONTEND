@@ -10,7 +10,6 @@ import type { GrnDetailItem } from '../../types/grn.types';
 
 interface GrnStockFefoTableProps {
   items: GrnDetailItem[];
-  totalLandedCost: number;
 }
 
 const formatCurrency = (val: number): string => {
@@ -28,10 +27,8 @@ const isNearExpiry = (expDateStr?: string): boolean => {
 
 export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
   items,
-  totalLandedCost,
 }) => {
   const totalUnits = items.reduce((sum, item) => sum + (item.receivedQty || 0), 0);
-  const avgLandedCostPerUnit = totalUnits > 0 ? totalLandedCost / totalUnits : 0;
   const totalGoodsValue = items.reduce((sum, item) => sum + (item.receivedQty * (item.unitPrice || 0)), 0);
 
   return (
@@ -84,12 +81,6 @@ export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
           </span>
         </div>
 
-        <div style={{ fontSize: 12.5, color: '#64748b' }}>
-          <span>Phí VC phân bổ bình quân: </span>
-          <strong style={{ color: '#d97706', fontWeight: 700 }}>
-            +{formatCurrency(avgLandedCostPerUnit)}/ĐVT
-          </strong>
-        </div>
       </div>
 
       {/* Table Content */}
@@ -120,8 +111,7 @@ export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
               <th style={{ padding: '9px 12px', width: 130 }}>Mã Lô (Batch)</th>
               <th style={{ padding: '9px 12px', width: 130 }}>Hạn sử dụng</th>
               <th style={{ padding: '9px 12px', textAlign: 'right', width: 130 }}>SL CHẤP NHẬN (+)</th>
-              <th style={{ padding: '9px 12px', textAlign: 'right', width: 105 }}>Phí VC/ĐVT</th>
-              <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>Giá vốn mới</th>
+              <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>Giá mua/ĐVT</th>
               <th style={{ padding: '9px 12px', textAlign: 'right', width: 110 }}>Giá bán lẻ</th>
               <th style={{ padding: '9px 12px', textAlign: 'right', width: 85 }}>Margin %</th>
               <th style={{ padding: '9px 12px', minWidth: 150 }}>Ghi chú</th>
@@ -129,8 +119,7 @@ export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
           </thead>
           <tbody>
             {items.map((item, idx) => {
-              const allocatedFreight = avgLandedCostPerUnit;
-              const unitCost = (item.unitPrice || 0) + allocatedFreight;
+              const unitCost = item.unitPrice || 0;
               const retail = item.retailPrice || (item.unitPrice ? item.unitPrice * 1.35 : 0);
               const margin = retail > 0 ? ((retail - unitCost) / retail) * 100 : 0;
               const nearExp = isNearExpiry(item.expiryDate);
@@ -251,12 +240,7 @@ export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
                     </strong>
                   </td>
 
-                  {/* Landed Cost / Unit */}
-                  <td style={{ padding: '9px 12px', textAlign: 'right', color: '#d97706', fontWeight: 600 }}>
-                    +{formatCurrency(allocatedFreight)}
-                  </td>
-
-                  {/* New Unit Cost */}
+                  {/* Purchase Unit Cost */}
                   <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>
                     {formatCurrency(unitCost)}
                   </td>
@@ -304,7 +288,7 @@ export const GrnStockFefoTable: FC<GrnStockFefoTableProps> = ({
               <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0f766e', fontSize: 14 }}>
                 {totalUnits} ĐVT
               </td>
-              <td colSpan={2} style={{ padding: '10px 12px', textAlign: 'right', color: '#64748b' }}>
+              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#64748b' }}>
                 Tổng giá trị hàng:
               </td>
               <td colSpan={3} style={{ padding: '10px 12px', color: '#0f766e', fontSize: 14 }}>

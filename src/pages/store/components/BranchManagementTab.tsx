@@ -93,6 +93,8 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
     await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter, pageIndex, pageSize)]);
   };
 
+  const hasOnlyBranch = quota?.usedBranches === 1;
+
   const handleToggleStatus = async (branch: BranchItemResponse) => {
     const isCurrentlyActive = branch.status.toLowerCase() === 'active';
     const nextActive = !isCurrentlyActive;
@@ -112,7 +114,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
   };
 
   const handleDeleteBranch = async (branch: BranchItemResponse) => {
-    if (branch.isHeadquarter) {
+    if (branch.isHeadquarter || hasOnlyBranch) {
       alert('Không thể xóa chi nhánh chính (Trụ sở chính) của chuỗi cửa hàng.');
       return;
     }
@@ -275,6 +277,8 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
               ) : (
                 branches.map((b, index) => {
                   const isActive = b.status.toLowerCase() === 'active';
+                  const cannotDisable = isActive && hasOnlyBranch;
+                  const cannotDelete = b.isHeadquarter || hasOnlyBranch;
                   const rowNum = (pageIndex - 1) * pageSize + index + 1;
                   return (
                     <tr
@@ -428,6 +432,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(b)}
+                            disabled={cannotDisable}
                             style={{
                               width: 28,
                               height: 28,
@@ -438,9 +443,10 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              cursor: 'pointer',
+                              cursor: cannotDisable ? 'not-allowed' : 'pointer',
+                              opacity: cannotDisable ? 0.6 : 1,
                             }}
-                            title={isActive ? 'Tạm ngưng hoạt động' : 'Kích hoạt hoạt động'}
+                            title={cannotDisable ? 'Không thể ngừng hoạt động chi nhánh duy nhất' : isActive ? 'Tạm ngưng hoạt động' : 'Kích hoạt hoạt động'}
                           >
                             <Power size={14} />
                           </button>
@@ -449,21 +455,21 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
                           <button
                             type="button"
                             onClick={() => handleDeleteBranch(b)}
-                            disabled={b.isHeadquarter}
+                            disabled={cannotDelete}
                             style={{
                               width: 28,
                               height: 28,
                               borderRadius: 6,
-                              border: `1px solid ${b.isHeadquarter ? '#e2e8f0' : '#fecaca'}`,
-                              background: b.isHeadquarter ? '#f8fafc' : '#ffffff',
-                              color: b.isHeadquarter ? '#cbd5e1' : '#dc2626',
+                              border: `1px solid ${cannotDelete ? '#e2e8f0' : '#fecaca'}`,
+                              background: cannotDelete ? '#f8fafc' : '#ffffff',
+                              color: cannotDelete ? '#cbd5e1' : '#dc2626',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              cursor: b.isHeadquarter ? 'not-allowed' : 'pointer',
-                              opacity: b.isHeadquarter ? 0.6 : 1,
+                              cursor: cannotDelete ? 'not-allowed' : 'pointer',
+                              opacity: cannotDelete ? 0.6 : 1,
                             }}
-                            title={b.isHeadquarter ? 'Không thể xóa chi nhánh chính (Trụ sở chính)' : 'Xóa chi nhánh'}
+                            title={cannotDelete ? 'Không thể xóa chi nhánh chính (Trụ sở chính)' : 'Xóa chi nhánh'}
                           >
                             <Trash2 size={14} />
                           </button>
@@ -526,6 +532,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       {activeModal === 'detail' && selectedBranch && (
         <BranchDetailModal
           branch={selectedBranch}
+          isOnlyBranch={hasOnlyBranch}
           onClose={() => {
             setActiveModal(null);
             setSelectedBranch(null);

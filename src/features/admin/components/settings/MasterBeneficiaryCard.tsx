@@ -35,15 +35,15 @@ export const MasterBeneficiaryCard = ({ form, onChange, disabled }: MasterBenefi
         <datalist id="settings-bank-codes">{banks.map(bank => <option key={bank.code} value={bank.code}>{bank.name}</option>)}</datalist>
       </label>
       <label>Tên ngân hàng
-        <input required maxLength={200} value={form.masterBankName} disabled={disabled}
+        <input required minLength={2} maxLength={200} value={form.masterBankName} disabled={disabled}
           onChange={event => onChange('masterBankName', event.target.value)} placeholder="Nhập tên ngân hàng" />
       </label>
       <label>Số tài khoản
-        <input required maxLength={50} value={form.masterAccountNumber} disabled={disabled}
+        <input required maxLength={50} pattern="[A-Za-z0-9]+" title="Số tài khoản chỉ gồm chữ và số" value={form.masterAccountNumber} disabled={disabled}
           onChange={event => onChange('masterAccountNumber', event.target.value)} autoComplete="off" />
       </label>
       <label>Tên chủ tài khoản
-        <input required maxLength={200} value={form.masterAccountName} disabled={disabled}
+        <input required minLength={2} maxLength={200} value={form.masterAccountName} disabled={disabled}
           onChange={event => onChange('masterAccountName', event.target.value)} autoComplete="off" />
       </label>
     </div>

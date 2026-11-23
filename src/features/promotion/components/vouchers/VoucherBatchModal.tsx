@@ -209,7 +209,7 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
 
             <div className="form-grid-3">
               <div className="form-group">
-                <label className="form-label form-label-required">Tiền tố mã (Prefix)</label>
+                <label className="form-label form-label-required">Tiền tố mã</label>
                 <input
                   type="text"
                   value={prefix}

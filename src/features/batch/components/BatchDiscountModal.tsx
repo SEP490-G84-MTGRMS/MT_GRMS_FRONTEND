@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { FC } from 'react';
 import { X, Tag, AlertCircle, Check } from 'lucide-react';
 import type { BatchItem } from '../types/batch.types';
@@ -16,14 +16,40 @@ export const BatchDiscountModal: FC<BatchDiscountModalProps> = ({
   onClose,
   onApplyDiscount,
 }) => {
-  const [percent, setPercent] = useState<number>(20);
+  const [rawInput, setRawInput] = useState<string>('20');
+
+  useEffect(() => {
+    if (isOpen && batch) {
+      const init = batch.discountPercent && batch.discountPercent > 0 ? batch.discountPercent : 20;
+      setRawInput(String(init));
+    }
+  }, [isOpen, batch]);
 
   if (!isOpen || !batch) return null;
 
   const presetOptions = [10, 15, 20, 30, 50];
 
+  // Validation logic
+  const trimmed = rawInput.trim();
+  const numVal = Number(trimmed);
+  let errorMsg = '';
+  if (trimmed === '') {
+    errorMsg = 'Vui lòng nhập tỷ lệ phần trăm giảm giá';
+  } else if (Number.isNaN(numVal)) {
+    errorMsg = 'Giá trị nhập phải là chữ số hợp lệ';
+  } else if (!Number.isInteger(numVal)) {
+    errorMsg = 'Vui lòng nhập số nguyên (ví dụ: 15, 20)';
+  } else if (numVal < 1) {
+    errorMsg = 'Tỷ lệ giảm giá tối thiểu là 1%';
+  } else if (numVal > 90) {
+    errorMsg = 'Tỷ lệ giảm giá tối đa là 90%';
+  }
+
+  const isValid = !errorMsg;
+
   const handleConfirm = () => {
-    onApplyDiscount(batch.id, percent);
+    if (!isValid) return;
+    onApplyDiscount(batch.id, numVal);
     onClose();
   };
 
@@ -133,27 +159,30 @@ export const BatchDiscountModal: FC<BatchDiscountModalProps> = ({
               Chọn mức chiết khấu áp dụng tại POS:
             </label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {presetOptions.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setPercent(opt)}
-                  style={{
-                    flex: '1 1 60px',
-                    height: 38,
-                    borderRadius: 6,
-                    border: percent === opt ? '2px solid #2563eb' : '1px solid #cbd5e1',
-                    backgroundColor: percent === opt ? '#eff6ff' : '#ffffff',
-                    color: percent === opt ? '#1d4ed8' : '#334155',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  -{opt}%
-                </button>
-              ))}
+              {presetOptions.map((opt) => {
+                const isSelected = trimmed === String(opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setRawInput(String(opt))}
+                    style={{
+                      flex: '1 1 60px',
+                      height: 38,
+                      borderRadius: 6,
+                      border: isSelected ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                      backgroundColor: isSelected ? '#eff6ff' : '#ffffff',
+                      color: isSelected ? '#1d4ed8' : '#334155',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    -{opt}%
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -167,14 +196,16 @@ export const BatchDiscountModal: FC<BatchDiscountModalProps> = ({
                 type="number"
                 min={1}
                 max={90}
-                value={percent}
-                onChange={(e) => setPercent(Math.min(90, Math.max(1, Number(e.target.value))))}
+                value={rawInput}
+                onChange={(e) => setRawInput(e.target.value)}
+                placeholder="Nhập số từ 1 đến 90..."
                 style={{
                   width: '100%',
                   height: 36,
                   padding: '0 32px 0 12px',
                   borderRadius: 6,
-                  border: '1px solid #cbd5e1',
+                  border: errorMsg ? '1px solid #ef4444' : '1px solid #cbd5e1',
+                  backgroundColor: errorMsg ? '#fef2f2' : '#ffffff',
                   fontSize: 13,
                   fontWeight: 600,
                   outline: 'none',
@@ -188,29 +219,51 @@ export const BatchDiscountModal: FC<BatchDiscountModalProps> = ({
                   top: '50%',
                   transform: 'translateY(-50%)',
                   fontWeight: 700,
-                  color: '#64748b',
+                  color: errorMsg ? '#ef4444' : '#64748b',
                 }}
               >
                 %
               </span>
             </div>
+            {errorMsg && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  marginTop: 6,
+                  color: '#dc2626',
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                <span>{errorMsg}</span>
+              </div>
+            )}
           </div>
 
           <div
             style={{
               padding: '10px 12px',
-              backgroundColor: '#eff6ff',
+              backgroundColor: isValid ? '#eff6ff' : '#f8fafc',
               borderRadius: 6,
-              border: '1px solid #bfdbfe',
+              border: isValid ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
               display: 'flex',
               gap: 8,
               fontSize: 12,
-              color: '#1e40af',
+              color: isValid ? '#1e40af' : '#64748b',
             }}
           >
             <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
             <span>
-              Khi xác nhận, hệ thống POS sẽ tự động áp dụng mức giảm <b>{percent}%</b> cho các lượt xuất bán thuộc lô hàng này cho đến khi hết hàng hoặc hết hạn.
+              {isValid ? (
+                <>
+                  Khi xác nhận, hệ thống POS sẽ tự động áp dụng mức giảm <b>{numVal}%</b> cho các lượt xuất bán thuộc lô hàng này cho đến khi hết hàng hoặc hết hạn.
+                </>
+              ) : (
+                'Vui lòng nhập tỷ lệ phần trăm hợp lệ (từ 1% đến 90%) để tiếp tục.'
+              )}
             </span>
           </div>
         </div>
@@ -245,24 +298,26 @@ export const BatchDiscountModal: FC<BatchDiscountModalProps> = ({
           </button>
           <button
             type="button"
+            disabled={!isValid}
             onClick={handleConfirm}
             style={{
               height: 34,
               padding: '0 18px',
               borderRadius: 6,
               border: 'none',
-              backgroundColor: '#2563eb',
+              backgroundColor: isValid ? '#2563eb' : '#94a3b8',
               color: '#ffffff',
               fontSize: 12.5,
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: isValid ? 'pointer' : 'not-allowed',
               display: 'inline-flex',
               alignItems: 'center',
               gap: 5,
+              opacity: isValid ? 1 : 0.7,
             }}
           >
             <Check size={14} />
-            <span>Áp dụng giảm {percent}%</span>
+            <span>{isValid ? `Áp dụng giảm ${numVal}%` : 'Áp dụng giảm giá'}</span>
           </button>
         </div>
       </div>

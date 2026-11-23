@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { PlusIcon, CloseIcon, UploadIcon } from '../../admin/components';
 import { employeeApi } from '../../employee/api/employeeApi';
+import { formatLocalDateIso, getVietnamToday } from '../../employee/lib/vietnamTime';
 import {
   EXPENSE_CATEGORY_LABELS,
   type CreateExpenseRequest,
@@ -126,21 +127,25 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
   const activeBranches = branches && branches.length > 0 ? branches : internalBranches;
 
   // Poka-yoke: Do NOT pre-select category. User must explicitly choose one.
-  const [formData, setFormData] = useState(() => ({
-    branchId: defaultBranchId && defaultBranchId !== 'ALL' ? defaultBranchId : '',
-    category: '' as unknown as ExpenseCategory,
-    amount: '',
-    expenseDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-    vendorName: '',
-    isRecurring: false,
-    recurringDayOfMonth: 1,
-    isTaxDeductible: true,
-    invoiceNumber: '',
-    sellerTaxCode: '',
-    attachedBillUrl: '',
-    note: '',
-  }));
+  const [formData, setFormData] = useState(() => {
+    const today = getVietnamToday();
+    const dueDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7);
+    return {
+      branchId: defaultBranchId && defaultBranchId !== 'ALL' ? defaultBranchId : '',
+      category: '' as unknown as ExpenseCategory,
+      amount: '',
+      expenseDate: formatLocalDateIso(today),
+      dueDate: formatLocalDateIso(dueDate),
+      vendorName: '',
+      isRecurring: false,
+      recurringDayOfMonth: 1,
+      isTaxDeductible: true,
+      invoiceNumber: '',
+      sellerTaxCode: '',
+      attachedBillUrl: '',
+      note: '',
+    };
+  });
 
   // Cập nhật branchId nếu defaultBranchId hoặc danh sách chi nhánh sẵn sàng
   useEffect(() => {

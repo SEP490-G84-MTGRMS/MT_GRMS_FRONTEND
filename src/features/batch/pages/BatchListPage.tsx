@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -17,7 +17,7 @@ import type {
   UserRole,
 } from '../types/batch.types';
 import { batchApi } from '../api/batchApi';
-import { BatchFilterBar } from '../components/BatchFilterBar';
+import { BatchFilterBar, type BatchSuggestProduct } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
 import { BatchDiscountModal } from '../components/BatchDiscountModal';
@@ -26,7 +26,9 @@ import {
   type BatchAlertMode,
 } from '../components/BatchExpiryAlertModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { productApi } from '../../product/api/productApi';
 import '../../purchase-order/purchase-order.css';
+import '../../supplier/supplier.css';
 
 const DEFAULT_FILTERS: BatchFilterState = {
   keyword: '',
@@ -59,6 +61,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [appliedFilters, setAppliedFilters] = useState<BatchFilterState>(DEFAULT_FILTERS);
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [catalogProducts, setCatalogProducts] = useState<BatchSuggestProduct[]>([]);
 
   const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -99,16 +102,66 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     setTimeout(() => setToast(null), 3500);
   };
 
+  // Pool gợi ý Mã hàng / Tên SP (catalog + lô đã load)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const page = await productApi.getProductsPaged({
+          status: 'Active',
+          pageIndex: 1,
+          pageSize: 300,
+        });
+        if (cancelled) return;
+        setCatalogProducts(
+          (page.items || [])
+            .map((p) => ({
+              sku: (p.productCode || '').trim(),
+              productName: (p.name || '').trim(),
+            }))
+            .filter((p) => p.sku || p.productName)
+        );
+      } catch {
+        if (!cancelled) setCatalogProducts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const suggestionProducts = useMemo(() => {
+    const map = new Map<string, BatchSuggestProduct>();
+    for (const p of catalogProducts) {
+      const key = `${p.sku.toLowerCase()}|${p.productName.toLowerCase()}`;
+      map.set(key, p);
+    }
+    for (const b of batches) {
+      const sku = (b.sku || '').trim();
+      const productName = (b.productName || '').trim();
+      if (!sku && !productName) continue;
+      const key = `${sku.toLowerCase()}|${productName.toLowerCase()}`;
+      map.set(key, { sku, productName });
+    }
+    return Array.from(map.values());
+  }, [catalogProducts, batches]);
+
   // Sync initial query params from URL
   useEffect(() => {
     const skuFromUrl = searchParams.get('sku');
     const batchParam = searchParams.get('batch');
+    const keywordParam = searchParams.get('keyword') || searchParams.get('grn') || '';
     const statusParam = searchParams.get('status') as BatchStatus | null;
     const branchParam = searchParams.get('branch');
 
     const updated = { ...DEFAULT_FILTERS };
     if (skuFromUrl) updated.sku = skuFromUrl;
     if (batchParam && !skuFromUrl) updated.batchCode = batchParam;
+    // ?keyword=GRN-... / mã lô → ô Mã lô (và keyword BE)
+    if (keywordParam && !batchParam && !skuFromUrl) {
+      updated.batchCode = keywordParam;
+      updated.keyword = keywordParam;
+    }
 
     if (statusParam && ['Expired', 'Critical', 'Warning', 'Normal'].includes(statusParam)) {
       updated.status = statusParam;
@@ -265,12 +318,12 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
             )}
             <Package size={22} color="var(--blue-primary, #0f766e)" />
             <span>
-              {skuParam ? 'Chi tiết lô & hạn sử dụng' : 'Quản lý Lô & Hạn sử dụng (FEFO)'}
+              {skuParam ? 'Chi tiết lô & hạn sử dụng' : 'Quản lý lô & hạn sử dụng'}
             </span>
           </h1>
           {skuParam && (
-            <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4, marginLeft: 30 }}>
-              {focusedProduct?.productName || skuParam} · SKU {skuParam} · {totalCount} lô
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, marginLeft: 30 }}>
+              {focusedProduct?.productName || skuParam} · Mã hàng {skuParam} · {totalCount} lô
               {isLoading ? ' · Đang tải…' : ''}
             </div>
           )}
@@ -344,6 +397,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
           filterInputs={filterInputs}
           role={role}
           employeeBranchId={employeeBranchId}
+          suggestionProducts={suggestionProducts}
           onFilterChange={handleFilterChange}
           onSearch={handleSearch}
           onReset={handleReset}

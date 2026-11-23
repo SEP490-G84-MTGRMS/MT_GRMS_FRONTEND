@@ -53,24 +53,27 @@ const tableColGroup = (
 
 const thBaseStyle: CSSProperties = {
   backgroundColor: '#f8fafc',
-  padding: '8px 4px',
-  fontSize: 11,
+  padding: '6px 5px',
+  fontSize: 10.5,
   fontWeight: 700,
   color: '#334155',
+  textTransform: 'uppercase',
   letterSpacing: '0.01em',
-  whiteSpace: 'normal',
-  lineHeight: 1.25,
+  whiteSpace: 'nowrap',
+  lineHeight: 1.2,
   boxSizing: 'border-box',
+  borderBottom: '1px solid #cbd5e1',
 };
 
 const tdBase: CSSProperties = {
-  padding: '8px 6px',
-  fontSize: 12.5,
+  padding: '5px 6px',
+  fontSize: 11,
   borderBottom: '1px solid #f1f5f9',
   color: '#1e293b',
   boxSizing: 'border-box',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
+  lineHeight: 1.35,
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
 };
 
 export const InventoryTable: FC<Props> = ({
@@ -191,7 +194,10 @@ export const InventoryTable: FC<Props> = ({
         }}
       >
         <span>{label}</span>
-        <ArrowUpDown size={12} color={sortField === field ? '#0f766e' : '#94a3b8'} />
+        <ArrowUpDown
+          size={11}
+          style={{ color: sortField === field ? '#0f766e' : '#94a3b8', flexShrink: 0 }}
+        />
       </div>
     </th>
   );
@@ -202,11 +208,11 @@ export const InventoryTable: FC<Props> = ({
     borderCollapse: 'separate',
     borderSpacing: 0,
     textAlign: 'left',
-    fontSize: 12.5,
+    fontSize: 11,
   };
 
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card so-list-table-card--dense so-list-table-card--wrap">
       <div
         ref={headerRef}
         className="so-list-table-head"
@@ -217,11 +223,11 @@ export const InventoryTable: FC<Props> = ({
           <thead>
             <tr>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>#</th>
-              {renderSortTh('sku', 'SKU')}
+              {renderSortTh('sku', 'Mã hàng')}
               {renderSortTh('productName', 'Tên sản phẩm')}
               <th style={thBaseStyle}>Nhóm</th>
               <th style={thBaseStyle}>Chi nhánh</th>
-              <th style={{ ...thBaseStyle, textAlign: 'center' }} title="Đơn vị nhập">DVN</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }} title="Đơn vị nhập">ĐVT</th>
               {renderSortTh('onHand', 'Tồn', 'right')}
               <th style={{ ...thBaseStyle, textAlign: 'right' }}>Cách ly/Giữ</th>
               {renderSortTh('available', 'Khả dụng', 'right')}
@@ -267,18 +273,14 @@ export const InventoryTable: FC<Props> = ({
                         ...tdBase,
                         fontFamily: 'var(--font-mono, monospace)',
                         fontWeight: 600,
-                        color: '#334155',
-                        whiteSpace: 'nowrap',
+                        color: '#0f766e',
                       }}
                       title={item.sku}
                     >
                       {item.sku}
                     </td>
-                    <td
-                      style={{ ...tdBase, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}
-                      title={item.productName}
-                    >
-                      {item.productName}
+                    <td className="so-list-td--wrap" style={tdBase} title={item.productName}>
+                      <div className="so-list-name">{item.productName}</div>
                     </td>
                     <td style={tdBase}>{item.categoryLabel}</td>
                     <td style={tdBase}>{item.branchName}</td>
@@ -330,9 +332,9 @@ export const InventoryTable: FC<Props> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          padding: '3px 10px',
+                          padding: '2px 7px',
                           borderRadius: 9999,
-                          fontSize: 11.5,
+                          fontSize: 10.5,
                           fontWeight: 600,
                           backgroundColor: badge.bg,
                           color: badge.color,
@@ -352,10 +354,10 @@ export const InventoryTable: FC<Props> = ({
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 4,
-                          height: 28,
+                          height: 26,
                           padding: '0 8px',
                           borderRadius: 6,
-                          fontSize: 11.5,
+                          fontSize: 11,
                           fontWeight: 600,
                           background: '#ffffff',
                           border: '1px solid #0d9488',

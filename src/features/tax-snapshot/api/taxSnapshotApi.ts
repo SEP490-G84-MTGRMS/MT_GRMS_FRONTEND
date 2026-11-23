@@ -86,6 +86,28 @@ function extractErrorMessage(err: unknown, defaultMsg: string): string {
 }
 
 export const taxSnapshotApi = {
+  async getFilingConfirmation(snapshotId: string, signal?: AbortSignal): Promise<string | null> {
+    const response = await financeHttpClient.get<{ data: { confirmedAtUtc: string | null } }>(
+      `/tax/household/snapshots/${encodeURIComponent(snapshotId)}/filing-confirmation`, { signal },
+    );
+    return response.data.data.confirmedAtUtc;
+  },
+
+  async confirmFiling(snapshotId: string, signal?: AbortSignal): Promise<string> {
+    const response = await financeHttpClient.put<{ data: { confirmedAtUtc: string } }>(
+      `/tax/household/snapshots/${encodeURIComponent(snapshotId)}/filing-confirmation`, null, { signal },
+    );
+    return response.data.data.confirmedAtUtc;
+  },
+
+  async getSnapshot(id: string, signal?: AbortSignal): Promise<HouseholdTaxSnapshotDto> {
+    const response = await financeHttpClient.get<{ data: HouseholdTaxSnapshotDto }>(
+      `/tax/household/snapshots/${encodeURIComponent(id)}`, { signal },
+    );
+    if (!response.data?.data) throw new Error('Không tìm thấy hồ sơ chốt kỳ.');
+    return response.data.data;
+  },
+
   resetSecurityLock(): void {
     failedPinAttempts = 0;
     lockedUntilTimestamp = 0;

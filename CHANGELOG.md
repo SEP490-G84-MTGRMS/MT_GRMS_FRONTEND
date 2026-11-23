@@ -4,6 +4,13 @@ Toàn bộ các thay đổi của repository Frontend React SPA được tổng 
 
 ---
 
+## [Unreleased] - 2026-11-21
+
+### Changed
+- **Chuyển đổi giao diện Form Thông tin cửa hàng sang bố cục dọc (`StoreInfoTab.tsx`)**:
+  - Chuyển các trường nhập liệu (`Tên cửa hàng *`, `Số điện thoại liên hệ`, `Mã số thuế`, `Tỉnh / Thành phố`, `Địa chỉ`) từ dạng dàn ngang 4 cột sang dạng xếp chồng theo chiều dọc (vertical column stack, `maxWidth: 640px`).
+  - Đồng bộ bố cục mục "Gói dịch vụ" sang chiều dọc thanh lịch, ngăn ngừa hiện tượng form bị kéo dãn kỳ dị trên màn hình độ phân giải cao [FE-STORE] [worklog: docs/worklogs/2026-11-21_FE-STORE_AI_vertical-store-info-form.md].
+
 ## [Unreleased] - 2026-11-15
 
 ### Added

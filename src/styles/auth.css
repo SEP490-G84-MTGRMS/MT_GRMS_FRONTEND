@@ -356,6 +356,44 @@
   box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.12);
 }
 
+.auth-register-password-meter {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  margin-top: -4px;
+}
+
+.auth-register-password-meter span {
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--border-light);
+}
+
+.auth-register-password-meter[data-strength="1"] [data-filled="true"] {
+  background: var(--red-accent);
+}
+
+.auth-register-password-meter[data-strength="2"] [data-filled="true"] {
+  background: var(--orange-accent);
+}
+
+.auth-register-password-meter[data-strength="3"] [data-filled="true"] {
+  background: var(--green-money);
+}
+
+.auth-styled-input[aria-invalid="true"] {
+  border-color: var(--red-accent);
+}
+
+.auth-styled-input[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+}
+
+.auth-native-check[aria-invalid="true"] {
+  outline: 1px solid var(--red-accent);
+  outline-offset: 1px;
+}
+
 .auth-styled-input.has-eye-btn {
   padding-right: 44px;
 }

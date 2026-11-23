@@ -20,12 +20,12 @@ describe('StoreInfoTab & EditStoreInfoModal', () => {
     );
 
     expect(screen.getByText('Thông tin gian hàng')).toBeInTheDocument();
-    expect(screen.getByText('Hồ sơ định danh chuỗi')).toBeInTheDocument();
-    expect(screen.getByText('Cập nhật thông tin')).toBeInTheDocument();
-    expect(screen.getByText('Lưu thay đổi')).toBeInTheDocument();
+    expect(screen.getByText('Thông tin cửa hàng')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Tên cửa hàng *' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeDisabled();
   });
 
-  it('opens EditStoreInfoModal when clicking "Cập nhật thông tin"', async () => {
+  it('edits store information directly on the page', async () => {
     const mockUpdate = vi.fn().mockResolvedValue(true);
     render(
       <StoreInfoTab
@@ -34,11 +34,8 @@ describe('StoreInfoTab & EditStoreInfoModal', () => {
       />
     );
 
-    const updateBtn = screen.getByText('Cập nhật thông tin');
-    fireEvent.click(updateBtn);
-
-    expect(screen.getByRole('heading', { level: 2, name: /Thông tin gian hàng/i })).toBeInTheDocument();
-    expect(screen.getByText('Cập nhật tên chuỗi cửa hàng, mã số thuế, hotline và địa chỉ trụ sở chính.')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tên cửa hàng *' }), { target: { value: 'Cửa hàng mới' } });
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeEnabled();
   });
 
   it('submits update successfully and calls onUpdateStoreInfo', async () => {
@@ -50,13 +47,36 @@ describe('StoreInfoTab & EditStoreInfoModal', () => {
       />
     );
 
-    const saveBtn = screen.getByText('Lưu thay đổi');
+    const saveBtn = screen.getByRole('button', { name: 'Lưu thay đổi' });
+    expect(saveBtn).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tên cửa hàng *' }), { target: { value: 'Cửa hàng mới' } });
     fireEvent.click(saveBtn);
 
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalled();
-      expect(screen.getByText(/Cập nhật thông tin gian hàng thành công!/i)).toBeInTheDocument();
+      expect(screen.getByText(/Cập nhật thông tin cửa hàng thành công!/i)).toBeInTheDocument();
     });
+  });
+
+  it.each([
+    ['Tên cửa hàng *', ' A ', 'Tên cửa hàng phải có ít nhất 2 ký tự.'],
+    ['Tên cửa hàng *', '  ', 'Vui lòng nhập tên cửa hàng.'],
+    ['Tên cửa hàng *', 'a'.repeat(151), 'Tên cửa hàng tối đa 150 ký tự.'],
+    ['Số điện thoại liên hệ', '01234567', 'Số điện thoại phải có 9–12 chữ số, có thể bắt đầu bằng +.'],
+    ['Mã số thuế', '0'.repeat(51), 'Mã số thuế tối đa 50 ký tự.'],
+    ['Tỉnh / Thành phố', 'a'.repeat(101), 'Tỉnh / Thành phố tối đa 100 ký tự.'],
+    ['Địa chỉ', 'a'.repeat(256), 'Địa chỉ tối đa 255 ký tự.'],
+  ])('shows an inline error for %s and blocks saving', (label, value, message) => {
+    const mockUpdate = vi.fn();
+    render(<StoreInfoTab storeInfo={INITIAL_STORE_INFO} onUpdateStoreInfo={mockUpdate} />);
+
+    const input = screen.getByRole('textbox', { name: label });
+    fireEvent.change(input, { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
+
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription(message);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('StoreSettingsHubPage renders StoreInfoTab when tab=store-info', async () => {
@@ -96,7 +116,7 @@ describe('StoreInfoTab & EditStoreInfoModal', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 2, name: /Thông tin gian hàng/i })).toBeInTheDocument();
     });
-    expect(screen.getByText('Hồ sơ định danh chuỗi')).toBeInTheDocument();
+    expect(screen.getByText('Thông tin cửa hàng')).toBeInTheDocument();
   });
 
   it('mapBackendStoreToFrontend sets daysRemaining=0 when unselected, and SubscriptionPricingCards does not mark PRO when ELIGIBLE', async () => {

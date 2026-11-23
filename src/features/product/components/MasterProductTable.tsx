@@ -22,22 +22,28 @@ type SortDirection = 'asc' | 'desc';
 
 const thBaseStyle: CSSProperties = {
   backgroundColor: '#f8fafc',
-  padding: '10px 12px',
-  fontSize: 12,
+  padding: '6px 5px',
+  fontSize: 10.5,
   fontWeight: 700,
   color: '#334155',
   textTransform: 'uppercase',
-  letterSpacing: '0.03em',
+  letterSpacing: '0.01em',
   whiteSpace: 'nowrap',
+  lineHeight: 1.2,
   boxSizing: 'border-box',
+  borderBottom: '1px solid #cbd5e1',
+  userSelect: 'none',
 };
 
-const ellipsisStyle: CSSProperties = {
-  display: 'block',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+/** Dense: xuống dòng thay vì cắt … — đồng bộ SP theo cửa hàng */
+const cellTextStyle: CSSProperties = {
+  display: 'inline-block',
   maxWidth: '100%',
+  whiteSpace: 'normal',
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
+  lineHeight: 1.35,
+  fontSize: 11,
 };
 
 type UnitChip = { name: string; isPurchase: boolean; sellingPrice: number };
@@ -84,7 +90,7 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
   onOpenCreate,
 }) => {
   const showCost = userRole === 'StoreOwner';
-  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortField, setSortField] = useState<SortField | null>('sku');
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
 
   const headerRef = useRef<HTMLDivElement>(null);
@@ -108,37 +114,34 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
   const sortedProducts = useMemo(() => {
     if (!sortField) return products;
     return [...products].sort((a, b) => {
-      let valA: string | number = '';
-      let valB: string | number = '';
+      let cmp = 0;
       switch (sortField) {
         case 'sku':
-          valA = (a.productCode || '').toLowerCase();
-          valB = (b.productCode || '').toLowerCase();
+          cmp = (a.productCode || '').localeCompare(b.productCode || '', undefined, {
+            numeric: true,
+            sensitivity: 'base',
+          });
           break;
         case 'name':
-          valA = (a.productName || '').toLowerCase();
-          valB = (b.productName || '').toLowerCase();
+          cmp = (a.productName || '').localeCompare(b.productName || '', 'vi', { sensitivity: 'base' });
           break;
         case 'sellingPrice':
-          valA = a.sellingPrice ?? 0;
-          valB = b.sellingPrice ?? 0;
+          cmp = (a.sellingPrice ?? 0) - (b.sellingPrice ?? 0);
           break;
         case 'costPrice':
-          valA = a.costPrice ?? 0;
-          valB = b.costPrice ?? 0;
+          cmp = (a.costPrice ?? 0) - (b.costPrice ?? 0);
           break;
         case 'status':
-          valA = a.status;
-          valB = b.status;
+          cmp = (a.status || '').localeCompare(b.status || '');
           break;
-        case 'createdAt':
-          valA = a.rawCreatedAt ? new Date(a.rawCreatedAt).getTime() : 0;
-          valB = b.rawCreatedAt ? new Date(b.rawCreatedAt).getTime() : 0;
+        case 'createdAt': {
+          const timeA = a.rawCreatedAt ? new Date(a.rawCreatedAt).getTime() : 0;
+          const timeB = b.rawCreatedAt ? new Date(b.rawCreatedAt).getTime() : 0;
+          cmp = timeA - timeB;
           break;
+        }
       }
-      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
-      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
-      return 0;
+      return sortDir === 'asc' ? cmp : -cmp;
     });
   }, [products, sortField, sortDir]);
 
@@ -193,8 +196,15 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
 
   const colSpan = showCost ? 11 : 10;
 
+  const sortIcon = (field: SortField) => (
+    <ArrowUpDown
+      size={11}
+      style={{ color: sortField === field ? '#0f766e' : '#94a3b8', flexShrink: 0 }}
+    />
+  );
+
   return (
-    <div className="so-list-table-card so-list-table-card--fit">
+    <div className="so-list-table-card so-list-table-card--fit so-list-table-card--dense">
       <div
         ref={headerRef}
         className="so-list-table-head"
@@ -208,20 +218,22 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>Ảnh</th>
               <th
                 onClick={() => handleSort('sku')}
-                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo mã hàng"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <span>Mã hàng</span>
-                  <ArrowUpDown size={12} color={sortField === 'sku' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('sku')}
                 </div>
               </th>
               <th
                 onClick={() => handleSort('name')}
-                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo tên hàng hóa"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên hàng hóa</span>
-                  <ArrowUpDown size={12} color={sortField === 'name' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Tên hàng</span>
+                  {sortIcon('name')}
                 </div>
               </th>
               <th style={thBaseStyle}>
@@ -232,43 +244,71 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
               </th>
               <th
                 onClick={() => handleSort('sellingPrice')}
-                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer' }}
+                title="Sắp xếp theo giá bán"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
                   <span>Giá bán / khay</span>
-                  <ArrowUpDown size={12} color={sortField === 'sellingPrice' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('sellingPrice')}
                 </div>
               </th>
               {showCost && (
                 <th
                   onClick={() => handleSort('costPrice')}
-                  style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                  style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer' }}
+                  title="Sắp xếp theo giá vốn"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      gap: 3,
+                      width: '100%',
+                    }}
+                  >
                     <span>Giá vốn</span>
-                    <ArrowUpDown size={12} color={sortField === 'costPrice' ? '#0f766e' : '#94a3b8'} />
+                    {sortIcon('costPrice')}
                   </div>
                 </th>
               )}
               <th
                 onClick={() => handleSort('status')}
-                style={{ ...thBaseStyle, textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, textAlign: 'center', cursor: 'pointer' }}
+                title="Sắp xếp theo trạng thái"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
                   <span>Trạng thái</span>
-                  <ArrowUpDown size={12} color={sortField === 'status' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('status')}
                 </div>
               </th>
               <th
                 onClick={() => handleSort('createdAt')}
-                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo ngày tạo"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <span>Ngày tạo</span>
-                  <ArrowUpDown size={12} color={sortField === 'createdAt' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('createdAt')}
                 </div>
               </th>
-              <th style={{ ...thBaseStyle, textAlign: 'right' }}>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>
                 <span>Thao tác</span>
               </th>
             </tr>
@@ -313,14 +353,29 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
                   <tr
                     key={p.id}
                     style={{
-                      backgroundColor: p.status === 'Discontinued' ? '#f8fafc' : undefined,
-                      opacity: p.status === 'Discontinued' ? 0.75 : 1,
+                      backgroundColor: p.status === 'Discontinued' || p.status === 'Inactive' ? '#f8fafc' : undefined,
+                      opacity: p.status === 'Discontinued' || p.status === 'Inactive' ? 0.75 : 1,
                     }}
                   >
-                    <td style={{ textAlign: 'center', padding: '10px 6px', color: '#64748b', fontWeight: 600 }}>
+                    <td
+                      style={{
+                        textAlign: 'center',
+                        padding: '5px 6px',
+                        color: '#64748b',
+                        fontWeight: 600,
+                        fontSize: 11,
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
                       {stt}
                     </td>
-                    <td style={{ textAlign: 'center', padding: '10px 6px' }}>
+                    <td
+                      style={{
+                        textAlign: 'center',
+                        padding: '5px 4px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
                       {p.imageUrl ? (
                         <img
                           src={p.imageUrl}
@@ -345,7 +400,7 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 10,
+                            fontSize: 9,
                             color: '#94a3b8',
                           }}
                         >
@@ -353,23 +408,26 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
                         </div>
                       )}
                     </td>
-                    <td style={{ padding: '10px 12px' }}>
+                    <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         className="product-code-link"
-                        style={{ ...ellipsisStyle, fontWeight: 700, color: '#0f766e' }}
+                        style={{ ...cellTextStyle, fontWeight: 700, color: '#0f766e' }}
                         title={p.productCode}
                       >
                         {p.productCode}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <span style={{ ...ellipsisStyle, fontWeight: 600, color: '#1e293b' }} title={p.productName}>
+                    <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9' }}>
+                      <span
+                        style={{ ...cellTextStyle, fontWeight: 600, color: '#1e293b' }}
+                        title={p.productName}
+                      >
                         {p.productName}
                         {p.isCombo ? ' · Combo' : ''}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12.5 }}>
-                      <span style={ellipsisStyle} title={unitsTitle}>
+                    <td style={{ padding: '5px 6px', fontSize: 11, borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={cellTextStyle} title={unitsTitle}>
                         {unitChips.map((u, i) => (
                           <span key={`${u.name}-${i}`}>
                             {i > 0 ? ' · ' : ''}
@@ -387,45 +445,76 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
                         ))}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                    <td
+                      style={{
+                        textAlign: 'center',
+                        padding: '5px 6px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
                       {p.hasBatches ? (
                         <span
                           style={{
                             display: 'inline-flex',
-                            fontSize: 11.5,
+                            fontSize: 10.5,
                             fontWeight: 700,
                             color: '#1d4ed8',
                             background: '#eff6ff',
                             border: '1px solid #bfdbfe',
-                            padding: '3px 8px',
+                            padding: '2px 6px',
                             borderRadius: 999,
                           }}
                         >
                           Có
                         </span>
                       ) : (
-                        <span style={{ color: '#94a3b8' }}>—</span>
+                        <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'right', padding: '10px 12px', fontWeight: 600, color: '#1e293b' }}>
-                      <span style={{ ...ellipsisStyle, textAlign: 'right' }} title={priceTitle}>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        padding: '5px 6px',
+                        fontWeight: 600,
+                        color: '#1e293b',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      <span style={{ ...cellTextStyle, textAlign: 'right' }} title={priceTitle}>
                         {priceTitle}
                       </span>
                     </td>
                     {showCost && (
-                      <td style={{ textAlign: 'right', padding: '10px 12px', color: '#64748b' }}>
-                        <span style={{ ...ellipsisStyle, textAlign: 'right' }} title={costTitle || undefined}>
+                      <td
+                        style={{
+                          textAlign: 'right',
+                          padding: '5px 6px',
+                          color: '#64748b',
+                          borderBottom: '1px solid #f1f5f9',
+                        }}
+                      >
+                        <span
+                          style={{ ...cellTextStyle, textAlign: 'right' }}
+                          title={costTitle || undefined}
+                        >
                           {costTitle || '—'}
                         </span>
                       </td>
                     )}
-                    <td style={{ textAlign: 'center', padding: '10px 8px' }}>
+                    <td
+                      className="so-list-td--status"
+                      style={{
+                        textAlign: 'center',
+                        padding: '5px 6px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
                       <span
                         style={{
                           display: 'inline-flex',
-                          fontSize: 11.5,
+                          fontSize: 10.5,
                           fontWeight: 600,
-                          padding: '3px 8px',
+                          padding: '2px 8px',
                           borderRadius: 9999,
                           backgroundColor: p.status === 'Active' ? '#f0fdf4' : '#f8fafc',
                           color: p.status === 'Active' ? '#15803d' : '#64748b',
@@ -436,13 +525,27 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
                         {p.status === 'Active' ? 'Đang bán' : 'Ngừng KD'}
                       </span>
                     </td>
-                    <td style={{ padding: '10px 12px', fontSize: 12.5, color: '#64748b' }}>
-                      <span style={ellipsisStyle} title={p.createdAt}>
+                    <td
+                      style={{
+                        padding: '5px 6px',
+                        fontSize: 11,
+                        color: '#64748b',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      <span style={cellTextStyle} title={p.createdAt}>
                         {p.createdAt}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right', padding: '10px 12px' }}>
-                      <div className="so-list-actions">
+                    <td
+                      className="so-list-td--actions"
+                      style={{
+                        textAlign: 'center',
+                        padding: '5px 6px',
+                        borderBottom: '1px solid #f1f5f9',
+                      }}
+                    >
+                      <div className="so-list-actions" style={{ justifyContent: 'center' }}>
                         <button
                           type="button"
                           className="so-list-action-btn"
@@ -450,8 +553,8 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
                           aria-label={`Chỉnh sửa ${p.productName}`}
                           onClick={() => onEdit(p)}
                         >
-                          <Edit3 size={12} />
-                          <span>Chỉnh sửa</span>
+                          <Edit3 size={11} />
+                          <span>Sửa</span>
                         </button>
                       </div>
                     </td>

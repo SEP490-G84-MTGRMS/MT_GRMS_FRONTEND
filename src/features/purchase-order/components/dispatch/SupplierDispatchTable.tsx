@@ -27,46 +27,34 @@ type SortDirection = 'asc' | 'desc';
 function cutoffSingleLine(supplier: SupplierDispatchGroup): {
   text: string;
   color: string;
-  background: string;
-  border: string;
 } {
   if (supplier.status === 'dispatched') {
     return {
       text: `${supplier.cutoffTimeStr || '—'} · Đã gửi PO`,
       color: '#15803d',
-      background: '#dcfce7',
-      border: '1px solid #86efac',
     };
   }
   if (!(supplier.branchesWithQty || supplier.skuCount)) {
     return {
       text: 'Chưa có số lượng',
       color: '#64748b',
-      background: '#f8fafc',
-      border: '1px solid #e2e8f0',
     };
   }
   if (supplier.urgency === 'critical') {
     return {
       text: `${supplier.cutoffTimeStr} · Khẩn cấp · ${supplier.countdownDisplay}`,
       color: '#b91c1c',
-      background: '#fee2e2',
-      border: '1px solid #fecaca',
     };
   }
   if (supplier.urgency === 'today') {
     return {
       text: `${supplier.cutoffTimeStr} · ${supplier.countdownDisplay}`,
       color: '#b45309',
-      background: '#fef3c7',
-      border: '1px solid #fde68a',
     };
   }
   return {
     text: `${supplier.cutoffTimeStr || '—'} · ${supplier.countdownDisplay || 'Đợt tới'}`,
     color: '#334155',
-    background: '#f1f5f9',
-    border: '1px solid #e2e8f0',
   };
 }
 
@@ -281,14 +269,9 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
                     <td style={{ padding: '8px 12px' }}>
                       <span
                         style={{
-                          display: 'inline-block',
                           fontSize: 12,
                           fontWeight: 700,
                           color: cutoffTone.color,
-                          background: cutoffTone.background,
-                          border: cutoffTone.border,
-                          padding: '4px 8px',
-                          borderRadius: 4,
                           whiteSpace: 'nowrap',
                         }}
                       >

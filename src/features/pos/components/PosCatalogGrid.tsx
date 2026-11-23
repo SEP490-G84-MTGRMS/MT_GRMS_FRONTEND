@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { Package, Plus } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
 import type { Product, Category } from '../types/pos.types';
+import { formatPosStockLabel } from '../api/posOrderApi';
 
 interface Props {
   products: Product[];
@@ -78,11 +79,13 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
                 <div
                   key={prod.id}
                   className="pos-product-card"
-                  onClick={() => onAddToCart(prod)}
-                  role="button"
-                  tabIndex={0}
+                  onClick={() => { if (prod.quantityOnHand > 0) onAddToCart(prod); }}
+                  role={prod.quantityOnHand > 0 ? 'button' : undefined}
+                  tabIndex={prod.quantityOnHand > 0 ? 0 : -1}
+                  aria-disabled={prod.quantityOnHand <= 0}
+                  style={prod.quantityOnHand <= 0 ? { cursor: 'not-allowed' } : undefined}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
+                    if (prod.quantityOnHand > 0 && (e.key === 'Enter' || e.key === ' ')) {
                       e.preventDefault();
                       onAddToCart(prod);
                     }
@@ -117,14 +120,14 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
                       <span className="pos-product-fallback-text">{prod.baseUnit}</span>
                     </div>
 
-                    {/* Badge tồn kho */}
+                    {/* Badge tồn kho — ĐVT nhập, chỉ lô còn hạn (giống màn Lô) */}
                     {prod.quantityOnHand <= 15 ? (
                       <span className="pos-product-stock-tag low" title="Tồn kho thấp">
-                        Còn {prod.quantityOnHand}
+                        Còn {formatPosStockLabel(prod)}
                       </span>
                     ) : (
                       <span className="pos-product-stock-tag" title="Số lượng tồn kho">
-                        Tồn {prod.quantityOnHand}
+                        Tồn {formatPosStockLabel(prod)}
                       </span>
                     )}
 
@@ -132,11 +135,13 @@ export const PosCatalogGrid: FC<Props> = ({ products, categories, onAddToCart })
                     <button
                       type="button"
                       className="pos-product-floating-add-btn"
+                      disabled={prod.quantityOnHand <= 0}
+                      style={prod.quantityOnHand <= 0 ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
                       onClick={(e) => {
                         e.stopPropagation();
                         onAddToCart(prod);
                       }}
-                      title={`Thêm ${prod.name} vào hóa đơn`}
+                      title={prod.quantityOnHand <= 0 ? 'Sản phẩm đã hết tồn' : `Thêm ${prod.name} vào hóa đơn`}
                       aria-label={`Thêm ${prod.name} vào hóa đơn`}
                     >
                       <Plus size={16} strokeWidth={2.6} />

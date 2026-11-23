@@ -5,6 +5,7 @@ import type {
   DayColInfo,
   MatrixCellMap,
   MatrixCellData,
+  OrderMatrixDayStatus,
   OrderMatrixSupplierDeliveryConfig,
   SupplierDeliveryConfig,
   BranchOption,
@@ -135,10 +136,100 @@ export interface ExportMatrixExcelOptions {
   blankQty?: boolean;
   /** Map supplierId → mã NCC hiển thị trên cột Mã NCC */
   supplierCodeById?: Record<string, string>;
+  /** DayStatuses theo từng NCC — dùng tô màu cột ngày đúng từng sheet */
+  dayStatuses?: OrderMatrixDayStatus[];
   isCellEditable: (d: DayColInfo, product?: OrderMatrixProduct) => boolean;
 }
 
-const FIXED_COL_COUNT = 10; // STT..Đơn giá (đã gồm Mã NCC)
+/** Palette khớp purchase-order.css (thead ngày + brand teal). */
+const EXCEL_UI = {
+  brand: '0F766E',
+  brandSoft: 'F0FDFA',
+  brandBorder: '99F6E4',
+  metaText: '134E4A',
+  metaMuted: '64748B',
+  metaBg: 'F8FAFC',
+  theadBg: 'F1F5F9',
+  theadText: '1E293B',
+  theadBorder: 'CBD5E1',
+  openBg: 'ECFDF5',
+  openText: '047857',
+  openBorder: '10B981',
+  lockedBg: 'F1F5F9',
+  lockedText: '64748B',
+  lockedBorder: 'CBD5E1',
+  finalizedBg: 'E0F2FE',
+  finalizedText: '0369A1',
+  finalizedBorder: '38BDF8',
+  cutoffBg: 'FFFBEB',
+  cutoffText: 'B45309',
+  cutoffBorder: 'F59E0B',
+  offBg: 'F8FAFC',
+  offText: '94A3B8',
+  offBorder: 'E2E8F0',
+  qtyFillBg: 'EFF6FF',
+  qtyFillText: '1D4ED8',
+  disabledBg: 'F1F5F9',
+  totalBg: 'F0FDF4',
+  totalText: '047857',
+  footerBg: '1E293B',
+  footerDark: '0F172A',
+  footerGreen: '065F46',
+  borderCell: 'CBD5E1',
+  skuText: '0F766E',
+  nccText: '0F766E',
+  moqText: 'D97706',
+} as const;
+
+type DayHeaderPalette = { bg: string; text: string; border: string };
+
+function resolveDayHeaderPalette(
+  d: DayColInfo,
+  supplierId: string,
+  dayStatuses?: OrderMatrixDayStatus[]
+): DayHeaderPalette {
+  const ds = dayStatuses?.find(
+    (x) => x.supplierId === supplierId && x.deliveryDate === d.dateKey
+  );
+  const status = String(ds?.deliveryDateStatus || d.cutoffStatus || '').toUpperCase();
+
+  if (status === 'SUPPLIER_OFF' || (!ds && d.isOff)) {
+    return { bg: EXCEL_UI.offBg, text: EXCEL_UI.offText, border: EXCEL_UI.offBorder };
+  }
+  if (status === 'FINALIZED' || status === 'PO_GENERATED') {
+    return {
+      bg: EXCEL_UI.finalizedBg,
+      text: EXCEL_UI.finalizedText,
+      border: EXCEL_UI.finalizedBorder,
+    };
+  }
+  if (status === 'CUTOFF_DUE') {
+    return { bg: EXCEL_UI.cutoffBg, text: EXCEL_UI.cutoffText, border: EXCEL_UI.cutoffBorder };
+  }
+  if (status === 'LOCKED' || (!ds && d.isLocked)) {
+    return { bg: EXCEL_UI.lockedBg, text: EXCEL_UI.lockedText, border: EXCEL_UI.lockedBorder };
+  }
+  if (status === 'OPEN' || (!ds && !d.isLocked && !d.isOff)) {
+    return { bg: EXCEL_UI.openBg, text: EXCEL_UI.openText, border: EXCEL_UI.openBorder };
+  }
+  return { bg: EXCEL_UI.lockedBg, text: EXCEL_UI.lockedText, border: EXCEL_UI.lockedBorder };
+}
+
+function sanitizeExcelSheetName(raw: string, used: Set<string>): string {
+  const cleaned = (raw || 'NCC').replace(/[\\/?*\[\]]/g, '_').trim() || 'NCC';
+  let base = cleaned.slice(0, 31);
+  let candidate = base;
+  let i = 2;
+  while (used.has(candidate)) {
+    const suffix = `_${i}`;
+    candidate = `${base.slice(0, Math.max(1, 31 - suffix.length))}${suffix}`;
+    i += 1;
+  }
+  used.add(candidate);
+  return candidate;
+}
+
+const FIXED_COL_COUNT = 9; // STT..Giá nhập (đã gồm Mã NCC, không có Bội số)
 
 /** Qty hiển thị trên Excel — khớp OrderMatrixTable theo role. */
 export function resolveExportQty(
@@ -175,15 +266,10 @@ export function exportMatrixToExcel(
 ): void {
   const branchName = options.branch ? `${options.branch.name} (${options.branch.code})` : 'Tất cả chi nhánh';
   const branchId = options.branch ? options.branch.id : '';
-  const supplierName = options.supplier
-    ? `${options.supplier.name} (${options.supplier.code})`
-    : options.supplierId === 'ALL'
-    ? 'Tất cả nhà cung cấp'
-    : options.supplierId;
-  const supplierId = options.supplier ? options.supplier.id : options.supplierId;
   const isStoreOwner = options.isStoreOwner !== false;
   const blankQty = Boolean(options.blankQty);
   const codeById = options.supplierCodeById ?? {};
+  const dayStatuses = options.dayStatuses;
 
   const exportTime = dayjs().format('DD/MM/YYYY HH:mm:ss');
   const periodStr = `${dayjs(options.viewFrom).format('DD/MM/YYYY')} - ${dayjs(options.viewTo).format('DD/MM/YYYY')}`;
@@ -194,339 +280,414 @@ export function exportMatrixToExcel(
       ? products
       : products.filter((p) => p.supplierId === options.supplierId);
 
+  // Nhóm theo NCC — mỗi NCC một sheet (đúng bộ lọc đang hiển thị trên màn hình)
+  const groups = new Map<string, OrderMatrixProduct[]>();
+  relevantProducts.forEach((p) => {
+    const sid = p.supplierId || 'UNKNOWN';
+    const list = groups.get(sid);
+    if (list) list.push(p);
+    else groups.set(sid, [p]);
+  });
+
+  if (groups.size === 0) {
+    throw new Error('Không có sản phẩm nào để xuất Excel theo bộ lọc hiện tại.');
+  }
+
   const totalCols = FIXED_COL_COUNT + dayColumns.length + 2;
   const lastColIdx = totalCols - 1;
   const dayColStart = FIXED_COL_COUNT;
+  const fontBase = 'Segoe UI';
 
   const borderThin = {
-    top: { style: 'thin', color: { rgb: 'CBD5E1' } },
-    bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
-    left: { style: 'thin', color: { rgb: 'CBD5E1' } },
-    right: { style: 'thin', color: { rgb: 'CBD5E1' } },
-  };
-
-  const borderHeader = {
-    top: { style: 'thin', color: { rgb: '60A5FA' } },
-    bottom: { style: 'medium', color: { rgb: '1E293B' } },
-    left: { style: 'thin', color: { rgb: '60A5FA' } },
-    right: { style: 'thin', color: { rgb: '60A5FA' } },
+    top: { style: 'thin', color: { rgb: EXCEL_UI.borderCell } },
+    bottom: { style: 'thin', color: { rgb: EXCEL_UI.borderCell } },
+    left: { style: 'thin', color: { rgb: EXCEL_UI.borderCell } },
+    right: { style: 'thin', color: { rgb: EXCEL_UI.borderCell } },
   };
 
   const borderDoubleBottom = {
     top: { style: 'thin', color: { rgb: '94A3B8' } },
-    bottom: { style: 'double', color: { rgb: '0F172A' } },
-    left: { style: 'thin', color: { rgb: 'CBD5E1' } },
-    right: { style: 'thin', color: { rgb: 'CBD5E1' } },
+    bottom: { style: 'double', color: { rgb: EXCEL_UI.footerDark } },
+    left: { style: 'thin', color: { rgb: EXCEL_UI.borderCell } },
+    right: { style: 'thin', color: { rgb: EXCEL_UI.borderCell } },
   };
 
-  const fontBase = 'Segoe UI';
-  const ws: any = {};
-  const merges: any[] = [];
-  const rowHeights: any[] = [];
+  const buildSupplierSheet = (
+    supplierId: string,
+    sheetProducts: OrderMatrixProduct[]
+  ): any => {
+    const nccCode =
+      codeById[supplierId] ||
+      sheetProducts[0]?.supplierName ||
+      options.supplier?.code ||
+      supplierId;
+    const nccName =
+      sheetProducts[0]?.supplierName ||
+      options.supplier?.name ||
+      nccCode;
+    const supplierLabel = `${nccName} (${nccCode})`;
 
-  const setCell = (r: number, c: number, val: any, type: 's' | 'n', style?: any) => {
-    const ref = XLSX.utils.encode_cell({ r, c });
-    ws[ref] = { v: val, t: type, s: style };
-  };
+    const ws: any = {};
+    const merges: any[] = [];
+    const rowHeights: any[] = [];
 
-  const setBannerRow = (r: number, text: string, style: any, heightPt: number) => {
-    for (let c = 0; c <= lastColIdx; c++) {
-      setCell(r, c, c === 0 ? text : '', 's', style);
-    }
-    merges.push({ s: { r, c: 0 }, e: { r, c: lastColIdx } });
-    rowHeights[r] = { hpt: heightPt };
-  };
+    const setCell = (r: number, c: number, val: any, type: 's' | 'n', style?: any) => {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      ws[ref] = { v: val, t: type, s: style };
+    };
 
-  setBannerRow(
-    0,
-    'HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS — ĐẶT HÀNG NHẬP KHO (PURCHASE ORDER MATRIX)',
-    {
-      font: { name: fontBase, sz: 14, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '1E3A8A' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-    },
-    36
-  );
+    const setBannerRow = (r: number, text: string, style: any, heightPt: number) => {
+      for (let c = 0; c <= lastColIdx; c++) {
+        setCell(r, c, c === 0 ? text : '', 's', style);
+      }
+      merges.push({ s: { r, c: 0 }, e: { r, c: lastColIdx } });
+      rowHeights[r] = { hpt: heightPt };
+    };
 
-  setBannerRow(
-    1,
-    `Chi nhánh: ${branchName}   |   Mã hệ thống: ${branchId}`,
-    {
-      font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: '1E3A8A' } },
-      fill: { fgColor: { rgb: 'F0F9FF' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: { bottom: { style: 'thin', color: { rgb: 'BAE6FD' } } },
-    },
-    22
-  );
+    setBannerRow(
+      0,
+      'HỆ THỐNG QUẢN LÝ BÁN LẺ MT-GRMS — ĐẶT HÀNG NHẬP KHO (PURCHASE ORDER MATRIX)',
+      {
+        font: { name: fontBase, sz: 14, bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: EXCEL_UI.brand } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+      },
+      36
+    );
 
-  setBannerRow(
-    2,
-    `Nhà cung cấp: ${supplierName}   |   Mã NCC: ${supplierId}   |   Kỳ đặt hàng: ${periodStr}`,
-    {
-      font: { name: fontBase, sz: 10, color: { rgb: '334155' } },
-      fill: { fgColor: { rgb: 'F0F9FF' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: { bottom: { style: 'thin', color: { rgb: 'BAE6FD' } } },
-    },
-    22
-  );
+    setBannerRow(
+      1,
+      `Chi nhánh: ${branchName}   |   Mã hệ thống: ${branchId}`,
+      {
+        font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: EXCEL_UI.metaText } },
+        fill: { fgColor: { rgb: EXCEL_UI.brandSoft } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: { bottom: { style: 'thin', color: { rgb: EXCEL_UI.brandBorder } } },
+      },
+      22
+    );
 
-  setBannerRow(
-    3,
-    `Thời gian xuất: ${exportTime}   |   Người lập: ${exportedBy}   |   Tổng số: ${relevantProducts.length} mặt hàng`,
-    {
-      font: { name: fontBase, sz: 9.5, italic: true, color: { rgb: '64748B' } },
-      fill: { fgColor: { rgb: 'F8FAFC' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: { bottom: { style: 'thin', color: { rgb: 'CBD5E1' } } },
-    },
-    20
-  );
+    setBannerRow(
+      2,
+      `Nhà cung cấp: ${supplierLabel}   |   Mã NCC: ${nccCode}   |   Kỳ đặt hàng: ${periodStr}`,
+      {
+        font: { name: fontBase, sz: 10, color: { rgb: '334155' } },
+        fill: { fgColor: { rgb: EXCEL_UI.brandSoft } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: { bottom: { style: 'thin', color: { rgb: EXCEL_UI.brandBorder } } },
+      },
+      22
+    );
 
-  for (let c = 0; c <= lastColIdx; c++) {
-    setCell(4, c, '', 's', {});
-  }
-  rowHeights[4] = { hpt: 10 };
-
-  const headerRowIdx = 5;
-  rowHeights[headerRowIdx] = { hpt: 32 };
-
-  const fixedHeaders = [
-    { text: 'STT', wch: 6 },
-    { text: 'Ngành hàng', wch: 15 },
-    { text: 'Mã vạch', wch: 16 },
-    { text: 'Mã sản phẩm', wch: 18 },
-    { text: 'Mã NCC', wch: 14 },
-    { text: 'Tên sản phẩm', wch: 34 },
-    { text: 'DVN', wch: 9 },
-    { text: 'MOQ', wch: 8 },
-    { text: 'Bội số', wch: 8 },
-    { text: 'Đơn giá (VNĐ)', wch: 14 },
-  ];
-
-  fixedHeaders.forEach((h, c) => {
-    setCell(headerRowIdx, c, h.text, 's', {
-      font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '1E40AF' } },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-      border: borderHeader,
-    });
-  });
-
-  dayColumns.forEach((d, i) => {
-    const colIdx = dayColStart + i;
-    const isLocked =
-      d.isLocked ||
-      d.isOff ||
-      d.cutoffStatus === 'PO_GENERATED' ||
-      d.cutoffStatus === 'LOCKED' ||
-      d.cutoffStatus === 'SUPPLIER_OFF';
-    setCell(headerRowIdx, colIdx, `${d.dowName} ${d.dateShort}\n[${d.dateKey}]`, 's', {
-      font: { name: fontBase, sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: isLocked ? '475569' : '2563EB' } },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-      border: borderHeader,
-    });
-  });
-
-  setCell(headerRowIdx, dayColStart + dayColumns.length, 'Tổng SL', 's', {
-    font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
-    fill: { fgColor: { rgb: '065F46' } },
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border: borderHeader,
-  });
-
-  setCell(headerRowIdx, dayColStart + dayColumns.length + 1, 'Thành tiền (VNĐ)', 's', {
-    font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
-    fill: { fgColor: { rgb: '065F46' } },
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border: borderHeader,
-  });
-
-  let currentRowIdx = 6;
-  const dayTotals: number[] = new Array(dayColumns.length).fill(0);
-  let grandTotalQty = 0;
-  let grandTotalAmt = 0;
-
-  relevantProducts.forEach((p, idx) => {
-    rowHeights[currentRowIdx] = { hpt: 22 };
-    const isOdd = idx % 2 === 1;
-    const bgRowColor = isOdd ? 'F8FAFC' : 'FFFFFF';
-    let rowQty = 0;
-    const nccCode = codeById[p.supplierId] || p.supplierName || p.supplierId || '';
-
-    const baseStyle = (extra: any = {}) => ({
-      font: { name: fontBase, sz: 10, color: { rgb: '334155' } },
-      fill: { fgColor: { rgb: bgRowColor } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderThin,
-      ...extra,
-    });
-
-    setCell(currentRowIdx, 0, idx + 1, 'n', baseStyle({ font: { name: fontBase, sz: 9.5, color: { rgb: '64748B' } } }));
-    setCell(currentRowIdx, 1, p.category || 'Tạp hóa', 's', baseStyle());
-    const barcodeStr = (p as any).barcode ? String((p as any).barcode) : '';
-    setCell(currentRowIdx, 2, barcodeStr, 's', baseStyle({ font: { name: 'Consolas', sz: 9.5, color: { rgb: '475569' } } }));
-    setCell(
-      currentRowIdx,
+    setBannerRow(
       3,
-      p.sku || '',
-      's',
-      baseStyle({ font: { name: 'Consolas', sz: 10, bold: true, color: { rgb: '0F766E' } } })
+      `Thời gian xuất: ${exportTime}   |   Người lập: ${exportedBy}   |   Tổng số: ${sheetProducts.length} mặt hàng`,
+      {
+        font: { name: fontBase, sz: 9.5, italic: true, color: { rgb: EXCEL_UI.metaMuted } },
+        fill: { fgColor: { rgb: EXCEL_UI.metaBg } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: { bottom: { style: 'thin', color: { rgb: EXCEL_UI.borderCell } } },
+      },
+      20
     );
-    setCell(currentRowIdx, 4, nccCode, 's', baseStyle({ font: { name: 'Consolas', sz: 9.5, bold: true, color: { rgb: '1E40AF' } } }));
+
+    for (let c = 0; c <= lastColIdx; c++) {
+      setCell(4, c, '', 's', {});
+    }
+    rowHeights[4] = { hpt: 10 };
+
+    const headerRowIdx = 5;
+    rowHeights[headerRowIdx] = { hpt: 32 };
+
+    const fixedHeaders = [
+      'STT',
+      'Ngành hàng',
+      'Mã vạch',
+      'Mã sản phẩm',
+      'Mã NCC',
+      'Tên sản phẩm',
+      'DVN',
+      'MOQ',
+      'Giá nhập',
+    ];
+
+    fixedHeaders.forEach((text, c) => {
+      setCell(headerRowIdx, c, text, 's', {
+        font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: EXCEL_UI.theadText } },
+        fill: { fgColor: { rgb: EXCEL_UI.theadBg } },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border: {
+          top: { style: 'thin', color: { rgb: EXCEL_UI.theadBorder } },
+          bottom: { style: 'medium', color: { rgb: EXCEL_UI.theadText } },
+          left: { style: 'thin', color: { rgb: EXCEL_UI.theadBorder } },
+          right: { style: 'thin', color: { rgb: EXCEL_UI.theadBorder } },
+        },
+      });
+    });
+
+    dayColumns.forEach((d, i) => {
+      const colIdx = dayColStart + i;
+      const palette = resolveDayHeaderPalette(d, supplierId, dayStatuses);
+      setCell(headerRowIdx, colIdx, `${d.dowName} ${d.dateShort}\n[${d.dateKey}]`, 's', {
+        font: { name: fontBase, sz: 10, bold: true, color: { rgb: palette.text } },
+        fill: { fgColor: { rgb: palette.bg } },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border: {
+          top: { style: 'thin', color: { rgb: palette.border } },
+          bottom: { style: 'medium', color: { rgb: palette.border } },
+          left: { style: 'thin', color: { rgb: palette.border } },
+          right: { style: 'thin', color: { rgb: palette.border } },
+        },
+      });
+    });
+
+    const totalHeaderStyle = {
+      font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: EXCEL_UI.footerGreen } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: EXCEL_UI.openBorder } },
+        bottom: { style: 'medium', color: { rgb: EXCEL_UI.theadText } },
+        left: { style: 'thin', color: { rgb: EXCEL_UI.openBorder } },
+        right: { style: 'thin', color: { rgb: EXCEL_UI.openBorder } },
+      },
+    };
+    setCell(headerRowIdx, dayColStart + dayColumns.length, 'Tổng SL', 's', totalHeaderStyle);
     setCell(
-      currentRowIdx,
-      5,
-      p.name || '',
+      headerRowIdx,
+      dayColStart + dayColumns.length + 1,
+      'Thành tiền (VNĐ)',
       's',
-      baseStyle({
-        font: { name: fontBase, sz: 10, bold: true, color: { rgb: '0F172A' } },
-        alignment: { horizontal: 'left', vertical: 'center' },
-      })
+      totalHeaderStyle
     );
-    setCell(currentRowIdx, 6, p.unit || 'Cái', 's', baseStyle());
-    setCell(currentRowIdx, 7, p.moq || 1, 'n', {
-      ...baseStyle({ font: { name: fontBase, sz: 10, bold: true, color: { rgb: 'D97706' } } }),
-      numFmt: '#,##0',
-    });
-    setCell(currentRowIdx, 8, p.orderMultiple || 1, 'n', { ...baseStyle(), numFmt: '#,##0' });
-    setCell(currentRowIdx, 9, p.price || 0, 'n', {
-      ...baseStyle({ alignment: { horizontal: 'right', vertical: 'center' } }),
-      numFmt: '#,##0',
-    });
 
-    dayColumns.forEach((d, dayIdx) => {
-      const colIdx = dayColStart + dayIdx;
-      const isEditable = options.isCellEditable(d, p);
-      const currentCell = getCellForExport(cellMap, p, d.dateKey);
-      const q = blankQty && isEditable ? 0 : resolveExportQty(currentCell, isStoreOwner);
+    let currentRowIdx = 6;
+    const dayTotals: number[] = new Array(dayColumns.length).fill(0);
+    let grandTotalQty = 0;
+    let grandTotalAmt = 0;
 
-      if (!isEditable) {
-        const displayVal = q > 0 ? q : '—';
-        setCell(currentRowIdx, colIdx, displayVal, typeof displayVal === 'number' ? 'n' : 's', {
-          font: {
-            name: fontBase,
-            sz: 10,
-            italic: displayVal === '—',
-            bold: displayVal !== '—',
-            color: { rgb: displayVal === '—' ? '94A3B8' : '64748B' },
-          },
-          fill: { fgColor: { rgb: 'F1F5F9' } },
-          alignment: { horizontal: 'center', vertical: 'center' },
-          border: borderThin,
-          numFmt: typeof displayVal === 'number' ? '#,##0' : undefined,
-        });
-        if (q > 0) {
+    sheetProducts.forEach((p, idx) => {
+      rowHeights[currentRowIdx] = { hpt: 22 };
+      const isOdd = idx % 2 === 1;
+      const bgRowColor = isOdd ? 'F8FAFC' : 'FFFFFF';
+      let rowQty = 0;
+      const rowNcc = codeById[p.supplierId] || p.supplierName || p.supplierId || '';
+
+      const baseStyle = (extra: any = {}) => ({
+        font: { name: fontBase, sz: 10, color: { rgb: '334155' } },
+        fill: { fgColor: { rgb: bgRowColor } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: borderThin,
+        ...extra,
+      });
+
+      setCell(
+        currentRowIdx,
+        0,
+        idx + 1,
+        'n',
+        baseStyle({ font: { name: fontBase, sz: 9.5, color: { rgb: '64748B' } } })
+      );
+      setCell(currentRowIdx, 1, p.category || 'Tạp hóa', 's', baseStyle());
+      const barcodeStr = (p as any).barcode ? String((p as any).barcode) : '';
+      setCell(
+        currentRowIdx,
+        2,
+        barcodeStr,
+        's',
+        baseStyle({ font: { name: 'Consolas', sz: 9.5, color: { rgb: '475569' } } })
+      );
+      setCell(
+        currentRowIdx,
+        3,
+        p.sku || '',
+        's',
+        baseStyle({
+          font: { name: 'Consolas', sz: 10, bold: true, color: { rgb: EXCEL_UI.skuText } },
+        })
+      );
+      setCell(
+        currentRowIdx,
+        4,
+        rowNcc,
+        's',
+        baseStyle({
+          font: { name: 'Consolas', sz: 9.5, bold: true, color: { rgb: EXCEL_UI.nccText } },
+        })
+      );
+      setCell(
+        currentRowIdx,
+        5,
+        p.name || '',
+        's',
+        baseStyle({
+          font: { name: fontBase, sz: 10, bold: true, color: { rgb: '0F172A' } },
+          alignment: { horizontal: 'left', vertical: 'center' },
+        })
+      );
+      setCell(currentRowIdx, 6, p.unit || 'Cái', 's', baseStyle());
+      setCell(currentRowIdx, 7, p.moq || 1, 'n', {
+        ...baseStyle({
+          font: { name: fontBase, sz: 10, bold: true, color: { rgb: EXCEL_UI.moqText } },
+        }),
+        numFmt: '#,##0',
+      });
+      setCell(currentRowIdx, 8, p.price || 0, 'n', {
+        ...baseStyle({ alignment: { horizontal: 'right', vertical: 'center' } }),
+        numFmt: '#,##0',
+      });
+
+      dayColumns.forEach((d, dayIdx) => {
+        const colIdx = dayColStart + dayIdx;
+        const isEditable = options.isCellEditable(d, p);
+        const currentCell = getCellForExport(cellMap, p, d.dateKey);
+        const q = blankQty && isEditable ? 0 : resolveExportQty(currentCell, isStoreOwner);
+
+        if (!isEditable) {
+          const displayVal = q > 0 ? q : '—';
+          setCell(currentRowIdx, colIdx, displayVal, typeof displayVal === 'number' ? 'n' : 's', {
+            font: {
+              name: fontBase,
+              sz: 10,
+              italic: displayVal === '—',
+              bold: displayVal !== '—',
+              color: { rgb: displayVal === '—' ? EXCEL_UI.offText : EXCEL_UI.lockedText },
+            },
+            fill: { fgColor: { rgb: EXCEL_UI.disabledBg } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: borderThin,
+            numFmt: typeof displayVal === 'number' ? '#,##0' : undefined,
+          });
+          if (q > 0) {
+            rowQty += q;
+            dayTotals[dayIdx] += q;
+          }
+        } else if (q > 0) {
           rowQty += q;
           dayTotals[dayIdx] += q;
+          setCell(currentRowIdx, colIdx, q, 'n', {
+            font: { name: fontBase, sz: 11, bold: true, color: { rgb: EXCEL_UI.qtyFillText } },
+            fill: { fgColor: { rgb: EXCEL_UI.qtyFillBg } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: borderThin,
+            numFmt: '#,##0',
+          });
+        } else {
+          setCell(currentRowIdx, colIdx, '', 's', {
+            fill: { fgColor: { rgb: bgRowColor } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: borderThin,
+          });
         }
-      } else if (q > 0) {
-        rowQty += q;
-        dayTotals[dayIdx] += q;
-        setCell(currentRowIdx, colIdx, q, 'n', {
-          font: { name: fontBase, sz: 11, bold: true, color: { rgb: '1D4ED8' } },
-          fill: { fgColor: { rgb: 'EFF6FF' } },
-          alignment: { horizontal: 'center', vertical: 'center' },
-          border: borderThin,
-          numFmt: '#,##0',
-        });
-      } else {
-        setCell(currentRowIdx, colIdx, '', 's', {
-          fill: { fgColor: { rgb: bgRowColor } },
-          alignment: { horizontal: 'center', vertical: 'center' },
-          border: borderThin,
-        });
-      }
+      });
+
+      const rowAmt = rowQty * (p.price || 0);
+      grandTotalQty += rowQty;
+      grandTotalAmt += rowAmt;
+
+      setCell(currentRowIdx, dayColStart + dayColumns.length, rowQty, 'n', {
+        font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: EXCEL_UI.totalText } },
+        fill: { fgColor: { rgb: EXCEL_UI.totalBg } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: borderThin,
+        numFmt: '#,##0',
+      });
+      setCell(currentRowIdx, dayColStart + dayColumns.length + 1, rowAmt, 'n', {
+        font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: EXCEL_UI.totalText } },
+        fill: { fgColor: { rgb: EXCEL_UI.totalBg } },
+        alignment: { horizontal: 'right', vertical: 'center' },
+        border: borderThin,
+        numFmt: '#,##0',
+      });
+
+      currentRowIdx++;
     });
 
-    const rowAmt = rowQty * (p.price || 0);
-    grandTotalQty += rowQty;
-    grandTotalAmt += rowAmt;
+    rowHeights[currentRowIdx] = { hpt: 26 };
+    for (let c = 0; c < FIXED_COL_COUNT; c++) {
+      setCell(currentRowIdx, c, c === 0 ? 'TỔNG CỘNG HÀNG NGÀY' : '', 's', {
+        font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: EXCEL_UI.footerBg } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: borderDoubleBottom,
+      });
+    }
+    merges.push({
+      s: { r: currentRowIdx, c: 0 },
+      e: { r: currentRowIdx, c: FIXED_COL_COUNT - 1 },
+    });
 
-    setCell(currentRowIdx, dayColStart + dayColumns.length, rowQty, 'n', {
-      font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: '047857' } },
-      fill: { fgColor: { rgb: 'F0FDF4' } },
+    dayColumns.forEach((_, dayIdx) => {
+      setCell(currentRowIdx, dayColStart + dayIdx, dayTotals[dayIdx], 'n', {
+        font: { name: fontBase, sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: EXCEL_UI.footerDark } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: borderDoubleBottom,
+        numFmt: '#,##0',
+      });
+    });
+
+    setCell(currentRowIdx, dayColStart + dayColumns.length, grandTotalQty, 'n', {
+      font: { name: fontBase, sz: 11.5, bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: EXCEL_UI.footerGreen } },
       alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderThin,
+      border: borderDoubleBottom,
       numFmt: '#,##0',
     });
-    setCell(currentRowIdx, dayColStart + dayColumns.length + 1, rowAmt, 'n', {
-      font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: '047857' } },
-      fill: { fgColor: { rgb: 'F0FDF4' } },
+    setCell(currentRowIdx, dayColStart + dayColumns.length + 1, grandTotalAmt, 'n', {
+      font: { name: fontBase, sz: 11.5, bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: EXCEL_UI.footerGreen } },
       alignment: { horizontal: 'right', vertical: 'center' },
-      border: borderThin,
-      numFmt: '#,##0',
-    });
-
-    currentRowIdx++;
-  });
-
-  rowHeights[currentRowIdx] = { hpt: 26 };
-  for (let c = 0; c < FIXED_COL_COUNT; c++) {
-    setCell(currentRowIdx, c, c === 0 ? 'TỔNG CỘNG HÀNG NGÀY' : '', 's', {
-      font: { name: fontBase, sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '1E293B' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
-      border: borderDoubleBottom,
-    });
-  }
-  merges.push({ s: { r: currentRowIdx, c: 0 }, e: { r: currentRowIdx, c: FIXED_COL_COUNT - 1 } });
-
-  dayColumns.forEach((_, dayIdx) => {
-    setCell(currentRowIdx, dayColStart + dayIdx, dayTotals[dayIdx], 'n', {
-      font: { name: fontBase, sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '0F172A' } },
-      alignment: { horizontal: 'center', vertical: 'center' },
       border: borderDoubleBottom,
       numFmt: '#,##0',
     });
-  });
 
-  setCell(currentRowIdx, dayColStart + dayColumns.length, grandTotalQty, 'n', {
-    font: { name: fontBase, sz: 11.5, bold: true, color: { rgb: 'FFFFFF' } },
-    fill: { fgColor: { rgb: '065F46' } },
-    alignment: { horizontal: 'center', vertical: 'center' },
-    border: borderDoubleBottom,
-    numFmt: '#,##0',
-  });
-  setCell(currentRowIdx, dayColStart + dayColumns.length + 1, grandTotalAmt, 'n', {
-    font: { name: fontBase, sz: 11.5, bold: true, color: { rgb: 'FFFFFF' } },
-    fill: { fgColor: { rgb: '065F46' } },
-    alignment: { horizontal: 'right', vertical: 'center' },
-    border: borderDoubleBottom,
-    numFmt: '#,##0',
-  });
-
-  const colWidths = [
-    { wch: 6 },
-    { wch: 15 },
-    { wch: 16 },
-    { wch: 18 },
-    { wch: 14 },
-    { wch: 36 },
-    { wch: 10 },
-    { wch: 9 },
-    { wch: 9 },
-    { wch: 15 },
-    ...dayColumns.map(() => ({ wch: 18 })),
-    { wch: 14 },
-    { wch: 20 },
-  ];
-
-  ws['!ref'] = XLSX.utils.encode_range({
-    s: { r: 0, c: 0 },
-    e: { r: currentRowIdx, c: lastColIdx },
-  });
-  ws['!merges'] = merges;
-  ws['!rows'] = rowHeights;
-  ws['!cols'] = colWidths;
-  ws['!freeze'] = { xSplit: 6, ySplit: 6 };
+    ws['!ref'] = XLSX.utils.encode_range({
+      s: { r: 0, c: 0 },
+      e: { r: currentRowIdx, c: lastColIdx },
+    });
+    ws['!merges'] = merges;
+    ws['!rows'] = rowHeights;
+    ws['!cols'] = [
+      { wch: 6 },
+      { wch: 15 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 24 }, // Mã NCC — rộng hơn để đọc mã dài
+      { wch: 36 },
+      { wch: 10 },
+      { wch: 9 },
+      { wch: 14 }, // Giá nhập
+      ...dayColumns.map(() => ({ wch: 18 })),
+      { wch: 14 },
+      { wch: 20 },
+    ];
+    ws['!freeze'] = { xSplit: 6, ySplit: 6 };
+    return ws;
+  };
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'PO_Matrix');
-  const cleanSup = options.supplier ? options.supplier.code : options.supplierId;
+  const usedSheetNames = new Set<string>();
+  const singleSheet = groups.size === 1;
+
+  groups.forEach((sheetProducts, supplierId) => {
+    const code =
+      codeById[supplierId] ||
+      sheetProducts[0]?.supplierName ||
+      options.supplier?.code ||
+      supplierId;
+    // 1 NCC → giữ tên PO_Matrix (tương thích import); nhiều NCC → tên theo mã NCC
+    const sheetName = singleSheet
+      ? sanitizeExcelSheetName('PO_Matrix', usedSheetNames)
+      : sanitizeExcelSheetName(String(code), usedSheetNames);
+    XLSX.utils.book_append_sheet(wb, buildSupplierSheet(supplierId, sheetProducts), sheetName);
+  });
+
+  const cleanSup = singleSheet
+    ? options.supplier?.code ||
+      codeById[[...groups.keys()][0]] ||
+      [...groups.keys()][0]
+    : `MultiNCC_${groups.size}`;
   const fileName = `PO_Matrix_${cleanSup}_${dayjs(options.viewFrom).format('YYYYMMDD')}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
@@ -573,7 +734,6 @@ export async function validateMatrixExcelFile(
     dayColumns,
     cellMap,
     qtyMap,
-    supplierConfigs,
     isCellEditable,
   } = context;
 
@@ -1245,16 +1405,10 @@ export async function validateMatrixExcelFile(
         return;
       }
 
-      // Lead time validation: minimum lead time >= 1 day (không cho giao hôm nay / quá khứ)
+      // Ngày giao quá khứ — không cho import (cutoff khóa hôm nay / tương lai)
       const base = baseDate ? dayjs(baseDate).startOf('day') : dayjs().startOf('day');
       const cellDeliveryDate = dayjs(dayCol.dateKey).startOf('day');
-      const leadTimeDays = cellDeliveryDate.diff(base, 'day');
-      const supConfig = supplierConfigs?.find((sc) => sc.supplierId === targetProduct.supplierId);
-      const configuredLeadDays =
-        supConfig && 'leadDays' in supConfig ? Number(supConfig.leadDays) || 1 : 1;
-      const minLead = Math.max(1, configuredLeadDays);
-
-      if (leadTimeDays < minLead) {
+      if (cellDeliveryDate.isBefore(base, 'day')) {
         result.errors.push({
           type: 'ERROR',
           row: rowNum,
@@ -1263,11 +1417,8 @@ export async function validateMatrixExcelFile(
           deliveryDate: dayCol.dateKey,
           dateLabel: `${dayCol.dowName} ${dayCol.dateShort}`,
           inputValue: numVal,
-          code: 'LEAD_TIME_NOT_MET',
-          message:
-            leadTimeDays <= 0
-              ? `Ngày giao hàng ${dayCol.dateKey} là ngày hôm nay hoặc trong quá khứ. Quy định đặt hàng yêu cầu lead time tối thiểu 1 ngày.`
-              : `Ngày giao hàng ${dayCol.dateKey} chỉ cách ${leadTimeDays} ngày, không đủ lead time tối thiểu (${minLead} ngày) của nhà cung cấp.`,
+          code: 'CUTOFF_PASSED',
+          message: `Ngày giao hàng ${dayCol.dateKey} đã qua — không thể đặt/sửa số lượng.`,
         });
         result.summary.errorCount++;
         return;

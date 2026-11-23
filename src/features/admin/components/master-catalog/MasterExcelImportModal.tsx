@@ -26,7 +26,12 @@ export const MasterExcelImportModal: FC<MasterExcelImportModalProps> = ({
   if (!isOpen) return null;
 
   const handleFileSelect = (file: File) => {
-    if (!file.name.endsWith('.xlsx')) {
+    setSelectedFile(null);
+    if (file.size === 0) {
+      setErrorMessage('Tệp Excel trống.');
+      return;
+    }
+    if (!file.name.toLowerCase().endsWith('.xlsx')) {
       setErrorMessage('Chỉ chấp nhận tệp định dạng Excel (.xlsx).');
       return;
     }
@@ -70,7 +75,7 @@ export const MasterExcelImportModal: FC<MasterExcelImportModalProps> = ({
         onImportSuccess();
       }
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Có lỗi xảy ra trong quá trình nạp tệp Excel.');
+      setErrorMessage(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra trong quá trình nạp tệp Excel.');
     } finally {
       setIsUploading(false);
     }

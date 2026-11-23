@@ -490,7 +490,7 @@ export const ApplyLockModal: FC<ApplyLockModalProps> = ({
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="Nhập nội dung giải trình phục vụ đối soát..."
                   required
-                  minLength={minReasonLength}
+                  maxLength={500} minLength={minReasonLength}
                   rows={4}
                   style={{
                     width: "100%",

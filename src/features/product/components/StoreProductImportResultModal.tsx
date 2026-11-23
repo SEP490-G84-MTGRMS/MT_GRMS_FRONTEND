@@ -159,12 +159,52 @@ export const StoreProductImportResultModal: FC<Props> = ({ isOpen, result, onClo
             </table>
           </div>
         </div>
-        {onConfirm && result.isPreview && ok && (
-          <footer style={{ padding: '12px 16px', textAlign: 'right', borderTop: '1px solid #e2e8f0' }}>
-            <button type="button" onClick={onConfirm} disabled={busy}
-              style={{ background: '#0f766e', color: 'white', border: 0, borderRadius: 8, padding: '8px 16px' }}>
-              {busy ? 'Đang áp dụng…' : 'Xác nhận cập nhật giá'}
+        {result.isPreview && (
+          <footer
+            style={{
+              padding: '12px 16px',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 10,
+              borderTop: '1px solid #e2e8f0',
+              background: '#f8fafc',
+            }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              style={{
+                background: '#fff',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
+                borderRadius: 8,
+                padding: '8px 16px',
+                fontWeight: 600,
+                cursor: busy ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Hủy
             </button>
+            {onConfirm && ok && (
+              <button
+                type="button"
+                onClick={onConfirm}
+                disabled={busy}
+                style={{
+                  background: '#0f766e',
+                  color: 'white',
+                  border: 0,
+                  borderRadius: 8,
+                  padding: '8px 16px',
+                  fontWeight: 600,
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                  opacity: busy ? 0.7 : 1,
+                }}
+              >
+                {busy ? 'Đang áp dụng…' : 'Xác nhận cập nhật giá'}
+              </button>
+            )}
           </footer>
         )}
       </div>

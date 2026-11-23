@@ -408,7 +408,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setImages(productToEdit.imageUrls && productToEdit.imageUrls.length > 0 ? productToEdit.imageUrls : (productToEdit.imageUrl ? [productToEdit.imageUrl] : []));
 
         setIsFavorite(Boolean(productToEdit.isFavorite));
-        setProductStatus(productToEdit.status === 'Discontinued' ? 'Discontinued' : 'Active');
+        setProductStatus(
+          productToEdit.status === 'Discontinued' || productToEdit.status === 'Inactive'
+            ? 'Discontinued'
+            : 'Active'
+        );
         setHasBatches(Boolean(productToEdit.hasBatches));
         setAllowRepack(Boolean(productToEdit.allowRepack));
         {

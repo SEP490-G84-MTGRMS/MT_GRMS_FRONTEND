@@ -22,7 +22,8 @@ export const ExtendGraceModal: FC<ExtendGraceModalProps> = ({
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    onSubmit(tenant, days, reason);
+    if (reason.trim().length < 10) return;
+    onSubmit(tenant, days, reason.trim());
     onClose();
   };
 
@@ -70,9 +71,9 @@ export const ExtendGraceModal: FC<ExtendGraceModalProps> = ({
                 Lý do giải trình gia hạn <span style={{ color: 'var(--red-accent)' }}>*</span>
               </label>
               <textarea
-                value={reason}
+                minLength={10} maxLength={500} value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Ví dụ: Khách hàng đang làm thủ tục ủy nhiệm chi qua Zalo..."
+                placeholder="Nhập lý do gia hạn (ít nhất 10 ký tự)"
                 required
                 rows={3}
                 style={{
@@ -92,7 +93,7 @@ export const ExtendGraceModal: FC<ExtendGraceModalProps> = ({
             <button type="button" className="admin-btn admin-btn-secondary" onClick={onClose}>
               Hủy bỏ
             </button>
-            <button type="submit" className="admin-btn admin-btn-primary">
+            <button disabled={reason.trim().length < 10} type="submit" className="admin-btn admin-btn-primary">
               Lưu Gia Hạn
             </button>
           </div>

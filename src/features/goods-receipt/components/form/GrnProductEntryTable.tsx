@@ -62,10 +62,10 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
         const nextReceived = targetItem.receivedQty + 1;
         onItemChange(targetItem.id, 'receivedQty', nextReceived);
 
-        setBarcodeAlert(`Đã quét SKU ${targetItem.productCode}: +1 cho "${targetItem.productName}"`);
+        setBarcodeAlert(`Đã quét mã ${targetItem.productCode}: +1 cho "${targetItem.productName}"`);
         setTimeout(() => setBarcodeAlert(null), 3000);
       } else {
-        setBarcodeAlert(`Không tìm thấy sản phẩm mã "${code}" trong đơn PO này!`);
+        setBarcodeAlert(`Không tìm thấy sản phẩm mã "${code}" trong đơn mua hàng này!`);
         setTimeout(() => setBarcodeAlert(null), 4000);
       }
       setBarcodeQuery('');
@@ -101,7 +101,21 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
     items.filter((it) => groupKey(it) === groupKey(row)).length > 1;
 
   return (
-    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+    <div
+      style={{
+        marginTop: 8,
+        padding: '12px 14px',
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        flex: 1,
+        overflow: 'hidden',
+        border: '1px solid #e2e8f0',
+        borderRadius: 8,
+        backgroundColor: '#ffffff',
+        boxSizing: 'border-box',
+      }}
+    >
       {/* Table Header Section */}
       <div
         style={{
@@ -138,7 +152,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
               fontWeight: 700,
             }}
           >
-            {items.length} SKU
+            {items.length} mặt hàng
           </span>
           {totalShortageQty > 0 && (
             <span
@@ -152,7 +166,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                 fontWeight: 700,
               }}
             >
-              Thiếu {totalShortageQty} so với PO — chọn lý do
+              Thiếu {totalShortageQty} so với đơn — chọn lý do
             </span>
           )}
         </div>
@@ -176,7 +190,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                 value={barcodeQuery}
                 onChange={(e) => setBarcodeQuery(e.target.value)}
                 onKeyDown={handleBarcodeKeyDown}
-                placeholder="Quét mã vạch hoặc gõ SKU, ấn Enter để nhận..."
+                placeholder="Quét mã vạch hoặc gõ mã hàng, ấn Enter để nhận..."
                 style={{
                   width: '100%',
                   height: 32,
@@ -220,22 +234,23 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
         </div>
       )}
 
-      {/* Table: fixed height + sticky header */}
+      {/* Chỉ scroll dọc trong danh sách — không scroll ngang */}
       <div
         style={{
           width: '100%',
           flex: 1,
-          minHeight: 360,
-          maxHeight: 'min(68vh, 640px)',
-          overflow: 'auto',
+          minHeight: 0,
+          overflowX: 'hidden',
+          overflowY: 'auto',
           border: '1px solid #e2e8f0',
-          borderRadius: 8,
+          borderRadius: '6px 6px 0 0',
+          borderBottom: items.length > 0 ? 'none' : '1px solid #e2e8f0',
         }}
       >
         <table
           style={{
             width: '100%',
-            minWidth: 1280,
+            tableLayout: 'fixed',
             borderCollapse: 'collapse',
             fontSize: 12,
             textAlign: 'left',
@@ -255,25 +270,25 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                 whiteSpace: 'nowrap',
               }}
             >
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 34, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>STT</th>
-              <th style={{ padding: '9px 10px', width: 90, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>MÃ SKU</th>
-              <th style={{ padding: '9px 10px', width: 300, minWidth: 300, maxWidth: 300, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
+              <th style={{ padding: '9px 4px', textAlign: 'center', width: '3%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>STT</th>
+              <th style={{ padding: '9px 6px', width: '7%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>MÃ HÀNG</th>
+              <th style={{ padding: '9px 6px', width: '14%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>
                 TÊN SẢN PHẨM
               </th>
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 72, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }} title="Đơn vị nhập">ĐVT nhập</th>
-              <th style={{ padding: '9px 8px', textAlign: 'right', width: 65, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>SL ĐẶT</th>
-              <th style={{ padding: '9px 8px', textAlign: 'right', width: 80, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THỰC NHẬN</th>
-              <th style={{ padding: '9px 8px', textAlign: 'right', width: 75, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THIẾU</th>
-              <th style={{ padding: '9px 10px', width: 180, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>LÝ DO THIẾU / TỪ CHỐI</th>
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 70, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>LỆCH PO</th>
-              <th style={{ padding: '9px 8px', textAlign: 'center', width: 88, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>QL BATCH</th>
-              <th style={{ padding: '9px 10px', width: 180, minWidth: 180, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>MÃ LÔ</th>
-              <th style={{ padding: '9px 10px', width: 120, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>NGÀY SX</th>
-              <th style={{ padding: '9px 10px', width: 125, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>HẠN SD</th>
-              <th style={{ padding: '9px 10px', textAlign: 'right', width: 90, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>ĐƠN GIÁ</th>
-              <th style={{ padding: '9px 12px', textAlign: 'right', width: 105, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THÀNH TIỀN</th>
+              <th style={{ padding: '9px 4px', textAlign: 'center', width: '5%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }} title="Đơn vị nhập">ĐVT nhập</th>
+              <th style={{ padding: '9px 4px', textAlign: 'right', width: '5%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>SL ĐẶT</th>
+              <th style={{ padding: '9px 4px', textAlign: 'right', width: '6%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THỰC NHẬN</th>
+              <th style={{ padding: '9px 4px', textAlign: 'right', width: '5%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THIẾU</th>
+              <th style={{ padding: '9px 6px', width: '10%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>LÝ DO THIẾU / TỪ CHỐI</th>
+              <th style={{ padding: '9px 4px', textAlign: 'center', width: '5%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>LỆCH ĐƠN</th>
+              <th style={{ padding: '9px 4px', textAlign: 'center', width: '6%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>QL LÔ</th>
+              <th style={{ padding: '9px 6px', width: '9%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>MÃ LÔ</th>
+              <th style={{ padding: '9px 6px', width: '7%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>NGÀY SX</th>
+              <th style={{ padding: '9px 6px', width: '7%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>HẠN SD</th>
+              <th style={{ padding: '9px 6px', textAlign: 'right', width: '6%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>ĐƠN GIÁ</th>
+              <th style={{ padding: '9px 6px', textAlign: 'right', width: '7%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THÀNH TIỀN</th>
               {!readOnly && (
-                <th style={{ padding: '9px 8px', textAlign: 'center', width: 72, position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THAO TÁC</th>
+                <th style={{ padding: '9px 4px', textAlign: 'center', width: '5%', position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f8fafc' }}>THAO TÁC</th>
               )}
             </tr>
           </thead>
@@ -291,7 +306,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     fontSize: 13,
                   }}
                 >
-                  Chưa có sản phẩm nào. Vui lòng chọn đơn đặt hàng PO để tải danh sách hàng hóa!
+                  Chưa có sản phẩm nào. Vui lòng chọn đơn mua hàng để tải danh sách hàng hóa!
                 </td>
               </tr>
             ) : (
@@ -314,7 +329,6 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                       borderBottom: '1px solid #f1f5f9',
                       backgroundColor: isShort ? '#fff5f5' : isMismatch ? '#fffbfb' : '#ffffff',
                       transition: 'background-color 0.15s ease',
-                      whiteSpace: 'nowrap',
                     }}
                   >
                     {/* 1. STT */}
@@ -335,13 +349,11 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     {/* 3. Tên sản phẩm */}
                     <td
                       style={{
-                        padding: '8px 10px',
+                        padding: '8px 6px',
                         fontWeight: 600,
                         color: '#0f172a',
-                        width: 300,
-                        minWidth: 300,
-                        maxWidth: 300,
                         whiteSpace: 'normal',
+                        overflowWrap: 'anywhere',
                         wordBreak: 'break-word',
                         lineHeight: 1.35,
                       }}
@@ -458,7 +470,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                             fontSize: 11,
                             border: '1px solid #fca5a5',
                           }}
-                          title={`Tổng các lô thiếu ${Math.abs(groupDiff)} so với PO`}
+                          title={`Tổng các lô thiếu ${Math.abs(groupDiff)} so với đơn mua hàng`}
                         >
                           <AlertTriangle size={11} />
                           {groupDiff}
@@ -491,7 +503,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                     </td>
 
                     {/* 12. Mã Lô */}
-                    <td style={{ padding: '6px 8px', width: 180, minWidth: 180 }}>
+                    <td style={{ padding: '6px 6px' }}>
                       {!manageBatch ? (
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
                       ) : (
@@ -500,10 +512,10 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                           value={row.batchCode || ''}
                           disabled={readOnly}
                           onChange={(e) => onItemChange(row.id, 'batchCode', e.target.value)}
-                          placeholder="BAT-..."
+                          placeholder="Nhập mã lô..."
                           style={{
                             width: '100%',
-                            minWidth: 160,
+                            maxWidth: '100%',
                             height: 28,
                             padding: '0 6px',
                             borderRadius: 4,
@@ -619,7 +631,7 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
                                 padding: 4,
                                 borderRadius: 4,
                               }}
-                              title="Tách lô (thêm dòng cùng SKU)"
+                              title="Tách lô (thêm dòng cùng mã hàng)"
                             >
                               <SplitSquareVertical size={14} />
                             </button>
@@ -650,65 +662,76 @@ export const GrnProductEntryTable: FC<GrnProductEntryTableProps> = ({
             )}
           </tbody>
 
-          {/* Footer Totals — khớp 15 cột (+1 Thao tác khi edit) */}
-          {items.length > 0 && (
-            <tfoot>
-              <tr
-                style={{
-                  backgroundColor: '#f8fafc',
-                  borderTop: '2px solid #cbd5e1',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  color: '#0f172a',
-                }}
-              >
-                {/* STT + SKU + Tên + ĐVT */}
-                <td colSpan={4} style={{ padding: '10px 10px', textAlign: 'right' }}>
-                  TỔNG CỘNG KIỂM ĐẾM:
-                </td>
-                {/* SL ĐẶT */}
-                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#475569' }}>
-                  {totalOrderedQty}
-                </td>
-                {/* THỰC NHẬN */}
-                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#0d9488' }}>
-                  {totalReceivedQty}
-                </td>
-                {/* THIẾU */}
-                <td
-                  style={{
-                    padding: '10px 8px',
-                    textAlign: 'right',
-                    color: totalShortageQty > 0 ? '#dc2626' : '#94a3b8',
-                  }}
-                >
-                  {totalShortageQty}
-                </td>
-                {/* Lý do + Lệch PO + QL Batch + Mã lô + Ngày SX + Hạn SD */}
-                <td colSpan={6} />
-                {/* ĐƠN GIÁ — nhãn tiền hàng */}
-                <td style={{ padding: '10px 8px', textAlign: 'right', color: '#64748b', fontWeight: 600 }}>
-                  Tiền hàng
-                </td>
-                {/* THÀNH TIỀN */}
-                <td
-                  style={{
-                    padding: '10px 12px',
-                    textAlign: 'right',
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                    color: '#0d9488',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {formatCurrency(totalGoodsAmount)}
-                </td>
-                {!readOnly && <td />}
-              </tr>
-            </tfoot>
-          )}
         </table>
       </div>
+
+      {/* Footer tổng — cố định đáy khối danh sách (không scroll theo bảng) */}
+      {items.length > 0 && (
+        <div
+          style={{
+            flexShrink: 0,
+            marginTop: 0,
+            borderTop: '2px solid #cbd5e1',
+            backgroundColor: '#f8fafc',
+            borderBottomLeftRadius: 6,
+            borderBottomRightRadius: 6,
+            padding: '10px 12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#0f172a',
+          }}
+        >
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 16,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span>TỔNG CỘNG KIỂM ĐẾM:</span>
+            <span style={{ color: '#475569', fontWeight: 600 }}>
+              SL đặt <strong style={{ color: '#0f172a' }}>{totalOrderedQty}</strong>
+            </span>
+            <span style={{ color: '#0d9488', fontWeight: 600 }}>
+              Thực nhận <strong>{totalReceivedQty}</strong>
+            </span>
+            <span
+              style={{
+                color: totalShortageQty > 0 ? '#dc2626' : '#94a3b8',
+                fontWeight: 600,
+              }}
+            >
+              Thiếu <strong>{totalShortageQty}</strong>
+            </span>
+          </div>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              marginLeft: 'auto',
+            }}
+          >
+            <span style={{ color: '#64748b', fontWeight: 600 }}>Tiền hàng</span>
+            <span
+              style={{
+                fontFamily: 'monospace',
+                fontSize: 13,
+                color: '#0d9488',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {formatCurrency(totalGoodsAmount)}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

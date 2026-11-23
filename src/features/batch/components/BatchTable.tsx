@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ClipboardCheck,
   ChefHat,
+  Tag,
 } from 'lucide-react';
 import type { BatchItem, BatchStatus } from '../types/batch.types';
 import { TablePagination } from '../../../components/common';
@@ -63,14 +64,17 @@ const formatCurrency = (val: number): string =>
 
 const thBaseStyle: CSSProperties = {
   backgroundColor: '#f8fafc',
-  padding: '10px 12px',
-  fontSize: 12,
+  padding: '6px 5px',
+  fontSize: 10.5,
   fontWeight: 700,
   color: '#334155',
   textTransform: 'uppercase',
-  letterSpacing: '0.03em',
+  letterSpacing: '0.01em',
   whiteSpace: 'nowrap',
+  lineHeight: 1.2,
   boxSizing: 'border-box',
+  borderBottom: '1px solid #cbd5e1',
+  userSelect: 'none',
 };
 
 export const BatchTable: FC<BatchTableProps> = ({
@@ -83,7 +87,7 @@ export const BatchTable: FC<BatchTableProps> = ({
   onPageChange,
   onPageSizeChange,
   onSelectBatch,
-  onDiscountClick: _onDiscountClick,
+  onDiscountClick,
   onWriteOffClick: _onWriteOffClick,
   onResetFilters,
 }) => {
@@ -201,29 +205,28 @@ export const BatchTable: FC<BatchTableProps> = ({
     }
   };
 
-  const tableMinWidth = 1480;
   const tableFitStyle: CSSProperties = {
-    minWidth: tableMinWidth,
+    // Giữ nhịp đọc ổn định ở màn hình nhỏ; màn hình rộng sẽ phân bổ theo colgroup.
+    minWidth: 1680,
     width: '100%',
     tableLayout: 'fixed',
   };
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: 148 }} />
-      <col style={{ width: 200 }} />
-      <col style={{ width: 110 }} />
-      <col style={{ width: 80 }} />
-      <col style={{ width: 130 }} />
-      <col style={{ width: 160 }} />
-      <col style={{ width: 90 }} />
-      <col style={{ width: 90 }} />
-      <col style={{ width: 84 }} />
-      <col style={{ width: 120 }} />
-      <col style={{ width: 140 }} />
-      <col style={{ width: 100 }} />
-      <col style={{ width: 92 }} />
-      <col style={{ width: 128 }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '5%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '7%' }} />
     </colgroup>
   );
 
@@ -241,9 +244,9 @@ export const BatchTable: FC<BatchTableProps> = ({
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '3px 10px',
+          padding: '2px 7px',
           borderRadius: 9999,
-          fontSize: 11.5,
+          fontSize: 10.5,
           fontWeight: 600,
           color: s.color,
           backgroundColor: s.bg,
@@ -318,13 +321,16 @@ export const BatchTable: FC<BatchTableProps> = ({
         }}
       >
         <span>{label}</span>
-        <ArrowUpDown size={12} color={sortField === field ? '#0f766e' : '#94a3b8'} />
+        <ArrowUpDown
+          size={11}
+          style={{ color: sortField === field ? '#0f766e' : '#94a3b8', flexShrink: 0 }}
+        />
       </div>
     </th>
   );
 
   return (
-    <div className="so-list-table-card so-list-table-card--wrap">
+    <div className="so-list-table-card so-list-table-card--dense so-list-table-card--wrap so-list-table-card--fit">
       <div
         ref={headerRef}
         className="so-list-table-head"
@@ -339,7 +345,6 @@ export const BatchTable: FC<BatchTableProps> = ({
               <SortTh field="batchCode" label="Mã lô" />
               <th style={thBaseStyle}>Vị trí kệ</th>
               <th style={thBaseStyle}>Chi nhánh</th>
-              <th style={thBaseStyle}>Nhà cung cấp</th>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>Ngày SX</th>
               <SortTh field="expiryDate" label="Hạn dùng" align="center" />
               <SortTh field="daysLeft" label="Còn (ngày)" align="right" />
@@ -356,7 +361,7 @@ export const BatchTable: FC<BatchTableProps> = ({
               />
               <SortTh field="costPrice" label="Giá vốn" align="right" />
               <SortTh field="status" label="Trạng thái" align="center" />
-              <th style={{ ...thBaseStyle, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>Thao tác</th>
             </tr>
           </thead>
         </table>
@@ -373,7 +378,7 @@ export const BatchTable: FC<BatchTableProps> = ({
             {sortedBatches.length === 0 ? (
               <tr>
                 <td
-                  colSpan={14}
+                  colSpan={13}
                   style={{
                     padding: '48px 16px',
                     textAlign: 'center',
@@ -411,8 +416,20 @@ export const BatchTable: FC<BatchTableProps> = ({
               sortedBatches.map((row) => {
                 return (
                   <tr key={row.id} className="so-list-row">
-                    <td style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, color: '#334155' }}>
-                      {row.sku}
+                    <td>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono, monospace)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: '#0f766e',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {row.sku}
+                      </span>
                     </td>
 
                     <td className="so-list-td--wrap">
@@ -428,7 +445,7 @@ export const BatchTable: FC<BatchTableProps> = ({
                         }}
                         title="Xem chi tiết lô"
                       >
-                        <div className="so-list-name" style={{ color: '#0d9488' }}>
+                        <div className="so-list-name" style={{ color: '#0f766e' }}>
                           {row.productName}
                         </div>
                       </button>
@@ -438,9 +455,12 @@ export const BatchTable: FC<BatchTableProps> = ({
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 700,
                           color: row.batchCode === '—' ? '#94a3b8' : '#0f172a',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.35,
                         }}
                       >
                         {row.batchCode}
@@ -451,23 +471,20 @@ export const BatchTable: FC<BatchTableProps> = ({
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: 600,
                           color: '#334155',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                          lineHeight: 1.35,
                         }}
                       >
                         {row.shelfLocation}
                       </span>
                     </td>
 
-                    <td style={{ color: '#475569', fontSize: 12 }}>
+                    <td style={{ color: '#475569', fontSize: 11, lineHeight: 1.35 }}>
                       {row.branchName}
-                    </td>
-
-                    <td className="so-list-td--wrap">
-                      <div className="so-list-name" style={{ fontWeight: 500 }}>
-                        {row.supplierName}
-                      </div>
                     </td>
 
                     <td style={{ textAlign: 'center', fontWeight: 500, color: row.mfgDate === '—' ? '#94a3b8' : '#334155' }}>
@@ -568,16 +585,30 @@ export const BatchTable: FC<BatchTableProps> = ({
                       style={{
                         textAlign: 'right',
                         fontFamily: 'monospace',
+                        fontSize: 11,
                         color: '#475569',
                       }}
                     >
                       {formatCurrency(row.costPrice)}
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>{renderStatusBadge(row.status)}</td>
+                    <td className="so-list-td--status" style={{ textAlign: 'center' }}>
+                      {renderStatusBadge(row.status)}
+                    </td>
 
-                    <td className="so-list-td--actions" style={{ textAlign: 'right' }}>
-                      <div className="so-list-actions">
+                    <td
+                      className="so-list-td--actions"
+                      style={{
+                        textAlign: 'center',
+                        overflow: 'visible',
+                        paddingLeft: 4,
+                        paddingRight: 4,
+                      }}
+                    >
+                      <div
+                        className="so-list-actions"
+                        style={{ justifyContent: 'center', gap: 4, flexWrap: 'nowrap' }}
+                      >
                         <button
                           type="button"
                           className="so-list-action-btn so-list-action-btn--icon so-list-action-btn--success"
@@ -585,8 +616,24 @@ export const BatchTable: FC<BatchTableProps> = ({
                           title="Chi tiết"
                           aria-label="Chi tiết"
                         >
-                          <Eye size={14} />
+                          <Eye size={13} />
                         </button>
+                        {row.status !== 'Expired' && (
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--icon"
+                            onClick={() => onDiscountClick(row)}
+                            title="Giảm giá FEFO"
+                            aria-label="Giảm giá FEFO"
+                            style={{
+                              color: '#1d4ed8',
+                              borderColor: '#bfdbfe',
+                              background: '#eff6ff',
+                            }}
+                          >
+                            <Tag size={14} />
+                          </button>
+                        )}
                         {onQuickStocktake && (
                           <button
                             type="button"
@@ -603,7 +650,7 @@ export const BatchTable: FC<BatchTableProps> = ({
                               borderColor: row.status === 'Expired' ? '#fecaca' : '#99f6e4',
                             }}
                           >
-                            <ClipboardCheck size={14} />
+                            <ClipboardCheck size={13} />
                           </button>
                         )}
                         {onProcessBatch && isKgBatch(row) && (
@@ -619,7 +666,7 @@ export const BatchTable: FC<BatchTableProps> = ({
                               background: '#fffbeb',
                             }}
                           >
-                            <ChefHat size={14} />
+                            <ChefHat size={13} />
                           </button>
                         )}
                       </div>

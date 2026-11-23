@@ -226,6 +226,7 @@ export const createServiceExpense = async (
     sellerTaxCode: data.sellerTaxCode || null,
     evidenceAttachmentUrl: data.attachedBillUrl || null,
     note: data.note || null,
+    dueDate: data.dueDate || null,
   };
 
   const res = await financeHttpClient.post<ApiResponse<any>>('/expenses', payload, {

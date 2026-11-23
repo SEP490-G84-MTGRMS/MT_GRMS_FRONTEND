@@ -2,6 +2,93 @@ import { httpClient } from '../../../api/httpClient';
 import { generateUuidV7 } from '../../../utils/uuid';
 import type { Product, Customer } from '../types/pos.types';
 
+/** Quy đổi tồn base → ĐVT nhập (giống màn Lô). */
+export const toPurchaseQty = (stockQty: number, rate?: number) => {
+  const r = Number(rate) > 0 ? Number(rate) : 1;
+  return Math.round((stockQty / r) * 1000) / 1000;
+};
+
+export const formatPosStockLabel = (product: Pick<Product, 'quantityOnHand' | 'baseUnit' | 'stockDisplayUnit' | 'purchaseToStockRate'>) => {
+  const rate = Number(product.purchaseToStockRate) > 0 ? Number(product.purchaseToStockRate) : 1;
+  const qty = toPurchaseQty(Number(product.quantityOnHand) || 0, rate);
+  const unit = (product.stockDisplayUnit || product.baseUnit || '').trim();
+  const qtyText = qty.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+  return unit ? `${qtyText} ${unit}` : qtyText;
+};
+
+const mapBranchProductToPos = (p: any): Product => {
+  const rawCategory = p.category;
+  const categoryId = p.categoryId ?? p.categoryID ?? (typeof rawCategory === 'object' ? rawCategory?.id : undefined);
+  const categoryName =
+    p.categoryName ||
+    p.category?.name ||
+    (typeof rawCategory === 'string' ? rawCategory : '') ||
+    'Chưa phân loại';
+
+  const unitPrices = Array.isArray(p.unitPrices)
+    ? p.unitPrices.map((u: any) => ({
+        unitId: u.unitId || u.id,
+        unitName: u.unitName,
+        conversionRate: Number(u.conversionRate ?? 1),
+        price: Number(u.price ?? 0),
+        isBaseUnit: Boolean(u.isBaseUnit),
+      }))
+    : undefined;
+
+  const stockUnit =
+    (p.stockUnit || unitPrices?.find((u: { isBaseUnit?: boolean }) => u.isBaseUnit)?.unitName || p.baseUnit || 'Cái').trim();
+  const displayUnit = (p.unit || p.stockDisplayUnit || stockUnit).trim();
+  let rate = Number(p.purchaseToStockRate ?? 0);
+  if (!(rate > 0) && unitPrices?.length) {
+    const matched = unitPrices.find(
+      (u: { unitName: string }) => String(u.unitName).trim().toLowerCase() === displayUnit.toLowerCase()
+    );
+    rate = Number(matched?.conversionRate) > 0 ? Number(matched?.conversionRate) : 1;
+  }
+  if (!(rate > 0)) rate = 1;
+
+  return {
+    id: p.productId || p.id,
+    sku: p.sku || p.productCode || '',
+    barcode: p.barcode || '',
+    name: p.name || p.productName || '',
+    imageUrl: p.imageUrl,
+    spec: '',
+    shelfLocation: p.shelfLocation,
+    category: String(categoryId ?? categoryName),
+    categoryName,
+    baseUnit: stockUnit,
+    stockDisplayUnit: displayUnit,
+    purchaseToStockRate: rate,
+    basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
+    costPrice: p.costPrice || 0,
+    quantityOnHand: Number(p.currentStock ?? p.quantityOnHand ?? 0),
+    unitPrices,
+  };
+};
+
+/**
+ * Endpoint sản phẩm theo chi nhánh có thể trả nhiều dòng cho cùng một sản phẩm
+ * (mỗi dòng tương ứng một nguồn NCC). POS chỉ bán theo ProductId, vì vậy phải
+ * gom lại trước khi hiển thị để ô tìm kiếm và danh mục Bán thường không bị lặp.
+ *
+ * Backend đã sắp xếp nguồn nhập theo giá hiệu lực tăng dần; giữ dòng đầu tiên
+ * giúp kết quả ổn định mà không làm thay đổi giá bán/tồn kho của sản phẩm.
+ */
+export const mapUniqueBranchProductsToPos = (items: any[]): Product[] => {
+  const uniqueProducts = new Map<string, Product>();
+
+  for (const item of items) {
+    const product = mapBranchProductToPos(item);
+    const key = String(product.id || product.sku || product.barcode).trim().toLowerCase();
+    if (key && !uniqueProducts.has(key)) {
+      uniqueProducts.set(key, product);
+    }
+  }
+
+  return Array.from(uniqueProducts.values());
+};
+
 export interface OrderItemCreateDto {
   productId: string;
   quantity: number;
@@ -13,6 +100,7 @@ export interface OrderItemCreateDto {
   isGift?: boolean;
   promotionId?: string | null;
   batchId?: string | null;
+  packageId?: string | null;
 }
 
 export interface OrderCreateRequest {
@@ -72,6 +160,8 @@ export interface OrderItemResponse {
   actualPrice: number;
   totalLineAmount: number;
   batchCode?: string;
+  batchId?: string | null;
+  stockAllocations?: Array<{ branchStockId: string; batchCode?: string; quantityBase: number; returnedBase: number; costPerBase?: number }>;
   isGift?: boolean;
   promotionId?: string | null;
 }
@@ -129,41 +219,7 @@ export const posOrderApi = {
             ? res.data
             : [];
 
-      return items.map((p: any) => {
-        const rawCategory = p.category;
-        const categoryId = p.categoryId ?? p.categoryID ?? (typeof rawCategory === 'object' ? rawCategory?.id : undefined);
-        const categoryName =
-          p.categoryName ||
-          p.category?.name ||
-          (typeof rawCategory === 'string' ? rawCategory : '') ||
-          'Chưa phân loại';
-
-        return ({
-        id: p.productId || p.id,
-        sku: p.sku || p.productCode || '',
-        barcode: p.barcode || '',
-        name: p.name || p.productName || '',
-        imageUrl: p.imageUrl,
-        spec: '',
-        shelfLocation: p.shelfLocation,
-        category: String(categoryId ?? categoryName),
-        categoryName,
-        baseUnit: p.unit || p.baseUnit || 'Cái',
-        basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
-        costPrice: p.costPrice || 0,
-        quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
-        batchCode: 'LÔ-FEFO',
-        unitPrices: Array.isArray(p.unitPrices)
-          ? p.unitPrices.map((u: any) => ({
-            unitId: u.unitId || u.id,
-            unitName: u.unitName,
-            conversionRate: Number(u.conversionRate ?? 1),
-            price: Number(u.price ?? 0),
-            isBaseUnit: Boolean(u.isBaseUnit),
-          }))
-          : undefined,
-        });
-      });
+      return mapUniqueBranchProductsToPos(items);
     }
 
     return [];
@@ -183,30 +239,7 @@ export const posOrderApi = {
           ? res.data
           : [];
 
-    return items.map((p: any) => ({
-      id: p.productId || p.id,
-      sku: p.sku || p.productCode || '',
-      barcode: p.barcode || '',
-      name: p.name || p.productName || '',
-      imageUrl: p.imageUrl,
-      spec: '',
-      shelfLocation: p.shelfLocation,
-      category: p.category || 'Bách hóa',
-      baseUnit: p.unit || p.baseUnit || 'Cái',
-      basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
-      costPrice: p.costPrice || 0,
-      quantityOnHand: p.currentStock ?? p.quantityOnHand ?? 0,
-      batchCode: 'LÔ-FEFO',
-      unitPrices: Array.isArray(p.unitPrices)
-        ? p.unitPrices.map((u: any) => ({
-          unitId: u.unitId || u.id,
-          unitName: u.unitName,
-          conversionRate: Number(u.conversionRate ?? 1),
-          price: Number(u.price ?? 0),
-          isBaseUnit: Boolean(u.isBaseUnit),
-        }))
-        : undefined,
-    }));
+    return mapUniqueBranchProductsToPos(items);
   },
 
   /**
@@ -235,6 +268,8 @@ export const posOrderApi = {
       loyaltyPoints: c.loyaltyPoints ?? c.rewardPoints ?? 0,
       membershipTier: c.membershipTier || 'Standard',
       currentDebt: c.currentDebtAR ?? c.currentDebt ?? c.totalDebt ?? 0,
+      debtCount: c.debtOrderCount ?? 0,
+      totalDebtPurchased: c.totalDebtPurchased ?? 0,
       note: c.note || '',
     }));
   },
@@ -422,14 +457,17 @@ export const posOrderApi = {
       unitName?: string;
       condition?: 'Restock' | 'Damaged';
       orderDetailId?: string;
+      batchId?: string;
       isGift?: boolean;
     }>;
     newItems: Array<{ productId: string; quantity: number; unitPrice: number; unitName?: string; discountAmount?: number }>;
     settlementMethod: string;
     reason?: string;
     note?: string;
-  }): Promise<any> => {
-    const res = await httpClient.post(`/orders/${orderId}/return-exchange`, data);
+    cashFundSource?: 'SHIFT' | 'SAFE';
+  }, idempotencyKey?: string): Promise<any> => {
+    const res = await httpClient.post(`/orders/${orderId}/return-exchange`, data,
+      { headers: { 'Idempotency-Key': idempotencyKey || generateUuidV7() } });
     return res.data;
   },
 };

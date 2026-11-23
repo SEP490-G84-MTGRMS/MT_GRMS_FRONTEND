@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Tag, ShoppingBag, Trash2 } from 'lucide-react';
 import type { CartItem } from '../types/pos.types';
+import { formatPosStockLabel } from '../api/posOrderApi';
 
 interface Props {
   cart: CartItem[];
@@ -80,9 +81,19 @@ export const PosCartTable: FC<Props> = ({
                     <td>
                       <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.product.name}</div>
                       <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span>&#10003; Tồn kho: {item.product.quantityOnHand}</span>
+                        <span>
+                          &#10003; {item.batchId ? 'Tồn lô:' : 'Tồn khả dụng:'}{' '}
+                          {item.batchId && item.availableQty != null
+                            ? formatPosStockLabel({
+                                quantityOnHand: item.availableQty,
+                                baseUnit: item.product.baseUnit,
+                                stockDisplayUnit: item.product.stockDisplayUnit,
+                                purchaseToStockRate: item.product.purchaseToStockRate,
+                              })
+                            : formatPosStockLabel(item.product)}
+                        </span>
                       </div>
-                      {item.batchCode && (
+                      {item.batchId && item.batchCode ? (
                         <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 11 }}>
                           <span style={{ color: '#475569' }}>Lô: <b>{item.batchCode}</b></span>
                           {item.expiryDate && <span style={{ color: '#64748b' }}>HSD: {new Date(item.expiryDate).toLocaleDateString('vi-VN')}</span>}
@@ -92,10 +103,17 @@ export const PosCartTable: FC<Props> = ({
                             </span>
                           )}
                         </div>
+                      ) : (
+                        <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: '#64748b' }}>
+                          <span>Phân lô:</span>
+                          <span style={{ padding: '1px 6px', borderRadius: 4, background: '#f0fdfa', color: '#0f766e', fontWeight: 700, border: '1px solid #ccfbf1' }}>
+                            LÔ-FEFO
+                          </span>
+                        </div>
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {item.product.unitPrices && item.product.unitPrices.length > 1 ? (
+                      {!item.packageId && item.product.unitPrices && item.product.unitPrices.length > 1 ? (
                         <select
                           className="pos-unit-select"
                           value={item.unitId || item.unit}
@@ -132,6 +150,7 @@ export const PosCartTable: FC<Props> = ({
                           if (Number.isFinite(val)) onUpdateQuantity(item.id, val);
                         }}
                         className="pos-qty-input"
+                          disabled={Boolean(item.packageId)}
                       />
                     </td>
                     <td style={{ textAlign: 'right' }}>

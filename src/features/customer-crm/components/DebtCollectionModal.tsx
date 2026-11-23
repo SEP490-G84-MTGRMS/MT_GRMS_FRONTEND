@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
-import { X, QrCode, Banknote, CheckCircle, AlertTriangle, Copy } from 'lucide-react';
-import type { CustomerDto } from '../types/customer.types';
+import { X, QrCode, Banknote, AlertTriangle, Copy } from 'lucide-react';
+import type { CollectDebtInput, CustomerDto } from '../types/customer.types';
 import type { CashAccount } from '../../cashbook/types/cashbook.types';
 import { VietQrDisplayCard } from './VietQrDisplayCard';
 import { cashbookService } from '../../cashbook/services/cashbookService';
@@ -12,15 +12,7 @@ interface DebtCollectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   customer: CustomerDto | null;
-  onConfirm: (data: {
-    customerId: string;
-    amount: number;
-    method: 'Cash' | 'VietQR';
-    targetAccountId?: string;
-    note?: string;
-    excessAmount?: number;
-    transactionRef?: string;
-  }) => Promise<void>;
+  onConfirm: (data: CollectDebtInput) => Promise<void>;
   isSubmitting: boolean;
 }
 
@@ -38,23 +30,21 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
   const [accounts, setAccounts] = useState<CashAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
 
-  // Overpayment (Trả thừa) Handling - Decision D4
-  const [showOverpaymentDialog, setShowOverpaymentDialog] = useState(false);
-  const [managerPin, setManagerPin] = useState('');
-  const [pinError, setPinError] = useState('');
-
-  // Webhook Fallback Handling - Decision D3
-  const [showManualRefInput, setShowManualRefInput] = useState(false);
   const [transactionRef, setTransactionRef] = useState('');
-  const [isWaitingWebhook, setIsWaitingWebhook] = useState(true);
+  const [accountLoadFailed, setAccountLoadFailed] = useState(false);
   const [isCopiedContent, setIsCopiedContent] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
     let isMounted = true;
+    setAccounts([]);
+    setAccountLoadFailed(false);
     cashbookService.getCashAccounts().then((accs) => {
       if (isMounted) {
         setAccounts(accs);
       }
+    }).catch(() => {
+      if (isMounted) setAccountLoadFailed(true);
     });
     return () => {
       isMounted = false;
@@ -85,10 +75,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
       setMethod('VietQR');
       setNote(`Thu hồi công nợ khách hàng ${customer.fullName}`);
       setErrorMsg('');
-      setShowOverpaymentDialog(false);
-      setShowManualRefInput(false);
       setTransactionRef('');
-      setIsWaitingWebhook(true);
     }
   }, [customer, isOpen]);
 
@@ -96,8 +83,6 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
 
   const currentDebt = customer.currentDebtAR || 0;
   const isOverpaying = amount > currentDebt;
-  const excessAmount = isOverpaying ? amount - currentDebt : 0;
-  const requiresManagerPin = excessAmount > 1_000_000 || excessAmount > currentDebt * 0.2;
 
   const qrPaymentContent = `THU NO KH ${customer.fullName.toUpperCase().replace(/\s+/g, ' ')}`;
 
@@ -121,16 +106,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
       return;
     }
 
-    // Check if overpayment requires confirmation dialog
-    if (isOverpaying && !showOverpaymentDialog) {
-      setShowOverpaymentDialog(true);
-      return;
-    }
-
-    if (isOverpaying && requiresManagerPin && managerPin !== '1234') {
-      setPinError('Mã PIN xác nhận chủ tiệm không đúng (Mặc định: 1234)');
-      return;
-    }
+    if (isSubmitting || !selectedAccountId || isOverpaying) return;
 
     setErrorMsg('');
     await onConfirm({
@@ -138,9 +114,8 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
       amount,
       method,
       targetAccountId: selectedAccountId,
-      note: note + (isOverpaying ? ` (Ghi nhận tiền gửi thừa: ${formatMoney(excessAmount)})` : ''),
-      excessAmount: isOverpaying ? excessAmount : 0,
-      transactionRef: transactionRef || undefined,
+      note,
+      transactionRef: method === 'VietQR' ? transactionRef.trim() || undefined : undefined,
     });
   };
 
@@ -247,47 +222,10 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                 </div>
               </div>
 
-              {/* Overpayment Warning/Prompt - Decision D4 */}
               {isOverpaying && (
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 space-y-2">
-                  <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
-                    <AlertTriangle size={18} className="text-amber-700" />
-                    <span>Khách trả thừa tiền</span>
-                  </div>
-                  <p className="text-xs text-amber-900">
-                    Khách nợ <strong>{formatMoney(currentDebt)}</strong>, bạn nhập{' '}
-                    <strong>{formatMoney(amount)}</strong> (thừa{' '}
-                    <strong className="text-red-700">{formatMoney(excessAmount)}</strong>).
-                  </p>
-                  <p className="text-xs text-gray-700">
-                    Hệ thống sẽ ghi nhận <strong>{formatMoney(excessAmount)}</strong> vào Quỹ Đặt cọc /
-                    Trả trước của khách để cấn trừ vào các đơn hàng sau.
-                  </p>
-
-                  {requiresManagerPin && (
-                    <div className="pt-2 border-t border-amber-200">
-                      <label className="block text-xs font-bold text-gray-800 mb-1">
-                        Khoản thừa lớn (&gt;20% nợ) - Nhập PIN chủ tiệm:
-                      </label>
-                      <input
-                        type="password"
-                        maxLength={4}
-                        placeholder="Mã PIN 4 số (1234)"
-                        value={managerPin}
-                        onChange={(e) => {
-                          setManagerPin(e.target.value);
-                          setPinError('');
-                        }}
-                        className="w-full h-9 px-3 text-sm rounded-lg border border-amber-300 outline-none"
-                      />
-                      {pinError && (
-                        <p className="text-[11px] text-red-600 font-semibold mt-1">
-                          {pinError}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                  Số tiền thu không được vượt quá dư nợ {formatMoney(currentDebt)}.
+                </p>
               )}
 
               {/* Note */}
@@ -404,61 +342,17 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Webhook Status & Fallback Button - Decision D3 */}
-                  <div className="p-3 rounded-xl bg-teal-50 border border-teal-200 text-xs text-teal-900 flex flex-col items-center gap-2">
-                    {isWaitingWebhook && !transactionRef ? (
-                      <div className="flex items-center gap-2 text-teal-800">
-                        <span className="w-2.5 h-2.5 rounded-full bg-teal-600 animate-ping inline-block" />
-                        <span>Đang chờ tín hiệu biến động số dư từ ngân hàng...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
-                        <CheckCircle size={16} className="text-emerald-600" />
-                        <span>Đã có mã xác nhận đối soát: {transactionRef}</span>
-                      </div>
-                    )}
-
-                    {!showManualRefInput && (
-                      <button
-                        type="button"
-                        onClick={() => setShowManualRefInput(true)}
-                        className="text-teal-700 font-semibold underline hover:text-teal-900 mt-1"
-                      >
-                        Khách đã chuyển thành công nhưng hệ thống chưa tự nhận?
-                      </button>
-                    )}
-
-                    {showManualRefInput && (
-                      <div className="w-full pt-2 border-t border-teal-200 space-y-2 text-left">
-                        <label className="block text-xs font-bold text-gray-800">
-                          Nhập mã giao dịch ngân hàng (FT...):
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Ví dụ: FT2630098234"
-                            value={transactionRef}
-                            onChange={(e) => setTransactionRef(e.target.value)}
-                            className="flex-1 h-9 px-3 text-xs rounded-lg border border-gray-300 outline-none uppercase font-mono"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (transactionRef.trim()) {
-                                setIsWaitingWebhook(false);
-                              }
-                            }}
-                            className="px-3 py-1 bg-emerald-700 text-white rounded-lg text-xs font-bold"
-                          >
-                            Xác nhận bằng mắt
-                          </button>
-                        </div>
-                        <span className="text-[11px] text-gray-500 block">
-                          Phiếu thu sẽ được ghi nhận trạng thái <strong>Chờ đối soát</strong>.
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  <label className="flex w-full flex-col gap-2 rounded-xl bg-teal-50 p-3 text-xs text-teal-900">
+                    Kiểm tra tiền đã vào tài khoản trước khi xác nhận thu nợ.
+                    <span className="font-semibold">Mã giao dịch ngân hàng (không bắt buộc)</span>
+                    <input
+                      type="text"
+                      maxLength={100}
+                      value={transactionRef}
+                      onChange={(event) => setTransactionRef(event.target.value)}
+                      className="h-9 rounded-lg border border-gray-300 px-3 font-mono"
+                    />
+                  </label>
                 </div>
               ) : (
                 /* Cash View */
@@ -479,6 +373,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
             </div>
           </div>
 
+          {accountLoadFailed && <p role="alert" className="mt-3 text-sm text-red-700">Không thể tải tài khoản nhận tiền. Mở lại biểu mẫu để thử lại.</p>}
           {/* Sheet Footer: Action Buttons */}
           <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-6">
             <button
@@ -493,7 +388,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
             {/* Decision D5: Green button for collecting debt */}
             <button
               type="submit"
-              disabled={isSubmitting || amount <= 0}
+              disabled={isSubmitting || amount <= 0 || isOverpaying || !selectedAccountId}
               className="btn-collect-debt text-lg min-w-[200px] shadow-lg disabled:opacity-50"
               id="btn-confirm-collect-debt"
             >

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customerApi } from '../api/customerApi';
+import { useIdempotentAction } from '../../../hooks/useIdempotentAction';
 import type {
   CustomerDto,
   CreateCustomerInput,
@@ -17,6 +18,7 @@ export const CUSTOMER_KPIS_QUERY_KEY = ['customer-kpis'];
  */
 export function useCustomerCrm(defaultPageSize = 15) {
   const queryClient = useQueryClient();
+  const { getOrRotateKey, resetKey } = useIdempotentAction();
 
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,13 +101,14 @@ export function useCustomerCrm(defaultPageSize = 15) {
 
   // Collect debt mutation
   const collectDebtMutation = useMutation({
-    mutationFn: (input: CollectDebtInput) => customerApi.collectDebt(input),
-    onSuccess: (updated) => {
+    mutationFn: (input: CollectDebtInput) => customerApi.collectDebt(input, getOrRotateKey),
+    onSuccess: (receipt, input) => {
+      resetKey();
       queryClient.invalidateQueries({ queryKey: CUSTOMERS_QUERY_KEY });
       queryClient.invalidateQueries({ queryKey: CUSTOMER_KPIS_QUERY_KEY });
-      if (selectedCustomer?.id === updated.id) {
-        setSelectedCustomer(updated);
-      }
+      setSelectedCustomer((current) => current?.id === input.customerId
+        ? { ...current, currentDebtAR: receipt.remainingDebt }
+        : current);
       setCollectingCustomer(null);
     },
   });

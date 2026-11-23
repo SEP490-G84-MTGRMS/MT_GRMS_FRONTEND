@@ -5,14 +5,12 @@ import {
   Upload,
   ChevronLeft,
   ChevronRight,
-  Copy,
   Calendar,
 } from 'lucide-react';
 
 interface OrderMatrixToolbarProps {
   onShiftWeek: (deltaWeeks: number) => void;
   onThisWeek: () => void;
-  onCopyPrevWeek: () => void;
   onExcelDownload: () => void;
   onExcelUpload: (file: File) => void;
 }
@@ -20,7 +18,6 @@ interface OrderMatrixToolbarProps {
 export const OrderMatrixToolbar: FC<OrderMatrixToolbarProps> = ({
   onShiftWeek,
   onThisWeek,
-  onCopyPrevWeek,
   onExcelDownload,
   onExcelUpload,
 }) => {
@@ -98,17 +95,6 @@ export const OrderMatrixToolbar: FC<OrderMatrixToolbarProps> = ({
         >
           <span>Tuần tới</span>
           <ChevronRight size={13} />
-        </button>
-
-        <button
-          type="button"
-          onClick={onCopyPrevWeek}
-          className="po-btn po-btn-secondary"
-          style={{ height: 32, fontSize: 12.5, borderColor: 'var(--blue-primary)', color: 'var(--blue-primary)' }}
-          title="Sao chép toàn bộ số lượng từ các ngày của tuần trước sang tuần này"
-        >
-          <Copy size={13} />
-          <span>Copy Tuần Trước</span>
         </button>
       </div>
     </div>

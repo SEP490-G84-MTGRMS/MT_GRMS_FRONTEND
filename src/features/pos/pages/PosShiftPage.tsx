@@ -17,7 +17,6 @@ import {
   FileText,
   Search,
   RotateCcw,
-  CalendarCheck,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
 import { posOrderApi, type OwnerUnsettledSummaryResponse } from '../api/posOrderApi';
@@ -27,7 +26,16 @@ import { TablePagination } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
 
-export const PosShiftPage: FC = () => {
+type PosShiftPageProps = {
+  dailyClosing?: {
+    branchId: string;
+    branchName: string;
+    onClose: () => void;
+    onChange: () => void;
+  };
+};
+
+export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -36,6 +44,7 @@ export const PosShiftPage: FC = () => {
 
   // Quay về trang gọi (Work schedule hoặc POS checkout)
   const branchFromUrl = searchParams.get('branchId');
+  const linkedShiftId = dailyClosing ? null : searchParams.get('shiftId');
   const returnPath = location.pathname.startsWith('/employee/pos')
     ? '/employee/pos'
     : location.pathname.startsWith('/pos')
@@ -46,15 +55,9 @@ export const PosShiftPage: FC = () => {
 
   // Chi nhánh đang chọn (GUID hợp lệ)
   const [selectedBranchId, setSelectedBranchId] = useState<string>(
-    branchFromUrl || user?.branchId || ''
+    dailyClosing?.branchId || branchFromUrl || user?.branchId || ''
   );
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
-  const selectedBranchName = branches.find((branch) => branch.id === selectedBranchId)?.name || 'Chi nhánh chưa xác định';
-  const fundTypeLabel = (type: string) => ({ Till: 'Két quầy', Safe: 'Két sắt', Bank: 'Ngân hàng', Transit: 'Tiền đang chuyển', Suspense: 'Khoản chờ xử lý', '1': 'Két quầy', '2': 'Két sắt', '3': 'Ngân hàng', '4': 'Tiền đang chuyển', '5': 'Khoản chờ xử lý' }[type] || 'Quỹ');
-  const fundDisplayName = (fund: { fundName: string; fundType: string }) =>
-    fund.fundName.includes('?') || fund.fundName.includes('�')
-      ? `${fundTypeLabel(fund.fundType)} · ${selectedBranchName}`
-      : fund.fundName;
+  const [selectedBranchName, setSelectedBranchName] = useState('');
 
   // Bộ lọc dải thời gian & tìm kiếm
   const [timePreset, setTimePreset] = useState<'today' | '7days' | '30days' | 'all'>('7days');
@@ -78,22 +81,72 @@ export const PosShiftPage: FC = () => {
   const [isSubmittingHandover, setIsSubmittingHandover] = useState<boolean>(false);
   const isOwnerOrAdmin = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
 
+  useEffect(() => {
+    if (!linkedShiftId || !isStoreOwner) return;
+    let active = true;
+    setSelectedDetailShift(null);
+    void posShiftApi.getShiftById(linkedShiftId).then((shift) => {
+      if (active) setSelectedDetailShift(shift);
+    }).catch(() => {
+      if (active) setErrorMessage('Không thể mở ca bán hàng từ thông báo.');
+    });
+    return () => { active = false; };
+  }, [linkedShiftId, isStoreOwner]);
+
+  const closeShiftDetail = () => {
+    setSelectedDetailShift(null);
+    if (linkedShiftId) {
+      setSearchParams((previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete('shiftId');
+        return next;
+      }, { replace: true });
+    }
+  };
+
   // Chốt doanh thu bán lẻ cuối ngày của Chủ cửa hàng (tách riêng Đơn Chủ tự bán & Duyệt ca theo Ngày nghiệp vụ)
   const [ownerUnsettled, setOwnerUnsettled] = useState<OwnerUnsettledSummaryResponse | null>(null);
-  const [isOwnerEodModalOpen, setIsOwnerEodModalOpen] = useState(false);
+  const [isOwnerEodModalOpen, setIsOwnerEodModalOpen] = useState(Boolean(dailyClosing));
+  const closeDailyClosing = () => {
+    if (isSettlingOwnerEod) return;
+    dailyClosing?.onClose();
+    setIsOwnerEodModalOpen(false);
+  };
   const [ownerEodNote, setOwnerEodNote] = useState('');
   const [isSettlingOwnerEod, setIsSettlingOwnerEod] = useState(false);
-  const [eodBranchScope, setEodBranchScope] = useState<'CURRENT' | 'ALL'>('CURRENT');
+  const [eodBranchScope] = useState<'CURRENT' | 'ALL'>('CURRENT');
   const [eodBusinessDate, setEodBusinessDate] = useState<string>(() => {
     const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
     return vnNow.toISOString().slice(0, 10);
   });
   const [businessDayPreview, setBusinessDayPreview] = useState<BusinessDayClosingPreview | null>(null);
+  const [previewRevision, setPreviewRevision] = useState(0);
   const [isLoadingBusinessDayPreview, setIsLoadingBusinessDayPreview] = useState(false);
   const [businessDayPreviewError, setBusinessDayPreviewError] = useState<string | null>(null);
   const [businessDayFundCounts, setBusinessDayFundCounts] = useState<Record<string, string>>({});
   const [businessDayHistory, setBusinessDayHistory] = useState<BusinessDayClosingVersion[]>([]);
-  const isBusinessDayClosed = businessDayHistory.some((closing) => closing.isActive && closing.status.toLowerCase() === 'closed');
+
+  const repairLegacyUtf8 = (value?: string | null) => {
+    if (!value || !/[ÃÂÄÅÆáºá»]/.test(value)) return value || '';
+    const windows1252: Record<number, number> = {
+      0x20ac: 0x80, 0x201a: 0x82, 0x0192: 0x83, 0x201e: 0x84, 0x2026: 0x85,
+      0x2020: 0x86, 0x2021: 0x87, 0x02c6: 0x88, 0x2030: 0x89, 0x0160: 0x8a,
+      0x2039: 0x8b, 0x0152: 0x8c, 0x017d: 0x8e, 0x2018: 0x91, 0x2019: 0x92,
+      0x201c: 0x93, 0x201d: 0x94, 0x2022: 0x95, 0x2013: 0x96, 0x2014: 0x97,
+      0x02dc: 0x98, 0x2122: 0x99, 0x0161: 0x9a, 0x203a: 0x9b, 0x0153: 0x9c,
+      0x017e: 0x9e, 0x0178: 0x9f,
+    };
+    try {
+      const bytes = Uint8Array.from(Array.from(value), (character) => {
+        const code = character.charCodeAt(0);
+        return windows1252[code] ?? code;
+      });
+      return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      return value;
+    }
+  };
+
 
   // Modal Buộc đóng ca (Force Close) cho Chủ cửa hàng khi nhân viên quên chốt ca
   const [forceCloseTargetShift, setForceCloseTargetShift] = useState<ShiftDetailResponse | null>(null);
@@ -117,10 +170,10 @@ export const PosShiftPage: FC = () => {
   }, [isOwnerEodModalOpen, eodBranchScope, selectedBranchId]);
 
   useEffect(() => {
+    if (dailyClosing) return;
     let isMounted = true;
     employeeApi.getBranches().then((list) => {
       if (!isMounted) return;
-      setBranches(list || []);
       if (list && list.length > 0) {
         // Khởi tạo từ mtgrms_active_branch nếu là Chủ cửa hàng
         let initialId = '';
@@ -147,6 +200,7 @@ export const PosShiftPage: FC = () => {
         }
 
         setSelectedBranchId(initialId);
+        setSelectedBranchName(list.find((branch) => branch.id === initialId)?.name || 'Chi nhánh đang chọn');
         setSearchParams({ branchId: initialId });
       }
     });
@@ -157,6 +211,7 @@ export const PosShiftPage: FC = () => {
       const branch = customEvent.detail;
       if (branch?.id && (branch.id !== 'ALL' || isOwnerOrAdmin)) {
         setSelectedBranchId(branch.id);
+        setSelectedBranchName(branch.name || 'Chi nhánh đang chọn');
         setSearchParams({ branchId: branch.id });
       }
     };
@@ -166,7 +221,7 @@ export const PosShiftPage: FC = () => {
       isMounted = false;
       window.removeEventListener('mtgrms:branch-changed', handleGlobalBranchChange);
     };
-  }, [branchFromUrl, user?.branchId, isOwnerOrAdmin]);
+  }, [branchFromUrl, user?.branchId, isOwnerOrAdmin, dailyClosing?.branchId]);
 
   // Tải danh sách lịch sử ca từ Backend API
   const fetchShiftHistory = useCallback(async () => {
@@ -228,6 +283,10 @@ export const PosShiftPage: FC = () => {
   );
 
   useEffect(() => {
+    setBusinessDayFundCounts({});
+  }, [selectedBranchId, eodBusinessDate]);
+
+  useEffect(() => {
     if (!isOwnerEodModalOpen || eodBranchScope !== 'CURRENT' || !selectedBranchId || selectedBranchId === 'ALL') {
       setBusinessDayPreview(null);
       return;
@@ -242,7 +301,7 @@ export const PosShiftPage: FC = () => {
           setBusinessDayFundCounts((current) => Object.fromEntries(
             preview.funds
               .filter((fund) => fund.requiresPhysicalCount)
-              .map((fund) => [fund.fundId, current[fund.fundId] ?? String(fund.expectedCash)])
+              .map((fund) => [fund.fundId, current[fund.fundId] ?? ''])
           ));
         }
       })
@@ -256,7 +315,7 @@ export const PosShiftPage: FC = () => {
         if (!cancelled) setIsLoadingBusinessDayPreview(false);
       });
     return () => { cancelled = true; };
-  }, [isOwnerEodModalOpen, eodBranchScope, selectedBranchId, eodBusinessDate]);
+  }, [isOwnerEodModalOpen, eodBranchScope, selectedBranchId, eodBusinessDate, previewRevision]);
 
   useEffect(() => {
     if (!isOwnerEodModalOpen || eodBranchScope !== 'CURRENT' || !selectedBranchId || selectedBranchId === 'ALL') {
@@ -269,6 +328,7 @@ export const PosShiftPage: FC = () => {
       .catch(() => { if (!cancelled) setBusinessDayHistory([]); });
     return () => { cancelled = true; };
   }, [isOwnerEodModalOpen, eodBranchScope, selectedBranchId, eodBusinessDate]);
+
 
   // Danh sách tất cả các ca của Nhân viên đã đóng nhưng đang chờ Chủ cửa hàng duyệt bàn giao (tiền đang lơ lửng chưa vào Két sắt)
   const pendingEmployeeShifts = useMemo(() => {
@@ -306,14 +366,17 @@ export const PosShiftPage: FC = () => {
     [shifts, eodBusinessDate, getShiftBusinessDate]
   );
 
-  // Mọi ca đang mở hoặc đang kiểm đếm của ngày này đều phải được chốt, kể cả ca của Chủ cửa hàng.
+  // Các ca mở trong Ngày nghiệp vụ đang chọn mà nhân viên quên chưa chốt (Ca của ngày hôm sau đang mở sẽ KHÔNG nằm trong danh sách này và KHÔNG chặn khóa sổ ngày cũ)
   const openShiftsForBusinessDate = useMemo(
     () =>
       shiftsForBusinessDate.filter(
         (s) =>
-          s.status === 1 || s.status === 3 || s.status === 'Open' || s.status === 'Closing'
+          !s.closedAtUtc &&
+          s.status !== 2 &&
+          s.status !== 'Closed' &&
+          s.cashierUserId !== user?.id
       ),
-    [shiftsForBusinessDate]
+    [shiftsForBusinessDate, user?.id]
   );
 
   const pendingShiftsForBusinessDate = useMemo(
@@ -357,7 +420,6 @@ export const PosShiftPage: FC = () => {
   // Thao tác 1 (Độc lập 24/7): Kết toán đơn Chủ tự bán (ShiftId = null) tính đến thời điểm hiện tại (Không bị chặn bởi ca nhân viên đang mở)
   // Thao tác 2: Duyệt bàn giao & Khóa sổ các ca nhân viên đã đóng thuộc Ngày nghiệp vụ đang chọn
   const handleApproveBusinessDateShifts = async () => {
-    if (isBusinessDayClosed) return;
     const blockersOtherThanPendingHandover = businessDayPreview?.blockers.filter(
       (blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER'
     ) ?? [];
@@ -399,6 +461,7 @@ export const PosShiftPage: FC = () => {
           disputeReason: null,
         });
         approvedShiftsCount++;
+        dailyClosing?.onChange();
       }
 
       // Xác nhận bàn giao là một thay đổi dữ liệu nguồn, vì vậy preview/token cũ
@@ -409,7 +472,7 @@ export const PosShiftPage: FC = () => {
         setBusinessDayFundCounts(Object.fromEntries(
           refreshedPreview.funds
             .filter((fund) => fund.requiresPhysicalCount)
-            .map((fund) => [fund.fundId, String(fund.expectedCash)])
+            .map((fund) => [fund.fundId, ''])
         ));
         await fetchShiftHistory();
         alert(`Đã xác nhận bàn giao ${approvedShiftsCount} ca. Vui lòng kiểm tra số liệu tạm tính rồi bấm Khóa sổ ngày.`);
@@ -424,6 +487,7 @@ export const PosShiftPage: FC = () => {
         previewToken: businessDayPreview?.previewToken ?? '',
         note: ownerEodNote.trim() || undefined,
       });
+      dailyClosing?.onChange();
       alert(
         `Đã duyệt ${approvedShiftsCount} ca và khóa sổ ngày ${eodBusinessDate}. Mã chốt ngày: ${closing.referenceCode}.`
       );
@@ -438,7 +502,7 @@ export const PosShiftPage: FC = () => {
           setBusinessDayFundCounts((current) => Object.fromEntries(
             refreshedPreview.funds
               .filter((fund) => fund.requiresPhysicalCount)
-              .map((fund) => [fund.fundId, current[fund.fundId] ?? String(fund.expectedCash)])
+              .map((fund) => [fund.fundId, current[fund.fundId] ?? ''])
           ));
           alert('Số liệu hệ thống đã thay đổi. Bản nháp kiểm đếm được giữ lại; vui lòng kiểm tra và xác nhận lại.');
           return;
@@ -467,7 +531,7 @@ export const PosShiftPage: FC = () => {
         approvedShiftsCount++;
       }
       alert(
-        `Đã duyệt bàn giao toàn bộ ${approvedShiftsCount} ca chờ duyệt (Tổng tiền mặt vào Két sắt: ${formatVND(pendingEmployeeCashDrop)})!`
+        `Đã xác nhận bàn giao ${approvedShiftsCount} ca. Các khoản chưa ghi sổ sẽ được ghi nhận khi khóa sổ ngày.`
       );
       await fetchShiftHistory();
     } catch (err: any) {
@@ -491,16 +555,8 @@ export const PosShiftPage: FC = () => {
   const handleConfirmForceCloseShift = async () => {
     if (!forceCloseTargetShift) return;
     if (forceCloseTargetShift.cashierUserId === user?.id) return;
-    if (![forceActualCash, forceRetainedFloat].every((amount) => Number.isSafeInteger(amount) && amount >= 0 && amount <= 999_999_999_999) || forceRetainedFloat > forceActualCash) {
-      alert('Tiền kiểm đếm và tiền để lại phải là số nguyên không âm, tối đa 999.999.999.999 đ; tiền để lại không vượt quá tiền thực đếm.');
-      return;
-    }
     if (!forceReason.trim()) {
       alert('Vui lòng nhập lý do buộc đóng ca (VD: Nhân viên quên bấm chốt ca khi hết giờ).');
-      return;
-    }
-    if (forceReason.trim().length > 470) {
-      alert('Lý do buộc đóng ca tối đa 470 ký tự.');
       return;
     }
     const dropped = Math.max(0, forceActualCash - forceRetainedFloat);
@@ -513,7 +569,12 @@ export const PosShiftPage: FC = () => {
         reason: forceReason.trim(),
         notes: `Chủ cửa hàng buộc đóng ca: ${forceReason.trim()}`,
       });
-      alert(`Đã buộc đóng ca #${forceCloseTargetShift.shiftCode} và ghi nhận vào Sổ quỹ thành công!`);
+      if (dailyClosing) {
+        setBusinessDayPreview(null);
+        setPreviewRevision((revision) => revision + 1);
+        dailyClosing.onChange();
+      }
+      alert(`Đã buộc đóng ca #${forceCloseTargetShift.shiftCode}. Các khoản chưa ghi sổ sẽ được ghi nhận khi khóa sổ ngày.`);
       setForceCloseTargetShift(null);
       setForceReason('');
       await fetchShiftHistory();
@@ -679,7 +740,7 @@ export const PosShiftPage: FC = () => {
   return (
     <div
       className="so-list-page pos-shift-page"
-      style={{
+      style={dailyClosing ? { display: 'contents' } : {
         width: '100%',
         height: '100%',
         maxHeight: '100%',
@@ -690,6 +751,7 @@ export const PosShiftPage: FC = () => {
         overflow: 'hidden',
       }}
     >
+      {!dailyClosing && <>
       {/* ─── 1. HEADER CHUẨN SO-LIST-HEADER (ĐỒNG BỘ STORE PRODUCT) ─── */}
       <div className="so-list-header" style={{ flexShrink: 0, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -711,37 +773,6 @@ export const PosShiftPage: FC = () => {
         </div>
 
         <div className="so-list-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {isOwnerOrAdmin && (
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedBranchId === 'ALL' && branches[0]) setSelectedBranchId(branches[0].id);
-                setEodBranchScope('CURRENT');
-                setIsOwnerEodModalOpen(true);
-              }}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                height: 32,
-                padding: '0 12px',
-                borderRadius: 6,
-                border: 'none',
-                backgroundColor: '#0F766E',
-                color: '#FFFFFF',
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                transition: 'background-color 0.15s ease',
-              }}
-              title="Khóa sổ ngày nghiệp vụ, kiểm đếm quỹ và kết toán doanh thu tiền mặt về Két sắt"
-            >
-              <CalendarCheck size={15} />
-              <span>Chốt doanh thu ngày</span>
-            </button>
-          )}
-
           <button
             type="button"
             onClick={fetchShiftHistory}
@@ -757,408 +788,408 @@ export const PosShiftPage: FC = () => {
 
       {/* ─── 2. THANH BỘ LỌC CHUẨN SO-LIST-FILTER (GIỐNG STORE PRODUCT) ─── */}
       <div className="so-list-filter" style={{ flexShrink: 0, marginBottom: 12 }}>
-          <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
-            {/* 1. Ô Tìm kiếm Mã ca / Thu ngân */}
-            <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
-              <label className="so-list-filter-label">Tìm kiếm:</label>
-              <div style={{ position: 'relative', width: '100%' }}>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Nhập mã ca, tên thu ngân..."
-                  className="so-list-filter-input"
-                  style={{ width: '100%', paddingLeft: 30, paddingRight: searchTerm ? 28 : 10 }}
-                />
-                <Search
-                  size={14}
-                  style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
-                />
-                {searchTerm && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchTerm('');
-                      setCurrentPage(1);
-                    }}
-                    style={{
-                      position: 'absolute',
-                      right: 8,
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      color: '#94a3b8',
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: 2,
-                    }}
-                    title="Xóa tìm kiếm"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* 2. Lọc Khoảng thời gian */}
-            <div className="so-list-filter-field">
-              <label className="so-list-filter-label">Thời gian:</label>
-              <select
-                value={timePreset}
+        <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
+          {/* 1. Ô Tìm kiếm Mã ca / Thu ngân */}
+          <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
+            <label className="so-list-filter-label">Tìm kiếm:</label>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type="text"
+                value={searchTerm}
                 onChange={(e) => {
-                  setTimePreset(e.target.value as any);
+                  setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                className={`so-list-filter-select ${timePreset !== '7days' ? 'so-list-filter-select--active' : ''}`}
-              >
-                <option value="today">Hôm nay</option>
-                <option value="7days">7 ngày qua</option>
-                <option value="30days">30 ngày qua</option>
-                <option value="all">Tất cả thời gian</option>
-              </select>
-            </div>
-
-            {/* 3. Lọc Trạng thái ca / Bàn giao */}
-            <div className="so-list-filter-field">
-              <label className="so-list-filter-label">Trạng thái:</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className={`so-list-filter-select ${statusFilter !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
-              >
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="OPEN">Đang mở (bán hàng)</option>
-                <option value="CLOSED">Đã chốt ca</option>
-                <option value="CONFIRMED">Đã duyệt bàn giao</option>
-                <option value="DISPUTED">Có chênh lệch / Khiếu nại</option>
-              </select>
-            </div>
-
-            {/* Nút Thao tác Filter */}
-            <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-              {(searchTerm || timePreset !== '7days' || statusFilter !== 'ALL') && (
+                placeholder="Nhập mã ca, tên thu ngân..."
+                className="so-list-filter-input"
+                style={{ width: '100%', paddingLeft: 30, paddingRight: searchTerm ? 28 : 10 }}
+              />
+              <Search
+                size={14}
+                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+              />
+              {searchTerm && (
                 <button
                   type="button"
                   onClick={() => {
                     setSearchTerm('');
-                    setTimePreset('7days');
-                    setStatusFilter('ALL');
                     setCurrentPage(1);
                   }}
-                  className="so-list-filter-reset"
-                  title="Đặt lại bộ lọc"
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 2,
+                  }}
+                  title="Xóa tìm kiếm"
                 >
-                  <RotateCcw size={13} />
-                  <span>Đặt lại</span>
+                  <X size={13} />
                 </button>
               )}
-              <button
-                type="button"
-                onClick={fetchShiftHistory}
-                className="so-list-filter-search"
-                title="Tải lại dữ liệu"
-              >
-                <RefreshCw size={13} className={isLoading ? 'spin' : ''} />
-                <span>Làm mới</span>
-              </button>
             </div>
           </div>
+
+          {/* 2. Lọc Khoảng thời gian */}
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label">Thời gian:</label>
+            <select
+              value={timePreset}
+              onChange={(e) => {
+                setTimePreset(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className={`so-list-filter-select ${timePreset !== '7days' ? 'so-list-filter-select--active' : ''}`}
+            >
+              <option value="today">Hôm nay</option>
+              <option value="7days">7 ngày qua</option>
+              <option value="30days">30 ngày qua</option>
+              <option value="all">Tất cả thời gian</option>
+            </select>
+          </div>
+
+          {/* 3. Lọc Trạng thái ca / Bàn giao */}
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label">Trạng thái:</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className={`so-list-filter-select ${statusFilter !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="OPEN">Đang mở (bán hàng)</option>
+              <option value="CLOSED">Đã chốt ca</option>
+              <option value="CONFIRMED">Đã duyệt bàn giao</option>
+              <option value="DISPUTED">Có chênh lệch / Khiếu nại</option>
+            </select>
+          </div>
+
+          {/* Nút Thao tác Filter */}
+          <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {(searchTerm || timePreset !== '7days' || statusFilter !== 'ALL') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setTimePreset('7days');
+                  setStatusFilter('ALL');
+                  setCurrentPage(1);
+                }}
+                className="so-list-filter-reset"
+                title="Đặt lại bộ lọc"
+              >
+                <RotateCcw size={13} />
+                <span>Đặt lại</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={fetchShiftHistory}
+              className="so-list-filter-search"
+              title="Tải lại dữ liệu"
+            >
+              <RefreshCw size={13} className={isLoading ? 'spin' : ''} />
+              <span>Làm mới</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* THÔNG BÁO LỖI NẾU CÓ */}
+      {errorMessage && (
+        <div
+          style={{
+            padding: '12px 16px',
+            backgroundColor: '#FEF2F2',
+            border: '1px solid #FECACA',
+            borderRadius: 8,
+            color: '#991B1B',
+            fontSize: 13,
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <AlertCircle size={16} />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* BẢNG LỊCH SỬ CÁC CA LÀM VIỆC */}
+      <div className="so-list-table-card so-list-table-card--wrap" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', flexShrink: 0 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <History size={16} className="text-teal-700" />
+            <span>Danh Sách Các Phiên Ca Bán Hàng ({filteredShifts.length})</span>
+          </h3>
         </div>
 
-        {/* THÔNG BÁO LỖI NẾU CÓ */}
-        {errorMessage && (
-          <div
-            style={{
-              padding: '12px 16px',
-              backgroundColor: '#FEF2F2',
-              border: '1px solid #FECACA',
-              borderRadius: 8,
-              color: '#991B1B',
-              fontSize: 13,
-              marginBottom: 16,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <AlertCircle size={16} />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {/* BẢNG LỊCH SỬ CÁC CA LÀM VIỆC */}
-        <div className="so-list-table-card so-list-table-card--wrap" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', flexShrink: 0 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <History size={16} className="text-teal-700" />
-              <span>Danh Sách Các Phiên Ca Bán Hàng ({filteredShifts.length})</span>
-            </h3>
-          </div>
-
-          <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-            <table className="so-list-table" style={{ minWidth: 1205, width: '100%', tableLayout: 'fixed' }}>
-              <colgroup>
-                <col style={{ width: 110 }} />
-                <col style={{ width: 160 }} />
-                <col style={{ width: 185 }} />
-                <col style={{ width: 110 }} />
-                <col style={{ width: 115 }} />
-                <col style={{ width: 115 }} />
-                <col style={{ width: 115 }} />
-                <col style={{ width: 135 }} />
-                <col style={{ width: 160 }} />
-              </colgroup>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
+        <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
+          <table className="so-list-table" style={{ minWidth: 1205, width: '100%', tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: 110 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 185 }} />
+              <col style={{ width: 110 }} />
+              <col style={{ width: 115 }} />
+              <col style={{ width: 115 }} />
+              <col style={{ width: 115 }} />
+              <col style={{ width: 135 }} />
+              <col style={{ width: 160 }} />
+            </colgroup>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
+              <tr>
+                <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Mã ca</th>
+                <th style={{ width: 160, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thời gian mở - đóng</th>
+                <th style={{ width: 185, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thu ngân</th>
+                <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền đầu ca</th>
+                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền lý thuyết</th>
+                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Thực đếm</th>
+                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Chênh lệch</th>
+                <th style={{ width: 135, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Xác nhận kết ca</th>
+                <th style={{ width: 160, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
                 <tr>
-                  <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Mã ca</th>
-                  <th style={{ width: 160, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thời gian mở - đóng</th>
-                  <th style={{ width: 185, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thu ngân</th>
-                  <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền đầu ca</th>
-                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền lý thuyết</th>
-                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Thực đếm</th>
-                  <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Chênh lệch</th>
-                  <th style={{ width: 135, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Xác nhận kết ca</th>
-                  <th style={{ width: 160, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Thao tác</th>
+                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
+                    <RefreshCw size={20} className="spin text-teal-700" style={{ margin: '0 auto 8px' }} />
+                    <div>Đang tải lịch sử ca làm việc từ hệ thống...</div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
-                      <RefreshCw size={20} className="spin text-teal-700" style={{ margin: '0 auto 8px' }} />
-                      <div>Đang tải lịch sử ca làm việc từ hệ thống...</div>
-                    </td>
-                  </tr>
-                ) : paginatedShifts.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-                      <AlertCircle size={24} color="#94A3B8" style={{ margin: '0 auto 8px' }} />
-                      <div style={{ fontWeight: 600, color: '#334155' }}>Không có ca làm việc nào trong khoảng thời gian này</div>
-                      <div style={{ fontSize: 12, marginTop: 4 }}>Hãy chọn khoảng thời gian khác hoặc kiểm tra lại chi nhánh đã chọn.</div>
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedShifts.map((s) => {
-                    const diff = s.discrepancy ?? 0;
-                    const isPendingHandover = s.handoverStatus === 1 || s.handoverStatus === 'PENDING';
-                    const isDisputedHandover = s.handoverStatus === 3 || s.handoverStatus === 'DISPUTED';
-                    const uniqueParticipants = dedupeParticipants(s.participants);
-                    const cashierDisplay = uniqueParticipants.length > 0
-                      ? uniqueParticipants.map((p) => p.fullName || p.userName).join(', ')
-                      : 'Thu ngân quầy';
+              ) : paginatedShifts.length === 0 ? (
+                <tr>
+                  <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                    <AlertCircle size={24} color="#94A3B8" style={{ margin: '0 auto 8px' }} />
+                    <div style={{ fontWeight: 600, color: '#334155' }}>Không có ca làm việc nào trong khoảng thời gian này</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>Hãy chọn khoảng thời gian khác hoặc kiểm tra lại chi nhánh đã chọn.</div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedShifts.map((s) => {
+                  const diff = s.discrepancy ?? 0;
+                  const isPendingHandover = s.handoverStatus === 1 || s.handoverStatus === 'PENDING';
+                  const isDisputedHandover = s.handoverStatus === 3 || s.handoverStatus === 'DISPUTED';
+                  const uniqueParticipants = dedupeParticipants(s.participants);
+                  const cashierDisplay = uniqueParticipants.length > 0
+                    ? uniqueParticipants.map((p) => repairLegacyUtf8(p.fullName || p.userName)).join(', ')
+                    : 'Thu ngân quầy';
 
-                    const earlyLateMatch = s.notes?.match(/\[GIẢI TRÌNH GIỜ CHỐT CA:\s*([^\]]+)\]/i);
-                    const earlyLateText = earlyLateMatch ? earlyLateMatch[1].trim() : null;
-                    const isEarlyClose = earlyLateText?.toUpperCase().includes('SỚM');
-                    const isLateClose = earlyLateText?.toUpperCase().includes('MUỘN');
+                  const earlyLateMatch = s.notes?.match(/\[GIẢI TRÌNH GIỜ CHỐT CA:\s*([^\]]+)\]/i);
+                  const earlyLateText = earlyLateMatch ? earlyLateMatch[1].trim() : null;
+                  const isEarlyClose = earlyLateText?.toUpperCase().includes('SỚM');
+                  const isLateClose = earlyLateText?.toUpperCase().includes('MUỘN');
 
-                    return (
-                      <tr
-                        key={s.id}
-                        className="so-list-row"
-                        style={{
-                          borderBottom: '1px solid #f1f5f9',
-                          backgroundColor: '#ffffff',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f8fafc';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#ffffff';
-                        }}
-                      >
-                        <td className="so-list-td" style={{ overflow: 'hidden' }}>
-                          <span className="so-list-code font-mono font-bold">{s.shiftCode}</span>
-                        </td>
-                        <td className="so-list-td" style={{ color: '#334155', fontSize: 12, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                          <div><b>Mở:</b> {formatDate(s.openedAtUtc)}</div>
-                          <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981', fontWeight: 600 }}>Đang mở</span>}</div>
-                          {earlyLateText && (
-                            <div
+                  return (
+                    <tr
+                      key={s.id}
+                      className="so-list-row"
+                      style={{
+                        borderBottom: '1px solid #f1f5f9',
+                        backgroundColor: '#ffffff',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f8fafc';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
+                    >
+                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
+                        <span className="so-list-code font-mono font-bold">{s.shiftCode}</span>
+                      </td>
+                      <td className="so-list-td" style={{ color: '#334155', fontSize: 12, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        <div><b>Mở:</b> {formatDate(s.openedAtUtc)}</div>
+                        <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981', fontWeight: 600 }}>Đang mở</span>}</div>
+                        {earlyLateText && (
+                          <div
+                            style={{
+                              marginTop: 4,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              backgroundColor: isEarlyClose ? '#FEF3C7' : isLateClose ? '#FEE2E2' : '#E0F2FE',
+                              color: isEarlyClose ? '#B45309' : isLateClose ? '#B91C1C' : '#0369A1',
+                              border: isEarlyClose ? '1px solid #FCD34D' : isLateClose ? '1px solid #FCA5A5' : '1px solid #BAE6FD',
+                              maxWidth: 135,
+                            }}
+                            title={`Giải trình giờ chốt ca: ${earlyLateText}`}
+                          >
+                            <span>{isEarlyClose ? '⚠️ Chốt sớm' : isLateClose ? '⏰ Chốt muộn' : '⏱ Giải trình'}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="so-list-td" style={{ color: '#1E293B', overflow: 'hidden' }}>
+                        {uniqueParticipants.length > 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%' }} title={cashierDisplay}>
+                            <span
                               style={{
-                                marginTop: 4,
+                                fontWeight: 600,
+                                color: '#0F172A',
+                                fontSize: 12.5,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '100%',
+                              }}
+                              title={repairLegacyUtf8(uniqueParticipants[0].fullName || uniqueParticipants[0].userName)}
+                            >
+                              {repairLegacyUtf8(uniqueParticipants[0].fullName || uniqueParticipants[0].userName)}
+                            </span>
+                            {uniqueParticipants.length > 1 && (
+                              <span
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 3,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: '#0F766E',
+                                  backgroundColor: '#F0FDFA',
+                                  border: '1px solid #CCFBF1',
+                                  borderRadius: 4,
+                                  padding: '1px 6px',
+                                  width: 'fit-content',
+                                }}
+                                title={`Danh sách nhân viên cùng trực: ${cashierDisplay}`}
+                              >
+                                +{uniqueParticipants.length - 1} nhân viên khác
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: '#64748B', fontStyle: 'italic' }}>Thu ngân quầy</span>
+                        )}
+                      </td>
+                      <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569', overflow: 'hidden' }}>
+                        {formatVND(s.openingFloat)}
+                      </td>
+                      <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600, overflow: 'hidden' }}>
+                        {formatVND(s.expectedCash)}
+                      </td>
+                      <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A', overflow: 'hidden' }}>
+                        {s.actualCashCounted !== null && s.actualCashCounted !== undefined ? formatVND(s.actualCashCounted) : '---'}
+                      </td>
+                      <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, overflow: 'hidden' }}>
+                        {diff === 0 ? (
+                          <span style={{ color: '#059669' }}>Khớp (0 đ)</span>
+                        ) : diff > 0 ? (
+                          <span style={{ color: '#059669' }}>+{formatVND(diff)}</span>
+                        ) : (
+                          <span style={{ color: '#DC2626' }}>{formatVND(diff)}</span>
+                        )}
+                      </td>
+                      <td className="so-list-td" style={{ textAlign: 'center', overflow: 'hidden' }}>
+                        {getHandoverBadge(s.handoverStatus)}
+                      </td>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'center', overflow: 'hidden' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center', width: '100%' }}>
+                          <button
+                            type="button"
+                            className="so-list-action-btn"
+                            onClick={() => setSelectedDetailShift(s)}
+                            title="Xem chi tiết phiên ca & Lý do chênh lệch"
+                          >
+                            <Eye size={13} />
+                            <span>Chi tiết</span>
+                          </button>
+
+                          {!s.closedAtUtc && isOwnerOrAdmin && s.cashierUserId !== user?.id && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenForceCloseModal(s)}
+                              style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: 4,
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                                fontSize: 11,
-                                fontWeight: 600,
-                                backgroundColor: isEarlyClose ? '#FEF3C7' : isLateClose ? '#FEE2E2' : '#E0F2FE',
-                                color: isEarlyClose ? '#B45309' : isLateClose ? '#B91C1C' : '#0369A1',
-                                border: isEarlyClose ? '1px solid #FCD34D' : isLateClose ? '1px solid #FCA5A5' : '1px solid #BAE6FD',
-                                maxWidth: 135,
+                                height: 28,
+                                padding: '0 8px',
+                                borderRadius: 6,
+                                border: '1px solid #DC2626',
+                                backgroundColor: '#FEF2F2',
+                                color: '#DC2626',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
                               }}
-                              title={`Giải trình giờ chốt ca: ${earlyLateText}`}
+                              title="Nhân viên quên chốt ca: Chủ cửa hàng tự kiểm đếm tiền, nhập lý do và buộc đóng ca"
                             >
-                              <span>{isEarlyClose ? 'Chốt sớm' : isLateClose ? 'Chốt muộn' : 'Giải trình'}</span>
-                            </div>
+                              <AlertTriangle size={13} />
+                              <span>Buộc đóng ca</span>
+                            </button>
                           )}
-                        </td>
-                        <td className="so-list-td" style={{ color: '#1E293B', overflow: 'hidden' }}>
-                          {uniqueParticipants.length > 0 ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%' }} title={cashierDisplay}>
-                              <span
-                                style={{
-                                  fontWeight: 600,
-                                  color: '#0F172A',
-                                  fontSize: 12.5,
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  maxWidth: '100%',
-                                }}
-                                title={uniqueParticipants[0].fullName || uniqueParticipants[0].userName}
-                              >
-                                {uniqueParticipants[0].fullName || uniqueParticipants[0].userName}
-                              </span>
-                              {uniqueParticipants.length > 1 && (
-                                <span
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: 3,
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    color: '#0F766E',
-                                    backgroundColor: '#F0FDFA',
-                                    border: '1px solid #CCFBF1',
-                                    borderRadius: 4,
-                                    padding: '1px 6px',
-                                    width: 'fit-content',
-                                  }}
-                                  title={`Danh sách nhân viên cùng trực: ${cashierDisplay}`}
-                                >
-                                  +{uniqueParticipants.length - 1} nhân viên khác
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span style={{ color: '#64748B', fontStyle: 'italic' }}>Thu ngân quầy</span>
-                          )}
-                        </td>
-                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#475569', overflow: 'hidden' }}>
-                          {formatVND(s.openingFloat)}
-                        </td>
-                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#0F766E', fontWeight: 600, overflow: 'hidden' }}>
-                          {formatVND(s.expectedCash)}
-                        </td>
-                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#0F172A', overflow: 'hidden' }}>
-                          {s.actualCashCounted !== null && s.actualCashCounted !== undefined ? formatVND(s.actualCashCounted) : '---'}
-                        </td>
-                        <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, overflow: 'hidden' }}>
-                          {diff === 0 ? (
-                            <span style={{ color: '#059669' }}>Khớp (0 đ)</span>
-                          ) : diff > 0 ? (
-                            <span style={{ color: '#059669' }}>+{formatVND(diff)}</span>
-                          ) : (
-                            <span style={{ color: '#DC2626' }}>{formatVND(diff)}</span>
-                          )}
-                        </td>
-                        <td className="so-list-td" style={{ textAlign: 'center', overflow: 'hidden' }}>
-                          {getHandoverBadge(s.handoverStatus)}
-                        </td>
-                        <td className="so-list-td so-list-td--actions" style={{ textAlign: 'center', overflow: 'hidden' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center', width: '100%' }}>
+
+                          {isOwnerOrAdmin && Boolean(s.closedAtUtc) && (isPendingHandover || isDisputedHandover) && (
                             <button
                               type="button"
-                              className="so-list-action-btn"
-                              onClick={() => setSelectedDetailShift(s)}
-                              title="Xem chi tiết phiên ca & Lý do chênh lệch"
+                              onClick={() => {
+                                setHandoverShift(s);
+                                setHandoverDecision('CONFIRMED');
+                                setDisputeReason('');
+                              }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                height: 28,
+                                padding: '0 8px',
+                                borderRadius: 6,
+                                border: '1px solid #059669',
+                                backgroundColor: '#ECFDF5',
+                                color: '#047857',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title="Chủ cửa hàng duyệt bàn giao & cộng tiền nộp két vào Sổ quỹ"
                             >
-                              <Eye size={13} />
-                              <span>Chi tiết</span>
+                              <UserCheck size={13} />
+                              <span>Duyệt</span>
                             </button>
-
-                            {!s.closedAtUtc && isOwnerOrAdmin && s.cashierUserId !== user?.id && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenForceCloseModal(s)}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                  height: 28,
-                                  padding: '0 8px',
-                                  borderRadius: 6,
-                                  border: '1px solid #DC2626',
-                                  backgroundColor: '#FEF2F2',
-                                  color: '#DC2626',
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title="Nhân viên quên chốt ca: Chủ cửa hàng tự kiểm đếm tiền, nhập lý do và buộc đóng ca"
-                              >
-                                <AlertTriangle size={13} />
-                                <span>Buộc đóng ca</span>
-                              </button>
-                            )}
-
-                            {isOwnerOrAdmin && Boolean(s.closedAtUtc) && (isPendingHandover || isDisputedHandover) && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setHandoverShift(s);
-                                  setHandoverDecision('CONFIRMED');
-                                  setDisputeReason('');
-                                }}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                  height: 28,
-                                  padding: '0 8px',
-                                  borderRadius: 6,
-                                  border: '1px solid #059669',
-                                  backgroundColor: '#ECFDF5',
-                                  color: '#047857',
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                title="Chủ cửa hàng duyệt bàn giao & cộng tiền nộp két vào Sổ quỹ"
-                              >
-                                <UserCheck size={13} />
-                                <span>Duyệt</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
-          {filteredShifts.length > 0 && (
-            <TablePagination
-              currentPage={currentPage}
-              pageSize={pageSize}
-              totalItems={filteredShifts.length}
-              itemLabel="ca làm việc"
-              pageSizeOptions={[15, 24, 36, 48]}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={(newSize) => {
-                setPageSize(newSize);
-                setCurrentPage(1);
-              }}
-            />
-          )}
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {/* ── Footer Phân trang chuẩn theo StoreProductTable ── */}
+        {filteredShifts.length > 0 && (
+          <TablePagination
+            currentPage={currentPage}
+            pageSize={pageSize}
+            totalItems={filteredShifts.length}
+            itemLabel="ca làm việc"
+            pageSizeOptions={[15, 24, 36, 48]}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+          />
+        )}
+      </div>
 
       {/* ─── 3. MODAL XÁC NHẬN BÀN GIAO CA (HANDOVER CONFIRMATION) ─── */}
       {isOwnerOrAdmin && handoverShift && (
@@ -1187,7 +1218,7 @@ export const PosShiftPage: FC = () => {
             <div style={{ marginTop: 16, fontSize: 13, color: '#334155' }}>
               <div style={{ background: '#F8FAFC', padding: '12px 14px', borderRadius: 8, marginBottom: 16, border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748B' }}>Tiền mặt đầu ca (Opening Float):</span>
+                  <span style={{ color: '#64748B' }}>Tiền mặt đầu ca:</span>
                   <span style={{ fontWeight: 600, color: '#B45309' }}>
                     {formatVND(handoverShift.openingFloat || 0)}
                   </span>
@@ -1211,7 +1242,7 @@ export const PosShiftPage: FC = () => {
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#1E40AF' }}>Doanh thu Chuyển khoản / VietQR trong ca:</span>
+                  <span style={{ color: '#1E40AF' }}>Doanh thu chuyển khoản trong ca:</span>
                   <span style={{ fontWeight: 700, color: '#2563EB' }}>
                     {formatVND(handoverShift.totalBankRevenue || 0)}
                   </span>
@@ -1330,7 +1361,7 @@ export const PosShiftPage: FC = () => {
       {selectedDetailShift && (
         <div
           className="pos-modal-overlay"
-          onClick={() => setSelectedDetailShift(null)}
+          onClick={closeShiftDetail}
           style={{
             position: 'fixed',
             inset: 0,
@@ -1369,7 +1400,7 @@ export const PosShiftPage: FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedDetailShift(null)}
+                onClick={closeShiftDetail}
                 style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748B' }}
               >
                 <X size={20} />
@@ -1407,18 +1438,18 @@ export const PosShiftPage: FC = () => {
                 </div>
               </div>
 
-              {/* Bảng chỉ số đối soát tiền két Z-Report */}
+              {/* Bảng chỉ số đối soát tiền két */}
               <div>
                 <div style={{ fontWeight: 700, fontSize: 13.5, color: '#0F172A', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <BarChart3 size={16} color="#0F766E" /> Báo Cáo Kết Toán Tiền Két (Z-Report):
+                  <BarChart3 size={16} color="#0F766E" /> Báo Cáo Kết Toán Tiền Két:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                   <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Vốn đầu ca (Opening Float):</div>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Vốn đầu ca:</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{formatVND(selectedDetailShift.openingFloat)}</div>
                   </div>
                   <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Doanh thu chuyển khoản (VietQR):</div>
+                    <div style={{ fontSize: 11.5, color: '#64748B' }}>Doanh thu chuyển khoản:</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0284C7' }}>{formatVND(selectedDetailShift.totalBankRevenue)}</div>
                   </div>
                   <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
@@ -1521,7 +1552,7 @@ export const PosShiftPage: FC = () => {
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18, borderTop: '1px solid #E2E8F0', paddingTop: 12 }}>
               <button
                 type="button"
-                onClick={() => setSelectedDetailShift(null)}
+                onClick={closeShiftDetail}
                 style={{
                   padding: '8px 18px',
                   borderRadius: 6,
@@ -1540,22 +1571,26 @@ export const PosShiftPage: FC = () => {
         </div>
       )}
 
+      </>}
       {/* ─── 5. MODAL BÁO CÁO CUỐI NGÀY & KẾT TOÁN CHO CHỦ TIỆM (TÁCH ĐƠN CHỦ 24/7 & KHÓA SỔ CA THEO NGÀY NGHIỆP VỤ) ─── */}
-      {isOwnerEodModalOpen && (
+      {isOwnerEodModalOpen && !forceCloseTargetShift && (
         <div
           className="pos-modal-overlay"
-          onClick={(e) => e.target === e.currentTarget && setIsOwnerEodModalOpen(false)}
+          onClick={(e) => e.target === e.currentTarget && closeDailyClosing()}
         >
-          <div className="pos-modal-dialog" style={{ width: 'min(1080px, calc(100vw - 32px))', maxWidth: 'none', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
+          <div className="pos-modal-dialog" role="dialog" aria-modal="true" aria-label="Chốt doanh thu ngày" style={{ maxWidth: 760, maxHeight: '90vh', overflowY: 'auto', padding: 20, fontSize: 13 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid #E2E8F0' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0F172A' }}>
-                  Chốt doanh thu ngày · {selectedBranchName}
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0F172A' }}>
+                  Chốt doanh thu ngày
                 </h3>
+                <div style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
+                  Kiểm tra tiền, xử lý ca còn tồn và khóa số liệu của một ngày nghiệp vụ.
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setIsOwnerEodModalOpen(false)}
+                onClick={closeDailyClosing}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
               >
                 <X size={18} />
@@ -1563,25 +1598,27 @@ export const PosShiftPage: FC = () => {
             </div>
 
             <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {/* Thanh chọn Chi nhánh (Mặc định theo từng chi nhánh) & Ngày nghiệp vụ */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: 10, padding: '10px 12px', backgroundColor: '#F8FAFC', borderRadius: 8, border: '1px solid #CBD5E1' }}>
+              {/* Khóa sổ luôn thực hiện theo một chi nhánh cụ thể. */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 180px', gap: 10, padding: '10px 12px', backgroundColor: '#F8FAFC', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13 }}>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>Chi nhánh</div>
-                  <select className="pos-input" value={selectedBranchId === 'ALL' ? '' : selectedBranchId} onChange={(event) => setSelectedBranchId(event.target.value)} style={{ width: '100%', height: 36 }}>
-                    {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-                  </select>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                    Chi nhánh khóa sổ:
+                  </div>
+                  <div style={{ padding: '7px 10px', border: '1px solid #99F6E4', borderRadius: 6, background: '#F0FDFA', color: '#0F766E', fontWeight: 800 }}>
+                    {dailyClosing?.branchName || selectedBranchName || 'Chi nhánh đang chọn'}
+                  </div>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                    Ngày kinh doanh
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 6 }}>
+                    Ngày nghiệp vụ:
                   </label>
                   <input
                     type="date"
                     className="pos-input"
                     value={eodBusinessDate}
                     onChange={(e) => setEodBusinessDate(e.target.value)}
-                    style={{ width: '100%', height: 32, fontSize: 12.5, padding: '0 8px' }}
+                    style={{ width: '100%', height: 34, fontSize: 13, padding: '0 8px' }}
                   />
                 </div>
               </div>
@@ -1635,19 +1672,26 @@ export const PosShiftPage: FC = () => {
               )}
 
               {/* MỤC 1 (ĐỘC LẬP 24/7): KẾT TOÁN ĐƠN CHỦ TỰ BÁN (SHIFT_ID = NULL) TÍNH ĐẾN HIỆN TẠI */}
-              <div style={{ backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+              <details style={{ backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: 10, padding: '10px 14px', fontSize: 13 }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 800, color: '#0F172A' }}>
+                  Đơn Chủ tự bán: {ownerUnsettled?.unsettledOrdersCount || 0} đơn · {formatVND(ownerUnsettled?.totalRevenue || 0)}
+                </summary>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 800, color: '#0F172A' }}>
-                    1. Đơn chủ cửa hàng tự bán
+                    Chi tiết đơn Chủ cửa hàng tự bán
                   </span>
                   <strong style={{ color: '#0F766E' }}>{ownerUnsettled?.unsettledOrdersCount || 0} đơn chưa kết toán</strong>
                 </div>
+                <div style={{ fontSize: 11.5, color: '#64748B' }}>
+                  Các đơn này được cộng đúng một lần khi Chủ cửa hàng khóa sổ ngày nghiệp vụ; không tạo phiếu thu riêng trước đó.
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginTop: 2 }}>
-                  <span style={{ color: '#065F46' }}>Tiền mặt Chủ tự bán (vào Két sắt):</span>
+                  <span style={{ color: '#065F46' }}>Tiền mặt Chủ tự bán:</span>
                   <strong style={{ color: '#059669' }}>+{formatVND(ownerUnsettled?.cashRevenue || 0)}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                  <span style={{ color: '#1E40AF' }}>Chuyển khoản / VietQR Chủ tự bán (vào Ngân hàng):</span>
+                  <span style={{ color: '#1E40AF' }}>Doanh thu chuyển khoản Chủ tự bán:</span>
                   <strong style={{ color: '#2563EB' }}>+{formatVND(ownerUnsettled?.bankRevenue || 0)}</strong>
                 </div>
 
@@ -1657,7 +1701,8 @@ export const PosShiftPage: FC = () => {
                   </span>
                   <span style={{ color: '#64748B', fontSize: 11.5 }}>Sẽ kết toán khi khóa sổ ngày</span>
                 </div>
-              </div>
+                </div>
+              </details>
 
               {isLoadingBusinessDayPreview && (
                 <div role="status" style={{ padding: 12, borderRadius: 8, background: '#F8FAFC', color: '#475569' }}>
@@ -1670,31 +1715,36 @@ export const PosShiftPage: FC = () => {
                 </div>
               )}
               {businessDayPreview && (
-              <div style={{ backgroundColor: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 10, padding: 18, display: 'grid', gap: 16, fontSize: 14 }}>
-                  <div style={{ fontWeight: 800, color: '#0F766E', fontSize: 16 }}>Số liệu ngày kinh doanh</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10 }}>
-                    {([
-                      ['Doanh thu tiền mặt', businessDayPreview.totalCashSales],
-                      ['Doanh thu chuyển khoản', businessDayPreview.totalBankSales],
-                      ['Thu khác', businessDayPreview.totalCashIn],
-                      ['Chi vận hành', businessDayPreview.totalCashOut],
-                    ] as const).map(([label, amount]) => <div key={label} style={{ background: '#FFFFFF', border: '1px solid #CCFBF1', borderRadius: 8, padding: '10px 12px', display: 'grid', gap: 4 }}><span style={{ color: '#475569' }}>{label}</span><strong style={{ fontSize: 16, color: '#0F172A' }}>{formatVND(amount)}</strong></div>)}
+                <div style={{ backgroundColor: '#F0FDFA', border: '1px solid #99F6E4', borderRadius: 10, padding: 14, display: 'grid', gap: 12, fontSize: 13 }}>
+                  <div style={{ fontWeight: 800, color: '#0F766E', fontSize: 14 }}>Tổng quan trong ngày</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+                    {[
+                      ['Tiền mặt', businessDayPreview.totalCashSales, '#065F46'],
+                      ['Chuyển khoản', businessDayPreview.totalBankSales, '#1D4ED8'],
+                      ['Thu khác', businessDayPreview.totalCashIn, '#475569'],
+                      ['Chi từ ca', businessDayPreview.totalCashOut, '#B45309'],
+                    ].map(([label, amount, color]) => (
+                      <div key={String(label)} style={{ background: '#FFFFFF', border: '1px solid #CCFBF1', borderRadius: 8, padding: '9px 10px' }}>
+                        <div style={{ color: '#64748B', marginBottom: 4 }}>{label}</div>
+                        <b style={{ color: String(color), fontSize: 14 }}>{formatVND(Number(amount))}</b>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ color: '#475569', fontSize: 13 }}>
-                    Tiền chuyển khoản đã vào ngân hàng khi SePay xác nhận và chỉ được tổng hợp khi chốt ngày. Không cộng thêm lần nữa vào số dư.
-                    <button type="button" onClick={() => navigate('/store-owner/subscriptions?tab=finance-accounts&subtab=history')} style={{ marginLeft: 8, border: 0, background: 'none', color: '#0F766E', fontWeight: 700, cursor: 'pointer' }}>Đối chiếu giao dịch</button>
+                  <div style={{ color: '#64748B' }}>
+                    Hoàn từ két quầy: <b>{formatVND(businessDayPreview.shiftReturnRefunds ?? 0)}</b>
+                    {' · '}Hoàn từ két sắt: <b>{formatVND(businessDayPreview.safeReturnRefunds ?? 0)}</b>
                   </div>
                   <div style={{ borderTop: '1px dashed #5EEAD4', paddingTop: 8 }}>
-                    <div style={{ fontWeight: 700, marginBottom: 5 }}>Đối soát theo quỹ</div>
+                    <div style={{ fontWeight: 800, marginBottom: 7, color: '#0F172A' }}>Tiền thực đếm</div>
                     {businessDayPreview.funds.length === 0
                       ? <span style={{ color: '#64748B' }}>Chưa có quỹ hoạt động tại chi nhánh.</span>
                       : businessDayPreview.funds.map((fund) => (
-                        <div key={fund.fundId} style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 1fr) minmax(145px, auto) minmax(180px, 210px)', alignItems: 'center', gap: 16, padding: '10px 12px', background: '#FFFFFF', border: '1px solid #CCFBF1', borderRadius: 8 }}>
-                          <span style={{ display: 'grid', gap: 2, minWidth: 0, overflowWrap: 'anywhere' }}><strong>{fundDisplayName(fund)}</strong><small style={{ color: '#64748B' }}>{fundTypeLabel(fund.fundType)}</small></span>
+                        <div key={fund.fundId} style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 1fr) auto minmax(150px, 190px)', alignItems: 'center', gap: 12, padding: '4px 0' }}>
+                          <span>{fund.fundName}</span>
                           <span>Dự kiến: <b>{formatVND(fund.expectedCash)}</b></span>
                           {fund.requiresPhysicalCount ? (
-                            <label style={{ display: 'grid', gap: 3, fontSize: 13 }}>
-                              Thực đếm (đ)
+                            <label style={{ display: 'grid', gap: 3, fontSize: 11.5 }}>
+                              Số tiền thực tế (VNĐ)
                               <input
                                 aria-label={`Tiền thực đếm quỹ ${fund.fundName}`}
                                 type="number"
@@ -1705,7 +1755,7 @@ export const PosShiftPage: FC = () => {
                                 style={{ padding: '7px 9px', border: '1px solid #94A3B8', borderRadius: 6 }}
                               />
                             </label>
-                          ) : <span style={{ color: '#64748B' }}>Không kiểm đếm</span>}
+                          ) : <span style={{ color: '#64748B' }}>Không cần kiểm đếm</span>}
                         </div>
                       ))}
                   </div>
@@ -1714,7 +1764,7 @@ export const PosShiftPage: FC = () => {
                       <div style={{ fontWeight: 800, color: '#9A3412', marginBottom: 6 }}>Việc cần xử lý trước khi khóa sổ</div>
                       {businessDayPreview.blockers.map((blocker) => (
                         <div key={`${blocker.code}-${blocker.entityId}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '3px 0' }}>
-                          <span>{blocker.displayName}{blocker.amount != null ? ` · ${formatVND(blocker.amount)}` : ''}</span>
+                          <span>{blocker.displayName} — {blocker.status}{blocker.amount != null ? ` — ${formatVND(blocker.amount)}` : ''}</span>
                           {blocker.actionPath && <button type="button" onClick={() => navigate(blocker.actionPath!)} style={{ border: 0, background: 'none', color: '#C2410C', fontWeight: 700, cursor: 'pointer' }}>Xem/Xử lý</button>}
                         </div>
                       ))}
@@ -1724,10 +1774,10 @@ export const PosShiftPage: FC = () => {
               )}
 
               {/* MỤC 2: BÁO CÁO & KHÓA SỔ CÁC CA NHÂN VIÊN THUỘC NGÀY NGHIỆP VỤ ĐANG CHỌN */}
-              <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+              <div style={{ backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: 800, color: '#92400E' }}>
-                    2. Các ca Nhân viên thuộc Ngày nghiệp vụ ({eodBusinessDate}):
+                    Tình trạng ca bán hàng ({eodBusinessDate})
                   </span>
                   <strong style={{ color: '#B45309' }}>
                     {businessDateMetrics.totalShifts} ca ({businessDateMetrics.pendingCount} ca chờ duyệt)
@@ -1739,7 +1789,7 @@ export const PosShiftPage: FC = () => {
                   <strong style={{ color: '#059669' }}>+{formatVND(businessDateMetrics.pendingCashDrop)}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                  <span style={{ color: '#78350F' }}>Doanh thu Chuyển khoản / VietQR các ca trong ngày:</span>
+                  <span style={{ color: '#78350F' }}>Doanh thu chuyển khoản các ca trong ngày:</span>
                   <strong style={{ color: '#2563EB' }}>{formatVND(businessDateMetrics.totalBankRev)}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
@@ -1766,7 +1816,6 @@ export const PosShiftPage: FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              setIsOwnerEodModalOpen(false);
                               handleOpenForceCloseModal(os);
                             }}
                             style={{
@@ -1791,50 +1840,31 @@ export const PosShiftPage: FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, paddingTop: 8, borderTop: '1px dashed #FCD34D' }}>
                   <span style={{ fontSize: 11.5, color: '#78350F' }}>
                     {pendingShiftsForBusinessDate.length > 0
-                      ? `Có ${pendingShiftsForBusinessDate.length} ca đã đóng chờ duyệt vào Két sắt ngày ${eodBusinessDate}.`
+                      ? `Có ${pendingShiftsForBusinessDate.length} ca đã đóng chờ xác nhận bàn giao ngày ${eodBusinessDate}.`
                       : openShiftsForBusinessDate.length > 0
                         ? 'Các ca đã đóng của ngày này đã duyệt xong; còn ca đang hoạt động ở trên.'
                         : 'Tất cả các ca đã đóng trong ngày nghiệp vụ này đều đã được duyệt.'}
                   </span>
                   <button
                     type="button"
-                    disabled={
-                      isBusinessDayClosed ||
-                      isSettlingOwnerEod ||
-                      isLoadingBusinessDayPreview ||
-                      Boolean(businessDayPreview?.blockers.some((blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER')) ||
-                      !businessDayPreview ||
-                      (pendingShiftsForBusinessDate.length === 0 && businessDayPreview.funds
-                        .filter((fund) => fund.requiresPhysicalCount)
-                        .some((fund) => {
-                          const raw = businessDayFundCounts[fund.fundId];
-                          const value = Number(raw);
-                          return raw == null || raw.trim() === '' || !Number.isInteger(value) || value < 0 || value > 999_999_999_999;
-                        })) ||
-                      openShiftsForBusinessDate.length > 0
-                    }
+                    disabled={isSettlingOwnerEod || isLoadingBusinessDayPreview || !businessDayPreview}
+                    title={businessDayPreview?.blockers.length ? 'Bấm để xem lý do chưa thể khóa sổ' : 'Khóa sổ ngày nghiệp vụ'}
                     onClick={handleApproveBusinessDateShifts}
                     style={{
                       padding: '6px 14px',
                       borderRadius: 6,
                       border: 'none',
                       backgroundColor:
-                        Boolean(businessDayPreview?.blockers.some((blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER')) || openShiftsForBusinessDate.length > 0
-                          ? '#94A3B8'
-                          : '#D97706',
+                        '#D97706',
                       color: '#FFFFFF',
                       fontSize: 12,
                       fontWeight: 700,
                       cursor:
-                        Boolean(businessDayPreview?.blockers.some((blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER')) || openShiftsForBusinessDate.length > 0
-                          ? 'not-allowed'
-                          : 'pointer',
+                        isSettlingOwnerEod || isLoadingBusinessDayPreview || !businessDayPreview ? 'not-allowed' : 'pointer',
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {isBusinessDayClosed
-                      ? 'Đã chốt ngày'
-                      : isSettlingOwnerEod
+                    {isSettlingOwnerEod
                       ? 'Đang duyệt...'
                       : pendingShiftsForBusinessDate.length > 0
                         ? `Xác nhận bàn giao (${pendingShiftsForBusinessDate.length} ca)`
@@ -1844,14 +1874,14 @@ export const PosShiftPage: FC = () => {
               </div>
 
               {businessDayHistory.length > 0 && (
-                <div style={{ border: '1px solid #CBD5E1', borderRadius: 10, padding: 12, display: 'grid', gap: 8 }}>
-                  <strong style={{ color: '#334155' }}>Lịch sử chốt ngày nghiệp vụ</strong>
+                <details style={{ border: '1px solid #CBD5E1', borderRadius: 10, padding: 12, fontSize: 13 }}>
+                  <summary style={{ color: '#334155', fontWeight: 800, cursor: 'pointer' }}>Lịch sử khóa sổ ({businessDayHistory.length} phiên bản)</summary>
                   {businessDayHistory.map((closing) => (
-                    <div key={closing.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '7px 0', borderTop: '1px solid #E2E8F0', fontSize: 12.5 }}>
-                      <span><b>{closing.referenceCode}</b> — {closing.status.toLowerCase() === 'closed' ? 'Đã chốt' : closing.status}</span>
+                    <div key={closing.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '8px 0', borderTop: '1px solid #E2E8F0', fontSize: 13 }}>
+                      <span><b>Phiên bản {closing.version}</b> — {closing.referenceCode} — {closing.status}{closing.reopenReason ? ` — Lý do mở lại: ${closing.reopenReason}` : ''}</span>
                     </div>
                   ))}
-                </div>
+                </details>
               )}
 
               <div>
@@ -1872,7 +1902,7 @@ export const PosShiftPage: FC = () => {
                 <button
                   type="button"
                   className="pos-btn-secondary"
-                  onClick={() => setIsOwnerEodModalOpen(false)}
+                  onClick={closeDailyClosing}
                 >
                   Đóng
                 </button>
@@ -1881,6 +1911,7 @@ export const PosShiftPage: FC = () => {
           </div>
         </div>
       )}
+
 
       {/* ─── 6. MODAL BUỘC ĐÓNG CA (FORCE CLOSE) DÀNH CHO CHỦ CỬA HÀNG KHI NHÂN VIÊN QUÊN CHỐT CA ─── */}
       {forceCloseTargetShift && (
@@ -1892,7 +1923,7 @@ export const PosShiftPage: FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, borderBottom: '1px solid #E2E8F0' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#991B1B' }}>
-                  Buộc Đóng Ca #{forceCloseTargetShift.shiftCode} (Chủ Cửa Hàng)
+                  Buộc Đóng Ca #{forceCloseTargetShift.shiftCode}
                 </h3>
                 <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                   Dùng khi nhân viên hết giờ về nhưng quên bấm chốt ca. Hệ thống sẽ ghi log người đóng và lý do.
@@ -1914,11 +1945,11 @@ export const PosShiftPage: FC = () => {
                   <b>{forceCloseTargetShift.shiftName} ({formatDate(forceCloseTargetShift.openedAtUtc)})</b>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748B' }}>Tiền mặt đầu ca (Opening Float):</span>
+                  <span style={{ color: '#64748B' }}>Tiền mặt đầu ca:</span>
                   <b>{formatVND(forceCloseTargetShift.openingFloat || 0)}</b>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#64748B' }}>Tiền mặt lý thuyết trong két (Expected):</span>
+                  <span style={{ color: '#64748B' }}>Tiền mặt lý thuyết trong két:</span>
                   <b style={{ color: '#0F766E' }}>{formatVND(forceCloseTargetShift.expectedCash || 0)}</b>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 4, borderTop: '1px dashed #CBD5E1' }}>
@@ -1940,7 +1971,7 @@ export const PosShiftPage: FC = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                  1. Tiền mặt thực tế Chủ cửa hàng kiểm đếm trong két (đ):
+                  1. Tiền mặt thực tế kiểm đếm trong két:
                 </label>
                 <input
                   type="number"
@@ -1960,7 +1991,7 @@ export const PosShiftPage: FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    2. Để lại két cho ca sau (đ):
+                    2. Để lại két cho ca sau:
                   </label>
                   <input
                     type="number"
@@ -1978,7 +2009,7 @@ export const PosShiftPage: FC = () => {
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
-                    3. Rút nộp về Két sắt Chủ (đ):
+                    3. Rút nộp về két sắt:
                   </label>
                   <input
                     type="text"
@@ -1992,7 +2023,7 @@ export const PosShiftPage: FC = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#991B1B', marginBottom: 4 }}>
-                  4. Lý do buộc đóng ca (Bắt buộc ghi log):
+                  4. Lý do buộc đóng ca (*):
                 </label>
                 <input
                   type="text"

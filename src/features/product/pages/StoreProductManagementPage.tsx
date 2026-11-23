@@ -255,11 +255,14 @@ export const StoreProductManagementPage: FC = () => {
         await fetchProducts();
       }
       if (result.summary.failedCount === 0) {
+        setIsImportResultOpen(false);
+        setImportResult(null);
         showToast(
           `Import thành công ${result.summary.successCount}/${result.summary.totalRows} dòng.`,
           'success'
         );
       } else {
+        // Giữ popup để xem dòng lỗi
         showToast(
           `Import xong: ${result.summary.successCount} OK, ${result.summary.failedCount} lỗi.`,
           'info'

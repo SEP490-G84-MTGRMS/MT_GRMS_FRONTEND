@@ -29,6 +29,8 @@ export interface BackendTenantStoreResponse {
   staffCount: number;
   maxStaff: number;
   walletBalance?: number;
+  staffManagementLocked?: boolean;
+  canPurchaseStaffManagementAddon?: boolean;
 }
 
 export interface UpdateStoreInfoPayload {
@@ -99,11 +101,15 @@ export const mapBackendStoreToFrontend = (
     email: `${backend.subdomain}@mtgrms.vn`,
     status: (backend.status as StoreInfo['status']) || 'ACTIVE',
     currentPlan: backend.planName || backend.currentPlan || 'Chưa chọn gói',
+    currentPlanCode: backend.currentPlan,
+    subscriptionExpiresAtUtc: backend.subscriptionExpiresAt,
     subscriptionExpiresAt: expiresAt,
     daysRemaining,
     branchesCount: backend.branchCount,
     industry: 'Tạp hóa & Siêu thị',
     walletBalance: backend.walletBalance !== undefined ? backend.walletBalance : existingWalletBalance,
+    staffManagementLocked: backend.staffManagementLocked,
+    canPurchaseStaffManagementAddon: backend.canPurchaseStaffManagementAddon,
   };
 };
 
@@ -148,6 +154,11 @@ export const storeApi = {
     return res.data;
   },
 
+  async quoteProUpgrade(payload: PurchaseSubscriptionPayload): Promise<ApiResponse<ProUpgradeQuote>> {
+    const res = await httpClient.post<ApiResponse<ProUpgradeQuote>>('/tenant/subscriptions/pro-quote', payload);
+    return res.data;
+  },
+
   async purchaseSubscription(
     payload: PurchaseSubscriptionPayload
   ): Promise<ApiResponse<PurchaseSubscriptionResult>> {
@@ -182,26 +193,6 @@ export const storeApi = {
     return res.data;
   },
 
-  async getStorageUsage(): Promise<ApiResponse<StorageUsage>> {
-    const res = await httpClient.get<ApiResponse<StorageUsage>>('/tenant/storage');
-    return res.data;
-  },
-
-  async getStorageQuote(extraGb: number): Promise<ApiResponse<StorageQuote>> {
-    const res = await httpClient.get<ApiResponse<StorageQuote>>('/tenant/storage/quote', {
-      params: { extraGb },
-    });
-    return res.data;
-  },
-
-  async purchaseStorage(extraGb: number, requestId: string): Promise<ApiResponse<StorageQuote>> {
-    const res = await httpClient.post<ApiResponse<StorageQuote>>('/tenant/storage/purchase', {
-      extraGb,
-      requestId,
-    });
-    return res.data;
-  },
-
   async getBranchAddonQuote(extraBranches: number): Promise<ApiResponse<BranchAddonQuote>> {
     const res = await httpClient.get<ApiResponse<BranchAddonQuote>>('/tenant/branch-addon/quote', { params: { extraBranches } });
     return res.data;
@@ -211,18 +202,23 @@ export const storeApi = {
     const res = await httpClient.post<ApiResponse<BranchAddonQuote>>('/tenant/branch-addon/purchase', { extraBranches, requestId });
     return res.data;
   },
+
+  async getStaffAddonQuote(): Promise<ApiResponse<StaffAddonQuote>> {
+    const res = await httpClient.get<ApiResponse<StaffAddonQuote>>('/tenant/subscriptions/staff-addon/quote');
+    return res.data;
+  },
+
+  async purchaseStaffAddon(quote: StaffAddonQuote, requestId: string): Promise<ApiResponse<{ walletBalance: number }>> {
+    const res = await httpClient.post<ApiResponse<{ walletBalance: number }>>('/tenant/subscriptions/staff-addon/purchase', {
+      requestId,
+      total: quote.total,
+      expiresAt: quote.expiresAt,
+    });
+    return res.data;
+  },
 };
 
-export interface StorageUsage {
-  usedBytes: number;
-  limitBytes: number;
-  baseGb: number;
-  extraGb: number;
-  addonExpiresAt?: string | null;
-}
-
-export interface StorageQuote {
-  extraGb: number;
+export interface StaffAddonQuote {
   subtotal: number;
   vat: number;
   total: number;
@@ -254,9 +250,22 @@ export interface PurchaseSubscriptionPayload {
   extraBranches?: number;
   hasStaffManagementAddon?: boolean;
   extraWarehouses?: number;
-  extraStorageGb?: number;
   requestId?: string;
   paymentMethod?: 'Wallet' | 'VietQR';
+  quoteAt?: string;
+  expectedExpiry?: string;
+  expectedTotal?: number;
+}
+
+export interface ProUpgradeQuote {
+  quoteAt: string;
+  expectedExpiry: string;
+  expiresAt: string;
+  remainingPro: number;
+  credit: number;
+  additionalTerm: number;
+  branches: number;
+  total: number;
 }
 
 export interface PurchaseSubscriptionResult {

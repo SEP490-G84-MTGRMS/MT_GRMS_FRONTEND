@@ -168,18 +168,28 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
 
   const thBaseStyle: React.CSSProperties = {
     backgroundColor: '#f8fafc',
-    padding: '10px 12px',
-    fontSize: 12,
+    padding: '6px 5px',
+    fontSize: 10.5,
     fontWeight: 700,
     color: '#334155',
     textTransform: 'uppercase',
-    letterSpacing: '0.03em',
+    letterSpacing: '0.01em',
     whiteSpace: 'nowrap',
+    lineHeight: 1.2,
     boxSizing: 'border-box',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
   };
 
+  const sortIcon = (field: typeof sortField) => (
+    <ArrowUpDown
+      size={11}
+      style={{ color: sortField === field ? '#0f766e' : '#94a3b8', flexShrink: 0 }}
+    />
+  );
+
   return (
-    <div className="so-list-table-card">
+    <div className="so-list-table-card so-list-table-card--dense">
       <div
         ref={headerRef}
         className="so-list-table-head"
@@ -197,91 +207,127 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
 
               <th
                 onClick={() => handleSort('sku')}
-                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo mã SKU"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Mã SKU</span>
-                  <ArrowUpDown size={12} color={sortField === 'sku' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>SKU</span>
+                  {sortIcon('sku')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('name')}
-                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo tên sản phẩm"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>Tên Sản Phẩm</span>
-                  <ArrowUpDown size={12} color={sortField === 'name' ? '#0f766e' : '#94a3b8'} />
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                  <span>Tên SP</span>
+                  {sortIcon('name')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('supplierCode')}
-                style={{ ...thBaseStyle, cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, cursor: 'pointer' }}
+                title="Sắp xếp theo mã nhà cung cấp"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <span>Mã NCC</span>
-                  <ArrowUpDown size={12} color={sortField === 'supplierCode' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('supplierCode')}
                 </div>
               </th>
 
               <th style={thBaseStyle}>
-                <span>Nhà Cung Cấp</span>
+                <span>Tên NCC</span>
               </th>
 
               <th style={thBaseStyle}>
-                <span>Ngành Hàng</span>
+                <span>Ngành hàng</span>
               </th>
 
-              <th style={{ ...thBaseStyle, textAlign: 'center' }}>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }} title="Đơn vị nhập">
                 <span>Đơn vị nhập</span>
               </th>
 
               <th
                 onClick={() => handleSort('agreedPrice')}
-                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer' }}
+                title="Sắp xếp theo giá nhập sỉ"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
-                  <span>Giá Nhập Sỉ</span>
-                  <ArrowUpDown size={12} color={sortField === 'agreedPrice' ? '#0f766e' : '#94a3b8'} />
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
+                  <span>Giá nhập sỉ</span>
+                  {sortIcon('agreedPrice')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('moq')}
-                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer' }}
+                title="Số lượng đặt hàng tối thiểu (MOQ)"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
                   <span>MOQ</span>
-                  <ArrowUpDown size={12} color={sortField === 'moq' ? '#0f766e' : '#94a3b8'} />
+                  {sortIcon('moq')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('allowedShortageQty')}
-                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, textAlign: 'right', cursor: 'pointer' }}
+                title="Số lượng thiếu cho phép"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
                   <span>Thiếu cho phép</span>
-                  <ArrowUpDown
-                    size={12}
-                    color={sortField === 'allowedShortageQty' ? '#0f766e' : '#94a3b8'}
-                  />
+                  {sortIcon('allowedShortageQty')}
                 </div>
               </th>
 
               <th
                 onClick={() => handleSort('status')}
-                style={{ ...thBaseStyle, textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...thBaseStyle, textAlign: 'center', cursor: 'pointer' }}
+                title="Sắp xếp theo trạng thái"
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                  <span>Trạng Thái</span>
-                  <ArrowUpDown size={12} color={sortField === 'status' ? '#0f766e' : '#94a3b8'} />
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 3,
+                    width: '100%',
+                  }}
+                >
+                  <span>Trạng thái</span>
+                  {sortIcon('status')}
                 </div>
               </th>
 
-              <th style={{ ...thBaseStyle, textAlign: 'right' }}>
-                <span>Thao Tác</span>
+              <th style={{ ...thBaseStyle, textAlign: 'center' }}>
+                <span>Thao tác</span>
               </th>
             </tr>
           </thead>

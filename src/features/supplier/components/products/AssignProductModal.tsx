@@ -114,13 +114,22 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
     return masterProducts.length > 0 ? masterProducts : localMasterProducts;
   }, [masterProducts, localMasterProducts]);
 
+  /** Chỉ cho gán mới SP master đang bán; SP Ngừng KD vẫn giữ trên list NCC–SP đã gán. */
+  const assignableCatalog = useMemo(
+    () =>
+      productCatalog.filter(
+        (p) => p.isActive !== false && p.status !== 'Inactive' && p.status !== 'Discontinued'
+      ),
+    [productCatalog]
+  );
+
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
-    if (!q) return productCatalog;
-    return productCatalog.filter(
+    if (!q) return assignableCatalog;
+    return assignableCatalog.filter(
       (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
     );
-  }, [productCatalog, productSearch]);
+  }, [assignableCatalog, productSearch]);
 
   const availableFilteredProducts = useMemo(
     () => filteredProducts.filter((p) => !assignedMap[p.id]),

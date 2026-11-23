@@ -81,7 +81,7 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
           <input
             type="text"
             disabled={isEdit}
-            value={code}
+            required maxLength={50} value={code}
             onChange={(e) => onChange({ code: e.target.value.toUpperCase().replace(/\s+/g, '_') })}
             placeholder="VD: PLAN_PRO..."
             style={{
@@ -108,7 +108,7 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
           </label>
           <input
             type="text"
-            value={name}
+            required minLength={2} maxLength={100} value={name}
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="VD: Gói Siêu Thị Mini..."
             style={{
@@ -135,9 +135,9 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
             <input
               type="number"
               min={0}
-              step={10000}
-              value={monthlyPrice || ''}
-              onChange={(e) => onChange({ monthlyPrice: Math.max(0, Number(e.target.value)) })}
+              required step={0.01}
+              value={Number.isNaN(monthlyPrice) ? '' : monthlyPrice}
+              onChange={(e) => onChange({ monthlyPrice: e.target.valueAsNumber })}
               placeholder="0"
               style={{
                 width: '100%',
@@ -184,9 +184,9 @@ export const PlanBasicInfoForm: React.FC<PlanBasicInfoFormProps> = ({
             <input
               type="number"
               min={0}
-              step={100000}
-              value={yearlyPrice || ''}
-              onChange={(e) => onChange({ yearlyPrice: Math.max(0, Number(e.target.value)) })}
+              required step={0.01}
+              value={Number.isNaN(yearlyPrice) ? '' : yearlyPrice}
+              onChange={(e) => onChange({ yearlyPrice: e.target.valueAsNumber })}
               placeholder="0"
               style={{
                 width: '100%',

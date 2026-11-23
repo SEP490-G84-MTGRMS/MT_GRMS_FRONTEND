@@ -209,6 +209,9 @@ export interface SupplierProductItem {
   supplierProductCode?: string;
   effectiveDate: string;
   status: 'Active' | 'Inactive';
+  /** Trạng thái SP master — ngừng bán master không xóa dòng NCC–SP */
+  masterProductStatus?: 'Active' | 'Inactive' | string;
+  isMasterProductActive?: boolean;
 }
 
 export interface MasterProduct {
@@ -221,6 +224,9 @@ export interface MasterProduct {
   defaultWholesalePrice: number;
   defaultMoq: number;
   imageUrl?: string;
+  /** Active | Inactive — master Ngừng KD vẫn giữ dòng NCC–SP đã gán */
+  status?: 'Active' | 'Inactive' | string;
+  isActive?: boolean;
 }
 
 export interface AssignProductInput {

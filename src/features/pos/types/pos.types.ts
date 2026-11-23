@@ -20,9 +20,15 @@ export class ProductDTO {
   spec?: string;
   category: string = '';
   categoryName?: string;
+  /** ĐVT tồn gốc (base) — quantityOnHand tính theo đơn vị này. */
   baseUnit: string = '';
+  /** ĐVT nhập — hiển thị tồn giống màn Lô (vd Thùng). */
+  stockDisplayUnit?: string;
+  /** 1 ĐVT nhập = N ĐVT tồn. */
+  purchaseToStockRate?: number;
   basePrice: number = 0;
   costPrice: number = 0;
+  /** Tồn khả dụng bán (RULE-01) theo ĐVT tồn gốc — chỉ lô còn hạn. */
   quantityOnHand: number = 0;
   allocatedQty?: number;
   batchCode?: string;
@@ -61,8 +67,10 @@ export class CartItemDTO {
   isBelowCostApproved?: boolean;
   batchCode?: string;
   batchId?: string;
+  packageId?: string;
   fefoDiscountPercent?: number;
   expiryDate?: string;
+  availableQty?: number;
 
   constructor(init?: Partial<CartItemDTO>) {
     Object.assign(this, init);
@@ -202,6 +210,9 @@ export class ReceiptDataDTO {
   remainingDebt?: number;
   debtNote?: string;
   giftStockWarning?: string;
+  isPreOrder?: boolean;
+  depositAmount?: number;
+  remainingAmount?: number;
 
   constructor(init?: Partial<ReceiptDataDTO>) {
     Object.assign(this, init);

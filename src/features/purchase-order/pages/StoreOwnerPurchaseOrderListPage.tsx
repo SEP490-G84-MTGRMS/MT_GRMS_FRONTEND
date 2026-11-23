@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Grid, Zap, Layers, Loader2 } from 'lucide-react';
@@ -6,6 +6,7 @@ import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import { branchApi } from '../api/branchApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
 import type { PurchaseOrderListItem, PoListFilterState, PurchaseOrderStatus } from '../types/po-list.types';
+import { DEFAULT_PO_LIST_FILTERS } from '../types/po-list.types';
 import { PoListFilterBar } from '../components/po-list/PoListFilterBar';
 import { PoListTable } from '../components/po-list/PoListTable';
 import { downloadPoInvoicePdf } from '../lib/poInvoicePdf';
@@ -17,17 +18,6 @@ import {
 } from '../lib/deliveryDateGate';
 import '../purchase-order.css';
 import '../../supplier/supplier.css';
-
-const DEFAULT_FILTERS: PoListFilterState = {
-  branchId: 'all',
-  supplierId: 'all',
-  status: 'all',
-  dateFrom: '',
-  dateTo: '',
-  keyword: '',
-  pageIndex: 1,
-  pageSize: 10,
-};
 
 const formatVnDateTime = (iso?: string): string => {
   if (!iso) return '—';
@@ -82,17 +72,43 @@ const RECEIVE_ELIGIBLE_STATUSES: PurchaseOrderStatus[] = [
 ];
 
 const canReceiveOrder = (order: PurchaseOrderListItem): boolean => {
-  if (order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED') return true; // xem phiếu
+  if (order.activeGoodsReceiptStatus?.toUpperCase() === 'COMPLETED') return true;
   if (order.status === 'CANCELLED' || order.status === 'REJECTED') return false;
-  // DRAFT đã tạo: cho mở lại; tạo mới / hoàn tất: phải đến ngày giao (check ở handle + table)
   return RECEIVE_ELIGIBLE_STATUSES.includes(order.status) || order.status === 'RECEIVED';
 };
 
-/** Filter 1-1 với status BE — không remap SENT → PENDING_APPROVAL. */
 const mapFilterStatusToBackend = (status: PoListFilterState['status']): string | undefined => {
   if (status === 'all') return undefined;
   return status;
 };
+
+function tokenMatches(value: string | undefined, tokens: string[]): boolean {
+  if (!tokens.length) return true;
+  const hay = (value || '').toLowerCase();
+  return tokens.some((t) => hay.includes(t.trim().toLowerCase()));
+}
+
+function hasChipFilters(f: PoListFilterState): boolean {
+  return (
+    f.poCodes.length > 0 ||
+    f.supplierCodes.length > 0 ||
+    f.supplierNames.length > 0 ||
+    f.branchCodes.length > 0 ||
+    f.branchNames.length > 0
+  );
+}
+
+function resolveUniqueId(
+  options: { id: string; code: string; name: string }[],
+  codes: string[],
+  names: string[]
+): string {
+  if (!codes.length && !names.length) return 'all';
+  const matched = options.filter(
+    (o) => tokenMatches(o.code, codes) && tokenMatches(o.name, names)
+  );
+  return matched.length === 1 ? matched[0].id : 'all';
+}
 
 export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const navigate = useNavigate();
@@ -107,15 +123,9 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const [branchOptions, setBranchOptions] = useState<{ id: string; code: string; name: string }[]>([]);
   const [supplierOptions, setSupplierOptions] = useState<{ id: string; code: string; name: string }[]>([]);
 
-  const [filterInputs, setFilterInputs] = useState<PoListFilterState>(() => ({
-    ...DEFAULT_FILTERS,
-    supplierId: supplierIdFromUrl || 'all',
-    keyword: codeFromUrl,
-  }));
   const [appliedFilters, setAppliedFilters] = useState<PoListFilterState>(() => ({
-    ...DEFAULT_FILTERS,
-    supplierId: supplierIdFromUrl || 'all',
-    keyword: codeFromUrl,
+    ...DEFAULT_PO_LIST_FILTERS,
+    poCodes: codeFromUrl ? [codeFromUrl] : [],
   }));
 
   const [pageIndex, setPageIndex] = useState(1);
@@ -140,18 +150,37 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
     try {
+      const chipActive = hasChipFilters(appliedFilters);
+      const supplierId = resolveUniqueId(
+        supplierOptions,
+        appliedFilters.supplierCodes,
+        appliedFilters.supplierNames
+      );
+      const branchId = resolveUniqueId(
+        branchOptions,
+        appliedFilters.branchCodes,
+        appliedFilters.branchNames
+      );
+
+      // BE chỉ hỗ trợ 1 keyword — dùng mã PO đầu tiên để thu hẹp server-side
+      const keyword =
+        appliedFilters.poCodes.length === 1 ? appliedFilters.poCodes[0] : undefined;
+
+      const fetchPageSize = chipActive ? 200 : pageSize;
+      const fetchPageIndex = chipActive ? 1 : pageIndex;
+
       const result = await purchaseOrderApi.getPagedPurchaseOrders({
-        branchId: appliedFilters.branchId,
-        supplierId: appliedFilters.supplierId,
+        branchId,
+        supplierId,
         status: mapFilterStatusToBackend(appliedFilters.status),
         dateFrom: appliedFilters.dateFrom || undefined,
         dateTo: appliedFilters.dateTo || undefined,
-        keyword: appliedFilters.keyword.trim() || undefined,
-        pageIndex,
-        pageSize,
+        keyword,
+        pageIndex: fetchPageIndex,
+        pageSize: fetchPageSize,
       });
 
-      const mapped: PurchaseOrderListItem[] = result.items.map((po) => {
+      let mapped: PurchaseOrderListItem[] = result.items.map((po) => {
         const branchCode = po.branchCode || '';
         const supplierCode = po.supplierCode || '';
         return {
@@ -190,8 +219,23 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         };
       });
 
-      setOrders(mapped);
-      setTotalCount(result.totalItems);
+      if (chipActive) {
+        mapped = mapped.filter(
+          (o) =>
+            tokenMatches(o.poCode, appliedFilters.poCodes) &&
+            tokenMatches(o.supplierCode, appliedFilters.supplierCodes) &&
+            tokenMatches(o.supplierName, appliedFilters.supplierNames) &&
+            tokenMatches(o.branchCode, appliedFilters.branchCodes) &&
+            tokenMatches(o.branchName, appliedFilters.branchNames)
+        );
+        const total = mapped.length;
+        const start = (pageIndex - 1) * pageSize;
+        setOrders(mapped.slice(start, start + pageSize));
+        setTotalCount(total);
+      } else {
+        setOrders(mapped);
+        setTotalCount(result.totalItems);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Không tải được danh sách PO.';
       showToast(message, 'error');
@@ -200,7 +244,7 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters, pageIndex, pageSize]);
+  }, [appliedFilters, pageIndex, pageSize, supplierOptions, branchOptions]);
 
   useEffect(() => {
     void loadOrders();
@@ -239,30 +283,40 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     };
   }, []);
 
+  // URL → chip filter (supplierId / code) — chỉ áp dụng 1 lần
+  const urlAppliedRef = useRef(false);
   useEffect(() => {
-    const nextSupplier = supplierIdFromUrl || 'all';
-    const nextKeyword = codeFromUrl;
-    setFilterInputs((prev) => ({
-      ...prev,
-      supplierId: nextSupplier,
-      keyword: nextKeyword || prev.keyword,
-    }));
-    setAppliedFilters((prev) => ({
-      ...prev,
-      supplierId: nextSupplier,
-      keyword: nextKeyword || prev.keyword,
-    }));
-    setPageIndex(1);
-  }, [supplierIdFromUrl, codeFromUrl]);
+    if (urlAppliedRef.current) return;
+    if (!supplierIdFromUrl && !codeFromUrl) {
+      urlAppliedRef.current = true;
+      return;
+    }
+    // Chờ catalog nếu cần map supplierId → mã NCC
+    if (supplierIdFromUrl && !supplierOptions.length) return;
 
-  const handleSearch = () => {
-    setAppliedFilters(filterInputs);
+    const patches: Partial<PoListFilterState> = {};
+    if (codeFromUrl) patches.poCodes = [codeFromUrl];
+
+    if (supplierIdFromUrl) {
+      const s = supplierOptions.find((x) => x.id === supplierIdFromUrl);
+      if (s?.code) patches.supplierCodes = [s.code];
+      else if (s?.name) patches.supplierNames = [s.name];
+    }
+
+    urlAppliedRef.current = true;
+    if (!Object.keys(patches).length) return;
+
+    setAppliedFilters((prev) => ({ ...prev, ...patches }));
+    setPageIndex(1);
+  }, [supplierIdFromUrl, codeFromUrl, supplierOptions]);
+
+  const handleSearch = (values: PoListFilterState) => {
+    setAppliedFilters({ ...values, pageIndex: 1, pageSize });
     setPageIndex(1);
   };
 
   const handleReset = () => {
-    setFilterInputs(DEFAULT_FILTERS);
-    setAppliedFilters(DEFAULT_FILTERS);
+    setAppliedFilters({ ...DEFAULT_PO_LIST_FILTERS, pageSize });
     setPageIndex(1);
   };
 
@@ -278,7 +332,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     const isExchange =
       String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN';
 
-    // PO đổi hàng nhận nhiều đợt: nếu còn PARTIALLY_RECEIVED thì tạo GRN mới, không khóa vào GRN cũ.
     if (
       grnId &&
       grnStatus === 'COMPLETED' &&
@@ -289,7 +342,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
       return;
     }
 
-    // Rule: chỉ nhập hàng từ ngày giao trở đi (xem phiếu COMPLETED vẫn được)
     if (!isDeliveryDateReached(order.deliveryDate)) {
       showToast(formatDeliveryDateGateMessage(order.deliveryDate), 'warning');
       return;
@@ -329,7 +381,7 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         <div>
           <h1 className="so-list-title">
             <Layers size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Danh sách đơn mua hàng (PO)</span>
+            <span>Danh sách đơn mua hàng</span>
             {isLoading && <Loader2 size={16} className="animate-spin" style={{ color: '#0f766e' }} />}
           </h1>
         </div>
@@ -359,12 +411,12 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
 
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <PoListFilterBar
-          filterInputs={filterInputs}
-          onFilterInputChange={(newFilters) => setFilterInputs((prev) => ({ ...prev, ...newFilters }))}
+          initialValues={appliedFilters}
           onSearch={handleSearch}
           onReset={handleReset}
           branches={branchOptions}
           suppliers={supplierOptions}
+          poCodeSuggestions={orders.map((o) => o.poCode).filter(Boolean)}
         />
       </div>
 
@@ -391,7 +443,6 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           }
         }}
         onEditOrder={(order) => {
-          // Sửa SL trên matrix trước cutoff → chốt lại ở dispatch-hub để amend PO
           const params = new URLSearchParams();
           if (order.branchId) params.set('branchId', order.branchId);
           if (order.supplierId) params.set('supplier', order.supplierId);

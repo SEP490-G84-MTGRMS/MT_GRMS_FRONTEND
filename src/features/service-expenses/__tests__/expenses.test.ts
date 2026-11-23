@@ -88,12 +88,13 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
             amount: 850000,
             status: 'Approved',
             expenseDate: '2026-11-04T00:00:00Z',
+            dueDate: '2026-11-10',
             note: 'Cước cáp quang tháng 11',
           },
         },
       };
 
-      vi.spyOn(financeHttpClient, 'post').mockResolvedValueOnce(createdItem as any);
+      const post = vi.spyOn(financeHttpClient, 'post').mockResolvedValueOnce(createdItem as any);
 
       const newExpense = await expenseApi.createServiceExpense({
         branchId: '01a188b1-f1b0-7640-ad7c-a1dc16e62218',
@@ -108,6 +109,8 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
       expect(newExpense.expenseId).toBe('99999999-9999-9999-9999-999999999999');
       expect(newExpense.amount).toBe(850000);
       expect(newExpense.vendorName).toBe('Viễn thông VNPT');
+      expect(newExpense.dueDate).toBe('2026-11-10');
+      expect(post.mock.calls[0][1]).toMatchObject({ dueDate: '2026-11-10' });
     });
 
     it('TC-EXP-04: should disburse payment and return updated paid voucher', async () => {

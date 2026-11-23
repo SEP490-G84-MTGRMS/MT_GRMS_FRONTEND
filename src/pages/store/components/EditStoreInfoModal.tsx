@@ -3,14 +3,11 @@ import { useState, type FC, type FormEvent } from 'react';
 import {
   X,
   Store,
-  Globe,
   Building,
   Phone,
-  Mail,
   MapPin,
   Save,
   Loader2,
-  Lock,
 } from 'lucide-react';
 import type { StoreInfo } from '../storeData';
 
@@ -35,11 +32,16 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const hasChanges = formData.name !== storeInfo.name || formData.taxCode !== storeInfo.taxCode || formData.hotline !== storeInfo.hotline || formData.address !== storeInfo.address || formData.city !== storeInfo.city;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      setErrorMessage('Vui lòng nhập tên chuỗi cửa hàng / gian hàng.');
+    if (formData.name.trim().length < 2) {
+      setErrorMessage(formData.name.trim() ? 'Tên cửa hàng phải có ít nhất 2 ký tự.' : 'Vui lòng nhập tên cửa hàng.');
+      return;
+    }
+    if (formData.hotline.trim() && !/^\+?[0-9]{9,12}$/.test(formData.hotline.trim())) {
+      setErrorMessage('Số điện thoại phải có 9–12 chữ số, có thể bắt đầu bằng +.');
       return;
     }
 
@@ -68,9 +70,9 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
       >
         <div className="store-modal-header">
           <div>
-            <div className="store-modal-title">Cập nhật thông tin gian hàng</div>
+            <h2 className="store-modal-title" style={{ margin: 0 }}>Chỉnh sửa thông tin cửa hàng</h2>
             <p style={{ fontSize: 13, color: '#64748B', margin: '4px 0 0 0' }}>
-              Cập nhật tên chuỗi cửa hàng, mã số thuế, hotline và địa chỉ trụ sở chính.
+              Các thông tin này hiển thị trong hồ sơ cửa hàng.
             </p>
           </div>
           <button
@@ -124,14 +126,14 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
                 }}
               >
                 <Store size={15} color="var(--blue-primary)" />
-                <span>Tên chuỗi cửa hàng / Gian hàng *</span>
+                <span>Tên cửa hàng *</span>
               </label>
               <input
                 type="text"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="VD: Chuỗi Siêu thị Mini Minh Đức"
+                placeholder="VD: Tạp hóa Minh Đức"
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -190,10 +192,10 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
                   }}
                 >
                   <Phone size={15} color="var(--blue-primary)" />
-                  <span>Hotline liên hệ / CSKH</span>
+                  <span>Số điện thoại liên hệ</span>
                 </label>
                 <input
-                  type="text"
+                  type="tel"
                   value={formData.hotline}
                   onChange={(e) => setFormData({ ...formData, hotline: e.target.value })}
                   placeholder="VD: 0369880798"
@@ -256,7 +258,7 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
                 }}
               >
                 <MapPin size={15} color="var(--blue-primary)" />
-                <span>Địa chỉ trụ sở chính</span>
+                <span>Địa chỉ</span>
               </label>
               <input
                 type="text"
@@ -274,62 +276,6 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
               />
             </div>
 
-            {/* Thông tin cố định bởi hệ thống (Readonly) */}
-            <div
-              style={{
-                padding: '12px 16px',
-                backgroundColor: '#F8FAFC',
-                borderRadius: 14,
-                border: '1px dashed #CBD5E1',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: '#64748B' }}>
-                <Lock size={13} color="#94A3B8" />
-                <span>THÔNG TIN ĐỊNH DANH HỆ THỐNG (CỐ ĐỊNH)</span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div>
-                  <span style={{ fontSize: 11.5, color: '#64748B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                    <Globe size={13} /> Tên miền con (Subdomain)
-                  </span>
-                  <div
-                    style={{
-                      padding: '7px 12px',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: 'var(--radius-pill)',
-                      border: '1px solid #E2E8F0',
-                      fontSize: 13,
-                      fontFamily: 'var(--font-mono)',
-                      color: '#475569',
-                    }}
-                  >
-                    {storeInfo.subdomain}.mt-grms.vn
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: 11.5, color: '#64748B', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                    <Mail size={13} /> Email nhận thông báo
-                  </span>
-                  <div
-                    style={{
-                      padding: '7px 12px',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: 'var(--radius-pill)',
-                      border: '1px solid #E2E8F0',
-                      fontSize: 13,
-                      color: '#475569',
-                    }}
-                  >
-                    {storeInfo.email}
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="store-modal-footer">
@@ -352,7 +298,7 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSaving}
+              disabled={isSaving || !hasChanges}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -366,7 +312,7 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
                 fontWeight: 700,
                 cursor: isSaving ? 'not-allowed' : 'pointer',
                 boxShadow: '0 4px 14px rgba(15, 118, 110, 0.28)',
-                opacity: isSaving ? 0.7 : 1,
+                opacity: isSaving || !hasChanges ? 0.7 : 1,
               }}
             >
               {isSaving ? (

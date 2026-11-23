@@ -10,7 +10,7 @@ interface Props {
   currentBranchId: string;
   currentBranchName: string;
   products: Product[];
-  onSelectBatchToCart?: (product: Product, batchId?: string, batchCode?: string, expiryDate?: string, discountPercent?: number) => void;
+  onSelectBatchToCart?: (product: Product, batchId?: string, batchCode?: string, expiryDate?: string, discountPercent?: number, packageItem?: { id: string; netWeight: number; sellingPrice: number }, availableQty?: number) => void;
 }
 interface InventoryBatch {
   batchId: string;
@@ -41,6 +41,10 @@ export const PosInventoryLookupModal: FC<Props> = ({
   const [batchResult, setBatchResult] = useState<{ key: string; items: InventoryBatch[] } | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  type SellablePackage = { id: string; internalCode: string; barcode?: string | null; netWeight: number; sellingPrice: number; status: string; expiryDate?: string | null };
+
+  const isSellablePackage = (item: { status: string; expiryDate?: string | null }) =>
+    item.status === 'AVAILABLE' && (!item.expiryDate || item.expiryDate.slice(0, 10) >= new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     if (!isOpen) {
@@ -54,10 +58,13 @@ export const PosInventoryLookupModal: FC<Props> = ({
   );
   const requestKey = `${currentBranchId}:${selectedProduct?.id || ''}`;
   const batches = batchResult?.key === requestKey ? batchResult.items : [];
+  const [packageResult, setPackageResult] = useState<{ key: string; items: Array<{ batch: InventoryBatch; packageItem: SellablePackage }> } | null>(null);
+  const availablePackages = packageResult?.key === requestKey ? packageResult.items : [];
 
   useEffect(() => {
     setBatchResult(null);
     setError('');
+    setPackageResult(null);
     if (!isOpen || !currentBranchId || !selectedProduct?.id) return;
     const controller = new AbortController();
     setLoading(true);
@@ -77,6 +84,19 @@ export const PosInventoryLookupModal: FC<Props> = ({
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [isOpen, currentBranchId, selectedProduct?.id, requestKey]);
+
+  useEffect(() => {
+    if (!isOpen || loading || error || batches.length === 0) return;
+    let active = true;
+    Promise.allSettled(batches.filter((batch) => batch.daysLeft == null || batch.daysLeft >= 0).map(async (batch) => {
+      const response = await httpClient.get(`/branch-stocks/${batch.batchId}/packages`);
+      const data = response.data?.data ?? response.data;
+      return (data?.packages || []).filter(isSellablePackage).map((packageItem: SellablePackage) => ({ batch, packageItem }));
+    })).then((groups) => {
+      if (active) setPackageResult({ key: requestKey, items: groups.flatMap((group) => group.status === 'fulfilled' ? group.value : []) });
+    });
+    return () => { active = false; };
+  }, [isOpen, loading, error, batches, requestKey]);
 
   if (!isOpen) return null;
   return (
@@ -112,22 +132,52 @@ export const PosInventoryLookupModal: FC<Props> = ({
                     <td>{batch.daysLeft == null ? 'Không giới hạn' : batch.daysLeft < 0 ? 'Đã hết hạn' : batch.daysLeft === 0 ? 'Hết hạn hôm nay' : `${batch.daysLeft} ngày`}</td>
                     <td>{batch.isFefoDiscountActive ? `-${batch.fefoDiscountPercent || 0}%` : '—'}</td>
                     <td><b>{formatQuantity(batch.availableQty)} {selectedProduct.baseUnit}</b></td>
-                    <td><button type="button" className="pos-btn-secondary"
-                      disabled={batch.availableQty <= 0 || (batch.daysLeft != null && batch.daysLeft < 0)}
-                      onClick={() => {
-                        onSelectBatchToCart?.(selectedProduct, batch.batchId, batch.batchCode, batch.expiryDate || undefined,
-                          batch.isFefoDiscountActive ? batch.fefoDiscountPercent || 0 : 0);
-                        onClose();
-                      }}>Chọn lô</button></td>
+                    <td>
+                      {batch.daysLeft != null && batch.daysLeft < 0 ? (
+                        <span style={{ color: '#ef4444', fontWeight: 600, fontSize: 12 }}>Đã hết hạn</span>
+                      ) : (
+                        <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                          {batch.availableQty <= 0 ? <span style={{ color: '#94a3b8', fontSize: 12 }}>Hết tồn bán lẻ</span> : (
+                          <button
+                            type="button"
+                            className="pos-btn-secondary"
+                            onClick={() => {
+                              onSelectBatchToCart?.(
+                                selectedProduct,
+                                batch.batchId,
+                                batch.batchCode,
+                                batch.expiryDate || undefined,
+                                batch.isFefoDiscountActive ? batch.fefoDiscountPercent || 0 : 0,
+                                undefined,
+                                batch.availableQty
+                              );
+                              onClose();
+                            }}
+                          >
+                            Chọn lô
+                          </button>)}
+                        </div>
+                      )}
+                    </td>
                   </tr>)}</tbody>
                 </table>
+                {availablePackages.length > 0 && <section style={{ marginTop: 16 }} aria-label="Khay còn bán">
+                  <b>Khay còn bán ({availablePackages.length})</b>
+                  {availablePackages.map(({ batch, packageItem: pkg }) => <div key={pkg.id} style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 6 }}>
+                    <span>{pkg.internalCode} · {pkg.barcode || 'Không có barcode'} · Lô {batch.batchCode} · {formatQuantity(pkg.netWeight)} kg · {pkg.sellingPrice.toLocaleString('vi-VN')} đ · HSD {formatDate(pkg.expiryDate)}</span>
+                    <button type="button" className="pos-btn-secondary" onClick={() => {
+                      onSelectBatchToCart?.(selectedProduct, batch.batchId, batch.batchCode, pkg.expiryDate || batch.expiryDate || undefined, 0, pkg, pkg.netWeight);
+                      onClose();
+                    }}>Thêm khay {pkg.internalCode} vào đơn</button>
+                  </div>)}
+                </section>}
               </div>}
           </> : <p style={{ color: '#64748b', fontSize: 13.5, margin: '8px 0 0' }}>Quét mã vạch, SKU hoặc nhập tên sản phẩm ở trên để tra cứu tồn kho theo lô FEFO tại <b>{currentBranchName}</b>.</p>}
         </div>
         <div className="pos-modal-footer">
           <button type="button" className="pos-btn-secondary" onClick={onClose}>Đóng</button>
           {selectedProduct && onSelectBatchToCart && <button type="button" className="pos-btn-primary"
-            disabled={loading || Boolean(error) || !batches.some(batch => batch.availableQty > 0 && (batch.daysLeft == null || batch.daysLeft > 0))}
+            disabled={loading || Boolean(error) || !batches.some(batch => batch.availableQty > 0 && (batch.daysLeft == null || batch.daysLeft >= 0))}
             onClick={() => { onSelectBatchToCart(selectedProduct); onClose(); }}>Thêm vào đơn · tự động FEFO</button>}
         </div>
       </div>
