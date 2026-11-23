@@ -205,7 +205,7 @@ describe('ReturnExchangeModal new item barcode scan & search', () => {
     fireEvent.change(searchInput, { target: { value: '8934563138165' } });
     fireEvent.keyDown(searchInput, { key: 'Enter' });
 
-    const reasonSelect = screen.getByDisplayValue(/Lỗi do Nhà Sản Xuất/);
+    const reasonSelect = screen.getByDisplayValue('Lỗi do nhà sản xuất');
     fireEvent.change(reasonSelect, { target: { value: 'OTHER' } });
 
     fireEvent.click(screen.getByRole('button', { name: /Xác Nhận Đổi \/ Trả Hàng/ }));

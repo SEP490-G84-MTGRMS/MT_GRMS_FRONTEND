@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { useAuthStore } from '../../../stores/useAuthStore';
+import { posShiftApi } from '../../pos/api/posShiftApi';
+import { posOrderApi } from '../../pos/api/posOrderApi';
 import { CashbookPage } from '../pages/CashbookPage';
 import { cashbookService } from '../services/cashbookService';
 import { employeeApi } from '../../employee/api/employeeApi';
@@ -112,6 +115,35 @@ describe('Phase 1: Cashbook Page UI/UX Standardization Suite', () => {
       </MemoryRouter>
     );
   };
+
+  it('opens daily closing on the cashbook route without rendering shift history', async () => {
+    const previousUser = useAuthStore.getState().user;
+    useAuthStore.setState({ user: { role: 'STORE_OWNER' } as NonNullable<typeof previousUser> });
+    localStorage.setItem('mtgrms_active_branch', JSON.stringify({ id: 'BR-01', name: 'Chi nhánh Quận 1' }));
+    vi.spyOn(posShiftApi, 'getCurrentBusinessDate').mockRejectedValue(new Error('Unavailable'));
+    vi.spyOn(posShiftApi, 'previewBusinessDay').mockRejectedValue(new Error('Unavailable'));
+    vi.spyOn(posShiftApi, 'getBusinessDayHistory').mockResolvedValue([]);
+    vi.spyOn(posShiftApi, 'getShiftHistory').mockResolvedValue([]);
+    vi.spyOn(posOrderApi, 'getOwnerUnsettledSummary').mockRejectedValue(new Error('Unavailable'));
+    const Route = () => <output data-testid="route">{useLocation().pathname}</output>;
+
+    const view = render(
+      <MemoryRouter initialEntries={['/store-owner/cashbook']}>
+        <CashbookPage />
+        <Route />
+      </MemoryRouter>,
+    );
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Chốt doanh thu ngày' }));
+      expect(await screen.findByRole('dialog', { name: 'Chốt doanh thu ngày' })).toBeTruthy();
+      expect(screen.getByTestId('route').textContent).toBe('/store-owner/cashbook');
+      expect(screen.queryByText('Lịch Sử Chốt Ca & Bàn Giao Quầy')).toBeNull();
+      await waitFor(() => expect(posShiftApi.previewBusinessDay).toHaveBeenCalled());
+    } finally {
+      view.unmount();
+      useAuthStore.setState({ user: previousUser });
+    }
+  });
 
   it('1. Standardizes container: uses zero-page-scroll .po-matrix-container and removes min-h-screen', async () => {
     const { container } = renderComponent();

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -17,7 +17,7 @@ import type {
   UserRole,
 } from '../types/batch.types';
 import { batchApi } from '../api/batchApi';
-import { BatchFilterBar } from '../components/BatchFilterBar';
+import { BatchFilterBar, type BatchSuggestProduct } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
 import { BatchDiscountModal } from '../components/BatchDiscountModal';
@@ -26,6 +26,7 @@ import {
   type BatchAlertMode,
 } from '../components/BatchExpiryAlertModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { productApi } from '../../product/api/productApi';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
 
@@ -60,6 +61,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const [appliedFilters, setAppliedFilters] = useState<BatchFilterState>(DEFAULT_FILTERS);
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [catalogProducts, setCatalogProducts] = useState<BatchSuggestProduct[]>([]);
 
   const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -99,6 +101,50 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // Pool gợi ý Mã hàng / Tên SP (catalog + lô đã load)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const page = await productApi.getProductsPaged({
+          status: 'Active',
+          pageIndex: 1,
+          pageSize: 300,
+        });
+        if (cancelled) return;
+        setCatalogProducts(
+          (page.items || [])
+            .map((p) => ({
+              sku: (p.productCode || '').trim(),
+              productName: (p.name || '').trim(),
+            }))
+            .filter((p) => p.sku || p.productName)
+        );
+      } catch {
+        if (!cancelled) setCatalogProducts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const suggestionProducts = useMemo(() => {
+    const map = new Map<string, BatchSuggestProduct>();
+    for (const p of catalogProducts) {
+      const key = `${p.sku.toLowerCase()}|${p.productName.toLowerCase()}`;
+      map.set(key, p);
+    }
+    for (const b of batches) {
+      const sku = (b.sku || '').trim();
+      const productName = (b.productName || '').trim();
+      if (!sku && !productName) continue;
+      const key = `${sku.toLowerCase()}|${productName.toLowerCase()}`;
+      map.set(key, { sku, productName });
+    }
+    return Array.from(map.values());
+  }, [catalogProducts, batches]);
 
   // Sync initial query params from URL
   useEffect(() => {
@@ -351,6 +397,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
           filterInputs={filterInputs}
           role={role}
           employeeBranchId={employeeBranchId}
+          suggestionProducts={suggestionProducts}
           onFilterChange={handleFilterChange}
           onSearch={handleSearch}
           onReset={handleReset}

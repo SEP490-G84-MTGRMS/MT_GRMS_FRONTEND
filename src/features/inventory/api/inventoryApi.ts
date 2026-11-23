@@ -47,7 +47,16 @@ export const inventoryApi = {
     kpiSummary: InventoryKpiSummary;
   }> {
     const params = new URLSearchParams();
-    const keyword = [filters.keyword, filters.sku, filters.productName].filter(Boolean).join(' ').trim();
+    const keyword = [
+      ...(filters.skus ?? []),
+      ...(filters.names ?? []),
+      ...(filters.branchCodes ?? []),
+      ...(filters.branchNames ?? []),
+    ]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     if (keyword) params.append('keyword', keyword);
     if (filters.branchId) params.append('branchId', filters.branchId);
     if (filters.category) params.append('category', filters.category);
@@ -82,6 +91,7 @@ export const inventoryApi = {
         categoryLabel: i.categoryName || i.category || 'Chung',
         branchId: i.branchId,
         branchName: i.branchName,
+        branchCode: i.branchCode || '',
         location: i.locationShelf || '—',
         unit: i.unit || 'Cái',
         onHand: Number(i.physicalQty ?? 0),

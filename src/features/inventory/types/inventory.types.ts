@@ -19,6 +19,8 @@ export interface InventoryItem {
   categoryLabel: string;
   branchId: string;
   branchName: string;
+  /** Mã chi nhánh (nếu API có) — dùng filter chip */
+  branchCode?: string;
   location: string;
   unit: string;
   onHand: number;
@@ -36,11 +38,13 @@ export interface InventoryItem {
   reserved?: number;
 }
 
+/** Chip filter — OR trong field, AND giữa các field (giống SP theo NCC). */
 export interface InventoryFilterState {
-  keyword: string;
-  sku: string;
-  productName: string;
-  branchKeyword: string;
+  skus: string[];
+  names: string[];
+  branchCodes: string[];
+  branchNames: string[];
+  /** Chi nhánh đã resolve (locked employee / unique match). */
   branchId: string;
   category: string;
   location: string;
@@ -48,6 +52,19 @@ export interface InventoryFilterState {
   pageIndex: number;
   pageSize: number;
 }
+
+export const DEFAULT_INVENTORY_FILTERS: InventoryFilterState = {
+  skus: [],
+  names: [],
+  branchCodes: [],
+  branchNames: [],
+  branchId: '',
+  category: '',
+  location: '',
+  stockStatus: '',
+  pageIndex: 1,
+  pageSize: 10,
+};
 
 export interface InventoryKpiSummary {
   skuCount: number;

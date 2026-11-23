@@ -27,18 +27,11 @@ import {
   Gift,
 } from 'lucide-react';
 import { TablePagination } from '../../../components/common';
-import {
-  mockInvoicesList,
-  mockPreOrdersList,
-  mockInvoicesAnNhien,
-  mockPreOrdersAnNhien,
-} from '../mock/inventoryMockData';
 import type { InvoiceDTO, PreOrderDTO } from '../types/inventory.types';
 import { ReturnExchangeModal } from '../components/modals/ReturnExchangeModal';
 import { CreatePreOrderModal } from '../components/modals/CreatePreOrderModal';
 import { FulfillPreOrderModal } from '../components/modals/FulfillPreOrderModal';
 import { PosReceiptModal } from '../components/PosReceiptModal';
-import { AN_NHIEN_BRANCHES } from '../mock/posMockData';
 import type { Product, Customer, ReceiptData } from '../types/pos.types';
 import { posOrderApi } from '../api/posOrderApi';
 import { posShiftApi } from '../api/posShiftApi';
@@ -135,14 +128,12 @@ export const InvoiceManagementPage: FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [timePreset, setTimePreset] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH' | 'DEBT' | 'CREDIT'>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'PENDING_PAYMENT'>(showPendingPayments ? 'PENDING_PAYMENT' : 'ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'RETURNED' | 'PENDING_PAYMENT'>(showPendingPayments ? 'PENDING_PAYMENT' : 'ALL');
   const [returnRecordsByOrder, setReturnRecordsByOrder] = useState<Record<string, ReturnRecord[]>>({});
 
   // Danh sách hóa đơn có thể hủy / cập nhật trạng thái (Phân lập theo Cửa Hàng / Tenant)
   const { user } = useAuthStore();
-  const currentTenantId = user?.tenantId || 'tenant_mt_mart_01';
-  const isDefaultDemoStore = currentTenantId === 'tenant_mt_mart_01';
-  const isAnNhienStore = currentTenantId === 'tenant_an_nhien_02';
+  const currentTenantId = user?.tenantId;
 
   // Quyền hạn tài khoản: Chỉ STORE_OWNER / ADMIN mới có quyền xem toàn chuỗi và hủy hóa đơn đã thanh toán
   const isStoreOwner = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
@@ -153,6 +144,7 @@ export const InvoiceManagementPage: FC = () => {
 
   useEffect(() => {
     let isMounted = true;
+    setDbBranches([]);
     employeeApi
       .getBranches()
       .then((list) => {
@@ -164,28 +156,13 @@ export const InvoiceManagementPage: FC = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentTenantId]);
 
   // Chi nhánh được giao ca của nhân viên
   const assignedBranch = useMemo(() => {
-    if (user?.branchId) {
-      const dbFound = dbBranches.find((b) => b.id === user.branchId);
-      if (dbFound) return dbFound;
-
-      if (isAnNhienStore) {
-        const found = AN_NHIEN_BRANCHES.find((b) => b.id === user.branchId || b.code === user.branchId);
-        if (found) return found;
-      }
-      return { id: user.branchId, name: isAnNhienStore ? 'An Nhiên Mart - Chi nhánh Ba Đình' : 'Chi nhánh chính' };
-    }
-    if (isAnNhienStore) {
-      if (user?.fullName?.includes('Nam') || user?.fullName?.includes('Cầu Giấy')) {
-        return AN_NHIEN_BRANCHES[1] || { id: 'BR-AN-02', name: 'An Nhiên Mart - Chi nhánh Cầu Giấy' };
-      }
-      return AN_NHIEN_BRANCHES[0] || { id: 'BR-AN-01', name: 'An Nhiên Mart - Chi nhánh Ba Đình' };
-    }
-    return { id: 'BR-01', name: 'Chi nhánh Cầu Giấy (Trung tâm)' };
-  }, [user, isAnNhienStore, dbBranches]);
+    const id = user?.branchId || '';
+    return dbBranches.find((branch) => branch.id === id) || { id, name: 'Chi nhánh được phân công' };
+  }, [user?.branchId, dbBranches]);
 
   // Bộ lọc chi nhánh (Multi-Branch Filter): Nhân viên luôn cố định theo chi nhánh được giao ca
   const [branchFilter, setBranchFilter] = useState<string>(() => pendingBranchId || (isStoreOwner ? 'ALL' : assignedBranch.id));
@@ -199,20 +176,8 @@ export const InvoiceManagementPage: FC = () => {
     }
   }, [isStoreOwner, assignedBranch.id, pendingBranchId]);
 
-  const getInitialInvoices = () => {
-    if (isDefaultDemoStore) return mockInvoicesList;
-    if (isAnNhienStore) return mockInvoicesAnNhien;
-    return [];
-  };
-
-  const getInitialPreOrders = () => {
-    if (isDefaultDemoStore) return mockPreOrdersList;
-    if (isAnNhienStore) return mockPreOrdersAnNhien;
-    return [];
-  };
-
-  const [invoices, setInvoices] = useState<InvoiceDTO[]>(getInitialInvoices);
-  const [preOrders, setPreOrders] = useState<PreOrderDTO[]>(getInitialPreOrders);
+  const [invoices, setInvoices] = useState<InvoiceDTO[]>([]);
+  const [preOrders, setPreOrders] = useState<PreOrderDTO[]>([]);
   const [activeShiftCash, setActiveShiftCash] = useState<number | undefined>(undefined);
   const returnRequestRef = useRef<{ signature: string; key: string } | null>(null);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
@@ -221,8 +186,9 @@ export const InvoiceManagementPage: FC = () => {
 
   useEffect(() => {
     let mounted = true;
+    setCatalogCustomers([]);
+    setCatalogProducts([]);
     if (branchFilter === 'ALL') {
-      setCatalogProducts([]);
       posOrderApi.getAllCustomers().then((custs) => {
         if (mounted && custs) setCatalogCustomers(custs);
       }).catch(() => { });
@@ -231,10 +197,7 @@ export const InvoiceManagementPage: FC = () => {
       };
     }
 
-    const targetBranchId =
-      !branchFilter.startsWith('BR-')
-        ? branchFilter
-        : (!assignedBranch.id.startsWith('BR-') ? assignedBranch.id : undefined);
+    const targetBranchId = branchFilter;
 
     if (!targetBranchId) {
       setCatalogProducts([]);
@@ -259,7 +222,7 @@ export const InvoiceManagementPage: FC = () => {
     return () => {
       mounted = false;
     };
-  }, [branchFilter, assignedBranch.id, currentTenantId]);
+  }, [branchFilter, currentTenantId]);
 
   const mapBackendOrderToInvoice = (o: any): InvoiceDTO => {
     const isPreOrderFlag = Boolean(
@@ -274,8 +237,8 @@ export const InvoiceManagementPage: FC = () => {
       orderUuid: o.id,
       invoiceId: o.orderCode || o.id,
       createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
-      branchId: o.branchId || dbBranches[0]?.id || assignedBranch.id,
-      branchName: o.branchName || dbBranches[0]?.name || 'Chi nhánh mặc định',
+      branchId: o.branchId || '',
+      branchName: o.branchName || '—',
       cashierId: '',
       cashierName: o.cashierName || 'Thu ngân POS',
       customerId: o.customerId,
@@ -355,7 +318,7 @@ export const InvoiceManagementPage: FC = () => {
 
   // Nạp tiền mặt trong két ca làm việc đang mở của chi nhánh
   useEffect(() => {
-    const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? (dbBranches[0]?.id || assignedBranch.id) : assignedBranch.id);
+    const targetBranchId = branchFilter !== 'ALL' ? branchFilter : assignedBranch.id;
     setActiveShiftCash(undefined);
     posShiftApi.getCurrentShift(targetBranchId).then((s) => {
       setActiveShiftCash(s?.expectedCash);
@@ -363,22 +326,19 @@ export const InvoiceManagementPage: FC = () => {
   }, [branchFilter, assignedBranch.id]);
 
   // Khi chuyển tài khoản hoặc đăng nhập chủ cửa hàng khác -> Reset danh sách hóa đơn
-  useEffect(() => {
-    setInvoices(showPendingPayments ? [] : getInitialInvoices());
-    setPreOrders(getInitialPreOrders());
-  }, [currentTenantId, isDefaultDemoStore, showPendingPayments]);
 
   // Nạp dữ liệu thực tế từ Backend API theo Tenant
   useEffect(() => {
     let isMounted = true;
+    setInvoices([]);
+    setPreOrders([]);
+    setReturnRecordsByOrder({});
     posOrderApi
       .getOrders(showPendingPayments ? { status: 'PendingPayment', branchId: pendingBranchId || undefined, pageSize: 100 } : undefined)
       .then((res) => {
         if (!isMounted) return;
         if (!res || !res.items || res.items.length === 0) {
           setReturnRecordsByOrder({});
-          setInvoices(showPendingPayments ? [] : getInitialInvoices());
-          setPreOrders(getInitialPreOrders());
           return;
         }
 
@@ -392,17 +352,7 @@ export const InvoiceManagementPage: FC = () => {
             o.status !== 'PreOrder' &&
             o.status !== 'PendingPickup'
         );
-        const mappedInvoices: InvoiceDTO[] = invoiceOrders.map(mapBackendOrderToInvoice);
-
-        // Hợp nhất đơn hàng Backend với danh sách hóa đơn lịch sử chi nhánh (ca trước) để luôn có dữ liệu đổi trả
-        const combinedInvoices = [...mappedInvoices];
-        const existingCodes = new Set(mappedInvoices.map((i) => i.invoiceId));
-        if (!showPendingPayments) getInitialInvoices().forEach((initInv) => {
-          if (!existingCodes.has(initInv.invoiceId) && !initInv.invoiceId.startsWith('DT') && !initInv.invoiceId.startsWith('PO') && !initInv.invoiceId.startsWith('PRE-')) {
-            combinedInvoices.push(initInv);
-          }
-        });
-        setInvoices(combinedInvoices);
+        setInvoices(invoiceOrders.map(mapBackendOrderToInvoice));
 
         // 2. Phân loại và nạp danh sách Đơn đặt trước giữ kho
         const preOrderItems = res.items.filter(
@@ -423,7 +373,7 @@ export const InvoiceManagementPage: FC = () => {
               preOrderId: o.orderCode || o.id,
               createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
               branchId: o.branchId || '',
-              branchName: o.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)',
+              branchName: o.branchName || '—',
               cashierName: o.cashierName || 'Thu ngân POS',
               fulfilledByCashierName: o.fulfilledByCashierName,
               fulfilledAt: o.fulfilledAtUtc ? new Date(o.fulfilledAtUtc).toLocaleString('vi-VN') : undefined,
@@ -477,7 +427,7 @@ export const InvoiceManagementPage: FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentTenantId, isDefaultDemoStore, showPendingPayments, pendingBranchId]);
+  }, [currentTenantId, showPendingPayments, pendingBranchId]);
 
   // Danh sách các chi nhánh có trong hệ thống (Tự động hợp nhất từ CSDL & cấu hình chuỗi, loại trừ trùng lặp)
   const availableBranches = useMemo(() => {
@@ -498,19 +448,9 @@ export const InvoiceManagementPage: FC = () => {
       }
     };
 
-    // Chỉ dùng danh sách chi nhánh từ Database Backend (ưu tiên tuyệt đối)
-    if (dbBranches && dbBranches.length > 0) {
-      dbBranches.forEach((b) => addBranch(b.id, b.name));
-    } else if (isAnNhienStore) {
-      AN_NHIEN_BRANCHES.forEach((b) => addBranch(b.id, b.name));
-    } else {
-      addBranch('BR-01', 'Chi nhánh Cầu Giấy (Trung tâm)');
-      addBranch('BR-02', 'Chi nhánh Thanh Xuân');
-      addBranch('BR-03', 'Chi nhánh Quận 1');
-    }
-
+    dbBranches.forEach((branch) => addBranch(branch.id, branch.name));
     return [{ id: 'ALL', name: 'Tất cả chi nhánh (Toàn chuỗi)' }, ...list];
-  }, [isAnNhienStore, isStoreOwner, assignedBranch, dbBranches]);
+  }, [isStoreOwner, assignedBranch, dbBranches]);
 
   // Modal Xác nhận hủy hóa đơn
   const [cancelModalInvoice, setCancelModalInvoice] = useState<InvoiceDTO | null>(null);
@@ -519,11 +459,19 @@ export const InvoiceManagementPage: FC = () => {
 
   // Modal Đổi / Trả hàng chuẩn KiotViet
   const [returnExchangeModalInvoice, setReturnExchangeModalInvoice] = useState<InvoiceDTO | null>(null);
+  const returnCashFundSource: 'SHIFT' | 'SAFE' = useMemo(() => {
+    if (!isStoreOwner) return 'SHIFT';
+    const branchId = returnExchangeModalInvoice?.branchId;
+    if (!branchId) return 'SAFE';
+    return sessionStorage.getItem(`mtgrms_owner_shift_mode_${branchId}`) === 'attach'
+      ? 'SHIFT'
+      : 'SAFE';
+  }, [isStoreOwner, returnExchangeModalInvoice?.branchId]);
 
   // Scoped danh mục cho modal Đổi/Trả hàng theo đúng chi nhánh của đơn gốc
   useEffect(() => {
     let mounted = true;
-    if (returnExchangeModalInvoice?.branchId && !returnExchangeModalInvoice.branchId.startsWith('BR-')) {
+    if (returnExchangeModalInvoice?.branchId) {
       posOrderApi.getAllProducts(returnExchangeModalInvoice.branchId)
         .then((prods) => {
           if (mounted) setExchangeBranchProducts(prods || []);
@@ -669,7 +617,7 @@ export const InvoiceManagementPage: FC = () => {
     setInvoices((prev) =>
       prev.map((i) =>
         i.invoiceId === cancelModalInvoice.invoiceId
-          ? { ...i, status: 'CANCELLED', statusLabel: 'Đã hủy / Đổi trả' }
+          ? { ...i, status: 'CANCELLED', statusLabel: 'Đã hủy' }
           : i
       )
     );
@@ -681,6 +629,10 @@ export const InvoiceManagementPage: FC = () => {
 
   // Hủy đơn đặt trước và hoàn lại tồn kho giữ
   const handleCancelPreOrder = async (pre: PreOrderDTO) => {
+    if (pre.depositAmount > 0) {
+      alert('Đơn đã nhận tiền cọc cần được hoàn tiền và đối soát trước khi hủy. Vui lòng liên hệ Chủ cửa hàng.');
+      return;
+    }
     if (!window.confirm(`Bạn có chắc chắn muốn hủy đơn đặt trước ${pre.preOrderId}? Tồn kho đã giữ sẽ được tự động hoàn lại vào kho hàng.`)) {
       return;
     }
@@ -713,6 +665,7 @@ export const InvoiceManagementPage: FC = () => {
       unitName?: string;
       condition?: 'Restock' | 'Damaged';
       orderDetailId?: string;
+      batchId?: string;
       isGift?: boolean;
     }>;
     newItems: Array<{
@@ -756,7 +709,7 @@ export const InvoiceManagementPage: FC = () => {
       });
 
       // Tự động đồng bộ lại tiền mặt trong két quầy của ca hiện tại
-      const targetBranchId = branchFilter !== 'ALL' ? branchFilter : (assignedBranch.id.startsWith('BR-') ? (dbBranches[0]?.id || assignedBranch.id) : assignedBranch.id);
+      const targetBranchId = branchFilter !== 'ALL' ? branchFilter : assignedBranch.id;
       posShiftApi.getCurrentShift(targetBranchId).then((s) => {
         if (s) setActiveShiftCash(s.expectedCash);
       }).catch(() => { });
@@ -791,7 +744,7 @@ export const InvoiceManagementPage: FC = () => {
     const creatorCashier = user?.role === 'STORE_OWNER' ? `Chủ cửa hàng: ${user?.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS');
     const targetBranchId = branchFilter !== 'ALL'
       ? branchFilter
-      : (!assignedBranch.id.startsWith('BR-') ? assignedBranch.id : undefined);
+      : assignedBranch.id;
 
     if (!targetBranchId) {
       throw new Error('Vui lòng chọn một chi nhánh cụ thể trước khi tạo đơn đặt trước.');
@@ -840,9 +793,12 @@ export const InvoiceManagementPage: FC = () => {
       const merchandiseAmount = backendRes?.totalAmount ?? merchandiseAmt;
       const discountAmount = backendRes?.discountAmount ?? promoDisc;
       const totalAmt = backendRes?.finalAmount ?? Math.max(0, merchandiseAmt - promoDisc);
+      const preOrderId = createdCode || createdUuid;
+      if (!preOrderId) throw new Error('Backend chưa trả mã đơn đặt trước.');
+
       const newPreOrder: PreOrderDTO = {
         orderUuid: createdUuid,
-        preOrderId: createdCode || `PO${Math.floor(100000 + Math.random() * 900000)}`,
+        preOrderId,
         createdAt: new Date().toLocaleString('vi-VN'),
         branchId: branchFilter !== 'ALL' ? branchFilter : assignedBranch.id,
         branchName:
@@ -894,24 +850,8 @@ export const InvoiceManagementPage: FC = () => {
     }
   };
 
-  // Kiểm tra chi nhánh khớp nhau (hỗ trợ cả GUID DB, mã BR-AN-*, và tên chi nhánh)
-  const isBranchMatching = (filterId: string, itemBranchId?: string, itemBranchName?: string) => {
-    if (filterId === 'ALL') return true;
-    if (itemBranchId && itemBranchId === filterId) return true;
-    const filterBranch = availableBranches.find((b) => b.id === filterId);
-    const normStr = (s: string) => s.normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ');
-    const filterName = normStr(filterBranch?.name || '');
-    const targetName = normStr(itemBranchName || '');
-    if (targetName && filterName && (targetName === filterName || targetName.includes(filterName) || filterName.includes(targetName))) {
-      return true;
-    }
-    if (filterName.includes('ba đình') && (targetName.includes('ba đình') || itemBranchId === 'BR-AN-01' || itemBranchId === 'cd5e8d1b-b08b-448d-beff-b85ea5873d52')) return true;
-    if (filterName.includes('cầu giấy') && (targetName.includes('cầu giấy') || itemBranchId === 'BR-01' || itemBranchId === 'BR-AN-02')) return true;
-    if (filterName.includes('đống đa') && (targetName.includes('đống đa') || itemBranchId === 'BR-AN-03')) return true;
-    if (filterName.includes('thanh xuân') && (targetName.includes('thanh xuân') || itemBranchId === 'BR-02')) return true;
-    if (filterName.includes('quận 1') && (targetName.includes('quận 1') || itemBranchId === 'BR-03')) return true;
-    return false;
-  };
+  const isBranchMatching = (filterId: string, itemBranchId?: string) =>
+    filterId === 'ALL' || Boolean(itemBranchId && itemBranchId === filterId);
 
   // Lọc Hóa đơn
   const filteredInvoices = useMemo(() => {
@@ -921,8 +861,8 @@ export const InvoiceManagementPage: FC = () => {
       const isSearching = isStoreOwner && searchQuery.trim().length > 0;
 
       const matchBranch = !isStoreOwner
-        ? isBranchMatching(branchFilter, inv.branchId, inv.branchName)
-        : (isSearching || branchFilter === 'ALL' || isBranchMatching(branchFilter, inv.branchId, inv.branchName));
+        ? isBranchMatching(branchFilter, inv.branchId)
+        : (isSearching || branchFilter === 'ALL' || isBranchMatching(branchFilter, inv.branchId));
 
       const cleanQuery = searchQuery.trim().toLowerCase();
       const phoneQuery = cleanQuery.replace(/\D/g, '');
@@ -938,11 +878,14 @@ export const InvoiceManagementPage: FC = () => {
           ? inv.paymentMethod === 'DEBT' || inv.paymentMethod === 'CREDIT'
           : inv.paymentMethod === paymentMethodFilter);
 
-      const matchStatus = statusFilter === 'ALL' || inv.status === statusFilter;
+      const hasReturn = (returnRecordsByOrder[inv.invoiceId]?.length ?? 0) > 0;
+      const matchStatus = statusFilter === 'ALL' ||
+        (statusFilter === 'RETURNED' ? inv.status !== 'CANCELLED' && hasReturn :
+          statusFilter === 'COMPLETED' ? inv.status === 'COMPLETED' && !hasReturn : inv.status === statusFilter);
 
       return matchBranch && matchSearch && matchMethod && matchStatus;
     });
-  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, branchFilter, isStoreOwner, availableBranches]);
+  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, branchFilter, isStoreOwner, availableBranches, returnRecordsByOrder]);
 
   // Phân trang dữ liệu Hóa đơn
   const paginatedInvoices = useMemo(() => {
@@ -956,8 +899,8 @@ export const InvoiceManagementPage: FC = () => {
       const isSearching = isStoreOwner && searchQuery.trim().length > 0;
 
       const matchBranch = !isStoreOwner
-        ? isBranchMatching(branchFilter, p.branchId, p.branchName)
-        : (isSearching || branchFilter === 'ALL' || isBranchMatching(branchFilter, p.branchId, p.branchName));
+        ? isBranchMatching(branchFilter, p.branchId)
+        : (isSearching || branchFilter === 'ALL' || isBranchMatching(branchFilter, p.branchId));
 
       const matchSearch =
         !searchQuery.trim() ||
@@ -1050,7 +993,7 @@ export const InvoiceManagementPage: FC = () => {
             <div className="unified-header-subtitle">
               {branchFilter === 'ALL'
                 ? 'Toàn chuỗi cửa hàng (3 Chi nhánh)'
-                : availableBranches.find((b) => b.id === branchFilter)?.name || 'Chi nhánh Cầu Giấy (Trung tâm)'}{' '}
+                : availableBranches.find((b) => b.id === branchFilter)?.name || '—'}{' '}
               &bull; Bán lẻ &bull; Đơn đặt trước giữ kho
             </div>
           </div>
@@ -1267,7 +1210,8 @@ export const InvoiceManagementPage: FC = () => {
                     <option value="ALL">Tất cả trạng thái</option>
                     <option value="COMPLETED">Hoàn thành</option>
                     <option value="PENDING_PAYMENT">Chờ chuyển khoản</option>
-                    <option value="CANCELLED">Đã hủy / Đổi trả</option>
+                    <option value="CANCELLED">Đã hủy</option>
+                    <option value="RETURNED">Đã đổi/trả</option>
                   </select>
                 </div>
               )}
@@ -1353,7 +1297,7 @@ export const InvoiceManagementPage: FC = () => {
                                   lineHeight: 1.35,
                                 }}
                               >
-                                {inv.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)'}
+                                {inv.branchName || '—'}
                               </span>
                             </div>
                           </td>
@@ -1490,7 +1434,7 @@ export const InvoiceManagementPage: FC = () => {
                             >
                               {isCompleted ? (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                  <CheckCircle2 size={12} /> Hoàn thành
+                                  <CheckCircle2 size={12} /> {(returnRecordsByOrder[inv.invoiceId]?.length ?? 0) > 0 ? 'Đã đổi/trả' : 'Hoàn thành'}
                                 </span>
                               ) : inv.status === 'PENDING_PAYMENT' ? (
                                 'Chờ chuyển khoản'
@@ -1499,7 +1443,7 @@ export const InvoiceManagementPage: FC = () => {
                                   <DollarSign size={12} /> Còn nợ {(inv.debtAmount || 0).toLocaleString('vi-VN')} đ
                                 </span>
                               ) : (
-                                'Đã hủy / Đổi trả'
+                                'Đã hủy'
                               )}
                             </span>
                           </td>
@@ -1538,31 +1482,7 @@ export const InvoiceManagementPage: FC = () => {
                                   <span>Đổi/Trả</span>
                                 </button>
                               )}
-                              {isCompleted ? (
-                                <button
-                                  type="button"
-                                  className="pos-btn-secondary-pill"
-                                  style={{
-                                    height: 26,
-                                    padding: '0 8px',
-                                    fontSize: 11,
-                                    borderColor: isStoreOwnerOrManager ? '#fca5a5' : '#cbd5e1',
-                                    color: isStoreOwnerOrManager ? '#dc2626' : '#94a3b8',
-                                    opacity: isStoreOwnerOrManager ? 1 : 0.6,
-                                  }}
-                                  title={isStoreOwnerOrManager ? 'Hủy hóa đơn này' : 'Chỉ Quản lý / Chủ cửa hàng mới được hủy hóa đơn'}
-                                  onClick={() => {
-                                    if (!isStoreOwnerOrManager) {
-                                      alert('Thu ngân không có quyền hủy hóa đơn đã thanh toán. Vui lòng liên hệ Quản lý hoặc Chủ cửa hàng!');
-                                      return;
-                                    }
-                                    setCancelModalInvoice(inv);
-                                  }}
-                                >
-                                  <XCircle size={12} />
-                                  <span>Hủy đơn</span>
-                                </button>
-                              ) : inv.status === 'PENDING_PAYMENT' ? (
+                              {isCompleted ? null : inv.status === 'PENDING_PAYMENT' ? (
                                 <button type="button" className="pos-btn-secondary-pill" onClick={() => setCancelModalInvoice(inv)}>Hủy đơn chờ</button>
                               ) : isDebt ? null : (
                                 <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', alignSelf: 'center' }}>
@@ -1768,7 +1688,7 @@ export const InvoiceManagementPage: FC = () => {
                     className="pos-btn-primary-pill"
                     style={{ height: 28, padding: '0 12px', fontSize: 11.5, backgroundColor: '#0f766e' }}
                     onClick={() => {
-                      if (branchFilter === 'ALL' && (!assignedBranch.id || assignedBranch.id.startsWith('BR-'))) {
+                      if (branchFilter === 'ALL' && !assignedBranch.id) {
                         alert('Vui lòng chọn một chi nhánh cụ thể từ bộ lọc trên thanh công cụ trước khi tạo đơn đặt trước.');
                         return;
                       }
@@ -1846,7 +1766,7 @@ export const InvoiceManagementPage: FC = () => {
                                     lineHeight: 1.35,
                                   }}
                                 >
-                                  {pre.branchName || 'Chi nhánh Cầu Giấy (Trung tâm)'}
+                                  {pre.branchName || '—'}
                                 </span>
                               </div>
                             </td>
@@ -1992,7 +1912,7 @@ export const InvoiceManagementPage: FC = () => {
                                       type="button"
                                       style={{ height: 26, padding: '0 8px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}
                                       onClick={() => handleCancelPreOrder(pre)}
-                                      title="Hủy đơn đặt trước và hoàn lại tồn kho đã giữ"
+                                       title={pre.depositAmount > 0 ? 'Đơn có tiền cọc cần đối soát hoàn tiền trước khi hủy' : 'Hủy đơn đặt trước và hoàn lại tồn kho đã giữ'}
                                     >
                                       <XCircle size={12} />
                                       <span>Hủy</span>
@@ -2337,8 +2257,10 @@ export const InvoiceManagementPage: FC = () => {
         isOpen={Boolean(returnExchangeModalInvoice)}
         invoice={returnExchangeModalInvoice}
         availableProducts={exchangeBranchProducts.length > 0 ? exchangeBranchProducts : catalogProducts}
-        currentDrawerCash={activeShiftCash}
+        currentDrawerCash={returnCashFundSource === 'SHIFT' ? activeShiftCash : undefined}
         isStoreOwner={isStoreOwner}
+        cashFundSource={returnCashFundSource}
+        refundSourceLabel={returnCashFundSource === 'SHIFT' ? 'Két quầy của ca đang tham gia' : 'Két sắt của chi nhánh hóa đơn'}
         onClose={() => setReturnExchangeModalInvoice(null)}
         onConfirm={handleConfirmReturnExchange}
       />

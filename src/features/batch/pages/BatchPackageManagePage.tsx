@@ -439,19 +439,36 @@ export const BatchPackageManagePage: FC<{ defaultRole?: UserRole }> = ({
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table className="so-list-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table
+                className="so-list-table"
+                style={{ width: '100%', minWidth: 1500, tableLayout: 'fixed', borderCollapse: 'collapse' }}
+              >
+                <colgroup>
+                  <col style={{ width: '3%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '7%' }} />
+                </colgroup>
                 <thead>
                   <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                    <th style={{ padding: 10, width: 48 }}>STT</th>
+                    <th style={{ padding: 10, textAlign: 'center' }}>STT</th>
                     <th style={{ padding: 10 }}>Đợt</th>
+                    <th style={{ padding: 10 }}>Tên khay</th>
                     <th style={{ padding: 10 }}>Mã khay</th>
-                    <th style={{ padding: 10 }}>Khối lượng</th>
-                    <th style={{ padding: 10 }}>NSX</th>
-                    <th style={{ padding: 10 }}>HSD</th>
-                    <th style={{ padding: 10 }}>Giá bán</th>
-                    <th style={{ padding: 10 }}>Bán hàng</th>
-                    <th style={{ padding: 10 }}>Trạng thái</th>
-                    <th style={{ padding: 10, textAlign: 'right' }}>Thao tác</th>
+                    <th style={{ padding: 10, textAlign: 'right' }}>Khối lượng</th>
+                    <th style={{ padding: 10, textAlign: 'center' }}>NSX</th>
+                    <th style={{ padding: 10, textAlign: 'center' }}>HSD</th>
+                    <th style={{ padding: 10, textAlign: 'right' }}>Giá bán</th>
+                    <th style={{ padding: 10, textAlign: 'center' }}>Bán hàng</th>
+                    <th style={{ padding: 10, textAlign: 'center' }}>Trạng thái</th>
+                    <th style={{ padding: 10, textAlign: 'center' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -459,7 +476,7 @@ export const BatchPackageManagePage: FC<{ defaultRole?: UserRole }> = ({
                     const sellMeta = STATUS_META[p.status] || STATUS_META.VOID;
                     return (
                       <tr key={p.id} style={{ borderTop: '1px solid #e2e8f0' }}>
-                        <td style={{ padding: 10, fontWeight: 700, color: '#64748b' }}>{idx + 1}</td>
+                        <td style={{ padding: 10, textAlign: 'center', fontWeight: 700, color: '#64748b' }}>{idx + 1}</td>
                         <td style={{ padding: 10 }}>
                           <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 12 }}>
                             {p.repackOrderCode || '—'}
@@ -468,12 +485,21 @@ export const BatchPackageManagePage: FC<{ defaultRole?: UserRole }> = ({
                             {fmtDateTimeVi(p.createdAt)}
                           </div>
                         </td>
-                        <td style={{ padding: 10, fontFamily: 'monospace' }}>{p.internalCode}</td>
-                        <td style={{ padding: 10 }}>{fmtWeightDisplay(p.netWeight)}</td>
-                        <td style={{ padding: 10 }}>{fmtDateVi(p.manufactureDate || p.createdAt)}</td>
-                        <td style={{ padding: 10 }}>{fmtDateVi(p.expiryDate)}</td>
-                        <td style={{ padding: 10 }}>{fmtMoney(p.sellingPrice)}</td>
-                        <td style={{ padding: 10 }}>
+                        <td style={{ padding: 10, fontWeight: 600 }} title={p.name?.trim() || undefined}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.name?.trim() || '—'}
+                          </div>
+                        </td>
+                        <td style={{ padding: 10, fontFamily: 'monospace' }} title={p.internalCode}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.internalCode}
+                          </div>
+                        </td>
+                        <td style={{ padding: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtWeightDisplay(p.netWeight)}</td>
+                        <td style={{ padding: 10, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDateVi(p.manufactureDate || p.createdAt)}</td>
+                        <td style={{ padding: 10, textAlign: 'center', whiteSpace: 'nowrap' }}>{fmtDateVi(p.expiryDate)}</td>
+                        <td style={{ padding: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtMoney(p.sellingPrice)}</td>
+                        <td style={{ padding: 10, textAlign: 'center' }}>
                           <span style={badgeStyle(p.status === 'SOLD' ? 'SOLD' : p.status === 'AVAILABLE' ? 'AVAILABLE' : p.status)}>
                             {sellMeta.sellLabel}
                           </span>
@@ -483,10 +509,10 @@ export const BatchPackageManagePage: FC<{ defaultRole?: UserRole }> = ({
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: 10 }}>
+                        <td style={{ padding: 10, textAlign: 'center' }}>
                           <span style={badgeStyle(p.status)}>{sellMeta.label}</span>
                         </td>
-                        <td style={{ padding: 10, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: 10, textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button
                             type="button"
                             className="so-list-action-btn"

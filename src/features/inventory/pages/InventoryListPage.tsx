@@ -4,24 +4,31 @@ import { useNavigate } from 'react-router-dom';
 import { Boxes, Hourglass, Download, Printer, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type { InventoryFilterState, InventoryItem } from '../types/inventory.types';
+import { DEFAULT_INVENTORY_FILTERS } from '../types/inventory.types';
 import { inventoryApi } from '../api/inventoryApi';
+import { branchApi } from '../../purchase-order/api/branchApi';
 import { InventoryFilterBar } from '../components/InventoryFilterBar';
 import { InventoryTable } from '../components/InventoryTable';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
 
-const DEFAULT_FILTERS: InventoryFilterState = {
-  keyword: '',
-  sku: '',
-  productName: '',
-  branchKeyword: '',
-  branchId: '',
-  category: '',
-  location: '',
-  stockStatus: '',
-  pageIndex: 1,
-  pageSize: 10,
-};
+function tokenMatches(value: string | undefined, tokens: string[]): boolean {
+  if (!tokens.length) return true;
+  const hay = (value || '').toLowerCase();
+  return tokens.some((t) => hay.includes(t.trim().toLowerCase()));
+}
+
+function resolveUniqueBranchId(
+  options: { id: string; code: string; name: string }[],
+  codes: string[],
+  names: string[]
+): string {
+  if (!codes.length && !names.length) return '';
+  const matched = options.filter(
+    (o) => tokenMatches(o.code, codes) && tokenMatches(o.name, names)
+  );
+  return matched.length === 1 ? matched[0].id : '';
+}
 
 export const InventoryListPage: FC = () => {
   const navigate = useNavigate();
@@ -30,28 +37,85 @@ export const InventoryListPage: FC = () => {
   const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
   const lockedBranch = !isStoreOwner && userBranchId ? userBranchId : '';
 
-  const [draft, setDraft] = useState<InventoryFilterState>({
-    ...DEFAULT_FILTERS,
-    branchId: lockedBranch,
-    branchKeyword: lockedBranch,
-  });
   const [applied, setApplied] = useState<InventoryFilterState>({
-    ...DEFAULT_FILTERS,
+    ...DEFAULT_INVENTORY_FILTERS,
     branchId: lockedBranch,
-    branchKeyword: lockedBranch,
   });
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [branchOptions, setBranchOptions] = useState<{ id: string; code: string; name: string }[]>(
+    []
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await branchApi.getBranches({
+          status: 'all',
+          pageIndex: 1,
+          pageSize: 100,
+        });
+        if (!mounted) return;
+        setBranchOptions(
+          (res.items ?? []).map((b) => ({
+            id: b.id,
+            code: b.code || '',
+            name: b.name,
+          }))
+        );
+      } catch {
+        if (!mounted) return;
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await inventoryApi.getStockSummary(applied);
-      setItems(res.items);
-      setTotalCount(res.totalCount);
+      const resolvedBranchId =
+        lockedBranch ||
+        resolveUniqueBranchId(branchOptions, applied.branchCodes, applied.branchNames) ||
+        applied.branchId;
+
+      const hasChipFilters =
+        applied.skus.length > 0 ||
+        applied.names.length > 0 ||
+        applied.branchCodes.length > 0 ||
+        applied.branchNames.length > 0;
+
+      const fetchFilters: InventoryFilterState = {
+        ...applied,
+        branchId: resolvedBranchId,
+        pageIndex: hasChipFilters ? 1 : applied.pageIndex,
+        pageSize: hasChipFilters ? Math.max(applied.pageSize, 100) : applied.pageSize,
+      };
+
+      const res = await inventoryApi.getStockSummary(fetchFilters);
+      let mapped = res.items;
+
+      if (hasChipFilters) {
+        mapped = mapped.filter(
+          (o) =>
+            tokenMatches(o.sku, applied.skus) &&
+            tokenMatches(o.productName, applied.names) &&
+            tokenMatches(o.branchCode || o.branchName, applied.branchCodes) &&
+            tokenMatches(o.branchName, applied.branchNames)
+        );
+        const total = mapped.length;
+        const start = (applied.pageIndex - 1) * applied.pageSize;
+        setItems(mapped.slice(start, start + applied.pageSize));
+        setTotalCount(total);
+      } else {
+        setItems(mapped);
+        setTotalCount(res.totalCount);
+      }
     } catch (err: any) {
       setItems([]);
       setTotalCount(0);
@@ -60,15 +124,27 @@ export const InventoryListPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [applied]);
+  }, [applied, branchOptions, lockedBranch]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3000);
+  };
+
+  const handleSearch = (values: InventoryFilterState) => {
+    const resolvedBranchId =
+      lockedBranch ||
+      resolveUniqueBranchId(branchOptions, values.branchCodes, values.branchNames) ||
+      '';
+    setApplied({ ...values, branchId: resolvedBranchId, pageIndex: 1 });
+  };
+
+  const handleReset = () => {
+    setApplied({ ...DEFAULT_INVENTORY_FILTERS, branchId: lockedBranch, pageSize: applied.pageSize });
   };
 
   const handleExportExcel = () => {
@@ -77,21 +153,20 @@ export const InventoryListPage: FC = () => {
       return;
     }
 
-    // Generate CSV content with BOM for UTF-8 Vietnamese support
     const headers = [
       'STT',
-      'Mã SKU',
+      'Mã hàng',
       'Tên sản phẩm',
       'Ngành hàng',
       'Chi nhánh',
       'Vị trí kệ',
-      'DVN',
-      'OnHand',
-      'Committed',
-      'Available',
-      'OnOrder',
-      'Reorder',
-      'Giá vốn bình quân',
+      'ĐVT',
+      'Tồn',
+      'Cách ly/Giữ',
+      'Khả dụng',
+      'Đang đặt',
+      'Điểm đặt lại',
+      'Giá vốn',
       'Tổng giá trị tồn',
       'Trạng thái',
     ];
@@ -145,7 +220,6 @@ export const InventoryListPage: FC = () => {
         overflow: 'hidden',
       }}
     >
-      {/* Toast Notification */}
       {toastMessage && (
         <div
           style={{
@@ -167,40 +241,25 @@ export const InventoryListPage: FC = () => {
         </div>
       )}
 
-      {/* Top Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 12,
-          marginBottom: 8,
-          flexShrink: 0,
-        }}
-      >
-        <h1
-          style={{
-            fontSize: 20,
-            fontWeight: 800,
-            color: 'var(--text-main)',
-            margin: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <Boxes size={22} color="var(--blue-primary, #0f766e)" />
-          <span>Tồn kho cửa hàng</span>
-          {isLoading && (
-            <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
-          )}
-        </h1>
+      <div className="so-list-header">
+        <div>
+          <h1 className="so-list-title">
+            <Boxes size={22} color="var(--blue-primary, #0f766e)" />
+            <span>Tồn kho cửa hàng</span>
+            {isLoading && (
+              <Loader2
+                size={16}
+                className="animate-spin"
+                style={{ color: 'var(--blue-primary, #0f766e)' }}
+              />
+            )}
+          </h1>
+        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="so-list-header-actions">
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 12px' }}
             onClick={handleExportExcel}
             title="Xuất bảng tồn kho ra Excel"
           >
@@ -210,7 +269,6 @@ export const InventoryListPage: FC = () => {
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 12px' }}
             onClick={handlePrint}
             title="In báo cáo tồn kho A4"
           >
@@ -220,7 +278,6 @@ export const InventoryListPage: FC = () => {
           <button
             type="button"
             className="po-btn po-btn-secondary"
-            style={{ height: 32, padding: '0 14px' }}
             onClick={() => navigate('/store-owner/batches')}
           >
             <Hourglass size={14} />
@@ -231,15 +288,12 @@ export const InventoryListPage: FC = () => {
 
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <InventoryFilterBar
-          draft={draft}
+          initialValues={applied}
           lockBranch={Boolean(lockedBranch)}
-          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          onSearch={() => setApplied({ ...draft, pageIndex: 1 })}
-          onReset={() => {
-            const reset = { ...DEFAULT_FILTERS, branchId: lockedBranch, branchKeyword: lockedBranch };
-            setDraft(reset);
-            setApplied(reset);
-          }}
+          branches={branchOptions}
+          products={items.map((i) => ({ sku: i.sku, productName: i.productName }))}
+          onSearch={handleSearch}
+          onReset={handleReset}
         />
       </div>
 
@@ -249,7 +303,9 @@ export const InventoryListPage: FC = () => {
         pageIndex={applied.pageIndex}
         pageSize={applied.pageSize}
         onPageChange={(page) => setApplied((prev) => ({ ...prev, pageIndex: page }))}
-        onPageSizeChange={(size) => setApplied((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }))}
+        onPageSizeChange={(size) =>
+          setApplied((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }))
+        }
         onViewBatches={(item) => {
           const params = new URLSearchParams();
           params.set('sku', item.sku);
