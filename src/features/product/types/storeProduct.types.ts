@@ -6,6 +6,17 @@ export interface StoreProductUnitPrice {
   isBaseUnit: boolean;
 }
 
+/** Một NCC nguồn nhập của SP tại cửa hàng (khi gộp nhiều NCC vào 1 dòng). */
+export interface StoreProductSupplierSource {
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  costPrice: number;
+  minOrderQuantity: number;
+  isPrimarySupplier?: boolean;
+  deliveryUoM?: string;
+}
+
 export interface StoreProductItem {
   id: string;
   storeId: string;
@@ -20,10 +31,10 @@ export interface StoreProductItem {
   unit: string;
   imageUrl?: string;
   retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
-  costPrice: number; // Giá vốn từ SupplierProduct
+  costPrice: number; // Giá vốn từ SupplierProduct (NCC rẻ nhất khi nhiều NCC)
   currentStock: number; // Tồn kho thực tế (SOH)
   minStockLevel: number; // Định mức tồn tối thiểu / an toàn
-  /** Id NCC của dòng nguồn nhập (1 BranchProduct có thể nhiều dòng / nhiều NCC). */
+  /** Id NCC primary (rẻ nhất) — khi nhiều NCC xem `suppliers`. */
   supplierId?: string;
   primarySupplierCode?: string;
   primarySupplierName: string;
@@ -32,6 +43,10 @@ export interface StoreProductItem {
   hasActiveSupplierSource?: boolean;
   /** SP đang bán tại CN nhưng mất nguồn NCC. */
   lostSupplierSource?: boolean;
+  /** Danh sách NCC nguồn nhập (1 dòng catalog có thể nhiều NCC). */
+  suppliers?: StoreProductSupplierSource[];
+  /** Số NCC — >1 thì UI hiện "N NCC" + hover list. */
+  supplierCount?: number;
   minOrderQuantity: number; // MOQ từ NCC — chỉ xem tại màn này
   status: 'Active' | 'Inactive';
   shelfLocation?: string;

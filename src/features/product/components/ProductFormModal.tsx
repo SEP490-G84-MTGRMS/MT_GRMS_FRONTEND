@@ -315,6 +315,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [productStatus, setProductStatus] = useState<'Active' | 'Discontinued'>('Active');
   const [hasBatches, setHasBatches] = useState<boolean>(false);
+  /** Số ngày cận hạn; rỗng = mặc định 30. */
+  const [nearExpiryThresholdDays, setNearExpiryThresholdDays] = useState<string>('');
   const [allowRepack, setAllowRepack] = useState<boolean>(false);
   /** Giá đ/kg khi đóng khay (PROCESSED). Mặc định = RAW khi bật chia khay. */
   const [processedSellingPrice, setProcessedSellingPrice] = useState<number>(0);
@@ -414,6 +416,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             : 'Active'
         );
         setHasBatches(Boolean(productToEdit.hasBatches));
+        setNearExpiryThresholdDays(
+          productToEdit.nearExpiryThresholdDays && productToEdit.nearExpiryThresholdDays > 0
+            ? String(productToEdit.nearExpiryThresholdDays)
+            : ''
+        );
         setAllowRepack(Boolean(productToEdit.allowRepack));
         {
           const raw = productToEdit.sellingPrice || 0;
@@ -546,6 +553,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setIsFavorite(false);
         setProductStatus('Active');
         setHasBatches(false);
+        setNearExpiryThresholdDays('');
         setAllowRepack(false);
         setIsSubmitting(false);
 
@@ -1132,6 +1140,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         isFavorite,
         status: productStatus,
         hasBatches: hasBatches || repackOn,
+        nearExpiryThresholdDays: (() => {
+          const n = Number(nearExpiryThresholdDays);
+          return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+        })(),
         allowRepack: repackOn,
         eligibleForVatReduction,
         description: description.trim() || undefined,
@@ -2384,6 +2396,28 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   disabled={allowRepack && isPurchaseUnitKg}
                   onChange={setHasBatches}
                 />
+              </div>
+
+              <div style={{ ...toggleRowStyle, alignItems: 'center' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={toggleTitleStyle}>Thời gian cận hạn</div>
+                  <div style={toggleHintStyle}>
+                    Lô còn ≤ số ngày này được đánh dấu cận hạn. Để trống = 30 ngày.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    className="filter-input"
+                    style={{ width: 88, textAlign: 'right', fontWeight: 600 }}
+                    placeholder="30"
+                    value={nearExpiryThresholdDays}
+                    onChange={(e) => setNearExpiryThresholdDays(e.target.value)}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>ngày</span>
+                </div>
               </div>
 
               <div style={toggleRowStyle}>

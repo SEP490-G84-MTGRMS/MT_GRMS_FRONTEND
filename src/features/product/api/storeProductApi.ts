@@ -83,6 +83,25 @@ export const storeProductApi = {
         isPrimarySupplier: Boolean(x.isPrimarySupplier),
         hasActiveSupplierSource: x.hasActiveSupplierSource !== false,
         lostSupplierSource: Boolean(x.lostSupplierSource),
+        suppliers: Array.isArray(x.suppliers)
+          ? x.suppliers.map((s: any) => ({
+              supplierId: String(s.supplierId || ''),
+              supplierCode: s.supplierCode || '',
+              supplierName: s.supplierName || '',
+              costPrice: Number(s.costPrice ?? 0),
+              minOrderQuantity: Number(s.minOrderQuantity ?? 0),
+              isPrimarySupplier: Boolean(s.isPrimarySupplier),
+              deliveryUoM: s.deliveryUoM || undefined,
+            }))
+          : undefined,
+        supplierCount:
+          typeof x.supplierCount === 'number'
+            ? x.supplierCount
+            : Array.isArray(x.suppliers)
+              ? x.suppliers.length
+              : x.supplierId
+                ? 1
+                : 0,
         status: x.status,
         shelfLocation: x.shelfLocation,
         assignedDate: x.assignedDate ? x.assignedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),

@@ -247,6 +247,7 @@ export const ProductListPage: React.FC = () => {
               taxCategory: (p as any).taxCategory || 'STANDARD_1PCT',
               isFavorite: Boolean(p.isFavorite),
               hasBatches: Boolean(p.hasBatches),
+              nearExpiryThresholdDays: p.nearExpiryThresholdDays ?? null,
               allowRepack: Boolean((p as { allowRepack?: boolean }).allowRepack),
               sellRawByWeight: p.sellRawByWeight ?? true,
               processedSellingPricePerKg:
@@ -411,6 +412,10 @@ export const ProductListPage: React.FC = () => {
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
           hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(productToEdit.hasBatches),
+          nearExpiryThresholdDays:
+            data.nearExpiryThresholdDays !== undefined
+              ? data.nearExpiryThresholdDays
+              : productToEdit.nearExpiryThresholdDays ?? null,
           allowRepack: data.allowRepack !== undefined ? data.allowRepack : Boolean(productToEdit.allowRepack),
           processedSellingPricePerKg:
             data.processedSellingPricePerKg !== undefined
@@ -508,6 +513,7 @@ export const ProductListPage: React.FC = () => {
           isFavorite: data.isFavorite ?? false,
           status: data.status || 'Active',
           hasBatches: data.hasBatches ?? false,
+          nearExpiryThresholdDays: data.nearExpiryThresholdDays ?? null,
           allowRepack: data.allowRepack ?? false,
           processedSellingPricePerKg: data.processedSellingPricePerKg ?? null,
           eligibleForVatReduction: data.eligibleForVatReduction ?? false,
@@ -652,6 +658,7 @@ export const ProductListPage: React.FC = () => {
         internalNote: product.internalNote,
         isFavorite: product.isFavorite ?? false,
         hasBatches: product.hasBatches ?? false,
+        nearExpiryThresholdDays: product.nearExpiryThresholdDays ?? null,
         allowRepack: product.allowRepack ?? false,
         processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
         eligibleForVatReduction: product.eligibleForVatReduction ?? false,
@@ -692,6 +699,7 @@ export const ProductListPage: React.FC = () => {
         internalNote: product.internalNote,
         isFavorite: Boolean(product.isFavorite),
         hasBatches: nextVal,
+        nearExpiryThresholdDays: product.nearExpiryThresholdDays ?? null,
         allowRepack: product.allowRepack ?? false,
         processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
         eligibleForVatReduction: Boolean(product.eligibleForVatReduction),
@@ -736,6 +744,7 @@ export const ProductListPage: React.FC = () => {
         internalNote: product.internalNote,
         isFavorite: product.isFavorite ?? false,
         hasBatches: product.hasBatches ?? false,
+        nearExpiryThresholdDays: product.nearExpiryThresholdDays ?? null,
         allowRepack: product.allowRepack ?? false,
         processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
         eligibleForVatReduction: product.eligibleForVatReduction ?? false,
@@ -1015,6 +1024,7 @@ export const ProductListPage: React.FC = () => {
             description: excelCell(row, 'Mô tả', 'Mo ta', 'Description') || existing?.description || undefined,
             internalNote: excelCell(row, 'Ghi chú nội bộ', 'Ghi chu noi bo', 'InternalNote') || existing?.internalNote || undefined,
             hasBatches: excelBoolean(excelCell(row, 'Quản lý lô', 'Quan ly lo', 'HasBatches'), existing?.hasBatches ?? false),
+            nearExpiryThresholdDays: existing?.nearExpiryThresholdDays ?? null,
             allowRepack: excelBoolean(excelCell(row, 'Cho phép đóng gói lại', 'AllowRepack'), existing?.allowRepack ?? false),
             processedSellingPricePerKg: excelNumber(
               excelCell(row, 'Giá bán hàng đóng gói/kg', 'ProcessedSellingPricePerKg'),
