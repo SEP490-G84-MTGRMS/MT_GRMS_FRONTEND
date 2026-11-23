@@ -20,7 +20,6 @@ import { batchApi } from '../api/batchApi';
 import { BatchFilterBar, type BatchSuggestProduct } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
-import { BatchDiscountModal } from '../components/BatchDiscountModal';
 import {
   BatchExpiryAlertModal,
   type BatchAlertMode,
@@ -29,6 +28,7 @@ import { AdminToast, type ToastState } from '../../admin/components';
 import { productApi } from '../../product/api/productApi';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 const DEFAULT_FILTERS: BatchFilterState = {
   keyword: '',
@@ -53,6 +53,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const fromInventory = searchParams.get('from') === 'inventory';
   const role: UserRole = roleParam || defaultRole;
   const employeeBranchId = searchParams.get('branch') || '';
+  const isStoreOwner = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
 
   const [batches, setBatches] = useState<BatchItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -65,8 +66,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
 
   const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [discountBatch, setDiscountBatch] = useState<BatchItem | null>(null);
-  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [kpi, setKpi] = useState<BatchKpiSummary | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [alertMode, setAlertMode] = useState<BatchAlertMode>('near_expiry');
@@ -257,27 +256,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     showToast('Chưa có API cập nhật vị trí kệ — thay đổi chưa được lưu.', 'warning');
   };
 
-  const handleOpenDiscount = (batch: BatchItem) => {
-    if (batch.status === 'Expired') {
-      showToast('Lô hàng đã quá hạn sử dụng, không thể áp dụng giảm giá. Bắt buộc xuất hủy!', 'error');
-      return;
-    }
-    setDiscountBatch(batch);
-    setIsDiscountModalOpen(true);
-  };
-
-  const handleApplyDiscount = async (batchId: string, discountPercent: number) => {
-    try {
-      await batchApi.applyFefoDiscount(batchId, discountPercent);
-      setIsDiscountModalOpen(false);
-      setDiscountBatch(null);
-      showToast(`Đã lưu giảm giá FEFO ${discountPercent}% cho lô hàng.`, 'success');
-      await loadBatches();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Không thể lưu giảm giá FEFO.', 'error');
-    }
-  };
-
   const handleWriteOff = (batch: BatchItem) => {
     handleCreateStocktake(batch);
   };
@@ -421,7 +399,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
           setPageIndex(1);
         }}
         onSelectBatch={handleSelectBatch}
-        onDiscountClick={handleOpenDiscount}
         onWriteOffClick={handleWriteOff}
         onResetFilters={handleReset}
       />
@@ -431,7 +408,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         batch={selectedBatch}
         onClose={() => setIsDrawerOpen(false)}
         onUpdateLocation={handleUpdateLocation}
-        onDiscountClick={handleOpenDiscount}
         onWriteOffClick={handleWriteOff}
         onStocktakeClick={(b) => {
           setIsDrawerOpen(false);
@@ -443,16 +419,10 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         }}
       />
 
-      <BatchDiscountModal
-        isOpen={isDiscountModalOpen}
-        batch={discountBatch}
-        onClose={() => setIsDiscountModalOpen(false)}
-        onApplyDiscount={handleApplyDiscount}
-      />
-
       <BatchExpiryAlertModal
         isOpen={isAlertOpen}
         mode={alertMode}
+        canManageDiscount={isStoreOwner}
         branchId={
           role === 'employee' && employeeBranchId
             ? employeeBranchId
@@ -461,6 +431,10 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
               : ''
         }
         onClose={() => setIsAlertOpen(false)}
+        onDiscountSaved={async (message) => {
+          showToast(message, 'success');
+          await loadBatches();
+        }}
         onCreated={(codes) => {
           setIsAlertOpen(false);
           const msg =

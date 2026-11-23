@@ -385,11 +385,8 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                       const cell = getCell(p, d.dateKey);
                       const q = cell.finalQty || 0;
                       rowQty += q;
-                      const isOwnerAdjusted = Boolean(
-                        cell.isOwnerAdjusted ||
-                        cell.isOwnerOverridden ||
-                        (cell.storeQty !== null && cell.storeQty !== undefined)
-                      );
+                      const isOwnerAdjusted =
+                        cell.storeQty !== null && cell.storeQty !== undefined;
                       const supConfig = supplierConfigs?.find((sc) => sc.supplierId === p.supplierId);
                       let isCellOff = false;
                       let cellOffReason = '';
@@ -554,11 +551,9 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                           const q = cell.finalQty || 0;
                           rowQty += q;
 
-                          const isOwnerAdjusted = Boolean(
-                            cell.isOwnerAdjusted ||
-                            cell.isOwnerOverridden ||
-                            (cell.storeQty !== null && cell.storeQty !== undefined)
-                          );
+                          // Đã chốt = còn storeQty (kể cả 0 = chủ hủy đặt). storeQty=null = đã khôi phục NV.
+                          const isOwnerAdjusted =
+                            cell.storeQty !== null && cell.storeQty !== undefined;
 
                           // Kiểm tra lịch giao và trạng thái của NCC theo cấu hình backend
                           const supConfig = supplierConfigs?.find((sc) => sc.supplierId === p.supplierId);
@@ -726,13 +721,24 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                           const tooltip = tooltipParts.length > 0 ? tooltipParts.join('\n') : undefined;
 
                           // Input value logic:
-                          // Store Owner: displays finalQty (or storeQty if set to 0), fallback to employeeQty
-                          // Employee: always displays employeeQty
-                          const displayVal = isStoreOwner
-                            ? (isOwnerAdjusted
-                                ? (cell.storeQty !== null && cell.storeQty !== undefined ? cell.storeQty : (q > 0 ? q : ''))
-                                : (cell.employeeQty > 0 ? cell.employeeQty : (q > 0 ? q : '')))
-                            : (cell.employeeQty > 0 ? cell.employeeQty : '');
+                          // Store Owner đã chốt: hiện storeQty; đã khôi phục / chưa chốt: hiện finalQty (= employeeQty)
+                          // Employee: luôn hiện employeeQty
+                          const empQty = Number(cell.employeeQty) || 0;
+                          const rawDisplay = isStoreOwner
+                            ? isOwnerAdjusted
+                              ? cell.storeQty !== null && cell.storeQty !== undefined
+                                ? cell.storeQty
+                                : q
+                              : q > 0
+                                ? q
+                                : empQty
+                            : empQty;
+                          const displayVal =
+                            rawDisplay !== null &&
+                            rawDisplay !== undefined &&
+                            Number(rawDisplay) > 0
+                              ? String(rawDisplay)
+                              : '';
 
                           const inputClassName = `po-qty-input ${isBad ? 'qty-bad' : ''} ${
                             isStoreOwner
@@ -756,7 +762,7 @@ export const OrderMatrixTable: FC<OrderMatrixTableProps> = ({
                                     type="text"
                                     className={inputClassName}
                                     value={displayVal}
-                                    placeholder={!isStoreOwner ? '' : (cell.employeeQty > 0 ? String(cell.employeeQty) : '')}
+                                    placeholder={!isStoreOwner ? '' : (empQty > 0 ? String(empQty) : '')}
                                     data-pid={rowKey}
                                     data-day={d.dateKey}
                                     data-col={colIdx}

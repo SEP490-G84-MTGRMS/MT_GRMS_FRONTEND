@@ -443,6 +443,10 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           }
         }}
         onEditOrder={(order) => {
+          if (String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN') {
+            showToast(`PO đổi hàng ${order.poCode} không thể chỉnh sửa trên ma trận.`, 'warning');
+            return;
+          }
           const params = new URLSearchParams();
           if (order.branchId) params.set('branchId', order.branchId);
           if (order.supplierId) params.set('supplier', order.supplierId);

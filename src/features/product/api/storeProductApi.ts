@@ -74,6 +74,10 @@ export const storeProductApi = {
         imageUrl: x.imageUrl || undefined,
         retailPrice: x.retailPrice,
         costPrice: x.costPrice,
+        averageCost:
+          x.averageCost != null && Number(x.averageCost) > 0
+            ? Number(x.averageCost)
+            : Number(x.costPrice ?? 0) || 0,
         minOrderQuantity: x.minOrderQuantity ?? x.minimumOrderQuantity ?? 1,
         currentStock: x.currentStock,
         minStockLevel: x.minStockLevel,
@@ -239,6 +243,10 @@ export const storeProductApi = {
       })),
       status: input.status,
       shelfLocation: input.shelfLocation,
+      processedSellingPricePerKg:
+        input.processedSellingPricePerKg != null && Number(input.processedSellingPricePerKg) > 0
+          ? Number(input.processedSellingPricePerKg)
+          : undefined,
     });
   },
 

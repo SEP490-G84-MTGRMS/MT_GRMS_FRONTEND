@@ -32,6 +32,8 @@ export interface StoreProductItem {
   imageUrl?: string;
   retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
   costPrice: number; // Giá vốn từ SupplierProduct (NCC rẻ nhất khi nhiều NCC)
+  /** Giá vốn TB tồn (WAC) theo ĐVT cơ sở; ĐVT khác = averageCost × conversionRate. */
+  averageCost?: number;
   currentStock: number; // Tồn kho thực tế (SOH)
   minStockLevel: number; // Định mức tồn tối thiểu / an toàn
   /** Id NCC primary (rẻ nhất) — khi nhiều NCC xem `suppliers`. */
@@ -101,5 +103,7 @@ export interface EditStoreProductInput {
   status?: 'Active' | 'Inactive';
   supplierId?: string;
   shelfLocation?: string;
+  /** Giá đóng khay đ/kg — chỉ khi allowRepack. */
+  processedSellingPricePerKg?: number | null;
 }
 
