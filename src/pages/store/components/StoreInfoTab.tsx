@@ -33,8 +33,8 @@ export const StoreInfoTab: FC<StoreInfoTabProps> = ({ storeInfo, onUpdateStoreIn
         errors[key] = `${label} tối đa ${maxLength} ký tự.`;
       }
     }
-    if (!formData.name.trim()) {
-      errors.name = 'Vui lòng nhập tên cửa hàng.';
+    if (formData.name.trim().length < 2) {
+      errors.name = formData.name.trim() ? 'Tên cửa hàng phải có ít nhất 2 ký tự.' : 'Vui lòng nhập tên cửa hàng.';
     }
     if (formData.hotline.trim() && !/^\+?[0-9]{9,12}$/.test(formData.hotline.trim())) {
       errors.hotline = 'Số điện thoại phải có 9–12 chữ số, có thể bắt đầu bằng +.';

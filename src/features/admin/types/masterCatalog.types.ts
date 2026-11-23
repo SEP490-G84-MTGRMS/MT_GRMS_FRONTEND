@@ -7,6 +7,7 @@ export interface MasterProductUnit {
 }
 
 export interface MasterProductItem {
+  description?: string | null;
   id: string;
   barcode: string;
   name: string;
@@ -23,7 +24,6 @@ export interface MasterProductItem {
 }
 
 export interface MasterProductDetail extends MasterProductItem {
-  description?: string | null;
   createdAt: string;
 }
 

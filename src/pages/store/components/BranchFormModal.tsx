@@ -2,7 +2,6 @@
 import { useState, useEffect, type FC, type FormEvent } from "react";
 import {
   X,
-  Building2,
   MapPin,
   Phone,
   User,
@@ -19,7 +18,6 @@ import {
   type CreateBranchPayload,
   type UpdateBranchPayload,
 } from "../api/branchManagementApi";
-import { color } from "chart.js/helpers";
 
 interface BranchFormModalProps {
   branch: BranchItemResponse | null;
@@ -36,7 +34,6 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
   onSuccess,
   quota,
   existingBranches = [],
-  onUpgrade,
 }) => {
   const isEdit = !!branch;
   const isHeadquarterRequired = quota?.usedBranches === (isEdit ? 1 : 0);

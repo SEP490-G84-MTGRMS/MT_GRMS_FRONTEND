@@ -36,8 +36,8 @@ export const EditStoreInfoModal: FC<EditStoreInfoModalProps> = ({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      setErrorMessage('Vui lòng nhập tên cửa hàng.');
+    if (formData.name.trim().length < 2) {
+      setErrorMessage(formData.name.trim() ? 'Tên cửa hàng phải có ít nhất 2 ký tự.' : 'Vui lòng nhập tên cửa hàng.');
       return;
     }
     if (formData.hotline.trim() && !/^\+?[0-9]{9,12}$/.test(formData.hotline.trim())) {

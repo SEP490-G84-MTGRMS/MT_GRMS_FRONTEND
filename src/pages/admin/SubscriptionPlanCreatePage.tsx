@@ -78,7 +78,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
     const quotasValidation = validatePlanQuotas(quotas);
 
     const newErrors: Record<string, string> = {};
-    if (!name.trim()) newErrors.name = 'Vui lòng nhập tên thương mại';
+    if (name.trim().length < 2 || name.trim().length > 100) newErrors.name = 'Tên gói phải có từ 2 đến 100 ký tự';
     if (!codeValidation.isValid) newErrors.code = codeValidation.error || 'Mã không hợp lệ';
     if (!pricingValidation.isValid) {
       if (pricingValidation.error?.includes('tháng')) newErrors.monthlyPrice = pricingValidation.error;
@@ -100,8 +100,9 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
 
     try {
       const res = await planApi.create({
+        isActive: status === 'Active',
         code,
-        name,
+        name: name.trim(),
         monthlyPrice,
         yearlyPrice,
         description,
@@ -226,8 +227,8 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
               Làm lại form
             </button>
             <button
-              type="button"
-              onClick={handleSubmit}
+              type="submit"
+              form="plan-create-form"
               disabled={isSubmitting}
               style={{
                 padding: '7px 20px',
@@ -255,7 +256,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
       </div>
 
       {/* Main Grid: Left Form Controls (60%) vs Right Live Preview Card (40%) */}
-      <form className="plans-editor" onSubmit={handleSubmit}>
+      <form id="plan-create-form" className="plans-editor" onSubmit={handleSubmit}>
         <div
           style={{
             display: 'grid',

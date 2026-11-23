@@ -63,6 +63,10 @@ export const CreateTenantModal = ({ onClose, onCreated }: CreateTenantModalProps
         city: values.city?.trim(),
         taxCode: values.taxCode?.trim(),
       };
+      if (payload.name.length < 2) throw new Error('Tên cửa hàng phải có ít nhất 2 ký tự.');
+      if (payload.ownerName.length < 2 || !/^\p{L}[\p{L}\p{M}' -]*$/u.test(payload.ownerName)) {
+        throw new Error('Họ tên chủ cửa hàng không hợp lệ.');
+      }
       const response = await tenantApi.create(payload);
       if (!response.success || !response.data?.id) {
         throw new Error(response.message || 'Không thể tạo cửa hàng. Vui lòng thử lại.');

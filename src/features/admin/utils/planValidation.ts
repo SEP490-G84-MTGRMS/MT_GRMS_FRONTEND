@@ -1,3 +1,5 @@
+import { fitsDecimal } from './adminInputValidation';
+
 /**
  * Subscription Plan Validation Utilities
  */
@@ -7,6 +9,7 @@ export function validatePlanCode(code: string, existingCodes: string[] = []): { 
   if (!formatted) {
     return { isValid: false, error: 'Mã gói không được để trống' };
   }
+  if (formatted.length > 50) return { isValid: false, error: "Mã gói tối đa 50 ký tự" };
   if (!/^[A-Z0-9_]+$/.test(formatted)) {
     return { isValid: false, error: 'Mã gói chỉ gồm chữ cái in hoa, số và dấu gạch dưới (_)' };
   }
@@ -23,6 +26,8 @@ export function validatePlanPricing(monthlyPrice: number, yearlyPrice: number): 
   if (!Number.isFinite(yearlyPrice) || yearlyPrice < 0) {
     return { isValid: false, error: 'Giá năm phải lớn hơn hoặc bằng 0' };
   }
+  if (!fitsDecimal(monthlyPrice, 2)) return { isValid: false, error: 'Giá tháng tối đa 16 chữ số nguyên và 2 chữ số thập phân' };
+  if (!fitsDecimal(yearlyPrice, 2)) return { isValid: false, error: 'Giá năm tối đa 16 chữ số nguyên và 2 chữ số thập phân' };
   return { isValid: true };
 }
 
@@ -32,13 +37,13 @@ export function validatePlanQuotas(quotas: {
   maxStorageGb: number;
 }): { isValid: boolean; error?: string } {
   // -1 means unlimited
-  if (quotas.maxBranches !== -1 && quotas.maxBranches < 1) {
+  if (!Number.isInteger(quotas.maxBranches) || quotas.maxBranches > 2147483647 || quotas.maxBranches !== -1 && quotas.maxBranches < 1) {
     return { isValid: false, error: 'Số chi nhánh tối thiểu là 1 hoặc -1 (vô hạn)' };
   }
-  if (quotas.maxEmployees !== -1 && quotas.maxEmployees < 1) {
+  if (!Number.isInteger(quotas.maxEmployees) || quotas.maxEmployees > 2147483647 || quotas.maxEmployees !== -1 && quotas.maxEmployees < 1) {
     return { isValid: false, error: 'Số nhân viên tối thiểu là 1 hoặc -1 (vô hạn)' };
   }
-  if (quotas.maxStorageGb < 1) {
+  if (!Number.isInteger(quotas.maxStorageGb) || quotas.maxStorageGb > 2147483647 || quotas.maxStorageGb < 1) {
     return { isValid: false, error: 'Dung lượng lưu trữ tối thiểu là 1 GB' };
   }
   return { isValid: true };

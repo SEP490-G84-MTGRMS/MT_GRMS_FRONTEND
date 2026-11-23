@@ -42,6 +42,20 @@ describe('AdminSettingsPage', () => {
     expect(screen.getAllByRole('button', { name: 'Lưu thay đổi' })[0]).toBeDisabled();
   });
 
+  it('keeps invalid hotline and sub-cent prices out of the update request', async () => {
+    render(<AdminSettingsPage />);
+    const phone = await screen.findByLabelText('Hotline hỗ trợ');
+    const form = phone.closest('form')!;
+    fireEvent.change(phone, { target: { value: '123' } });
+    fireEvent.submit(form);
+    expect(await screen.findByRole('alert')).toHaveTextContent('8 đến 15');
+    fireEvent.change(phone, { target: { value: '1900 6522' } });
+    fireEvent.change(screen.getByLabelText(/Mua thêm chi nhánh/), { target: { value: '0.001' } });
+    fireEvent.submit(form);
+    expect(await screen.findByRole('alert')).toHaveTextContent('2 chữ số thập phân');
+    expect(settingsApi.updateSettings).not.toHaveBeenCalled();
+  });
+
   it('shows a retry state instead of editable defaults when loading fails', async () => {
     vi.mocked(settingsApi.getSettings).mockRejectedValue(new Error('Unavailable'));
     render(<AdminSettingsPage />);

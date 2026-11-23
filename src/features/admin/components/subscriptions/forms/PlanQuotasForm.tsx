@@ -93,7 +93,7 @@ export const PlanQuotasForm: React.FC<PlanQuotasFormProps> = ({
           </label>
           <div style={{ position: "relative" }}>
             <input
-              type="number"
+              type="number" required step={1} max={2147483647}
               value={quotas.maxBranches}
               onChange={(e) =>
                 onChange({ maxBranches: Number(e.target.value) })
@@ -148,7 +148,7 @@ export const PlanQuotasForm: React.FC<PlanQuotasFormProps> = ({
           </label>
           <div style={{ position: "relative" }}>
             <input
-              type="number"
+              type="number" required step={1} max={2147483647}
               value={quotas.maxEmployees}
               onChange={(e) =>
                 onChange({ maxEmployees: Number(e.target.value) })
@@ -203,11 +203,11 @@ export const PlanQuotasForm: React.FC<PlanQuotasFormProps> = ({
           </label>
           <div style={{ position: "relative" }}>
             <input
-              type="number"
+              type="number" required step={1} max={2147483647}
               min={1}
               value={quotas.maxStorageGb || ""}
               onChange={(e) =>
-                onChange({ maxStorageGb: Math.max(1, Number(e.target.value)) })
+                onChange({ maxStorageGb: Number(e.target.value) })
               }
               placeholder="5"
               style={{

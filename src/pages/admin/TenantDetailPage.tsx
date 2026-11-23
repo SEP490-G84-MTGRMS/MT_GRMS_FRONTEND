@@ -106,6 +106,10 @@ export const TenantDetailPage = () => {
   const submitAction = async (event: FormEvent) => {
     event.preventDefault();
     if (!tenant || !action || saving) return;
+    if (action !== 'unlock' && reason.trim().length < 10) {
+      setActionError('Lý do phải có ít nhất 10 ký tự.');
+      return;
+    }
     setSaving(true);
     setActionError('');
     try {
@@ -224,10 +228,10 @@ export const TenantDetailPage = () => {
                 <p>Xác nhận {actionTitle.toLowerCase()} cho <strong>{tenant.name}</strong>.</p>
                 {action === 'lock' && <label>Hình thức khóa<select value={lockType} onChange={(event) => setLockType(event.target.value as 'SOFT' | 'HARD')} disabled={saving}><option value="SOFT">Khóa mềm</option><option value="HARD">Khóa cứng</option></select></label>}
                 {action === 'grace' && <label>Số ngày gia hạn<input type="number" value={days} min={1} max={365} required disabled={saving} onChange={(event) => setDays(Number(event.target.value))} /></label>}
-                {action !== 'unlock' && <label>Lý do<textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} required disabled={saving} rows={3} /></label>}
+                {action !== 'unlock' && <label>Lý do<textarea placeholder="Nhập lý do (ít nhất 10 ký tự)" value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={500} required disabled={saving} rows={3} /></label>}
                 {actionError && <div className="tenant-detail-action-error" role="alert">{actionError}</div>}
               </div>
-              <footer><button type="button" className="tenant-detail-button" disabled={saving} onClick={() => setAction(null)}>Hủy</button><button type="submit" className="tenant-detail-button is-primary" disabled={saving || (action !== 'unlock' && !reason.trim())}>{saving ? 'Đang xử lý...' : 'Xác nhận'}</button></footer>
+              <footer><button type="button" className="tenant-detail-button" disabled={saving} onClick={() => setAction(null)}>Hủy</button><button type="submit" className="tenant-detail-button is-primary" disabled={saving || (action !== 'unlock' && reason.trim().length < 10)}>{saving ? 'Đang xử lý...' : 'Xác nhận'}</button></footer>
             </form>
           </section>
         </div>

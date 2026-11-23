@@ -59,6 +59,7 @@ describe('StoreInfoTab & EditStoreInfoModal', () => {
   });
 
   it.each([
+    ['Tên cửa hàng *', ' A ', 'Tên cửa hàng phải có ít nhất 2 ký tự.'],
     ['Tên cửa hàng *', '  ', 'Vui lòng nhập tên cửa hàng.'],
     ['Tên cửa hàng *', 'a'.repeat(151), 'Tên cửa hàng tối đa 150 ký tự.'],
     ['Số điện thoại liên hệ', '01234567', 'Số điện thoại phải có 9–12 chữ số, có thể bắt đầu bằng +.'],
