@@ -231,7 +231,7 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
             onChange={(e) => onChangeFilter({ branchId: e.target.value })}
             title="Lọc theo chi nhánh"
           >
-            <option value="ALL">-- Toàn hệ thống --</option>
+            <option value="ALL">-- Toàn hệ thống (chỉ xem) --</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
