@@ -38,6 +38,9 @@ interface BatchListItemDto {
   originalGrnId?: string | null;
   fefoDiscountPercent?: number;
   isFefoDiscountActive?: boolean;
+  fefoDiscountStartAtUtc?: string | null;
+  fefoDiscountEndAtUtc?: string | null;
+  fefoDiscountStatus?: 'None' | 'Scheduled' | 'Active' | 'Completed';
   isWeightProduct?: boolean;
   allowRepack?: boolean;
   packagedQty?: number;
@@ -121,7 +124,11 @@ export const mapBatchDtoToItem = (dto: BatchListItemDto): BatchItem => ({
   shelfLocation: dto.shelfLocation || '—',
   originalGrnNo: dto.originalGrnNo || '',
   originalGrnId: dto.originalGrnId || undefined,
-  discountPercent: dto.isFefoDiscountActive ? Number(dto.fefoDiscountPercent) || 0 : 0,
+  discountPercent: Number(dto.fefoDiscountPercent) || 0,
+  isFefoDiscountActive: Boolean(dto.isFefoDiscountActive),
+  fefoDiscountStartAtUtc: dto.fefoDiscountStartAtUtc || undefined,
+  fefoDiscountEndAtUtc: dto.fefoDiscountEndAtUtc || undefined,
+  fefoDiscountStatus: dto.fefoDiscountStatus || 'None',
   movements: [],
   isWeightProduct: Boolean(dto.isWeightProduct) || String(dto.unit || '').trim().toLowerCase() === 'kg',
   allowRepack: Boolean(dto.allowRepack),
@@ -201,13 +208,46 @@ export const batchApi = {
     return mapBatchDtoToItem(res.data.data);
   },
 
-  async applyFefoDiscount(id: string, discountPercent: number) {
-    const res = await httpClient.patch<ApiResponse<{ batchId: string; discountPercent: number; isActive: boolean }>>(
-      `/batches/${id}/fefo-discount`,
-      { discountPercent, isActive: discountPercent > 0 }
-    );
+  async applyFefoDiscount(
+    id: string,
+    discountPercent: number,
+    startDaysBeforeExpiry = 0,
+    startTime = '00:00'
+  ) {
+    const normalizedTime =
+      startTime.length === 5 ? `${startTime}:00` : startTime || '00:00:00';
+    const res = await httpClient.patch<
+      ApiResponse<{
+        batchId: string;
+        discountPercent: number;
+        isActive: boolean;
+        startAtUtc?: string | null;
+        endAtUtc?: string | null;
+        status?: string;
+      }>
+    >(`/batches/${id}/fefo-discount`, {
+      discountPercent,
+      isActive: discountPercent > 0,
+      startDaysBeforeExpiry,
+      startTime: normalizedTime,
+    });
     if (!res.data?.success || !res.data.data) {
       throw new Error(res.data?.message || 'Không thể lưu giảm giá FEFO.');
+    }
+    return res.data.data;
+  },
+
+  async cancelFefoDiscount(id: string) {
+    const res = await httpClient.patch<
+      ApiResponse<{ batchId: string; discountPercent: number; isActive: boolean }>
+    >(`/batches/${id}/fefo-discount`, {
+      discountPercent: 0,
+      isActive: false,
+      startDaysBeforeExpiry: 0,
+      startTime: '00:00:00',
+    });
+    if (!res.data?.success || !res.data.data) {
+      throw new Error(res.data?.message || 'Không thể tắt giảm giá FEFO.');
     }
     return res.data.data;
   },

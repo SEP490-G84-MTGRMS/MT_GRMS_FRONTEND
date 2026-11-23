@@ -171,20 +171,24 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
     }
   };
 
-  /** Cột % tổng 100% — fit viewport, không ép min-width → không scroll ngang màn hình. */
+  /**
+   * Cột theo nội dung thật (ưu tiên đọc):
+   * Tên hàng rộng nhất → mã/giá vừa → badge/meta (#, ảnh, lô, cận hạn, thao tác) hẹp.
+   */
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '3.5%' }} />
+      <col style={{ width: '2.5%' }} />
+      <col style={{ width: '4%' }} />
+      <col style={{ width: showCost ? '10%' : '11%' }} />
+      <col style={{ width: showCost ? '18%' : '20%' }} />
+      <col style={{ width: showCost ? '10%' : '11%' }} />
       <col style={{ width: '5%' }} />
-      <col style={{ width: showCost ? '9%' : '10%' }} />
-      <col style={{ width: showCost ? '15%' : '17%' }} />
-      <col style={{ width: showCost ? '12%' : '14%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: showCost ? '16%' : '18%' }} />
+      <col style={{ width: showCost ? '13%' : '15%' }} />
       {showCost && <col style={{ width: '9%' }} />}
-      <col style={{ width: '9%' }} />
-      <col style={{ width: '8%' }} />
-      <col style={{ width: showCost ? '6.5%' : '8.5%' }} />
+      <col style={{ width: showCost ? '8%' : '9%' }} />
+      <col style={{ width: showCost ? '7%' : '8%' }} />
+      <col style={{ width: showCost ? '6.5%' : '7.5%' }} />
     </colgroup>
   );
 
@@ -194,7 +198,7 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
     tableLayout: 'fixed',
   };
 
-  const colSpan = showCost ? 11 : 10;
+  const colSpan = showCost ? 12 : 11;
 
   const sortIcon = (field: SortField) => (
     <ArrowUpDown
@@ -241,6 +245,9 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
               </th>
               <th style={{ ...thBaseStyle, textAlign: 'center' }}>
                 <span>Lô &amp; HSD</span>
+              </th>
+              <th style={{ ...thBaseStyle, textAlign: 'center', whiteSpace: 'nowrap' }} title="Số ngày trước HSD tính cận hạn">
+                <span>Cận hạn</span>
               </th>
               <th
                 onClick={() => handleSort('sellingPrice')}
@@ -448,7 +455,7 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
                     <td
                       style={{
                         textAlign: 'center',
-                        padding: '5px 6px',
+                        padding: '5px 4px',
                         borderBottom: '1px solid #f1f5f9',
                       }}
                     >
@@ -470,6 +477,26 @@ export const MasterProductTable: FC<MasterProductTableProps> = ({
                       ) : (
                         <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
                       )}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: 'center',
+                        padding: '5px 4px',
+                        borderBottom: '1px solid #f1f5f9',
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        color: p.hasBatches ? '#0f766e' : '#94a3b8',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={
+                        p.hasBatches
+                          ? `Cận hạn khi còn ≤ ${p.nearExpiryThresholdDays && p.nearExpiryThresholdDays > 0 ? p.nearExpiryThresholdDays : 30} ngày`
+                          : 'Chỉ áp dụng khi bật quản lý lô'
+                      }
+                    >
+                      {p.hasBatches
+                        ? `${p.nearExpiryThresholdDays && p.nearExpiryThresholdDays > 0 ? p.nearExpiryThresholdDays : 30} ngày`
+                        : '—'}
                     </td>
                     <td
                       style={{

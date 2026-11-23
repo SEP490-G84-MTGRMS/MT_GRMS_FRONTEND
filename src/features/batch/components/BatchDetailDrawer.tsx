@@ -5,7 +5,6 @@ import {
   Calendar,
   Building2,
   ClipboardCheck,
-  Tag,
 } from 'lucide-react';
 import type { BatchItem } from '../types/batch.types';
 
@@ -14,7 +13,6 @@ interface BatchDetailDrawerProps {
   batch: BatchItem | null;
   onClose: () => void;
   onUpdateLocation: (batchId: string, newLocation: string) => void;
-  onDiscountClick: (batch: BatchItem) => void;
   onWriteOffClick: (batch: BatchItem) => void;
   onViewGrn: (grnNo: string) => void;
   onStocktakeClick?: (batch: BatchItem) => void;
@@ -75,7 +73,6 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
   batch,
   onClose,
   onUpdateLocation: _onUpdateLocation,
-  onDiscountClick,
   onWriteOffClick: _onWriteOffClick,
   onViewGrn,
   onStocktakeClick,
@@ -391,31 +388,6 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
               <FileText size={13} />
               <span>Xem GRN gốc: {batch.originalGrnNo}</span>
             </button>
-
-            {batch.status !== 'Expired' && (
-              <button
-                type="button"
-                onClick={() => onDiscountClick(batch)}
-                style={{
-                  height: 32,
-                  padding: '0 12px',
-                  borderRadius: 6,
-                  border: '1px solid #bfdbfe',
-                  backgroundColor: '#eff6ff',
-                  color: '#1d4ed8',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-                title="Áp dụng giảm giá FEFO kích cầu xả hàng cận date"
-              >
-                <Tag size={13} />
-                <span>Giảm giá FEFO</span>
-              </button>
-            )}
 
             {onStocktakeClick && (
               <button

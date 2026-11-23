@@ -356,16 +356,31 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           }
         }
         for (const item of products) {
-          const val = item.primarySupplierCode;
-          if (!val?.trim()) continue;
-          const key = val.toLowerCase();
-          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-          seen.add(key);
-          mapped.push({
-            id: `prod-sc-${item.id}-${val}`,
-            value: val,
-            primary: `${val} (${item.primarySupplierName})`,
-          });
+          const sources =
+            item.suppliers && item.suppliers.length > 0
+              ? item.suppliers
+              : item.primarySupplierCode
+                ? [
+                    {
+                      supplierId: item.supplierId || item.id,
+                      supplierCode: item.primarySupplierCode,
+                      supplierName: item.primarySupplierName || '',
+                    },
+                  ]
+                : [];
+          for (const src of sources) {
+            const val = src.supplierCode;
+            if (!val?.trim()) continue;
+            const key = val.toLowerCase();
+            if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
+            seen.add(key);
+            mapped.push({
+              id: `prod-sc-${item.id}-${val}`,
+              value: val,
+              primary: `${val} (${src.supplierName || item.primarySupplierName || ''})`,
+            });
+            if (mapped.length >= 8) break;
+          }
           if (mapped.length >= 8) break;
         }
       } else if (field === 'supplierName') {
@@ -385,16 +400,31 @@ export const StoreProductFilterBar: FC<StoreProductFilterBarProps> = ({
           }
         }
         for (const item of products) {
-          const val = item.primarySupplierName;
-          if (!val?.trim()) continue;
-          const key = val.toLowerCase();
-          if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
-          seen.add(key);
-          mapped.push({
-            id: `prod-sn-${item.id}-${val}`,
-            value: val,
-            primary: val,
-          });
+          const sources =
+            item.suppliers && item.suppliers.length > 0
+              ? item.suppliers
+              : item.primarySupplierName
+                ? [
+                    {
+                      supplierId: item.supplierId || item.id,
+                      supplierCode: item.primarySupplierCode || '',
+                      supplierName: item.primarySupplierName,
+                    },
+                  ]
+                : [];
+          for (const src of sources) {
+            const val = src.supplierName;
+            if (!val?.trim()) continue;
+            const key = val.toLowerCase();
+            if (selectedSet.has(key) || seen.has(key) || !key.includes(trimmed)) continue;
+            seen.add(key);
+            mapped.push({
+              id: `prod-sn-${item.id}-${val}`,
+              value: val,
+              primary: val,
+            });
+            if (mapped.length >= 8) break;
+          }
           if (mapped.length >= 8) break;
         }
       }

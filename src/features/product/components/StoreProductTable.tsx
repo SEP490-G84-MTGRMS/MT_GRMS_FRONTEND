@@ -388,10 +388,32 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
               </tr>
             ) : (
               sortedProducts.map((p) => {
-                const rowKey = `${p.id}-${p.supplierId || 'none'}`;
+                const supplierList =
+                  p.suppliers && p.suppliers.length > 0
+                    ? p.suppliers
+                    : p.supplierId || p.primarySupplierCode || p.primarySupplierName
+                      ? [
+                          {
+                            supplierId: p.supplierId || '',
+                            supplierCode: p.primarySupplierCode || '',
+                            supplierName: p.primarySupplierName || '',
+                            costPrice: p.costPrice,
+                            minOrderQuantity: p.minOrderQuantity,
+                            isPrimarySupplier: p.isPrimarySupplier,
+                          },
+                        ]
+                      : [];
+                const supplierCount = p.supplierCount ?? supplierList.length;
+                const multiSupplier = supplierCount > 1;
+                const supplierHoverTitle = multiSupplier
+                  ? supplierList
+                      .map((s) => `${s.supplierCode || '—'} — ${s.supplierName || '—'}`)
+                      .join('\n')
+                  : undefined;
+
                 return (
                   <tr
-                    key={rowKey}
+                    key={p.id}
                     className="so-list-row"
                     style={{
                       borderBottom: '1px solid #f1f5f9',
@@ -456,40 +478,63 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
                       <div className="so-list-name" title={p.name}>{p.name}</div>
                     </td>
 
-                    {/* Mã Nhà Cung Cấp */}
+                    {/* Mã Nhà Cung Cấp — nhiều NCC → "N NCC" + hover list */}
                     <td style={{ padding: '8px 8px', verticalAlign: 'middle', borderBottom: '1px solid #f1f5f9' }}>
                       <span
                         style={{
                           fontFamily: 'var(--font-mono, monospace)',
                           fontSize: 11,
                           fontWeight: 600,
-                          color: '#334155',
+                          color: multiSupplier ? '#0f766e' : '#334155',
                           whiteSpace: 'normal',
                           overflowWrap: 'anywhere',
                           wordBreak: 'break-word',
                           display: 'inline-block',
                           maxWidth: '100%',
                           lineHeight: 1.35,
+                          cursor: multiSupplier ? 'help' : undefined,
                         }}
-                        title={p.primarySupplierCode}
+                        title={
+                          multiSupplier
+                            ? supplierHoverTitle
+                            : p.primarySupplierCode
+                        }
                       >
-                        {p.primarySupplierCode || '---'}
+                        {p.lostSupplierSource
+                          ? '---'
+                          : multiSupplier
+                            ? `${supplierCount} NCC`
+                            : p.primarySupplierCode || '---'}
                       </span>
                     </td>
 
-                    {/* Tên Nhà Cung Cấp */}
+                    {/* Tên Nhà Cung Cấp — nhiều NCC → "N NCC" + hover list */}
                     <td className="so-list-td--wrap">
                       <div
                         className="so-list-name"
                         title={
                           p.lostSupplierSource
                             ? 'Mất nguồn NCC — SP đang bán tại CN nhưng không còn NCC Active phục vụ'
-                            : p.primarySupplierName
+                            : multiSupplier
+                              ? supplierHoverTitle
+                              : p.primarySupplierName
                         }
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          flexWrap: 'wrap',
+                          cursor: multiSupplier ? 'help' : undefined,
+                        }}
                       >
-                        <span>{p.lostSupplierSource ? '—' : p.primarySupplierName || '---'}</span>
-                        {p.isPrimarySupplier && !p.lostSupplierSource ? (
+                        <span style={{ color: multiSupplier ? '#0f766e' : undefined, fontWeight: multiSupplier ? 600 : undefined }}>
+                          {p.lostSupplierSource
+                            ? '—'
+                            : multiSupplier
+                              ? `${supplierCount} NCC`
+                              : p.primarySupplierName || '---'}
+                        </span>
+                        {!multiSupplier && p.isPrimarySupplier && !p.lostSupplierSource ? (
                           <span
                             style={{
                               fontSize: 10,
