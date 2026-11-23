@@ -328,12 +328,35 @@ export const ShiftConfigPage: React.FC = () => {
       return;
     }
 
-    const durationInfo = calculateHoursText(formStartTime, formEndTime);
-    if (formStartTime === formEndTime || durationInfo.hours <= 0 || durationInfo.hours < 0.5) {
+    const normalizedStart = formStartTime.slice(0, 5);
+    const normalizedEnd = formEndTime.slice(0, 5);
+    if (normalizedStart === normalizedEnd) {
+      setFormError('Giờ bắt đầu và giờ kết thúc ca không được trùng nhau (ca làm việc phải lớn hơn 0 phút).');
+      return;
+    }
+
+    const durationInfo = calculateHoursText(normalizedStart, normalizedEnd);
+    if (durationInfo.hours <= 0 || durationInfo.hours < 0.5 || durationInfo.hours > 24) {
       setFormError('Giờ bắt đầu và giờ kết thúc không hợp lệ (thời lượng ca phải từ 0.5 đến 24 giờ).');
       return;
     }
-    const isNextDay = formEndTime < formStartTime;
+
+    const duplicateTimeShift = shifts.find((s) => {
+      if (editingShift && s.id === editingShift.id) return false;
+      if (s.isActive === false) return false;
+      const sBranches = s.branchIds && s.branchIds.length > 0 ? s.branchIds : s.branchId ? [s.branchId] : [];
+      if (sBranches.length > 0 && formBranchIds.length > 0 && !sBranches.some((bId) => formBranchIds.includes(bId))) {
+        return false;
+      }
+      return (s.startTime || '').slice(0, 5) === normalizedStart && (s.endTime || '').slice(0, 5) === normalizedEnd;
+    });
+    if (duplicateTimeShift) {
+      setFormError(
+        `Khung giờ ${normalizedStart} - ${normalizedEnd} bị trùng hoàn toàn với ca "${duplicateTimeShift.shiftName}" đang hoạt động trong chi nhánh.`
+      );
+      return;
+    }
+    const isNextDay = normalizedEnd < normalizedStart;
 
     try {
       setIsSubmitting(true);
