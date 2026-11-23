@@ -15,7 +15,6 @@ export const SettingsSummarySidebar = ({ form, isDirty }: SettingsSummarySidebar
       <div><dt>Dùng thử</dt><dd>{Number.isFinite(form.trialDays) ? form.trialDays : '—'} ngày</dd></div>
       <div><dt>Ân hạn</dt><dd>{Number.isFinite(form.gracePeriodDays) ? form.gracePeriodDays : '—'} ngày</dd></div>
       <div><dt>Chi nhánh bổ sung</dt><dd>{Number.isFinite(form.branchAddonPriceMonthly) ? form.branchAddonPriceMonthly.toLocaleString('vi-VN') : '—'} đ / tháng</dd></div>
-      <div><dt>Dung lượng bổ sung</dt><dd>{Number.isFinite(form.storageAddonPricePerGbMonthly) ? form.storageAddonPricePerGbMonthly.toLocaleString('vi-VN') : '—'} đ / GB / tháng</dd></div>
       <div><dt>Ngân hàng</dt><dd>{form.masterBankCode || '—'}</dd></div>
       <div><dt>Bảo trì</dt><dd><span className="plans-status">{form.isMaintenanceMode ? 'Bật' : 'Tắt'}</span></dd></div>
     </dl>

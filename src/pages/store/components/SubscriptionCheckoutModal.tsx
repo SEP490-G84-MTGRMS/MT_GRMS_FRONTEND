@@ -12,10 +12,9 @@ import {
   Sparkles,
   Store,
   Clock,
-  HardDrive,
 } from "lucide-react";
 import type { SubscriptionPlanItem, StoreInfo } from "../storeData";
-import { storeApi, mapStoreProblemMessage } from "../api/storeApi";
+import { storeApi, mapStoreProblemMessage, type ProUpgradeQuote } from "../api/storeApi";
 
 interface SubscriptionCheckoutModalProps {
   plan: SubscriptionPlanItem;
@@ -39,15 +38,20 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
 }) => {
   const isTrialPlan = (plan.code || plan.id || "").toUpperCase() === "TRIAL";
   const isPro = (plan.code || plan.id || "").toUpperCase() === "PRO";
+  const [isUpgrade] = useState(() => isPro && storeInfo.currentPlanCode === "STANDARD"
+    && !!storeInfo.subscriptionExpiresAtUtc
+    && new Date(storeInfo.subscriptionExpiresAtUtc).getTime() > Date.now());
 
   // 3 chu kỳ: 3 tháng | 6 tháng | 1 năm (12 tháng)
-  const [cycle, setCycle] = useState<"3m" | "6m" | "12m">("6m");
+  const [cycle, setCycle] = useState<"keep" | "3m" | "6m" | "12m">(isUpgrade ? "keep" : "6m");
   const [extraBranches, setExtraBranches] = useState<number>(0);
   const [hasStaffAddon, setHasStaffAddon] = useState<boolean>(false);
-  const [extraStorageGb, setExtraStorageGb] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [quote, setQuote] = useState<{ months: number; branches: number; data: ProUpgradeQuote } | null>(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [quoteRefresh, setQuoteRefresh] = useState(0);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
 
@@ -94,8 +98,32 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
     };
   }, [isProcessing, onClose]);
 
-  const months = isTrialPlan ? 0 : cycle === "3m" ? 3 : cycle === "6m" ? 6 : 12;
+  const months = isTrialPlan || cycle === "keep" ? 0 : cycle === "3m" ? 3 : cycle === "6m" ? 6 : 12;
   const bonusMonths = !isTrialPlan && cycle === "12m" ? 1 : 0;
+  const currentQuote = isUpgrade && quote?.months === months && quote.branches === extraBranches ? quote.data : null;
+
+  useEffect(() => {
+    idempotencyKeyRef.current = crypto.randomUUID();
+  }, [months, extraBranches, hasStaffAddon]);
+
+  useEffect(() => {
+    if (!isUpgrade) return;
+    let active = true;
+    storeApi.quoteProUpgrade({ planCode: "PRO", months, extraBranches })
+      .then((res) => {
+        if (!active) return;
+        if (res.success && res.data) {
+          setQuote({ months, branches: extraBranches, data: res.data });
+          setQuoteError(null);
+        } else {
+          setQuoteError(res.message || "Không lấy được báo giá nâng cấp.");
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) setQuoteError(mapStoreProblemMessage(err));
+      });
+    return () => { active = false; };
+  }, [isUpgrade, months, extraBranches, quoteRefresh]);
 
   // Tính toán chi phí
   const basePrice = isTrialPlan ? 0 : plan.monthlyPrice * months;
@@ -103,14 +131,13 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
     isPro && !isTrialPlan ? extraBranches * 80000 * months : 0;
   const staffAddonPrice =
     !isPro && !isTrialPlan && hasStaffAddon ? 30000 * months : 0;
-  const storageAddonPrice = isTrialPlan ? 0 : extraStorageGb * 15000 * months;
-  const subTotal = basePrice + branchAddonPrice + staffAddonPrice + storageAddonPrice;
+  const subTotal = basePrice + branchAddonPrice + staffAddonPrice;
   const vatAmount = Math.round(subTotal * 0.1); // VAT 10%
-  const grandTotal = isTrialPlan ? 0 : subTotal + vatAmount;
+  const grandTotal = isUpgrade ? currentQuote?.total ?? 0 : subTotal + vatAmount;
 
   const hasEnoughWalletBalance = isTrialPlan
     ? true
-    : storeInfo.walletBalance >= grandTotal;
+    : (!isUpgrade || !!currentQuote) && storeInfo.walletBalance >= grandTotal;
   const missingAmount = Math.max(0, grandTotal - storeInfo.walletBalance);
 
   // Chuẩn hóa danh sách tính năng bên cột trái
@@ -154,6 +181,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
 
   const handleConfirmPayment = async () => {
     setErrorMessage(null);
+    if (isUpgrade && !currentQuote) return;
     if (!isTrialPlan && !hasEnoughWalletBalance) {
       setErrorMessage(
         `Số dư ví gian hàng không đủ. Vui lòng nạp thêm ${new Intl.NumberFormat("vi-VN").format(missingAmount)} đ vào ví.`,
@@ -194,9 +222,11 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
         months,
         extraBranches: isPro ? extraBranches : 0,
         hasStaffManagementAddon: isPro ? true : hasStaffAddon,
-        extraStorageGb,
         requestId: idempotencyKeyRef.current,
         paymentMethod: "Wallet",
+        quoteAt: currentQuote?.quoteAt,
+        expectedExpiry: currentQuote?.expectedExpiry,
+        expectedTotal: currentQuote?.total,
       });
 
       if (res.success && res.data) {
@@ -206,7 +236,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
           onSuccess({
             planName: res.data.planName || plan.name,
             months: months + bonusMonths,
-            totalAmount: res.data.totalAmount || grandTotal,
+            totalAmount: res.data.totalAmount,
             paymentMethod: "Wallet",
             subscriptionExpiresAt: res.data.subscriptionExpiresAt,
             daysRemaining: res.data.daysRemaining,
@@ -220,6 +250,10 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
     } catch (err: unknown) {
       setIsProcessing(false);
       setErrorMessage(mapStoreProblemMessage(err));
+      if (isUpgrade) {
+        setQuote(null);
+        setQuoteRefresh((value) => value + 1);
+      }
     }
   };
 
@@ -376,7 +410,9 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
             >
               {isTrialPlan
                 ? "Gian hàng của bạn đã được kích hoạt 3 ngày trải nghiệm miễn phí với toàn bộ tính năng cao cấp."
-                : `Hệ thống đã nâng cấp gian hàng lên ${plan.name} với thời hạn ${months + bonusMonths} tháng.`}
+                : isUpgrade
+                  ? "Gian hàng đã được nâng cấp lên Pro."
+                  : `Hệ thống đã kích hoạt ${plan.name} với thời hạn ${months + bonusMonths} tháng.`}
             </p>
           </div>
         ) : (
@@ -758,8 +794,14 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                         display: "block",
                       }}
                     >
-                      1. Chọn chu kỳ gia hạn
+                      {isUpgrade ? "1. Chọn thời hạn Pro" : "1. Chọn chu kỳ gia hạn"}
                     </label>
+                    {isUpgrade && (
+                      <button type="button" className="btn btn-outline" aria-pressed={cycle === "keep"}
+                        disabled={isProcessing} onClick={() => setCycle("keep")}>
+                        {cycle === "keep" ? "✓ " : ""}Giữ ngày hết hạn hiện tại
+                      </button>
+                    )}
                     <div
                       style={{
                         display: "grid",
@@ -770,6 +812,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       {/* 3 Tháng */}
                       <button
                         type="button"
+                        disabled={isProcessing}
                         onClick={() => setCycle("3m")}
                         style={{
                           padding: "12px 8px",
@@ -806,6 +849,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       {/* 6 Tháng */}
                       <button
                         type="button"
+                        disabled={isProcessing}
                         onClick={() => setCycle("6m")}
                         style={{
                           padding: "12px 8px",
@@ -848,6 +892,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       {/* 1 Năm */}
                       <button
                         type="button"
+                        disabled={isProcessing}
                         onClick={() => setCycle("12m")}
                         style={{
                           padding: "12px 8px",
@@ -923,7 +968,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     {!isPro ? (
                       /* Gói Thường: Checkbox Option Quản lý & Phân quyền nhân viên */
                       <div
-                        onClick={() => setHasStaffAddon(!hasStaffAddon)}
+                        onClick={() => !isProcessing && setHasStaffAddon(!hasStaffAddon)}
                         style={{
                           border: hasStaffAddon
                             ? "1.5px solid var(--blue-primary)"
@@ -983,6 +1028,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                         <input
                           type="checkbox"
                           checked={hasStaffAddon}
+                          disabled={isProcessing}
                           onChange={(e) => setHasStaffAddon(e.target.checked)}
                           style={{
                             width: 18,
@@ -1052,6 +1098,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                         >
                           <button
                             type="button"
+                            disabled={isProcessing || extraBranches === 0}
                             onClick={() =>
                               setExtraBranches(Math.max(0, extraBranches - 1))
                             }
@@ -1086,6 +1133,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                           </span>
                           <button
                             type="button"
+                            disabled={isProcessing}
                             onClick={() => setExtraBranches(extraBranches + 1)}
                             style={{
                               width: 26,
@@ -1108,33 +1156,6 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       </div>
                     )}
 
-                    <div
-                      style={{
-                        marginTop: 10,
-                        border: "1px solid #E2E8F0",
-                        borderRadius: 14,
-                        padding: "12px 14px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        backgroundColor: "#FFFFFF",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "var(--blue-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--blue-primary)" }}>
-                          <HardDrive size={16} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>Mua thêm dung lượng</div>
-                          <div style={{ fontSize: 11.5, color: "#64748B" }}>Gói có sẵn 2 GB · +15.000 đ/GB/tháng</div>
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <button type="button" onClick={() => setExtraStorageGb(Math.max(0, extraStorageGb - 1))} disabled={extraStorageGb === 0} style={{ width: 26, height: 26, borderRadius: "50%", border: "1px solid #CBD5E1", background: "#FFFFFF", color: extraStorageGb > 0 ? "#0F172A" : "#CBD5E1", cursor: extraStorageGb > 0 ? "pointer" : "default" }}>−</button>
-                        <span style={{ minWidth: 42, textAlign: "center", fontSize: 13, fontWeight: 700 }}>{extraStorageGb} GB</span>
-                        <button type="button" onClick={() => setExtraStorageGb(Math.min(100, extraStorageGb + 1))} style={{ width: 26, height: 26, borderRadius: "50%", border: "1px solid var(--blue-primary)", background: "var(--blue-light)", color: "var(--blue-primary)", cursor: "pointer" }}>+</button>
-                      </div>
-                    </div>
                   </div>
 
                   {/* 3. Phương thức thanh toán (DUY NHẤT VÍ GIAN HÀNG) */}
@@ -1243,7 +1264,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       )}
                     </div>
 
-                    {!hasEnoughWalletBalance && (
+                    {!hasEnoughWalletBalance && (!isUpgrade || currentQuote) && (
                       <div
                         style={{
                           marginTop: 8,
@@ -1286,6 +1307,25 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       fontSize: 12.5,
                     }}
                   >
+                    {isUpgrade ? (
+                      <div aria-live="polite">
+                        {currentQuote ? (
+                          <>
+                            <div>Pro cho thời gian còn lại (gồm thuế): {currentQuote.remainingPro.toLocaleString("vi-VN")} đ</div>
+                            <div>Khấu trừ gói Thường và tiện ích còn lại: {Math.min(currentQuote.credit, currentQuote.remainingPro).toLocaleString("vi-VN")} đ</div>
+                            {currentQuote.additionalTerm > 0 && (
+                              <div>Kỳ mua thêm từ {new Date(currentQuote.expectedExpiry).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })} (gồm thuế): {currentQuote.additionalTerm.toLocaleString("vi-VN")} đ</div>
+                            )}
+                            {currentQuote.branches > 0 && <div>Chi nhánh thêm trong thời gian còn lại: {currentQuote.branches.toLocaleString("vi-VN")} đ</div>}
+                            <div>Hết hạn lúc {new Date(currentQuote.expiresAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}</div>
+                          </>
+                        ) : quoteError ? (
+                          <button type="button" onClick={() => { setQuoteError(null); setQuoteRefresh((value) => value + 1); }}>
+                            {quoteError} Lấy lại báo giá
+                          </button>
+                        ) : "Đang lấy báo giá…"}
+                      </div>
+                    ) : <>
                     <div
                       style={{
                         display: "flex",
@@ -1337,15 +1377,6 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                       </div>
                     )}
 
-                    {extraStorageGb > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", color: "#64748B" }}>
-                        <span>Thêm {extraStorageGb} GB ({months} tháng):</span>
-                        <span style={{ fontWeight: 600, color: "#0F172A", fontVariantNumeric: "tabular-nums" }}>
-                          {new Intl.NumberFormat("vi-VN").format(storageAddonPrice)} đ
-                        </span>
-                      </div>
-                    )}
-
                     <div
                       style={{
                         display: "flex",
@@ -1364,6 +1395,7 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                         {new Intl.NumberFormat("vi-VN").format(vatAmount)} đ
                       </span>
                     </div>
+                    </>}
 
                     <div
                       style={{
@@ -1481,7 +1513,9 @@ export const SubscriptionCheckoutModal: FC<SubscriptionCheckoutModalProps> = ({
                     ? "Đang xử lý..."
                     : isTrialPlan
                       ? "Kích hoạt dùng thử 3 ngày (0 đ)"
-                      : hasEnoughWalletBalance
+                      : isUpgrade && !currentQuote
+                        ? "Chờ báo giá"
+                        : hasEnoughWalletBalance
                         ? "Xác nhận thanh toán"
                         : "Số dư ví không đủ"}
                 </button>

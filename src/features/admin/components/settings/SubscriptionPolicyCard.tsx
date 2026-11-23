@@ -29,11 +29,6 @@ export const SubscriptionPolicyCard = ({ form, onChange, disabled }: Subscriptio
           value={Number.isNaN(form.branchAddonPriceMonthly) ? '' : form.branchAddonPriceMonthly} disabled={disabled}
           onChange={event => onChange('branchAddonPriceMonthly', event.target.valueAsNumber)} /><span>đ / tháng</span></div>
       </label>
-      <label>Mua thêm dung lượng
-        <div className="settings-input-unit"><input type="number" required min={0} step="any"
-          value={Number.isNaN(form.storageAddonPricePerGbMonthly) ? '' : form.storageAddonPricePerGbMonthly} disabled={disabled}
-          onChange={event => onChange('storageAddonPricePerGbMonthly', event.target.valueAsNumber)} /><span>đ / GB / tháng</span></div>
-      </label>
     </div>
   </section>
 );

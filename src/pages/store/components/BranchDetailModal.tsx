@@ -1,42 +1,32 @@
 // src/pages/store/components/BranchDetailModal.tsx
-import { useState, useEffect, type FC, type FormEvent } from 'react';
+import { useState, useEffect, type FC, type FormEvent } from "react";
 import {
-  X,
-  Building2,
-  MapPin,
-  Phone,
-  Mail,
-  User,
-  Calendar,
-  Package,
   AlertTriangle,
-  Users,
   Clock,
-  CheckCircle2,
-  XCircle,
-  ShieldCheck,
-  Store,
-  Layers,
-  Lock,
-  Save,
-  AlertCircle,
   Loader2,
-} from 'lucide-react';
+  Package,
+  Save,
+  Users,
+  X,
+} from "lucide-react";
+import { AdminToast } from "../../../features/admin/components/common/AdminToast";
 import {
   branchManagementApi,
   type BranchDetailResponse,
   type BranchItemResponse,
   type UpdateBranchPayload,
-} from '../api/branchManagementApi';
+} from "../api/branchManagementApi";
 
 interface BranchDetailModalProps {
   branch: BranchItemResponse;
+  isOnlyBranch: boolean;
   onClose: () => void;
   onSuccess?: () => void;
 }
 
 export const BranchDetailModal: FC<BranchDetailModalProps> = ({
   branch,
+  isOnlyBranch,
   onClose,
   onSuccess,
 }) => {
@@ -44,19 +34,23 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Form input states
-  const [name, setName] = useState<string>(branch.name || '');
-  const [address, setAddress] = useState<string>(branch.address || '');
-  const [phone, setPhone] = useState<string>(branch.phone || '');
-  const [email, setEmail] = useState<string>(branch.email || '');
-  const [managerName, setManagerName] = useState<string>(branch.managerName || '');
-  const [isHeadquarter, setIsHeadquarter] = useState<boolean>(
-    Boolean(branch.isHeadquarter ?? branch.name?.toLowerCase().includes('chính'))
+  const [name, setName] = useState<string>(branch.name || "");
+  const [address, setAddress] = useState<string>(branch.address || "");
+  const [phone, setPhone] = useState<string>(branch.phone || "");
+  const [email, setEmail] = useState<string>(branch.email || "");
+  const [managerName, setManagerName] = useState<string>(
+    branch.managerName || "",
   );
+  const [headquarterSelected, setIsHeadquarter] = useState<boolean>(
+    Boolean(branch.isHeadquarter),
+  );
+  const isHeadquarter = isOnlyBranch || headquarterSelected;
 
   // Submission & feedback states
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isNameInvalid, setIsNameInvalid] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -70,28 +64,28 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
           // Đồng bộ các trường input từ dữ liệu chi tiết
           setName(d.name || branch.name);
           setAddress(d.address || branch.address);
-          setPhone(d.phone || branch.phone || '');
-          setEmail(d.email || branch.email || '');
-          setManagerName(d.managerName || branch.managerName || '');
+          setPhone(d.phone || branch.phone || "");
+          setEmail(d.email || branch.email || "");
+          setManagerName(d.managerName || branch.managerName || "");
           setIsHeadquarter(Boolean(d.isHeadquarter ?? branch.isHeadquarter));
         } else if (isMounted) {
           // Fallback an toàn nếu API detail trả dữ liệu khác
           setName(branch.name);
           setAddress(branch.address);
-          setPhone(branch.phone || '');
-          setEmail(branch.email || '');
-          setManagerName(branch.managerName || '');
+          setPhone(branch.phone || "");
+          setEmail(branch.email || "");
+          setManagerName(branch.managerName || "");
           setIsHeadquarter(Boolean(branch.isHeadquarter));
         }
       } catch (err) {
-        console.error('Failed to load branch detail:', err);
+        console.error("Failed to load branch detail:", err);
         // Fallback an toàn nếu gặp lỗi mạng
         if (isMounted) {
           setName(branch.name);
           setAddress(branch.address);
-          setPhone(branch.phone || '');
-          setEmail(branch.email || '');
-          setManagerName(branch.managerName || '');
+          setPhone(branch.phone || "");
+          setEmail(branch.email || "");
+          setManagerName(branch.managerName || "");
           setIsHeadquarter(Boolean(branch.isHeadquarter));
         }
       } finally {
@@ -108,8 +102,9 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
   const handleSave = async (e?: FormEvent) => {
     if (e) e.preventDefault();
 
-    if (!name.trim()) {
-      setErrorMessage('Tên chi nhánh không được để trống.');
+    if (name.trim().length < 2) {
+      setIsNameInvalid(true);
+      setErrorMessage("Tên chi nhánh phải có ít nhất 2 ký tự.");
       return;
     }
 
@@ -152,12 +147,18 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
           setSaveSuccess(false);
         }, 3500);
       } else {
-        setErrorMessage(res.message || 'Không thể lưu thay đổi chi nhánh.');
+        setErrorMessage(res.message || "Không thể lưu thay đổi chi nhánh.");
       }
     } catch (err: unknown) {
-      console.error('Update branch error:', err);
-      const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
-      const msg = anyErr?.response?.data?.message || anyErr?.message || 'Lỗi khi lưu thông tin chi nhánh.';
+      console.error("Update branch error:", err);
+      const anyErr = err as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+      const msg =
+        anyErr?.response?.data?.message ||
+        anyErr?.message ||
+        "Lỗi khi lưu thông tin chi nhánh.";
       setErrorMessage(msg);
     } finally {
       setIsSaving(false);
@@ -165,1003 +166,238 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
   };
 
   const formatDate = (isoString?: string) => {
-    if (!isoString) return 'Chưa có';
+    if (!isoString) return "Chưa có";
     try {
       const d = new Date(isoString);
-      return d.toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
+      return d.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
       });
     } catch {
       return isoString;
     }
   };
 
-  const isActive = (detail?.status || branch.status).toLowerCase() === 'active';
+  const isActive = (detail?.status || branch.status).toLowerCase() === "active";
+
+  const stats = [
+    {
+      label: "Sản phẩm kinh doanh",
+      value: detail?.totalProducts ?? 0,
+      unit: "SKU",
+      note: `Tổng tồn kho: ${(detail?.totalStock ?? 0).toLocaleString("vi-VN")} SOH`,
+      icon: Package,
+    },
+    {
+      label: "Cảnh báo thiếu hàng",
+      value: detail?.lowStockCount ?? 0,
+      unit: "mặt hàng",
+      note: detail?.lowStockCount ? "Cần nhập hàng bổ sung" : "Tồn kho ổn định",
+      icon: AlertTriangle,
+    },
+    {
+      label: "Nhân sự chi nhánh",
+      value: detail?.totalEmployees ?? 0,
+      unit: "nhân viên",
+      note: `${detail?.activeEmployees ?? 0} đang làm việc`,
+      icon: Users,
+    },
+    {
+      label: "Đơn hàng và giao dịch",
+      value: detail?.pendingOrdersCount ?? branch.pendingOrdersCount ?? 0,
+      unit: "đơn chờ",
+      note: `Gần nhất: ${formatDate(detail?.lastOrderDate || branch.lastOrderDate)}`,
+      icon: Clock,
+    },
+  ];
 
   return (
     <div
-      className="store-modal-overlay"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(5px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1050,
-        padding: '16px',
-      }}
-      onClick={onClose}
+      className="store-modal-backdrop"
+      onClick={isSaving ? undefined : onClose}
     >
-      <div
-        className="store-modal-card"
-        style={{
-          width: '100%',
-          maxWidth: '920px',
-          maxHeight: '94vh',
-          backgroundColor: '#FFFFFF',
-          borderRadius: '16px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          animation: 'modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
-        onClick={(e) => e.stopPropagation()}
+      <form
+        className="store-modal-dialog branch-detail-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="branch-detail-title"
+        onClick={(event) => event.stopPropagation()}
+        onSubmit={handleSave}
       >
-        {/* 1. Header */}
-        <div
-          className="store-modal-header"
-          style={{
-            padding: '18px 24px',
-            borderBottom: '1px solid #E2E8F0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: '#FFFFFF',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: '12px',
-                background: isHeadquarter ? '#FEF3C7' : '#ECFDF5',
-                color: isHeadquarter ? '#D97706' : '#059669',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
-                transition: 'all 0.2s ease',
-              }}
-            >
-              {isHeadquarter ? <Building2 size={24} /> : <Store size={24} />}
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: '#0F172A',
-                  }}
-                >
-                  {name || detail?.name || branch.name}
-                </h3>
-
-                <span
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    backgroundColor: '#EFF6FF',
-                    color: '#2563EB',
-                    letterSpacing: '0.5px',
-                  }}
-                >
-                  {detail?.code || branch.code}
-                </span>
-
-                {isHeadquarter && (
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontSize: '11.5px',
-                      fontWeight: 700,
-                      backgroundColor: '#FEF3C7',
-                      color: '#B45309',
-                      border: '1px solid #FDE68A',
-                    }}
-                  >
-                    <ShieldCheck size={13} />
-                    Trụ sở chính
-                  </span>
-                )}
-
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    fontSize: '11.5px',
-                    fontWeight: 700,
-                    backgroundColor: isActive ? '#ECFDF5' : '#F1F5F9',
-                    color: isActive ? '#059669' : '#64748B',
-                  }}
-                >
-                  {isActive ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-                  {isActive ? 'Đang hoạt động' : 'Tạm ngưng'}
-                </span>
-              </div>
-
-              <p
-                style={{
-                  margin: '3px 0 0 0',
-                  fontSize: '13px',
-                  color: '#64748B',
-                }}
-              >
-                Chỉnh sửa trực tiếp thông tin cơ bản và xem các thông số hoạt động vận hành của chi nhánh
-              </p>
+        <header className="store-modal-header">
+          <div>
+            <h2 className="store-modal-title" id="branch-detail-title">
+              {detail?.name ?? branch.name}
+            </h2>
+            <div className="branch-detail-badges">
+              <span>{detail?.code ?? branch.code}</span>
+              {isHeadquarter && <span>Trụ sở chính</span>}
+              <span>{isActive ? "Đang hoạt động" : "Tạm ngưng"}</span>
             </div>
           </div>
-
           <button
+            className="branch-detail-close"
             type="button"
+            aria-label="Đóng"
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#94A3B8',
-              cursor: 'pointer',
-              padding: 6,
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'background-color 0.15s ease',
-            }}
-            title="Đóng"
+            disabled={isSaving}
           >
-            <X size={20} />
+            <X size={20} aria-hidden="true" />
           </button>
-        </div>
+        </header>
 
-        {/* 2. Body Scrollable */}
-        <div
-          className="store-modal-body"
-          style={{
-            padding: '22px 24px',
-            overflowY: 'auto',
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 22,
-          }}
-        >
-          {isLoading && !detail ? (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '48px 0',
-                gap: 12,
-                color: '#64748B',
-              }}
-            >
-              <Loader2 size={32} className="animate-spin" color="#0F766E" />
-              <span style={{ fontSize: 13.5, fontWeight: 500 }}>Đang tải thông số chi nhánh...</span>
-            </div>
+        <div className="store-modal-body">
+          {isLoading ? (
+            <p className="branch-detail-loading" role="status">
+              <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+              Đang tải thông tin chi nhánh...
+            </p>
           ) : (
             <>
-              {/* PHẦN TRÊN: Thông tin cơ bản của chi nhánh (GRID 2 CỘT CHUẨN, KHÔNG BỊ LỆCH) */}
-              <div
-                style={{
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: '12px',
-                  border: '1px solid #E2E8F0',
-                  padding: '18px 20px',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 16,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      color: '#0F172A',
-                      fontWeight: 700,
-                      fontSize: '14.5px',
-                    }}
-                  >
-                    <Building2 size={17} color="#0F766E" />
-                    <span>Thông tin cơ bản chi nhánh</span>
-                    <span style={{ fontSize: 12, color: '#64748B', fontWeight: 400 }}>
-                      (Chỉnh sửa trực tiếp tại các ô dưới đây)
+              <section aria-labelledby="branch-detail-info">
+                <h3 id="branch-detail-info">Thông tin chi nhánh</h3>
+                <div className="branch-detail-fields">
+                  <label>
+                    <span>
+                      Tên chi nhánh{" "}
+                      <span className="branch-detail-required">*</span>
                     </span>
-                  </div>
-
-                  {saveSuccess && (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        padding: '3px 10px',
-                        borderRadius: '6px',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        backgroundColor: '#ECFDF5',
-                        color: '#059669',
-                        border: '1px solid #A7F3D0',
+                    <input
+                      value={name}
+                      aria-invalid={isNameInvalid || undefined}
+                      onChange={(event) => {
+                        setName(event.target.value);
+                        if (
+                          isNameInvalid &&
+                          event.target.value.trim().length >= 2
+                        ) {
+                          setIsNameInvalid(false);
+                          setErrorMessage(null);
+                        }
                       }}
-                    >
-                      <CheckCircle2 size={13} />
-                      Đã lưu thành công!
-                    </span>
-                  )}
+                      placeholder="Nhập tên chi nhánh"
+                    />
+                  </label>
+                  <label>
+                    <span>Mã chi nhánh</span>
+                    <input value={detail?.code ?? branch.code} disabled />
+                  </label>
+                  <label className="branch-detail-address">
+                    <span>Địa chỉ hoạt động </span>
+                    <input
+                      value={address}
+                      onChange={(event) => setAddress(event.target.value)}
+                      placeholder="Số nhà, tên đường, phường/xã, tỉnh/thành phố"
+                    />
+                  </label>
+                  <label>
+                    <span>Số điện thoại hotline</span>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Email liên hệ</span>
+                    <input
+                      inputMode="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Quản lý phụ trách</span>
+                    <input
+                      value={managerName}
+                      onChange={(event) => setManagerName(event.target.value)}
+                    />
+                  </label>
+                  <label className="branch-detail-headquarter">
+                    <input
+                      type="checkbox"
+                      checked={isHeadquarter}
+                      disabled={isOnlyBranch}
+                      onChange={(event) =>
+                        setIsHeadquarter(event.target.checked)
+                      }
+                    />
+                    {isOnlyBranch
+                      ? "Trụ sở chính (chi nhánh duy nhất)"
+                      : "Đặt làm trụ sở chính"}
+                  </label>
                 </div>
+                <p className="branch-detail-created">
+                  Ngày tạo: {formatDate(detail?.createdAt || branch.createdAt)}
+                </p>
+              </section>
 
-                {/* Form Inputs: 2 Columns Disciplined Grid */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '14px 20px',
-                  }}
-                >
-                  {/* HÀNG 1, CỘT 1: Tên chi nhánh */}
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: '#334155',
-                        marginBottom: 6,
-                      }}
-                    >
-                      Tên chi nhánh <span style={{ color: '#EF4444' }}>*</span>
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <Store
-                        size={15}
-                        color="#64748B"
-                        style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
-                      />
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => {
-                          setName(e.target.value);
-                          if (errorMessage) setErrorMessage(null);
-                        }}
-                        placeholder="Nhập tên chi nhánh..."
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 12px 0 36px',
-                          borderRadius: '8px',
-                          border: '1px solid #CBD5E1',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: 13.5,
-                          fontWeight: 600,
-                          color: '#0F172A',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
+              <section aria-labelledby="branch-detail-stats">
+                <h3 id="branch-detail-stats">Thông số hoạt động</h3>
+                <dl className="branch-detail-stats">
+                  {stats.map(({ label, value, unit, note, icon: Icon }) => (
+                    <div key={label}>
+                      <dt>
+                        <Icon size={16} aria-hidden="true" />
+                        {label}
+                      </dt>
+                      <dd>
+                        <strong>{value.toLocaleString("vi-VN")}</strong> {unit}
+                      </dd>
+                      <dd>{note}</dd>
                     </div>
-                  </div>
-
-                  {/* HÀNG 1, CỘT 2: Mã chi nhánh (Khóa cố định) */}
-                  <div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: 6,
-                      }}
-                    >
-                      <label
-                        style={{
-                          fontSize: 12.5,
-                          fontWeight: 600,
-                          color: '#334155',
-                        }}
-                      >
-                        Mã chi nhánh
-                      </label>
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: '#64748B',
-                          backgroundColor: '#E2E8F0',
-                          padding: '1px 6px',
-                          borderRadius: 4,
-                        }}
-                      >
-                        Mã hệ thống
-                      </span>
-                    </div>
-                    <div style={{ position: 'relative' }}>
-                      <Lock
-                        size={15}
-                        color="#94A3B8"
-                        style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
-                      />
-                      <input
-                        type="text"
-                        value={detail?.code || branch.code}
-                        disabled
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 12px 0 36px',
-                          borderRadius: '8px',
-                          border: '1px solid #E2E8F0',
-                          backgroundColor: '#F1F5F9',
-                          fontSize: 13.5,
-                          fontWeight: 700,
-                          color: '#64748B',
-                          cursor: 'not-allowed',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* HÀNG 2: Địa chỉ hoạt động (Trải rộng 2 cột) */}
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: '#334155',
-                        marginBottom: 6,
-                      }}
-                    >
-                      Địa chỉ hoạt động <span style={{ color: '#EF4444' }}>*</span>
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <MapPin
-                        size={15}
-                        color="#64748B"
-                        style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
-                      />
-                      <input
-                        type="text"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố..."
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 12px 0 36px',
-                          borderRadius: '8px',
-                          border: '1px solid #CBD5E1',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: 13.5,
-                          color: '#0F172A',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* HÀNG 3, CỘT 1: Hotline */}
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: '#334155',
-                        marginBottom: 6,
-                      }}
-                    >
-                      Số điện thoại hotline
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <Phone
-                        size={15}
-                        color="#64748B"
-                        style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
-                      />
-                      <input
-                        type="text"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="Ví dụ: 0369880798"
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 12px 0 36px',
-                          borderRadius: '8px',
-                          border: '1px solid #CBD5E1',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: 13.5,
-                          color: '#0F172A',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* HÀNG 3, CỘT 2: Email liên hệ */}
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: '#334155',
-                        marginBottom: 6,
-                      }}
-                    >
-                      Email liên hệ
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <Mail
-                        size={15}
-                        color="#64748B"
-                        style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
-                      />
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="chinhanh@cuahang.com"
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 12px 0 36px',
-                          borderRadius: '8px',
-                          border: '1px solid #CBD5E1',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: 13.5,
-                          color: '#0F172A',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* HÀNG 4, CỘT 1: Quản lý phụ trách */}
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: '#334155',
-                        marginBottom: 6,
-                      }}
-                    >
-                      Quản lý phụ trách
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <User
-                        size={15}
-                        color="#64748B"
-                        style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
-                      />
-                      <input
-                        type="text"
-                        value={managerName}
-                        onChange={(e) => setManagerName(e.target.value)}
-                        placeholder="Họ và tên người quản lý..."
-                        style={{
-                          width: '100%',
-                          height: '38px',
-                          padding: '0 12px 0 36px',
-                          borderRadius: '8px',
-                          border: '1px solid #CBD5E1',
-                          backgroundColor: '#FFFFFF',
-                          fontSize: 13.5,
-                          color: '#0F172A',
-                          outline: 'none',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* HÀNG 4, CỘT 2: Phân cấp Trụ sở chính (Card gọn gàng, đồng đều chiều cao) */}
-                  <div>
-                    <label
-                      style={{
-                        display: 'block',
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: '#334155',
-                        marginBottom: 6,
-                      }}
-                    >
-                      Quy mô & Phân cấp
-                    </label>
-                    <label
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        height: '38px',
-                        padding: '0 12px',
-                        borderRadius: '8px',
-                        border: `1px solid ${isHeadquarter ? '#FDE68A' : '#CBD5E1'}`,
-                        backgroundColor: isHeadquarter ? '#FFFBEB' : '#FFFFFF',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                        boxSizing: 'border-box',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isHeadquarter}
-                        onChange={(e) => setIsHeadquarter(e.target.checked)}
-                        style={{ width: 16, height: 16, accentColor: '#0F766E', cursor: 'pointer', flexShrink: 0 }}
-                      />
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                        <ShieldCheck size={15} color={isHeadquarter ? '#B45309' : '#64748B'} style={{ flexShrink: 0 }} />
-                        <span
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: isHeadquarter ? '#B45309' : '#0F172A',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Đặt làm Trụ sở chính (Cơ sở đầu não)
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-
-                  {/* HÀNG 5: Ngày khởi tạo (Trải rộng 2 cột) */}
-                  <div
-                    style={{
-                      gridColumn: '1 / -1',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingTop: 8,
-                      borderTop: '1px dashed #E2E8F0',
-                      fontSize: 12,
-                      color: '#64748B',
-                    }}
-                  >
-                    <Calendar size={13} color="#94A3B8" />
-                    <span>Ngày khởi tạo cơ sở: {formatDate(detail?.createdAt || branch.createdAt)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* PHẦN DƯỚI: Các thông số tổng quát */}
-              <div>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    marginBottom: 14,
-                    color: '#0F172A',
-                    fontWeight: 700,
-                    fontSize: '14.5px',
-                  }}
-                >
-                  <Layers size={17} color="#0F766E" />
-                  <span>Các thông số tổng quát chi nhánh</span>
-                </div>
-
-                {/* 4 Cards Chỉ số */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                    gap: '14px',
-                  }}
-                >
-                  {/* Card 1: Sản phẩm kinh doanh */}
-                  <div
-                    style={{
-                      padding: '16px',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '12px',
-                      border: '1px solid #E2E8F0',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '10px',
-                        backgroundColor: '#F0FDF4',
-                        color: '#16A34A',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: 10,
-                      }}
-                    >
-                      <Package size={18} />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: '#64748B',
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      Sản phẩm kinh doanh
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 22,
-                        fontWeight: 800,
-                        color: '#0F172A',
-                        margin: '4px 0 2px 0',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {detail?.totalProducts ?? 0}{' '}
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#64748B' }}>SKU</span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: '#16A34A',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      Tổng tồn kho: {(detail?.totalStock ?? 0).toLocaleString('vi-VN')} SOH
-                    </div>
-                  </div>
-
-                  {/* Card 2: Cảnh báo tồn kho */}
-                  <div
-                    style={{
-                      padding: '16px',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '12px',
-                      border: '1px solid #E2E8F0',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '10px',
-                        backgroundColor: '#FFF7ED',
-                        color: '#EA580C',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: 10,
-                      }}
-                    >
-                      <AlertTriangle size={18} />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: '#64748B',
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      Cảnh báo thiếu hàng
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 22,
-                        fontWeight: 800,
-                        color: (detail?.lowStockCount ?? 0) > 0 ? '#EA580C' : '#0F172A',
-                        margin: '4px 0 2px 0',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {detail?.lowStockCount ?? 0}{' '}
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#64748B' }}>mặt hàng</span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: (detail?.lowStockCount ?? 0) > 0 ? '#EA580C' : '#64748B',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {(detail?.lowStockCount ?? 0) > 0 ? 'Cần nhập hàng bổ sung' : 'Tồn kho ổn định'}
-                    </div>
-                  </div>
-
-                  {/* Card 3: Đội ngũ nhân sự */}
-                  <div
-                    style={{
-                      padding: '16px',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '12px',
-                      border: '1px solid #E2E8F0',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '10px',
-                        backgroundColor: '#EFF6FF',
-                        color: '#2563EB',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: 10,
-                      }}
-                    >
-                      <Users size={18} />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: '#64748B',
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      Nhân sự chi nhánh
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 22,
-                        fontWeight: 800,
-                        color: '#0F172A',
-                        margin: '4px 0 2px 0',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {detail?.totalEmployees ?? 0}{' '}
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#64748B' }}>nhân viên</span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: '#2563EB',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {detail?.activeEmployees ?? 0} đang làm việc
-                    </div>
-                  </div>
-
-                  {/* Card 4: Đơn hàng & giao dịch */}
-                  <div
-                    style={{
-                      padding: '16px',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '12px',
-                      border: '1px solid #E2E8F0',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '10px',
-                        backgroundColor: '#FAF5FF',
-                        color: '#9333EA',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: 10,
-                      }}
-                    >
-                      <Clock size={18} />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        color: '#64748B',
-                        fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      Đơn hàng & Giao dịch
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 22,
-                        fontWeight: 800,
-                        color: '#0F172A',
-                        margin: '4px 0 2px 0',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {detail?.pendingOrdersCount ?? branch.pendingOrdersCount ?? 0}{' '}
-                      <span style={{ fontSize: 13, fontWeight: 500, color: '#64748B' }}>đơn chờ</span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: '#64748B',
-                        fontWeight: 500,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      Gần nhất: {formatDate(detail?.lastOrderDate || branch.lastOrderDate)}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                  ))}
+                </dl>
+              </section>
             </>
           )}
         </div>
 
-        {/* 3. Footer (NÚT LƯU CHỈNH SỬA TRỰC TIẾP TẠI ĐÂY) */}
-        <div
-          className="store-modal-footer"
-          style={{
-            padding: '16px 24px',
-            borderTop: '1px solid #E2E8F0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: '#F8FAFC',
-          }}
-        >
-          {/* Thông báo lỗi hoặc gợi ý bên trái */}
-          <div style={{ flex: 1, marginRight: 16 }}>
-            {errorMessage && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: '#DC2626',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                <AlertCircle size={15} />
-                <span>{errorMessage}</span>
-              </div>
+        <footer className="store-modal-footer">
+          <button
+            className="store-btn-secondary"
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+          >
+            Đóng
+          </button>
+          <button
+            className="store-btn-primary branch-detail-save"
+            type="submit"
+            disabled={isLoading || isSaving}
+          >
+            {isSaving ? (
+              <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Save size={15} aria-hidden="true" />
             )}
-            {saveSuccess && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: '#059669',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                <CheckCircle2 size={15} />
-                <span>Đã lưu cập nhật thông tin chi nhánh thành công!</span>
-              </div>
-            )}
-            {!errorMessage && !saveSuccess && (
-              <span style={{ fontSize: 12.5, color: '#64748B' }}>
-                Chỉnh sửa các ô ở trên và bấm "Lưu thay đổi" để cập nhật ngay.
-              </span>
-            )}
-          </div>
-
-          {/* Nhóm nút bên phải */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSaving}
-              style={{
-                padding: '9px 18px',
-                borderRadius: '8px',
-                border: '1px solid #CBD5E1',
-                background: '#FFFFFF',
-                color: '#475569',
-                fontSize: 13.5,
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Đóng
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSave()}
-              disabled={isSaving}
-              style={{
-                padding: '9px 24px',
-                borderRadius: '8px',
-                background: '#0F766E',
-                color: '#FFFFFF',
-                border: 'none',
-                fontSize: 13.5,
-                fontWeight: 700,
-                cursor: isSaving ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                boxShadow: '0 4px 12px rgba(15, 118, 110, 0.25)',
-                opacity: isSaving ? 0.75 : 1,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 size={15} className="animate-spin" />
-                  <span>Đang lưu...</span>
-                </>
-              ) : (
-                <>
-                  <Save size={15} />
-                  <span>Lưu thay đổi</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+            {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+          </button>
+        </footer>
+      </form>
+      <AdminToast
+        toast={
+          errorMessage
+            ? {
+                id: "branch-detail-error",
+                message: errorMessage,
+                type: "error",
+              }
+            : saveSuccess
+              ? {
+                  id: "branch-detail-success",
+                  message: "Đã lưu thông tin chi nhánh.",
+                  type: "success",
+                }
+              : null
+        }
+        onClose={() => {
+          setErrorMessage(null);
+          setSaveSuccess(false);
+        }}
+      />
     </div>
   );
 };

@@ -5,7 +5,7 @@ import { SubscriptionLockOverlay } from "../../../components/auth/SubscriptionLo
 import { useAuthStore } from "../../../stores/useAuthStore";
 import { storeApi } from "../api/storeApi";
 
-export function StaffManagementGate({ children }: { children: ReactNode }) {
+export function StaffManagementGate({ children, isOwner = true }: { children: ReactNode; isOwner?: boolean }) {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const store = useQuery({
@@ -33,7 +33,7 @@ export function StaffManagementGate({ children }: { children: ReactNode }) {
 
   return (
     <SubscriptionLockOverlay
-      isOwner
+      isOwner={isOwner}
       lockReason="STAFF_ADDON_REQUIRED"
       onGoToBilling={() => navigate("/store-owner/subscriptions?tab=subscriptions")}
     />

@@ -21,7 +21,6 @@ import { TermsOfServiceTab } from "./components/TermsOfServiceTab";
 import { WalletLedgerTab } from "./components/WalletLedgerTab";
 import { BranchManagementTab } from "./components/BranchManagementTab";
 import { storeApi, mapBackendStoreToFrontend, type TrialStatus } from "./api/storeApi";
-import { StorageAddonCard } from "./components/StorageAddonCard";
 import { BranchAddonModal } from "./components/BranchAddonModal";
 import { StaffAddonModal } from "./components/StaffAddonModal";
 import { TrialStatusBanner } from "./components/TrialStatusBanner";
@@ -241,12 +240,6 @@ export const StoreSettingsHubPage: FC = () => {
               onStartTrial={() => setSelectedPlanForCheckout(trialPlanItem)}
               onOpenWallet={() => handleSelectTab("wallet")}
             />
-            {isStandardPlan && <StorageAddonCard
-              onPurchased={(amount) => {
-                setStoreInfo((prev) => ({ ...prev, walletBalance: Math.max(0, prev.walletBalance - amount) }));
-                setWalletRefreshKey((key) => key + 1);
-              }}
-            />}
             {isProPlan && <section style={{ marginBottom: 18, padding: 20, border: "1px solid #DDE7F3", borderRadius: 24, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
               <div><strong style={{ color: "#0F172A" }}>Mở rộng chuỗi cửa hàng</strong><div style={{ marginTop: 4, color: "#64748B", fontSize: 13 }}>Gói Pro có thể mua thêm chi nhánh: 80.000 đ/chi nhánh/tháng.</div></div>
               <button type="button" onClick={() => setShowBranchAddonModal(true)} style={{ padding: "10px 18px", border: 0, borderRadius: 9999, background: "#0066FF", color: "#FFF", fontWeight: 700 }}>Mua thêm chi nhánh</button>

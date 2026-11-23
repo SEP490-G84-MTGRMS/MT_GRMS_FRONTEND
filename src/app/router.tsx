@@ -623,19 +623,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'employees/shifts',
-        element: <ShiftConfigPage />,
+        element: <StaffManagementGate><ShiftConfigPage /></StaffManagementGate>,
       },
       {
         path: 'employees/attendance',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <AttendancePage />
+            <StaffManagementGate><AttendancePage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
       {
         path: 'employees/approval-requests',
-        element: <ApprovalRequestsPage />,
+        element: <StaffManagementGate><ApprovalRequestsPage /></StaffManagementGate>,
       },
       {
         path: 'employees/payroll',
@@ -779,15 +779,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'employees/shifts',
-        element: <ShiftConfigPage />,
+        element: <StaffManagementGate><ShiftConfigPage /></StaffManagementGate>,
       },
       {
         path: 'employees/attendance',
-        element: <AttendancePage />,
+        element: <StaffManagementGate><AttendancePage /></StaffManagementGate>,
       },
       {
         path: 'employees/approval-requests',
-        element: <ApprovalRequestsPage />,
+        element: <StaffManagementGate><ApprovalRequestsPage /></StaffManagementGate>,
       },
       {
         path: 'employees/payroll',
@@ -894,11 +894,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'shifts',
-        element: <ShiftConfigPage />,
+        element: <StaffManagementGate><ShiftConfigPage /></StaffManagementGate>,
       },
       {
         path: 'attendance',
-        element: <AttendancePage />,
+        element: <StaffManagementGate><AttendancePage /></StaffManagementGate>,
       },
       {
         path: 'payroll',
@@ -970,11 +970,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'attendance',
-        element: <AttendancePage />,
+        element: <StaffManagementGate isOwner={false}><AttendancePage /></StaffManagementGate>,
       },
       {
         path: 'payroll',
-        element: <PayslipManagementPage />,
+        element: <StaffManagementGate isOwner={false}><PayslipManagementPage /></StaffManagementGate>,
       },
       {
         path: 'stocktakes',

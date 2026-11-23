@@ -101,6 +101,8 @@ export const mapBackendStoreToFrontend = (
     email: `${backend.subdomain}@mtgrms.vn`,
     status: (backend.status as StoreInfo['status']) || 'ACTIVE',
     currentPlan: backend.planName || backend.currentPlan || 'Chưa chọn gói',
+    currentPlanCode: backend.currentPlan,
+    subscriptionExpiresAtUtc: backend.subscriptionExpiresAt,
     subscriptionExpiresAt: expiresAt,
     daysRemaining,
     branchesCount: backend.branchCount,
@@ -152,6 +154,11 @@ export const storeApi = {
     return res.data;
   },
 
+  async quoteProUpgrade(payload: PurchaseSubscriptionPayload): Promise<ApiResponse<ProUpgradeQuote>> {
+    const res = await httpClient.post<ApiResponse<ProUpgradeQuote>>('/tenant/subscriptions/pro-quote', payload);
+    return res.data;
+  },
+
   async purchaseSubscription(
     payload: PurchaseSubscriptionPayload
   ): Promise<ApiResponse<PurchaseSubscriptionResult>> {
@@ -183,26 +190,6 @@ export const storeApi = {
 
   async getSubscriptionHistory(): Promise<ApiResponse<SubscriptionOrderHistoryItem[]>> {
     const res = await httpClient.get<ApiResponse<SubscriptionOrderHistoryItem[]>>('/tenant/subscriptions/history');
-    return res.data;
-  },
-
-  async getStorageUsage(): Promise<ApiResponse<StorageUsage>> {
-    const res = await httpClient.get<ApiResponse<StorageUsage>>('/tenant/storage');
-    return res.data;
-  },
-
-  async getStorageQuote(extraGb: number): Promise<ApiResponse<StorageQuote>> {
-    const res = await httpClient.get<ApiResponse<StorageQuote>>('/tenant/storage/quote', {
-      params: { extraGb },
-    });
-    return res.data;
-  },
-
-  async purchaseStorage(extraGb: number, requestId: string): Promise<ApiResponse<StorageQuote>> {
-    const res = await httpClient.post<ApiResponse<StorageQuote>>('/tenant/storage/purchase', {
-      extraGb,
-      requestId,
-    });
     return res.data;
   },
 
@@ -238,22 +225,6 @@ export interface StaffAddonQuote {
   expiresAt: string;
 }
 
-export interface StorageUsage {
-  usedBytes: number;
-  limitBytes: number;
-  baseGb: number;
-  extraGb: number;
-  addonExpiresAt?: string | null;
-}
-
-export interface StorageQuote {
-  extraGb: number;
-  subtotal: number;
-  vat: number;
-  total: number;
-  expiresAt: string;
-}
-
 export interface BranchAddonQuote {
   extraBranches: number;
   subtotal: number;
@@ -279,9 +250,22 @@ export interface PurchaseSubscriptionPayload {
   extraBranches?: number;
   hasStaffManagementAddon?: boolean;
   extraWarehouses?: number;
-  extraStorageGb?: number;
   requestId?: string;
   paymentMethod?: 'Wallet' | 'VietQR';
+  quoteAt?: string;
+  expectedExpiry?: string;
+  expectedTotal?: number;
+}
+
+export interface ProUpgradeQuote {
+  quoteAt: string;
+  expectedExpiry: string;
+  expiresAt: string;
+  remainingPro: number;
+  credit: number;
+  additionalTerm: number;
+  branches: number;
+  total: number;
 }
 
 export interface PurchaseSubscriptionResult {
