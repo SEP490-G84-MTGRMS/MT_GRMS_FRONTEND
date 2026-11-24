@@ -220,7 +220,18 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                           type="button"
                           onClick={() => handleOpenVerifyModal(s)}
                           className="tax-action-btn"
-                          style={{ color: '#0F766E', fontWeight: 700, fontSize: '0.76rem', padding: '4px 10px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                          style={{
+                            width: 'auto',
+                            minWidth: 'max-content',
+                            height: 30,
+                            color: '#0F766E',
+                            fontWeight: 700,
+                            fontSize: '0.76rem',
+                            padding: '0 10px',
+                            gap: 5,
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
                           title="Kiểm tra tính toàn vẹn chữ ký số HMAC-SHA256"
                         >
                           <ShieldCheck size={14} />
