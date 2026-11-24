@@ -573,23 +573,14 @@ export const ReceiveTransferPage: React.FC = () => {
             </span>
           </div>
 
-          {/* Nút bấm Lưu tạm & Nhận hàng */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-            <button
-              type="button"
-              className="btn-secondary-white"
-              onClick={() => showToast('Đã lưu tạm thông tin kiểm đếm nhận hàng.')}
-              style={{ justifyContent: 'center' }}
-            >
-              <Save size={15} /> Lưu tạm
-            </button>
-
+          {/* Nút bấm Nhận hàng */}
+          <div style={{ display: 'flex', marginTop: 4 }}>
             <button
               type="button"
               className="btn-primary-teal"
               onClick={handleConfirm}
               disabled={isSaving}
-              style={{ justifyContent: 'center' }}
+              style={{ flex: 1, justifyContent: 'center' }}
             >
               <Check size={15} /> Nhận hàng
             </button>

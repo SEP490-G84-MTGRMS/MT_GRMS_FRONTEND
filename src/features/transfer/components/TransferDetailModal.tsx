@@ -545,14 +545,6 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
               <button
                 type="button"
                 className="btn-secondary-white"
-                onClick={handleDuplicate}
-              >
-                <Copy size={15} /> Sao chép
-              </button>
-
-              <button
-                type="button"
-                className="btn-secondary-white"
                 onClick={handleExport}
               >
                 <Download size={15} /> Xuất file
