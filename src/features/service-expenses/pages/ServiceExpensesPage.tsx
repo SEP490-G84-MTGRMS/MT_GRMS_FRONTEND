@@ -1,4 +1,4 @@
-import { type FC, useState, useRef, useEffect } from 'react';
+import { type FC, useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Receipt, FileSpreadsheet, AlertTriangle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -255,6 +255,14 @@ export const ServiceExpensesPage: FC = () => {
   };
 
   const todayIso = getVietnamTodayIso();
+  const expenseRows = useMemo(() => {
+    const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]));
+    return (expensesData?.items ?? []).map((item) => ({
+      ...item,
+      branchName: item.branchName || branchNames.get(item.branchId) || 'Không xác định',
+    }));
+  }, [branches, expensesData?.items]);
+
   const clientOverdueCount = expensesData?.items
     ? expensesData.items.filter(
         (i) => i.status === 'Pending' && Boolean(i.dueDate) && i.dueDate < todayIso
@@ -268,7 +276,7 @@ export const ServiceExpensesPage: FC = () => {
     showToast('Đang kết xuất danh sách chi phí vận hành ra tệp Excel (.csv)...', 'info');
 
     try {
-      const exportItems = expensesData?.items || [];
+      const exportItems = expenseRows;
       if (!exportItems.length) {
         showToast('Không có dữ liệu chi phí nào để xuất theo bộ lọc hiện tại.', 'warning');
         return;
@@ -425,7 +433,7 @@ export const ServiceExpensesPage: FC = () => {
 
       {/* ── 3. Standardized Expense Table (.so-list-table-card with pinned pagination) ── */}
       <ExpenseTable
-        data={expensesData?.items}
+        data={expenseRows}
         isLoading={isExpensesLoading}
         totalItems={expensesData?.totalItems}
         page={filters.page}

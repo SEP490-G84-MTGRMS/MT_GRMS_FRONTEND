@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { FC } from 'react';
 import { Users, Plus, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import { employeeApi } from '../../employee/api/employeeApi';
 import { useCustomerCrm } from '../hooks/useCustomerCrm';
 import { CustomerFilterBar } from '../components/CustomerFilterBar';
@@ -17,6 +18,7 @@ import '../../../styles/so-list-page.css';
 import '../customer-crm.css';
 
 export const CustomerManagementPage: FC = () => {
+  const canManageDebt = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const {
@@ -372,7 +374,7 @@ export const CustomerManagementPage: FC = () => {
             title="Thêm mới khách hàng"
           >
             <Plus size={14} />
-            <span>+ Thêm khách hàng</span>
+            <span>Thêm khách hàng</span>
           </button>
         </div>
       </div>
@@ -403,8 +405,8 @@ export const CustomerManagementPage: FC = () => {
         isLoading={isLoading}
         onSelect={handleSelectCustomer}
         onEdit={handleOpenEditModal}
-        onCollect={handleOpenCollectModal}
-        onViewLedger={(c) => setLedgerCustomer(c)}
+        onCollect={canManageDebt ? handleOpenCollectModal : undefined}
+        onViewLedger={canManageDebt ? setLedgerCustomer : undefined}
         currentPage={currentPage}
         pageSize={pageSize}
         onPageChange={setCurrentPage}
@@ -416,8 +418,8 @@ export const CustomerManagementPage: FC = () => {
         customer={selectedCustomer}
         onClose={handleCloseDrawer}
         onOpenEdit={handleOpenEditModal}
-        onOpenCollect={handleOpenCollectModal}
-        onViewLedger={(c) => setLedgerCustomer(c)}
+        onOpenCollect={canManageDebt ? handleOpenCollectModal : undefined}
+        onViewLedger={canManageDebt ? setLedgerCustomer : undefined}
       />
 
       {/* ── 5. Create / Edit Modal ── */}
@@ -431,7 +433,7 @@ export const CustomerManagementPage: FC = () => {
 
       {/* ── 6. Collect Debt Modal (VietQR & Cash) ── */}
       <DebtCollectionModal
-        isOpen={Boolean(collectingCustomer)}
+        isOpen={canManageDebt && Boolean(collectingCustomer)}
         onClose={() => setCollectingCustomer(null)}
         customer={collectingCustomer}
         onConfirm={handleCollectDebtConfirm}
@@ -440,7 +442,7 @@ export const CustomerManagementPage: FC = () => {
 
       {/* ── 7. Customer Debt Ledger Drawer ── */}
       <CustomerDebtLedgerDrawer
-        isOpen={Boolean(ledgerCustomer)}
+        isOpen={canManageDebt && Boolean(ledgerCustomer)}
         customer={ledgerCustomer}
         onClose={() => setLedgerCustomer(null)}
         onOpenCollect={handleOpenCollectModal}

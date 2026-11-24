@@ -422,72 +422,6 @@
   min-width: 0;
 }
 
-.finance-pnl-toolbar {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-}
-
-.finance-pnl-periods {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  padding: 4px;
-  border-radius: 10px;
-  background: #F1F5F9;
-}
-
-.finance-pnl-periods button {
-  min-height: 32px;
-  padding: 0 13px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: #52647A;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.finance-pnl-periods button.active {
-  border-color: #99F6E4;
-  background: #FFFFFF;
-  color: #0F766E;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-}
-
-.finance-pnl-branch-filter,
-.finance-pnl-custom-dates label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  color: #475569;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.finance-pnl-branch-filter select,
-.finance-pnl-custom-dates input {
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid #CBD5E1;
-  border-radius: 8px;
-  background: #FFFFFF;
-  color: #0F172A;
-  font: inherit;
-  font-size: 0.78rem;
-}
-
-.finance-pnl-branch-filter select { min-width: 250px; }
-
-.finance-pnl-custom-dates {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .finance-pnl-scope-note {
   margin: 0;
   color: #334155;
@@ -688,10 +622,6 @@
 }
 
 @media (max-width: 640px) {
-  .finance-pnl-toolbar,
-  .finance-pnl-periods,
-  .finance-pnl-branch-filter,
-  .finance-pnl-branch-filter select { width: 100%; }
   .finance-pnl-story-banner { align-items: flex-start; flex-direction: column; }
   .finance-pnl-expense-row { align-items: flex-start; flex-direction: column; }
 }

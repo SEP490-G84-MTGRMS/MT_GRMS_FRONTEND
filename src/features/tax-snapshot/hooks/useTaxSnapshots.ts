@@ -62,8 +62,6 @@ export function useTaxSnapshots(initialYear: number = 2026) {
   const summaryQuery = useQuery({
     queryKey: ['tax-summary', filterParams],
     queryFn: () => taxSnapshotApi.getTaxSummary(filterParams),
-    // Giữ bảng hiện tại trong lúc đổi phương pháp/kỳ; tránh toàn bộ vùng nội dung nhấp nháy loading.
-    placeholderData: (previousData) => previousData,
   });
 
   // Query Historical Snapshots
@@ -181,6 +179,7 @@ export function useTaxSnapshots(initialYear: number = 2026) {
 
     snapshots: snapshotsQuery.data || [],
     isSnapshotsLoading: snapshotsQuery.isLoading,
+    snapshotsError: snapshotsQuery.error,
     refetchSnapshots: snapshotsQuery.refetch,
 
     filterParams,

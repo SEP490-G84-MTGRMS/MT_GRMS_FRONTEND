@@ -503,7 +503,7 @@ export const TransferListPage: React.FC = () => {
             title="Tạo phiếu chuyển kho mới"
           >
             <Plus size={15} />
-            <span>+ Tạo phiếu chuyển kho</span>
+            <span>Tạo phiếu chuyển kho</span>
           </button>
         </div>
       </div>

@@ -30,7 +30,7 @@ import { AccountingBooksView } from '../components/AccountingBooksView';
 import { TaxOverviewCard } from '../components/TaxOverviewCard';
 import { TaxDeclarationPreviewModal } from '../components/TaxDeclarationPreviewModal';
 import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
-import { isUsingMockData, taxSnapshotApi } from '../api/taxSnapshotApi';
+import { taxSnapshotApi } from '../api/taxSnapshotApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import {
   TaxPeriodType,
@@ -62,6 +62,8 @@ export const TaxSnapshotPage: FC = () => {
     refetchSummary,
     snapshots,
     isSnapshotsLoading,
+    snapshotsError,
+    refetchSnapshots,
     filterParams,
     setCalculationMethod,
     setPeriod,
@@ -214,27 +216,6 @@ export const TaxSnapshotPage: FC = () => {
 
       {/* Main Content Container */}
       <div className="tax-content-container">
-        {/* Demo Banner */}
-        {isUsingMockData() && (
-          <div
-            style={{
-              padding: '10px 16px',
-              borderRadius: 10,
-              background: '#FFFBEB',
-              border: '1px solid #FDE68A',
-              marginTop: 16,
-              marginBottom: 4,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}
-          >
-            <span style={{ fontSize: '0.84rem', color: '#92400E' }}>
-              Chế độ dữ liệu mẫu: máy chủ chưa kết nối, số liệu chỉ để xem thiết kế, không dùng để kê khai.
-            </span>
-          </div>
-        )}
-
         {/* Desktop: controls on the left, annual overview on the right. */}
         <div className="tax-hero-grid">
         <div className="tax-topbar-wrapper">
@@ -262,7 +243,7 @@ export const TaxSnapshotPage: FC = () => {
                   >
                     {summary?.householdGroupName
                       ? `${summary.householdGroupName} (${summary.booksSummary?.primaryBookCode || 'S2a-HKD'})`
-                      : 'Nhóm 2: 1 – 3 tỷ (Sổ S2a)'}
+                      : 'Chưa có dữ liệu phân nhóm thuế'}
                   </span>
                 </div>
               </div>
@@ -400,7 +381,7 @@ export const TaxSnapshotPage: FC = () => {
                     <div className="tax-actions-menu-separator" />
                     {canManageTax && <button type="button" role="menuitem" onClick={() => { setIsRateConfigOpen(true); setIsActionMenuOpen(false); }}><SlidersHorizontal size={16} /> Cấu hình thuế</button>}
                     {canManageTax && <button type="button" role="menuitem" onClick={() => { setPinModalInitialTab('change'); setIsPinModalOpen(true); setIsActionMenuOpen(false); }}><KeyRound size={16} /> Mã PIN bảo mật</button>}
-                    {canManageTax && <button type="button" role="menuitem" disabled={isExportingExcel || isSummaryLoading} onClick={() => { void handleExportExcel(); setIsActionMenuOpen(false); }}><Download size={16} /> {isExportingExcel ? 'Đang xuất…' : 'Xuất báo cáo Excel'}</button>}
+                    {canManageTax && <button type="button" role="menuitem" disabled={isExportingExcel || isSummaryLoading || !summary || Boolean(summaryError)} onClick={() => { void handleExportExcel(); setIsActionMenuOpen(false); }}><Download size={16} /> {isExportingExcel ? 'Đang xuất…' : 'Xuất báo cáo Excel'}</button>}
                   </div>
                 )}
               </div>
@@ -410,6 +391,7 @@ export const TaxSnapshotPage: FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(true)}
+                  disabled={!summary || isSummaryLoading || isSummaryRefetching || Boolean(summaryError)}
                   className="btn-primary-pill"
                 >
                   <span>Chốt kỳ sổ {periodLabel}</span>
@@ -440,9 +422,9 @@ export const TaxSnapshotPage: FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <AlertCircle size={20} style={{ color: '#DC2626' }} />
               <div>
-                <strong style={{ fontSize: '0.88rem', color: '#991B1B' }}>Không thể kết nối máy chủ tính thuế</strong>
+                <strong style={{ fontSize: '0.88rem', color: '#991B1B' }}>Không thể tải dữ liệu thuế</strong>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#B91C1C' }}>
-                  Đang hiển thị số liệu ngoại tuyến. Bấm thử lại để kết nối lại máy chủ.
+                  {summaryError.message || 'Vui lòng thử lại để tải dữ liệu từ máy chủ.'}
                 </p>
               </div>
             </div>
@@ -531,7 +513,9 @@ export const TaxSnapshotPage: FC = () => {
               <button type="button" className="tax-drawer-close-btn" aria-label="Đóng" onClick={() => setAuxiliaryView(null)}><X size={18} /></button>
             </header>
             <div className="tax-auxiliary-body">
-              {auxiliaryView === 'history' ? (
+              {snapshotsError ? (
+                <div role="alert"><p>Không thể tải lịch sử chốt kỳ: {snapshotsError.message}</p><button type="button" className="btn-secondary-pill" onClick={() => void refetchSnapshots()}>Thử lại</button></div>
+              ) : auxiliaryView === 'history' ? (
                 <TaxSnapshotsHistoryView
                   snapshots={snapshots as any}
                   isLoading={isSnapshotsLoading}

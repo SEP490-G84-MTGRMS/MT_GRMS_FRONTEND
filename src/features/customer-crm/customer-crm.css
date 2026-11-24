@@ -1076,6 +1076,11 @@
   font-weight: 700;
 }
 
+.btn-collect-debt:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Badges ── */
 .badge {
   display: inline-flex;

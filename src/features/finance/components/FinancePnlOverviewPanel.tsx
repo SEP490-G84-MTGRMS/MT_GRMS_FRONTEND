@@ -4,11 +4,10 @@ import type {
   BranchOption,
   PnlFilterParams,
   PnlReportResponse,
-  PresetPeriod,
 } from '../../reports-pnl/types/reportsPnl.types';
 import { PnlWaterfallSvg } from './PnlWaterfallSvg';
-import { resolvePresetRange } from '../utils/periodRanges';
-import type { FinancePeriodPreset } from '../types/financeOverview.types';
+import { FINANCE_PERIOD_PRESETS } from '../utils/periodRanges';
+import { FinanceOverviewFilterBar } from './FinanceOverviewFilterBar';
 import { formatMoney } from '../utils/formatters';
 
 interface Props {
@@ -21,17 +20,7 @@ interface Props {
   errorMessage?: string | null;
 }
 
-const PERIODS: Array<{ value: PresetPeriod; label: string }> = [
-  { value: 'TODAY', label: 'Hôm nay' },
-  { value: 'LAST_7_DAYS', label: '7 ngày qua' },
-  { value: 'THIS_MONTH', label: 'Tháng này' },
-  { value: 'LAST_MONTH', label: 'Tháng trước' },
-  { value: 'THIS_QUARTER', label: 'Quý này' },
-  { value: 'THIS_YEAR', label: 'Năm nay' },
-  { value: 'CUSTOM', label: 'Tùy chọn ngày' },
-];
-
-const PERIOD_LABELS = Object.fromEntries(PERIODS.map((item) => [item.value, item.label]));
+const PERIOD_LABELS = Object.fromEntries(FINANCE_PERIOD_PRESETS.map((item) => [item.value, item.label]));
 
 function formatDisplayDate(value: string): string {
   const [year, month, day] = value.split('-');
@@ -93,20 +82,6 @@ export const FinancePnlOverviewPanel: React.FC<Props> = ({
   isFetching,
   errorMessage,
 }) => {
-  const selectPeriod = (preset: PresetPeriod) => {
-    if (preset === 'CUSTOM') {
-      onFilterChange({ ...filter, presetPeriod: preset });
-      return;
-    }
-    const range = resolvePresetRange(preset as FinancePeriodPreset);
-    onFilterChange({ ...filter, presetPeriod: preset, ...range });
-  };
-
-  const updateDate = (field: 'startDate' | 'endDate', value: string) => {
-    const next = { ...filter, presetPeriod: 'CUSTOM' as const, [field]: value };
-    if (next.startDate <= next.endDate) onFilterChange(next);
-  };
-
   const selectedBranch = branches.find((branch) => branch.id === filter.branchId);
   const scopeLabel = filter.branchId === 'ALL' || !filter.branchId
     ? `toàn chuỗi (${Math.max(0, branches.filter((branch) => branch.id !== 'ALL').length)} chi nhánh)`
@@ -116,27 +91,11 @@ export const FinancePnlOverviewPanel: React.FC<Props> = ({
 
   return (
     <section className="finance-pnl-redesign" id="pnl-section" aria-busy={isFetching}>
-      <div className="finance-pnl-toolbar">
-        <div className="finance-pnl-periods" role="group" aria-label="Khoảng thời gian báo cáo lãi lỗ">
-          {PERIODS.map((item) => (
-            <button key={item.value} type="button" className={filter.presetPeriod === item.value ? 'active' : ''} onClick={() => selectPeriod(item.value)}>
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <label className="finance-pnl-branch-filter">
-          <span>Phạm vi chi nhánh</span>
-          <select value={filter.branchId || 'ALL'} onChange={(event) => onFilterChange({ ...filter, branchId: event.target.value })}>
-            {branches.map((branch) => <option value={branch.id} key={branch.id}>{branch.name}</option>)}
-          </select>
-        </label>
-        {filter.presetPeriod === 'CUSTOM' && (
-          <div className="finance-pnl-custom-dates">
-            <label><span>Từ ngày</span><input type="date" value={filter.startDate} max={filter.endDate} onChange={(event) => updateDate('startDate', event.target.value)} /></label>
-            <label><span>Đến ngày</span><input type="date" value={filter.endDate} min={filter.startDate} onChange={(event) => updateDate('endDate', event.target.value)} /></label>
-          </div>
-        )}
-      </div>
+      <FinanceOverviewFilterBar
+        value={{ branchId: filter.branchId || 'ALL', preset: filter.presetPeriod, startDate: filter.startDate, endDate: filter.endDate }}
+        branches={branches}
+        onChange={({ preset, ...next }) => onFilterChange({ ...filter, ...next, presetPeriod: preset })}
+      />
 
       <p className="finance-pnl-scope-note">Đang xem kết quả gộp của {scopeLabel}.</p>
 

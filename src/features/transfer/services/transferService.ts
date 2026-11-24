@@ -101,6 +101,7 @@ export const mapTransfer = (dto: ApiTransfer): TransferOrder => ({
   toBranchName: dto.toBranchName,
   createdBy: dto.createdBy,
   transferDate: new Date(dto.createdAt).toLocaleString('vi-VN'),
+  dispatchedAt: dto.dispatchedAt,
   receiveDate: dto.receivedAt ? new Date(dto.receivedAt).toLocaleString('vi-VN') : undefined,
   expectedDeliveryDate: dto.expectedDeliveryDate,
   status: dto.status as TransferOrder['status'],
@@ -274,7 +275,7 @@ export const transferService = {
         detailId: item.id,
         receivedQuantity: item.receivedQty ?? item.sentQty,
         damagedQuantity: item.damagedQty ?? 0,
-        discrepancyReason: item.note?.trim() || ((item.damagedQty ?? 0) > 0 ? note?.trim() : undefined),
+        discrepancyReason: item.note?.trim() || ((item.damagedQty ?? 0) > 0 || (item.receivedQty ?? item.sentQty) < item.sentQty ? note?.trim() : undefined),
       })),
     });
     return mapTransfer(unwrap(response.data));

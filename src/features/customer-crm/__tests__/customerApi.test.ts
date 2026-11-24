@@ -207,31 +207,6 @@ describe('customerApi Live Neon Integration Tests', () => {
     });
   });
 
-  describe('generateVietQr', () => {
-    it('should generate valid VietQR payload and image url', () => {
-      const config = customerApi.generateVietQr(
-        {
-          id: '111',
-          tenantId: 'tenant-1',
-          phoneNumber: '0901-234-567',
-          fullName: 'Test User',
-          membershipTier: 'Standard',
-          currentDebtAR: 500000,
-          totalSpending: 0,
-          status: 'Active',
-          loyaltyPoints: 0,
-          createdAt: '',
-        },
-        500000
-      );
-
-      expect(config.bankId).toBe('970422');
-      expect(config.amount).toBe(500000);
-      expect(config.description).toBe('THUNO 0901234567');
-      expect(config.qrDataUrl).toContain('img.vietqr.io');
-    });
-  });
-
   describe('getKpiSummary', () => {
     it('should call /customers/debts/summary endpoint and return summary data', async () => {
       const mockSummary = {

@@ -10,7 +10,7 @@ export interface CustomerTableProps {
   isLoading: boolean;
   onSelect: (customer: CustomerDto) => void;
   onEdit: (customer: CustomerDto) => void;
-  onCollect: (customer: CustomerDto) => void;
+  onCollect?: (customer: CustomerDto) => void;
   onViewLedger?: (customer: CustomerDto) => void;
   currentPage?: number;
   pageSize?: number;
@@ -187,7 +187,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                     {/* Cột 5: Thao tác */}
                     <td className="so-list-td" style={{ textAlign: 'right', paddingRight: '14px' }} onClick={(e) => e.stopPropagation()}>
                       <div className="so-list-actions">
-                        {hasDebt && (
+                        {hasDebt && onCollect && (
                           <button
                             type="button"
                             className="so-list-action-btn so-list-action-btn--warning"

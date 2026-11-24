@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as expenseApi from '../api/expenseApi';
+import { cashbookService } from '../../cashbook/services/cashbookService';
 import { financeHttpClient } from '../../../api/financeHttpClient';
 
 describe('FE-07 Service Expenses API & Workflow Tests', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(cashbookService, 'getCashAccounts').mockResolvedValue([{
+      id: 'cash-account', accountName: 'Quỹ chi nhánh', accountType: 'CASH', branchId: 'branch-1',
+      branchName: 'Chi nhánh 1', currentBalance: 25000000, initialBalance: 25000000, isActive: true, currency: 'VND',
+    }]);
   });
 
   describe('Happy Cases', () => {

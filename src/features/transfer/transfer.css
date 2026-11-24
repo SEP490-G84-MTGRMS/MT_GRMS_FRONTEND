@@ -354,3 +354,26 @@
 }
 
 
+
+.transfer-receive-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  align-items: start;
+  gap: 24px;
+}
+
+.transfer-receive-layout > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 950px) {
+  .transfer-receive-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.transfer-receive-actions {
+  display: flex;
+  justify-content: flex-end;
+}

@@ -59,7 +59,7 @@ function mapVoucherToExpenseDto(v: any): ServiceExpenseDto {
     expenseId: v.id || v.voucherCode,
     voucherCode: v.voucherCode || v.id,
     branchId: v.branchId || '',
-    branchName: v.branchId ? `Chi nhánh ${String(v.branchId).substring(0, 8)}` : 'Toàn hệ thống',
+    branchName: v.branchName || (v.branchId ? undefined : 'Toàn hệ thống'),
     category: v.category || 'Other',
     amount: Number(v.amount || 0),
     status: statusStr,

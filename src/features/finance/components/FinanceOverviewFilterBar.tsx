@@ -4,23 +4,13 @@ import type {
   FinanceOverviewFilter,
   FinancePeriodPreset,
 } from '../types/financeOverview.types';
-import { resolvePresetRange } from '../utils/periodRanges';
+import { FINANCE_PERIOD_PRESETS, resolvePresetRange } from '../utils/periodRanges';
 
 interface Props {
   value: FinanceOverviewFilter;
   branches: BranchOption[];
   onChange: (next: FinanceOverviewFilter) => void;
 }
-
-const PRESETS: Array<{ value: FinancePeriodPreset; label: string }> = [
-  { value: 'TODAY', label: 'Hôm nay' },
-  { value: 'LAST_7_DAYS', label: '7 ngày qua' },
-  { value: 'THIS_MONTH', label: 'Tháng này' },
-  { value: 'LAST_MONTH', label: 'Tháng trước' },
-  { value: 'THIS_QUARTER', label: 'Quý này' },
-  { value: 'THIS_YEAR', label: 'Năm nay' },
-  { value: 'CUSTOM', label: 'Tùy chọn ngày' },
-];
 
 export const FinanceOverviewFilterBar: React.FC<Props> = ({ value, branches, onChange }) => {
   const selectPreset = (preset: FinancePeriodPreset) => {
@@ -51,7 +41,7 @@ export const FinanceOverviewFilterBar: React.FC<Props> = ({ value, branches, onC
         </select>
       </label>
       <div className="finance-period-options" role="group" aria-label="Khoảng thời gian">
-        {PRESETS.map((preset) => (
+        {FINANCE_PERIOD_PRESETS.map((preset) => (
           <button
             key={preset.value}
             type="button"

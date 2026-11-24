@@ -304,13 +304,18 @@
   box-sizing: border-box;
 }
 
-.so-list-table tbody td:first-child,
-.so-list-table tbody td:last-child,
-.so-list-td--actions,
-.so-list-td--status {
-  overflow: visible !important;
-  text-overflow: clip !important;
-  white-space: nowrap;
+.so-list-table--readable thead th,
+.so-list-table--readable tbody td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.so-list-table--readable .so-list-code {
+  white-space: normal;
+}
+
+.so-list-table--readable .so-list-actions {
+  flex-wrap: wrap;
 }
 
 .so-list-code {

@@ -6,7 +6,6 @@ import type {
   UpdateCustomerInput,
   CollectDebtInput,
   CustomerKpiSummary,
-  VietQrConfig,
   DebtFilterStatus,
   CustomerDebtLedgerDto,
 } from '../types/customer.types';
@@ -208,29 +207,4 @@ export const customerApi = {
     }
   },
 
-  /**
-   * Generate VietQR configuration payload for instant QR scanning
-   */
-  generateVietQr(customer: CustomerDto, amount: number): VietQrConfig {
-    const bankId = '970422'; // MB Bank Napas Bin
-    const bankName = 'MB Bank (Ngân hàng Quân Đội)';
-    const accountNo = '090123456789';
-    const accountName = 'NGUYEN TRUONG AN';
-    const cleanPhone = customer.phoneNumber.replace(/\D/g, '');
-    const description = `THUNO ${cleanPhone}`;
-    const safeAmount = Math.max(0, Math.round(amount));
-
-    // Dynamic QR URL using vietqr standard
-    const qrDataUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${safeAmount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
-
-    return {
-      bankId,
-      bankName,
-      accountNo,
-      accountName,
-      amount: safeAmount,
-      description,
-      qrDataUrl,
-    };
-  },
 };

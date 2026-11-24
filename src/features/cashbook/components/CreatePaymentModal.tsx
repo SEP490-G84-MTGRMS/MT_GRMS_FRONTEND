@@ -1,3 +1,6 @@
+import { isAxiosError } from 'axios';
+import { mapProblemDetailsToVietnamese } from '../../../api/problemDetailsMapper';
+import { useCashbookSubmissionKey } from '../hooks/useCashbookSubmissionKey';
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { ArrowUpFromLine, Info, X } from 'lucide-react';
@@ -7,7 +10,7 @@ interface CreatePaymentModalProps {
   isOpen: boolean;
   accounts: CashAccount[];
   onClose: () => void;
-  onSubmit: (dto: CreatePaymentDTO) => Promise<void>;
+  onSubmit: (dto: CreatePaymentDTO, idempotencyKey: string) => Promise<void>;
   initialCategory?: string;
 }
 
@@ -38,6 +41,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
   const [taxReferenceDocId, setTaxReferenceDocId] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const getSubmissionKey = useCashbookSubmissionKey(isOpen);
 
   useEffect(() => {
     if (isOpen) {
@@ -107,6 +111,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMsg('');
 
     if (parsedAmount <= 0) {
@@ -148,7 +153,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
         ? (description.trim() || `Nộp thuế ${taxPeriod}${taxReferenceDocId ? ` (GNT: ${taxReferenceDocId})` : ''}`)
         : (description.trim() || 'Chi tiền từ quỹ');
 
-      await onSubmit({
+      const dto: CreatePaymentDTO = {
         accountId,
         amount: parsedAmount,
         category,
@@ -159,10 +164,11 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
         categoryCode: selectedCategory.code,
         taxTreatment,
         taxTreatmentReason: taxTreatmentReason.trim() || undefined,
-      });
+      };
+      await onSubmit(dto, getSubmissionKey(dto));
       onClose();
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Lỗi khi lưu phiếu chi');
+      setErrorMsg(isAxiosError(err) ? mapProblemDetailsToVietnamese(err) : err instanceof Error ? err.message : 'Lỗi khi lưu phiếu chi');
     } finally {
       setIsSubmitting(false);
     }
@@ -184,7 +190,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
         <form onSubmit={handleSubmit}>
           <div className="cb-modal-body">
             {errorMsg && (
-              <div className="cb-overdraft-alert">
+              <div className="cb-overdraft-alert" role="alert">
                 <span>⚠️</span> {errorMsg}
               </div>
             )}

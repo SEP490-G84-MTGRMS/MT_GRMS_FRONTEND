@@ -10,7 +10,7 @@ interface CreateTaxSnapshotModalProps {
   customVatRate?: number | null; customPitRate?: number | null; vatReductionPercentage?: number | null;
   existingFinalizedSnapshot?: HouseholdTaxSnapshotDto | null;
   onOpenPinModal?: (tab?: 'change' | 'reset') => void;
-  onSubmit: (request: CreateTaxSnapshotRequest) => Promise<HouseholdTaxSnapshotDto | void>;
+  onSubmit: (request: CreateTaxSnapshotRequest) => Promise<HouseholdTaxSnapshotDto>;
 }
 
 const steps = ['Kiểm tra số liệu', 'Xác thực', 'Xác nhận chốt sổ'];
@@ -48,7 +48,8 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({ 
     setIsSubmitting(true); setSubmitError(null);
     try {
       const result = await onSubmit({ year: summary.year, periodType: summary.periodType, periodNumber: summary.periodNumber, branchId: summary.branchId, calculationMethod, tier2Method: summary.tier2Method, applyVatReduction2026: applyVatReduction, customVatRate, customPitRate, vatReductionPercentage, confirmEstimatedCogsResponsible: isConfirmed, estimatedCogsConfirmationStatement: summary.isCogsEstimated ? 'Chủ hộ xác nhận chịu trách nhiệm pháp lý đối với giá vốn ước tính tạm thời.' : undefined, pin, notes: notes.trim() || undefined, allowSupersedeExisting: allowSupersede, rectificationReason: rectificationReason.trim() || undefined });
-      setSealedSnapshot(result || { id: `SNAP-${summary.year}-P${summary.periodNumber}`, year: summary.year, periodType: summary.periodType, periodNumber: summary.periodNumber, taxableRevenueInPeriod: summary.taxableRevenueInPeriod, totalTaxAmount: summary.totalTaxAmount, vatAmount: summary.vatAmount, pitAmount: summary.pitAmount, vatRate: summary.vatRate, pitRate: summary.pitRate, isTaxExempt: summary.isTaxExempt, householdGroup: summary.householdGroup, calculationMethod, finalizedBy: 'Chủ cửa hàng (STORE_OWNER)', finalizedAtUtc: new Date().toISOString(), annualAccumulatedRevenue: summary.annualAccumulatedRevenue, auditSignatureHash: 'SEALED-HMAC-SHA256-SERVER-VALIDATED', revisionNumber: existingFinalizedSnapshot?.revisionNumber ? existingFinalizedSnapshot.revisionNumber + 1 : 1 });
+      if (!result?.id) throw new Error('Máy chủ chưa xác nhận bản chốt kỳ. Vui lòng kiểm tra lịch sử trước khi thử lại.');
+      setSealedSnapshot(result);
     } catch (error: any) {
       const message = error.message || 'Không thể chốt kỳ sổ. Vui lòng kiểm tra kết nối và thử lại.';
       setSubmitError(message); if (message.toLowerCase().includes('pin')) { setPinError(message); setStep(2); }
@@ -90,7 +91,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({ 
           {submitError && <div className="tax-seal-error" role="alert">{submitError}</div>}<div className="tax-seal-notice"><Lock size={17} /><span>Hệ thống sẽ khóa dữ liệu và tạo chữ ký bảo mật để đảm bảo bản chốt không bị thay đổi.</span></div>
         </section>}
 
-        {sealedSnapshot && <section className="tax-seal-pane tax-seal-success" aria-labelledby="seal-success-title"><span className="tax-seal-success__icon"><Check size={30} /></span><span className="tax-seal-eyebrow">Hoàn tất</span><h3 id="seal-success-title">Đã chốt kỳ sổ thành công</h3><p>{periodLabel} đã được khóa và lưu an toàn. Bạn có thể tra cứu lại trong lịch sử chốt sổ.</p><div className="tax-seal-receipt"><div><span>Mã bản chốt</span><strong>{sealedSnapshot.id}</strong></div><div><span>Thời điểm</span><strong>{new Date(sealedSnapshot.finalizedAtUtc).toLocaleString('vi-VN')}</strong></div><div><span>Tổng thuế</span><strong>{formatMoney(sealedSnapshot.totalTaxAmount)}</strong></div><div className="tax-seal-receipt__signature"><span>Chữ ký bảo mật</span><code>{sealedSnapshot.auditSignatureHash || 'HMAC-SHA256-SERVER-CERTIFIED'}</code><button type="button" onClick={() => copyHash(sealedSnapshot.auditSignatureHash || '')} aria-label="Sao chép chữ ký">{isCopied ? <Check size={16} /> : <Copy size={16} />}</button></div></div></section>}
+        {sealedSnapshot && <section className="tax-seal-pane tax-seal-success" aria-labelledby="seal-success-title"><span className="tax-seal-success__icon"><Check size={30} /></span><span className="tax-seal-eyebrow">Hoàn tất</span><h3 id="seal-success-title">Đã chốt kỳ sổ thành công</h3><p>{periodLabel} đã được khóa và lưu an toàn. Bạn có thể tra cứu lại trong lịch sử chốt sổ.</p><div className="tax-seal-receipt"><div><span>Mã bản chốt</span><strong>{sealedSnapshot.id}</strong></div><div><span>Thời điểm</span><strong>{new Date(sealedSnapshot.finalizedAtUtc).toLocaleString('vi-VN')}</strong></div><div><span>Tổng thuế</span><strong>{formatMoney(sealedSnapshot.totalTaxAmount)}</strong></div><div className="tax-seal-receipt__signature"><span>Chữ ký bảo mật</span><code>{sealedSnapshot.auditSignatureHash || 'Chưa có chữ ký từ máy chủ'}</code><button type="button" disabled={!sealedSnapshot.auditSignatureHash} onClick={() => copyHash(sealedSnapshot.auditSignatureHash || '')} aria-label="Sao chép chữ ký">{isCopied ? <Check size={16} /> : <Copy size={16} />}</button></div></div></section>}
       </main>
 
       <footer className="tax-seal-footer">

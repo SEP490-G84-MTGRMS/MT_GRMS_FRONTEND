@@ -1,3 +1,6 @@
+import { isAxiosError } from 'axios';
+import { mapProblemDetailsToVietnamese } from '../../../api/problemDetailsMapper';
+import { useCashbookSubmissionKey } from '../hooks/useCashbookSubmissionKey';
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { CashAccount, FundTransferDTO } from '../types/cashbook.types';
@@ -7,7 +10,7 @@ interface InternalTransferModalProps {
   isOpen: boolean;
   accounts: CashAccount[];
   onClose: () => void;
-  onSubmit: (dto: FundTransferDTO) => Promise<void>;
+  onSubmit: (dto: FundTransferDTO, idempotencyKey: string) => Promise<void>;
 }
 
 const MAX_NOTE_LENGTH = 255;
@@ -24,6 +27,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
   const [transferFee, setTransferFee] = useState<number | ''>(0);
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const getSubmissionKey = useCashbookSubmissionKey(isOpen);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,6 +55,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMessage(null);
 
     const numAmount = Number(amount);
@@ -79,16 +84,17 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
 
     try {
       setIsSubmitting(true);
-      await onSubmit({
+      const dto: FundTransferDTO = {
         fromAccountId,
         toAccountId,
         amount: numAmount,
         transferFee: Number(transferFee) || 0,
         note: note.trim() || 'Chuyển tiền nội bộ',
-      });
+      };
+      await onSubmit(dto, getSubmissionKey(dto));
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Lỗi khi thực hiện chuyển quỹ');
+    } catch (err: unknown) {
+      setErrorMessage(isAxiosError(err) ? mapProblemDetailsToVietnamese(err) : err instanceof Error ? err.message : 'Lỗi khi thực hiện chuyển quỹ');
     } finally {
       setIsSubmitting(false);
     }

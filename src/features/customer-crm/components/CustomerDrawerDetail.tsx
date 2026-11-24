@@ -19,7 +19,7 @@ interface CustomerDrawerDetailProps {
   customer: CustomerDto | null;
   onClose: () => void;
   onOpenEdit: (customer: CustomerDto) => void;
-  onOpenCollect: (customer: CustomerDto) => void;
+  onOpenCollect?: (customer: CustomerDto) => void;
   onViewLedger?: (customer: CustomerDto) => void;
 }
 
@@ -332,7 +332,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
             <span>Chỉnh sửa hồ sơ</span>
           </button>
 
-          {hasDebt && (
+          {hasDebt && onOpenCollect && (
             <button
               onClick={() => onOpenCollect(customer)}
               className="btn-primary-pill"

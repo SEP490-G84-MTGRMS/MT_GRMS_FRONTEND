@@ -178,7 +178,7 @@ describe('Phase 1: Cashbook Page UI/UX Standardization Suite', () => {
     expect(financeLink.getAttribute('href')).toBe('/store-owner/finance?tab=overview');
 
     // Action buttons
-    expect(screen.getByRole('button', { name: /Kiểm kê két/i })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Kiểm kê két/i })).toBeNull();
     expect(screen.getByRole('button', { name: /Xuất Excel/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /Chuyển quỹ nội bộ/i })).toBeDefined();
     expect(screen.getByRole('button', { name: /Chi tiền/i })).toBeDefined();
@@ -229,7 +229,7 @@ describe('Phase 1: Cashbook Page UI/UX Standardization Suite', () => {
     expect(screen.getByText(/Hiển thị/i)).toBeDefined();
   });
 
-  it('5. Preserves modal triggers: opens Receipt, Payment, Transfer, Blind Audit, and Export modals', async () => {
+  it('5. Preserves modal triggers: opens Receipt, Payment, Transfer, and Export modals', async () => {
     renderComponent();
 
     await waitFor(() => {
@@ -258,15 +258,8 @@ describe('Phase 1: Cashbook Page UI/UX Standardization Suite', () => {
     });
     fireEvent.click(document.querySelector('.cb-btn-outline')!);
 
-    // 4. Open Blind Cash Audit Modal
-    fireEvent.click(screen.getByRole('button', { name: /Kiểm kê két/i }));
-    await waitFor(() => {
-      expect(screen.getByText(/Quy trình kiểm quỹ mù 3 bước/i)).toBeDefined();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Thoát/i }));
-
-    // 5. Open Export Modal
-    fireEvent.click(screen.getByRole('button', { name: /Xuất Excel/i }));
+    // 4. Open Export Modal
+    fireEvent.click(screen.getByText('Thao tác khác'));    fireEvent.click(screen.getByRole('button', { name: /Xuất Excel/i }));
     await waitFor(() => {
       expect(screen.getByText(/Xuất File Excel/i)).toBeDefined();
     });
@@ -332,21 +325,6 @@ describe('Phase 1: Cashbook Page UI/UX Standardization Suite', () => {
 
     await waitFor(() => {
       expect(document.querySelector('.printable-a4-sheet')).not.toBeNull();
-    });
-  });
-
-  it('8. Verifies date range filtering logic in local storage service', () => {
-    // Test that date filtering accurately includes and excludes dates
-    const res = cashbookService.getTransactionsFromLocal({
-      startDate: '2026-10-12',
-      endDate: '2026-10-13',
-    });
-
-    expect(res.items.length).toBeGreaterThan(0);
-    res.items.forEach((tx) => {
-      const day = tx.createdAt.slice(0, 10);
-      expect(day >= '2026-10-12').toBe(true);
-      expect(day <= '2026-10-13').toBe(true);
     });
   });
 });

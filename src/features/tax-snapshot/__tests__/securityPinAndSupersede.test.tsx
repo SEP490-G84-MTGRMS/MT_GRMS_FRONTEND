@@ -337,60 +337,10 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
       });
     });
 
-    it('rejects finalize in mock runner when period is locked and allowSupersedeExisting is false', async () => {
-      vi.mocked(financeHttpClient.post).mockRejectedValue(new Error('Network error fallback to mock'));
-
-      // 1. Chốt kỳ ban đầu cho Quý 4/2026 (Revision 0)
-      const firstSnapshot = await taxSnapshotApi.createSnapshot({
-        year: 2026,
-        periodType: TaxPeriodType.Quarter,
-        periodNumber: 4,
-        calculationMethod: TaxCalculationMethod.RevenuePercentage,
-        applyVatReduction2026: false,
-        pin: '1234',
-      });
-      expect(firstSnapshot.revisionNumber).toBe(0);
-
-      // 2. Chốt lại nhưng allowSupersedeExisting = false -> Ném lỗi TAX_PERIOD_LOCKED
-      await expect(
-        taxSnapshotApi.createSnapshot({
-          year: 2026,
-          periodType: TaxPeriodType.Quarter,
-          periodNumber: 4,
-          calculationMethod: TaxCalculationMethod.RevenuePercentage,
-          applyVatReduction2026: false,
-          pin: '1234',
-          allowSupersedeExisting: false,
-        })
-      ).rejects.toThrow(/Kỳ tính thuế.*đã được chốt và khóa sổ/);
-
-      // 3. Chốt lại có allowSupersedeExisting = true nhưng thiếu lý do -> Ném lỗi thiếu lý do
-      await expect(
-        taxSnapshotApi.createSnapshot({
-          year: 2026,
-          periodType: TaxPeriodType.Quarter,
-          periodNumber: 4,
-          calculationMethod: TaxCalculationMethod.RevenuePercentage,
-          applyVatReduction2026: false,
-          pin: '1234',
-          allowSupersedeExisting: true,
-          rectificationReason: '',
-        })
-      ).rejects.toThrow(/Bắt buộc phải nhập lý do thay thế/);
-
-      // 4. Chốt lại có allowSupersedeExisting = true và có lý do -> Thành công Revision 1
-      const superseded = await taxSnapshotApi.createSnapshot({
-        year: 2026,
-        periodType: TaxPeriodType.Quarter,
-        periodNumber: 4,
-        calculationMethod: TaxCalculationMethod.RevenuePercentage,
-        applyVatReduction2026: false,
-        pin: '1234',
-        allowSupersedeExisting: true,
-        rectificationReason: 'Điều chỉnh số liệu bổ sung Q4',
-      });
-      expect(superseded.revisionNumber).toBe(1);
-      expect(superseded.supersededSnapshotId).toBe(firstSnapshot.id);
+    it('surfaces a locked-period rejection from the server without creating a local snapshot', async () => {
+      vi.mocked(financeHttpClient.post).mockRejectedValue({ response: { data: { message: 'Kỳ tính thuế đã được chốt và khóa sổ.' } } });
+      await expect(taxSnapshotApi.createSnapshot({ year: 2026, periodType: TaxPeriodType.Quarter, periodNumber: 4,
+        calculationMethod: TaxCalculationMethod.RevenuePercentage, applyVatReduction2026: false, pin: '1234' })).rejects.toThrow('đã được chốt và khóa sổ');
     });
   });
 });

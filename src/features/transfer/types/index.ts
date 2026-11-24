@@ -48,6 +48,7 @@ export interface TransferOrder {
   toBranchName: string;
   createdBy: string;
   transferDate: string; // DD/MM/YYYY HH:mm
+  dispatchedAt?: string;
   receiveDate?: string;
   expectedDeliveryDate?: string;
   status: TransferStatus;

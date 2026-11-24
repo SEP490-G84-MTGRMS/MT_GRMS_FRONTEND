@@ -5,15 +5,12 @@ import type {
   CreateReceiptDTO,
   CreatePaymentDTO,
   FundTransferDTO,
-  CashReconciliationDTO,
   CashbookSummaryKPI,
-  CashTransitItem,
   TriageItem,
   ResolveTriageDTO,
 } from '../types/cashbook.types';
 import { financeHttpClient } from '../../../api/financeHttpClient';
 import { generateUuidV7 } from '../../../utils/uuid';
-import { posShiftApi } from '../../pos/api/posShiftApi';
 
 export interface BackendCashbookEntryResponse {
   id: string;
@@ -28,6 +25,7 @@ export interface BackendCashbookEntryResponse {
   sourceId?: string | null;
   referenceCode: string;
   auditHash: string;
+  isVoided?: boolean;
   description: string;
   occurredAtUtc: string;
   categoryCode?: string;
@@ -43,6 +41,9 @@ export interface BackendCashAccountResponse {
   accountName: string;
   accountType: 'CASH' | 'BANK';
   bankName?: string;
+  bankCode?: string;
+  accountHolderName?: string;
+  isDefaultForVietQr?: boolean;
   accountNumber?: string;
   currentBalance: number;
   initialBalance: number;
@@ -61,247 +62,6 @@ export interface BackendCashbookSummaryResponse {
   totalSafeDepositBalance: number;
 }
 
-const INITIAL_ACCOUNTS: CashAccount[] = [
-  {
-    id: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
-    branchId: 'BR-01',
-    branchName: 'Chi nhánh Quận 1 (Cửa hàng chính)',
-    accountName: 'Két tiền mặt quầy Q1',
-    accountType: 'CASH',
-    currentBalance: 12500000,
-    initialBalance: 10000000,
-    isActive: true,
-    currency: 'VND',
-    isSafeDeposit: false,
-  },
-  {
-    id: '01a19664-6238-7fb3-8bc6-2a2e444932ee',
-    branchId: 'BR-02',
-    branchName: 'Chi nhánh Quận 7',
-    accountName: 'Két tiền mặt quầy Q7',
-    accountType: 'CASH',
-    currentBalance: 8200000,
-    initialBalance: 5000000,
-    isActive: true,
-    currency: 'VND',
-    isSafeDeposit: false,
-  },
-  {
-    id: '01a19664-6492-7d10-9a82-54801db4f342',
-    branchId: 'ALL',
-    branchName: 'Toàn hệ thống (Chủ cửa hàng)',
-    accountName: 'Két sắt của chủ shop (Safe Deposit)',
-    accountType: 'CASH',
-    currentBalance: 150000000,
-    initialBalance: 120000000,
-    isActive: true,
-    currency: 'VND',
-    isSafeDeposit: true,
-  },
-  {
-    id: '01a19664-6741-7f3d-9be7-cb4c7b876559',
-    branchId: 'ALL',
-    branchName: 'Toàn hệ thống',
-    accountName: 'Vietcombank - TK Kinh doanh chính (VietQR)',
-    isDefault: true,
-    accountType: 'BANK',
-    bankName: 'Vietcombank (VCB)',
-    accountNumber: '0071001234567',
-    currentBalance: 145800000,
-    initialBalance: 100000000,
-    isActive: true,
-    currency: 'VND',
-  },
-];
-
-const INITIAL_TRANSITS: CashTransitItem[] = [
-  {
-    id: 'TR-001',
-    transferCode: 'TRANSIT-20261027-01',
-    fromAccountId: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
-    fromAccountName: 'Két tiền mặt quầy Q1',
-    toAccountId: '01a19664-6492-7d10-9a82-54801db4f342',
-    toAccountName: 'Két sắt của chủ shop',
-    amount: 10350000,
-    senderName: 'Thu ngân Ca sáng (Trần Thị Lan)',
-    sentAt: '2026-10-27T04:30:00Z',
-    status: 'PENDING',
-    note: 'Nộp tiền mặt doanh thu bán hàng ca sáng về két sắt chủ shop',
-  },
-];
-
-const INITIAL_TRANSACTIONS: LedgerTransaction[] = [
-  {
-    id: 'TX-001',
-    transactionCode: 'PT-20261014-001',
-    accountId: 'ACC-01',
-    accountName: 'Két tiền mặt quầy Q1',
-    branchId: 'BR-01',
-    transactionType: 'RECEIPT',
-    category: 'Doanh thu bán hàng POS',
-    amount: 1450000,
-    balanceAfter: 12500000,
-    counterpartyType: 'CUSTOMER',
-    counterpartyName: 'Khách lẻ POS #8821',
-    description: 'Thanh toán tiền mặt hóa đơn POS-8821',
-    referenceDocType: 'POS_ORDER',
-    referenceDocId: 'ORD-8821',
-    isAutomated: true,
-    createdBy: 'Thu ngân Ca 1',
-    createdAt: '2026-10-14T01:15:00Z',
-  },
-  {
-    id: 'TX-002',
-    transactionCode: 'PC-20261013-004',
-    accountId: 'ACC-01',
-    accountName: 'Két tiền mặt quầy Q1',
-    branchId: 'BR-01',
-    transactionType: 'PAYMENT',
-    category: 'Chi phí vận hành',
-    amount: 350000,
-    balanceAfter: 11050000,
-    counterpartyType: 'SUPPLIER',
-    counterpartyName: 'Điện lực EVN',
-    description: 'Tiền điện sinh hoạt cửa hàng Q1 tháng 10',
-    referenceDocType: 'SERVICE_EXPENSE',
-    referenceDocId: 'EXP-1092',
-    isAutomated: true,
-    createdBy: 'Nguyễn Trường An',
-    createdAt: '2026-10-13T14:30:00Z',
-  },
-  {
-    id: 'TX-003',
-    transactionCode: 'PT-20261013-003',
-    accountId: 'ACC-03',
-    accountName: 'Vietcombank - TK Thu Bán Hàng',
-    branchId: 'ALL',
-    transactionType: 'RECEIPT',
-    category: 'Thu nợ khách hàng',
-    amount: 15000000,
-    balanceAfter: 145800000,
-    counterpartyType: 'CUSTOMER',
-    counterpartyName: 'Đại lý Minh Phát',
-    description: 'Khách hàng thanh toán công nợ đơn buôn',
-    referenceDocType: 'MANUAL',
-    isAutomated: false,
-    createdBy: 'Nguyễn Trường An',
-    createdAt: '2026-10-13T10:00:00Z',
-  },
-  {
-    id: 'TX-004',
-    transactionCode: 'PC-20261012-002',
-    accountId: 'ACC-04',
-    accountName: 'Techcombank - TK Chi Trả NCC',
-    branchId: 'ALL',
-    transactionType: 'PAYMENT',
-    category: 'Thanh toán nhập hàng NCC',
-    amount: 1850000,
-    balanceAfter: 32450000,
-    counterpartyType: 'SUPPLIER',
-    counterpartyName: 'Công ty Cổ phần Vinamilk',
-    description: 'Thanh toán tiền hàng PO-202610-09',
-    referenceDocType: 'PURCHASE_ORDER',
-    referenceDocId: 'PO-202610-09',
-    isAutomated: true,
-    createdBy: 'Kế toán trưởng',
-    createdAt: '2026-10-12T09:15:00Z',
-  },
-  {
-    id: 'TX-005',
-    transactionCode: 'KK-20261011-001',
-    accountId: 'ACC-02',
-    accountName: 'Két tiền mặt quầy Q7',
-    branchId: 'BR-02',
-    transactionType: 'ADJUSTMENT',
-    category: 'Kiểm kê chênh lệch két',
-    amount: -50000,
-    balanceAfter: 8200000,
-    counterpartyType: 'OTHER',
-    counterpartyName: 'Hội đồng kiểm kê Q7',
-    description: 'Chênh lệch âm do hoàn tiền thối nhầm ca trưa',
-    referenceDocType: 'AUDIT',
-    isAutomated: false,
-    createdBy: 'Quản lý Q7',
-    createdAt: '2026-10-11T21:00:00Z',
-  },
-  {
-    id: 'TX-006',
-    transactionCode: 'PT-20261114-001',
-    accountId: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
-    accountName: 'Két tiền mặt quầy Q1',
-    branchId: 'BR-01',
-    transactionType: 'RECEIPT',
-    category: 'Doanh thu bán lẻ POS',
-    amount: 2450000,
-    balanceAfter: 12500000,
-    counterpartyType: 'CUSTOMER',
-    counterpartyName: 'Khách mua tại quầy #1102',
-    description: 'Thanh toán tiền mặt đơn hàng POS #1102',
-    referenceDocType: 'POS_ORDER',
-    referenceDocId: 'ORD-1102',
-    sourceModuleName: 'POS_RETAIL',
-    isAutomated: true,
-    createdBy: 'Thu ngân Ca sáng',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'TX-007',
-    transactionCode: 'PC-20261114-002',
-    accountId: '01a19664-6210-7b12-a9eb-6fa16ca5b9db',
-    accountName: 'Két tiền mặt quầy Q1',
-    branchId: 'BR-01',
-    transactionType: 'PAYMENT',
-    category: 'Chi phí vận hành',
-    amount: 150000,
-    balanceAfter: 12350000,
-    counterpartyType: 'SUPPLIER',
-    counterpartyName: 'Văn phòng phẩm An Phát',
-    description: 'Mua giấy in hóa đơn nhiệt cho quầy thu ngân',
-    referenceDocType: 'SERVICE_EXPENSE',
-    referenceDocId: 'EXP-1105',
-    sourceModuleName: 'SERVICE_OPEX',
-    isAutomated: false,
-    createdBy: 'Cửa hàng trưởng',
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-  },
-];
-
-const STORAGE_KEYS = {
-  ACCOUNTS: 'mt_grms_cash_accounts_v2',
-  TRANSACTIONS: 'mt_grms_cash_transactions_v2',
-  TRANSITS: 'mt_grms_cash_transits_v2',
-  TRIAGE: 'mt_grms_cash_triage_v2',
-};
-
-/**
- * Checks if mock mode should be used (Test runner or explicit env flag)
- */
-function isMockMode(): boolean {
-  return import.meta.env.MODE === 'test';
-}
-
-function loadState<T>(key: string, defaultValue: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return defaultValue;
-    return JSON.parse(raw) as T;
-  } catch (error) {
-    console.error(`Error loading state for ${key}:`, error);
-    return defaultValue;
-  }
-}
-
-function saveState<T>(key: string, value: T): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Error saving state for ${key}:`, error);
-  }
-}
-
-/**
- * Adapter that maps Backend CashbookEntryResponse to Frontend LedgerTransaction
- */
 function mapBackendEntryToLedgerTransaction(
   entry: BackendCashbookEntryResponse,
   accountNameLookup?: string
@@ -414,6 +174,7 @@ function mapBackendEntryToLedgerTransaction(
     taxTreatment: entry.taxTreatment,
     taxTreatmentReason: entry.taxTreatmentReason || undefined,
     isAutomated: entry.sourceType !== 'MANUAL',
+    isVoided: entry.isVoided,
     isCompensating,
     originalEntryId: isCompensating ? entry.sourceId || undefined : undefined,
     linkedTransactionId: isCompensating || isInternalTransfer ? entry.sourceId || undefined : undefined,
@@ -424,24 +185,15 @@ function mapBackendEntryToLedgerTransaction(
 
 export const cashbookService = {
   /**
-   * Retrieves all cash, safe, and bank accounts from Backend, with local fallback
+   * Retrieves all cash, safe, and bank accounts from Backend
    */
   async getCashAccounts(branchId?: string): Promise<CashAccount[]> {
-    if (isMockMode()) {
-      const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-      const filtered = accounts.filter((a) => a.id !== "01a19664-6761-78c3-b60a-cc460c68c51c");
-      if (!branchId || branchId === "ALL") {
-        return filtered;
-      }
-      return filtered.filter((acc) => acc.branchId === branchId || acc.branchId === "ALL");
-    }
-
     const params = branchId && branchId !== "ALL" ? { branchId } : {};
     const res = await financeHttpClient.get<{ data: BackendCashAccountResponse[] }>("/cashbook/accounts", { params });
-    const backendAccounts = res.data?.data || [];
+    const backendAccounts = res.data.data;
 
     return backendAccounts
-      .filter((b) => b.isActive && b.id !== "01a19664-6761-78c3-b60a-cc460c68c51c")
+      .filter((b) => b.isActive)
       .map((b) => ({
         id: b.id,
         branchId: b.branchId || "ALL",
@@ -449,13 +201,15 @@ export const cashbookService = {
         accountName: b.accountName,
         accountType: b.accountType,
         bankName: b.bankName,
+        bankCode: b.bankCode,
+        accountHolderName: b.accountHolderName,
         accountNumber: b.accountNumber,
         currentBalance: Number(b.currentBalance),
         initialBalance: Number(b.initialBalance),
         isActive: b.isActive,
         currency: b.currency || "VND",
         isSafeDeposit: b.isSafeDeposit,
-        isDefault: b.accountType === "BANK",
+        isDefault: b.isDefaultForVietQr === true,
       }));
   },
 
@@ -468,167 +222,6 @@ export const cashbookService = {
   },
 
   /**
-   * Retrieves Cash Transit transfers (Tiền đang chuyển về két sắt)
-   * Connects to POS live pending movements API with local storage fallback
-   */
-  async getCashTransits(branchId?: string): Promise<CashTransitItem[]> {
-    try {
-      const branchParam = branchId === 'ALL' ? undefined : branchId;
-      const res = await posShiftApi.getPendingMovements(branchParam);
-      if (res?.movements && res.movements.length > 0) {
-        const drops = res.movements.filter(
-          (m) => (m.category === 'CASH_DRAW' || (m.category as unknown) === 2) && !m.isConfirmedByOwner
-        );
-        if (drops.length > 0) {
-          return drops.map((d) => ({
-            id: d.id,
-            transferCode: `CD-${d.id.substring(0, 8).toUpperCase()}`,
-            amount: d.amount,
-            fromAccountId: 'POS_TILL',
-            fromAccountName: d.createdByName ? `Két quầy (${d.createdByName})` : 'Két quầy thu ngân',
-            toAccountId: 'ACC-SAFE-01',
-            toAccountName: 'Két sắt trung tâm',
-            senderName: d.createdByName || 'Thu ngân',
-            sentAt: d.occurredAtUtc || new Date().toISOString(),
-            status: 'PENDING',
-            note: d.reason || 'Rút két nộp tiền về két sắt',
-          }));
-        }
-      }
-    } catch (e) {
-      console.warn('Lỗi tải pending cash transit từ POS API, fallback local:', e);
-    }
-    return loadState<CashTransitItem[]>(STORAGE_KEYS.TRANSITS, isMockMode() ? INITIAL_TRANSITS : []);
-  },
-
-  /**
-   * Confirms a Cash Transit has been received into the Safe Deposit
-   */
-  async confirmTransitReceived(transitId: string, performedBy = 'Chủ shop'): Promise<void> {
-    try {
-      await posShiftApi.confirmCashDrop(transitId);
-    } catch (posErr) {
-      console.warn('Xác nhận drop trên POS API bỏ qua hoặc lỗi (có thể là local mock):', posErr);
-    }
-
-    const transits = await this.getCashTransits();
-    const tIndex = transits.findIndex((t) => t.id === transitId);
-    if (tIndex !== -1) {
-      const transit = transits[tIndex];
-      transit.status = 'RECEIVED';
-      transits[tIndex] = transit;
-      saveState(STORAGE_KEYS.TRANSITS, transits);
-
-      await this.createReceipt({
-        accountId: transit.toAccountId,
-        amount: transit.amount,
-        category: 'Tiền mặt chuyển về két sắt',
-        counterpartyType: 'INTERNAL',
-        counterpartyName: transit.fromAccountName,
-        description: `[ĐÃ NHẬN ĐỦ KÉT SẮT] Bởi ${performedBy} từ ${transit.fromAccountName} (Mã chuyển: ${transit.transferCode})`,
-        categoryCode: 'INTERNAL_REIMBURSEMENT',
-        taxTreatment: 'NonTaxableReceipt',
-        referenceDocType: 'CASH_TRANSIT',
-        referenceDocId: transit.id,
-        sourceModuleName: 'INTERNAL_TRANSFER',
-        isAutomated: true,
-      });
-    }
-  },
-
-  /**
-   * Reports a discrepancy in cash transit
-   */
-  async reportTransitDiscrepancy(transitId: string, note: string): Promise<void> {
-    const transits = await this.getCashTransits();
-    const tIndex = transits.findIndex((t) => t.id === transitId);
-    if (tIndex === -1) throw new Error('Không tìm thấy khoản chuyển tiền');
-
-    transits[tIndex].status = 'DISCREPANCY';
-    transits[tIndex].note = note;
-    saveState(STORAGE_KEYS.TRANSITS, transits);
-  },
-
-  /**
-   * Retrieves paginated transactions from local state (Fallback & Testing)
-   */
-  getTransactionsFromLocal(
-    params: CashbookFilterParams = {},
-    page = 1,
-    pageSize = 10
-  ): { items: LedgerTransaction[]; totalItems: number } {
-    const all = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, isMockMode() ? INITIAL_TRANSACTIONS : []);
-
-    let filtered = [...all];
-
-    if (params.branchId && params.branchId !== 'ALL') {
-      filtered = filtered.filter((tx) => tx.branchId === params.branchId || tx.branchId === 'ALL');
-    }
-
-    if (params.accountId && params.accountId !== 'ALL') {
-      filtered = filtered.filter((tx) => tx.accountId === params.accountId);
-    }
-
-    if (params.sourceType) {
-      filtered = filtered.filter(
-        (tx) =>
-          tx.sourceType === params.sourceType ||
-          tx.sourceModuleName === params.sourceType ||
-          tx.referenceDocType === params.sourceType
-      );
-    } else if (params.transactionType && params.transactionType !== 'ALL') {
-      filtered = filtered.filter((tx) => tx.transactionType === params.transactionType);
-    }
-
-    if (params.searchQuery && params.searchQuery.trim()) {
-      const q = params.searchQuery.trim().toLowerCase();
-      filtered = filtered.filter(
-        (tx) =>
-          tx.transactionCode.toLowerCase().includes(q) ||
-          tx.counterpartyName.toLowerCase().includes(q) ||
-          tx.description.toLowerCase().includes(q) ||
-          tx.category.toLowerCase().includes(q) ||
-          (tx.referenceDocId && tx.referenceDocId.toLowerCase().includes(q)) ||
-          (tx.sourceId && tx.sourceId.toLowerCase().includes(q)) ||
-          (tx.id && tx.id.toLowerCase().includes(q))
-      );
-    }
-
-    if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
-      const cq = params.counterpartyQuery.trim().toLowerCase();
-      filtered = filtered.filter((tx) => tx.counterpartyName?.toLowerCase().includes(cq));
-    }
-
-    if (params.status && params.status !== 'ALL') {
-      if (params.status === 'VOIDED') {
-        filtered = filtered.filter((tx) => tx.isVoided);
-      } else if (params.status === 'COMPENSATING') {
-        filtered = filtered.filter((tx) => tx.isCompensating);
-      } else if (params.status === 'ACTIVE') {
-        filtered = filtered.filter((tx) => !tx.isVoided && !tx.isCompensating);
-      }
-    }
-
-    if (params.startDate) {
-      const startStr = params.startDate.slice(0, 10);
-      filtered = filtered.filter((tx) => tx.createdAt.slice(0, 10) >= startStr);
-    }
-
-    if (params.endDate) {
-      const endStr = params.endDate.slice(0, 10);
-      filtered = filtered.filter((tx) => tx.createdAt.slice(0, 10) <= endStr);
-    }
-
-    filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    const totalItems = filtered.length;
-    const startIndex = (page - 1) * pageSize;
-    const items = filtered.slice(startIndex, startIndex + pageSize);
-
-    return { items, totalItems };
-  },
-
-  /**
    * Retrieves paginated transactions with flexible filtering from Backend
    */
   async getTransactions(
@@ -636,386 +229,122 @@ export const cashbookService = {
     page = 1,
     pageSize = 10
   ): Promise<{ items: LedgerTransaction[]; totalItems: number }> {
-    if (isMockMode()) {
-      return this.getTransactionsFromLocal(params, page, pageSize);
-    }
+    const queryParams: Record<string, unknown> = { page, pageSize };
+    if (params.accountId && params.accountId !== 'ALL') queryParams.accountId = params.accountId;
+    if (params.branchId && params.branchId !== 'ALL') queryParams.branchId = params.branchId;
+    if (params.startDate) queryParams.fromDate = params.startDate + 'T00:00:00+07:00';
+    if (params.endDate) queryParams.toDate = params.endDate + 'T23:59:59.999999+07:00';
+    if (params.sourceType) queryParams.sourceType = params.sourceType;
+    else if (params.transactionType === 'ADJUSTMENT') queryParams.sourceType = 'ADJUSTMENT';
+    else if (params.transactionType && params.transactionType !== 'ALL') queryParams.entryType = params.transactionType;
+    if (params.status && params.status !== 'ALL') queryParams.status = params.status;
+    if (params.searchQuery?.trim()) queryParams.keyword = params.searchQuery.trim();
+    if (params.counterpartyQuery?.trim()) queryParams.counterparty = params.counterpartyQuery.trim();
 
-    try {
-      const queryParams: Record<string, unknown> = { page, pageSize };
-      if (params.accountId && params.accountId !== 'ALL') queryParams.accountId = params.accountId;
-      if (params.branchId && params.branchId !== 'ALL') queryParams.branchId = params.branchId;
-      if (params.startDate) queryParams.fromDate = params.startDate;
-      if (params.endDate) queryParams.toDate = params.endDate;
-      if (params.transactionType && params.transactionType !== 'ALL') {
-        queryParams.entryType = params.transactionType;
-      }
-      if (params.sourceType) queryParams.sourceType = params.sourceType;
-      if (params.searchQuery && params.searchQuery.trim()) {
-        queryParams.keyword = params.searchQuery.trim();
-      } else if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
-        queryParams.keyword = params.counterpartyQuery.trim();
-      }
-
-      const res = await financeHttpClient.get<{ data: BackendCashbookEntryResponse[] }>('/cashbook/entries', {
-        params: queryParams,
-      });
-      const backendEntries = res.data?.data || [];
-
-      const accounts = await this.getCashAccounts();
-      const accountMap = new Map<string, string>();
-      accounts.forEach((a) => accountMap.set(a.id, a.accountName));
-
-      let mappedItems: LedgerTransaction[] = backendEntries.map((e) =>
-        mapBackendEntryToLedgerTransaction(e, accountMap.get(e.accountId))
-      );
-
-      // Check if user has offline pending transactions in local storage
-      if (mappedItems.length === 0) {
-        const localTx = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
-        if (localTx.length > 0) {
-          return this.getTransactionsFromLocal(params, page, pageSize);
-        }
-      }
-
-      if (params.sourceType) {
-        mappedItems = mappedItems.filter(
-          (tx) =>
-            tx.sourceType === params.sourceType ||
-            tx.sourceModuleName === params.sourceType ||
-            tx.referenceDocType === params.sourceType
-        );
-      } else if (params.transactionType && params.transactionType !== 'ALL') {
-        mappedItems = mappedItems.filter((tx) => tx.transactionType === params.transactionType);
-      }
-
-      if (params.searchQuery && params.searchQuery.trim()) {
-        const q = params.searchQuery.trim().toLowerCase();
-        mappedItems = mappedItems.filter(
-          (tx) =>
-            tx.transactionCode.toLowerCase().includes(q) ||
-            tx.counterpartyName.toLowerCase().includes(q) ||
-            tx.description.toLowerCase().includes(q) ||
-            tx.category.toLowerCase().includes(q) ||
-            (tx.referenceDocId && tx.referenceDocId.toLowerCase().includes(q)) ||
-            (tx.sourceId && tx.sourceId.toLowerCase().includes(q)) ||
-            (tx.id && tx.id.toLowerCase().includes(q))
-        );
-      }
-
-      if (params.counterpartyQuery && params.counterpartyQuery.trim()) {
-        const cq = params.counterpartyQuery.trim().toLowerCase();
-        mappedItems = mappedItems.filter((tx) =>
-          tx.counterpartyName?.toLowerCase().includes(cq)
-        );
-      }
-
-      if (params.status && params.status !== 'ALL') {
-        if (params.status === 'VOIDED') {
-          mappedItems = mappedItems.filter((tx) => tx.isVoided);
-        } else if (params.status === 'COMPENSATING') {
-          mappedItems = mappedItems.filter((tx) => tx.isCompensating);
-        } else if (params.status === 'ACTIVE') {
-          mappedItems = mappedItems.filter((tx) => !tx.isVoided && !tx.isCompensating);
-        }
-      }
-
-      return {
-        items: mappedItems,
-        totalItems: mappedItems.length,
-      };
-    } catch (err) {
-      console.warn('Backend /cashbook/entries unreachable, falling back to local storage:', err);
-      return this.getTransactionsFromLocal(params, page, pageSize);
-    }
+    const res = await financeHttpClient.get<{ data: BackendCashbookEntryResponse[]; totalItems?: number }>(
+      '/cashbook/entries', { params: queryParams }
+    );
+    const entries = res.data.data;
+    const accounts = entries.length ? await this.getCashAccounts() : [];
+    const accountMap = new Map(accounts.map((account) => [account.id, account.accountName]));
+    return {
+      items: entries.map((entry) => mapBackendEntryToLedgerTransaction(entry, accountMap.get(entry.accountId))),
+      totalItems: res.data.totalItems ?? entries.length,
+    };
   },
 
   /**
    * Records a manual cash/bank receipt (Phiếu Thu)
    */
-  async createReceipt(dto: CreateReceiptDTO): Promise<LedgerTransaction> {
+  async createReceipt(dto: CreateReceiptDTO, idempotencyKey = generateUuidV7()): Promise<LedgerTransaction> {
     if (dto.amount <= 0) {
       throw new Error('Số tiền thu phải lớn hơn 0');
     }
 
-    if (!isMockMode()) {
-      const idempotencyKey = generateUuidV7();
-      const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
-        '/cashbook/receipts',
-        {
-          accountId: dto.accountId,
-          amount: dto.amount,
-          category: dto.category,
-          categoryCode: dto.categoryCode,
-          taxTreatment: dto.taxTreatment,
-          taxTreatmentReason: dto.taxTreatmentReason,
-          description: dto.description,
-          referenceCode: dto.referenceDocId,
-        },
-        {
-          headers: { 'Idempotency-Key': idempotencyKey },
-        }
-      );
-      return mapBackendEntryToLedgerTransaction(res.data.data);
-    }
-
-    const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    const targetAccountIndex = accounts.findIndex((a) => a.id === dto.accountId);
-
-    if (targetAccountIndex === -1) {
-      throw new Error('Tài khoản thụ hưởng không tồn tại');
-    }
-
-    const targetAccount = accounts[targetAccountIndex];
-    const newBalance = targetAccount.currentBalance + dto.amount;
-    targetAccount.currentBalance = newBalance;
-    accounts[targetAccountIndex] = targetAccount;
-    saveState(STORAGE_KEYS.ACCOUNTS, accounts);
-
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const randCode = Math.floor(100 + Math.random() * 900);
-
-    const newTx: LedgerTransaction = {
-      id: `TX-${Date.now()}`,
-      transactionCode: `PT-${dateStr}-${randCode}`,
-      accountId: targetAccount.id,
-      accountName: targetAccount.accountName,
-      branchId: targetAccount.branchId,
-      transactionType: 'RECEIPT',
-      category: dto.category,
-      categoryCode: dto.categoryCode,
-      taxTreatment: dto.taxTreatment,
-      taxTreatmentReason: dto.taxTreatmentReason,
-      amount: dto.amount,
-      balanceAfter: newBalance,
-      counterpartyType: dto.counterpartyType,
-      counterpartyName: dto.counterpartyName,
-      description: dto.description,
-      referenceDocType: dto.referenceDocType || 'MANUAL',
-      referenceDocId: dto.referenceDocId,
-      sourceModuleName: dto.sourceModuleName || 'MANUAL',
-      isAutomated: dto.isAutomated ?? false,
-      createdBy: 'Nguyễn Trường An',
-      createdAt: now.toISOString(),
-    };
-
-    const transactions = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
-    transactions.unshift(newTx);
-    saveState(STORAGE_KEYS.TRANSACTIONS, transactions);
-
-    return newTx;
+    const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
+      '/cashbook/receipts',
+      {
+        accountId: dto.accountId,
+        amount: dto.amount,
+        category: dto.category,
+        categoryCode: dto.categoryCode,
+        taxTreatment: dto.taxTreatment,
+        taxTreatmentReason: dto.taxTreatmentReason,
+        description: dto.description,
+        referenceCode: dto.referenceDocId,
+      },
+      {
+        headers: { 'Idempotency-Key': idempotencyKey },
+      }
+    );
+    return mapBackendEntryToLedgerTransaction(res.data.data);
   },
 
   /**
    * Records a cash/bank payment (Phiếu Chi) with strict GBR-CSH-03 zero-overdraft check
    */
-  async createPayment(dto: CreatePaymentDTO): Promise<LedgerTransaction> {
+  async createPayment(dto: CreatePaymentDTO, idempotencyKey = generateUuidV7()): Promise<LedgerTransaction> {
     if (dto.amount <= 0) {
       throw new Error('Số tiền chi phải lớn hơn 0');
     }
 
-    if (!isMockMode()) {
-      const idempotencyKey = generateUuidV7();
-      if (dto.categoryCode === 'TAX_PAYMENT') {
-        if (!dto.referenceDocId?.trim()) {
-          throw new Error('Nộp thuế bắt buộc có số giấy nộp tiền hoặc mã giao dịch ngân hàng');
-        }
-        const taxRes = await financeHttpClient.post<{ data: { entry: BackendCashbookEntryResponse } }>(
-          '/cashbook/tax-payments',
-          {
-            sourceAccountId: dto.accountId,
-            amount: dto.amount,
-            beneficiaryName: dto.counterpartyName,
-            paymentReference: dto.referenceDocId.trim(),
-            evidenceAttachmentUrl: null,
-            householdTaxSnapshotId: null,
-            note: dto.description,
-          },
-          { headers: { 'Idempotency-Key': idempotencyKey } }
-        );
-        return mapBackendEntryToLedgerTransaction(taxRes.data.data.entry);
+    if (dto.categoryCode === 'TAX_PAYMENT') {
+      if (!dto.referenceDocId?.trim()) {
+        throw new Error('Nộp thuế bắt buộc có số giấy nộp tiền hoặc mã giao dịch ngân hàng');
       }
-      const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
-        '/cashbook/payments',
+      const taxRes = await financeHttpClient.post<{ data: { entry: BackendCashbookEntryResponse } }>(
+        '/cashbook/tax-payments',
         {
-          accountId: dto.accountId,
+          sourceAccountId: dto.accountId,
           amount: dto.amount,
-          category: dto.category,
-          categoryCode: dto.categoryCode,
-          taxTreatment: dto.taxTreatment,
-          taxTreatmentReason: dto.taxTreatmentReason,
-          description: dto.description,
-          referenceCode: dto.referenceDocId,
+          beneficiaryName: dto.counterpartyName,
+          paymentReference: dto.referenceDocId.trim(),
+          evidenceAttachmentUrl: null,
+          householdTaxSnapshotId: null,
+          note: dto.description,
         },
-        {
-          headers: { 'Idempotency-Key': idempotencyKey },
-        }
+        { headers: { 'Idempotency-Key': idempotencyKey } }
       );
-      return mapBackendEntryToLedgerTransaction(res.data.data);
+      return mapBackendEntryToLedgerTransaction(taxRes.data.data.entry);
     }
-
-    const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    const targetAccountIndex = accounts.findIndex((a) => a.id === dto.accountId);
-
-    if (targetAccountIndex === -1) {
-      throw new Error('Tài khoản xuất tiền không tồn tại');
-    }
-
-    const targetAccount = accounts[targetAccountIndex];
-
-    // Business Rule GBR-CSH-03: Chặn âm quỹ két tiền mặt
-    if (targetAccount.accountType === 'CASH' && dto.amount > targetAccount.currentBalance) {
-      throw new Error(
-        `Số tiền chi (${dto.amount.toLocaleString('vi-VN')} đ) vượt quá số dư két hiện có (${targetAccount.currentBalance.toLocaleString('vi-VN')} đ). Quy tắc Poka-yoke GBR-CSH-03 không cho phép âm két tiền mặt.`
-      );
-    }
-
-    const newBalance = targetAccount.currentBalance - dto.amount;
-    targetAccount.currentBalance = newBalance;
-    accounts[targetAccountIndex] = targetAccount;
-    saveState(STORAGE_KEYS.ACCOUNTS, accounts);
-
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const randCode = Math.floor(100 + Math.random() * 900);
-
-    const newTx: LedgerTransaction = {
-      id: `TX-${Date.now()}`,
-      transactionCode: `PC-${dateStr}-${randCode}`,
-      accountId: targetAccount.id,
-      accountName: targetAccount.accountName,
-      branchId: targetAccount.branchId,
-      transactionType: 'PAYMENT',
-      category: dto.category,
-      categoryCode: dto.categoryCode,
-      taxTreatment: dto.taxTreatment,
-      taxTreatmentReason: dto.taxTreatmentReason,
-      amount: dto.amount,
-      balanceAfter: newBalance,
-      counterpartyType: dto.counterpartyType,
-      counterpartyName: dto.counterpartyName,
-      description: dto.description,
-      referenceDocType: dto.referenceDocType || 'MANUAL',
-      referenceDocId: dto.referenceDocId,
-      sourceModuleName: dto.sourceModuleName || 'MANUAL',
-      isAutomated: dto.isAutomated ?? false,
-      createdBy: 'Nguyễn Trường An',
-      createdAt: now.toISOString(),
-    };
-
-    const transactions = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
-    transactions.unshift(newTx);
-    saveState(STORAGE_KEYS.TRANSACTIONS, transactions);
-
-    return newTx;
+    const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
+      '/cashbook/payments',
+      {
+        accountId: dto.accountId,
+        amount: dto.amount,
+        category: dto.category,
+        categoryCode: dto.categoryCode,
+        taxTreatment: dto.taxTreatment,
+        taxTreatmentReason: dto.taxTreatmentReason,
+        description: dto.description,
+        referenceCode: dto.referenceDocId,
+      },
+      {
+        headers: { 'Idempotency-Key': idempotencyKey },
+      }
+    );
+    return mapBackendEntryToLedgerTransaction(res.data.data);
   },
 
   /**
    * Voids an existing ledger entry by creating an opposite Compensating Entry
    */
-  async voidTransaction(
-    transactionId: string,
-    reason: string,
-    performedBy = 'Nguyễn Trường An'
-  ): Promise<LedgerTransaction> {
-    if (!isMockMode()) {
-      try {
-        const idempotencyKey = generateUuidV7();
-        const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
-          `/cashbook/entries/${transactionId}/void`,
-          { reason: reason.trim() },
-          {
-            headers: { 'Idempotency-Key': idempotencyKey },
-          }
-        );
-        return mapBackendEntryToLedgerTransaction(res.data.data);
-      } catch (err) {
-        console.warn('Backend void failed, falling back to local:', err);
+  async voidTransaction(transactionId: string, reason: string): Promise<LedgerTransaction> {
+    const idempotencyKey = generateUuidV7();
+    const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse }>(
+      `/cashbook/entries/${transactionId}/void`,
+      { reason: reason.trim() },
+      {
+        headers: { 'Idempotency-Key': idempotencyKey },
       }
-    }
-    const transactions = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
-    const origIndex = transactions.findIndex((tx) => tx.id === transactionId);
-
-    if (origIndex === -1) {
-      throw new Error('Không tìm thấy bút toán cần hủy');
-    }
-
-    const origTx = transactions[origIndex];
-    if (origTx.isVoided) {
-      throw new Error('Bút toán này đã được gạch bỏ trước đó');
-    }
-
-    const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    const accIndex = accounts.findIndex((a) => a.id === origTx.accountId);
-    if (accIndex === -1) {
-      throw new Error('Tài khoản sổ cái liên kết không tồn tại');
-    }
-
-    const targetAccount = accounts[accIndex];
-
-    let balanceDelta = 0;
-    let compType: LedgerTransaction['transactionType'] = 'PAYMENT';
-
-    if (origTx.transactionType === 'PAYMENT') {
-      balanceDelta = origTx.amount;
-      compType = 'RECEIPT';
-    } else if (origTx.transactionType === 'RECEIPT') {
-      if (targetAccount.accountType === 'CASH' && targetAccount.currentBalance < origTx.amount) {
-        throw new Error('Không thể hủy phiếu thu: Số dư hiện tại không đủ để hoàn lại!');
-      }
-      balanceDelta = -origTx.amount;
-      compType = 'PAYMENT';
-    } else {
-      balanceDelta = -origTx.amount;
-      compType = 'ADJUSTMENT';
-    }
-
-    targetAccount.currentBalance += balanceDelta;
-    accounts[accIndex] = targetAccount;
-    saveState(STORAGE_KEYS.ACCOUNTS, accounts);
-
-    origTx.isVoided = true;
-    origTx.voidReason = reason;
-    transactions[origIndex] = origTx;
-
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const randCode = Math.floor(100 + Math.random() * 900);
-
-    const compTx: LedgerTransaction = {
-      id: `TX-COMP-${Date.now()}`,
-      transactionCode: `GB-${dateStr}-${randCode}`,
-      accountId: targetAccount.id,
-      accountName: targetAccount.accountName,
-      branchId: targetAccount.branchId,
-      transactionType: compType,
-      category: `Gạch bỏ [${origTx.transactionCode}]`,
-      amount: compType === 'RECEIPT' ? Math.abs(origTx.amount) : -Math.abs(origTx.amount),
-      balanceAfter: targetAccount.currentBalance,
-      counterpartyType: origTx.counterpartyType,
-      counterpartyName: origTx.counterpartyName,
-      description: `[BÚT TOÁN GẠCH BỎ] Lý do: ${reason}. Bù trừ cho phiếu gốc ${origTx.transactionCode}`,
-      referenceDocType: 'COMPENSATING',
-      referenceDocId: origTx.id,
-      sourceModuleName: origTx.sourceModuleName,
-      linkedTransactionId: origTx.id,
-      isAutomated: false,
-      isCompensating: true,
-      originalEntryId: origTx.id,
-      createdBy: performedBy,
-      createdAt: now.toISOString(),
-    };
-
-    transactions.unshift(compTx);
-    saveState(STORAGE_KEYS.TRANSACTIONS, transactions);
-
-    return compTx;
+    );
+    return mapBackendEntryToLedgerTransaction(res.data.data);
   },
 
   /**
    * Transfers funds between two cash/bank accounts (Chuyển tiền nội bộ)
    */
-  async transferFunds(dto: FundTransferDTO): Promise<{ payment: LedgerTransaction; receipt: LedgerTransaction }> {
+  async transferFunds(dto: FundTransferDTO, idempotencyKey = generateUuidV7()): Promise<{ payment: LedgerTransaction; receipt: LedgerTransaction }> {
     if (dto.amount <= 0) {
       throw new Error('Số tiền chuyển quỹ phải lớn hơn 0');
     }
@@ -1023,268 +352,39 @@ export const cashbookService = {
       throw new Error('Tài khoản nguồn và tài khoản đích không được trùng nhau');
     }
 
-    if (!isMockMode()) {
-      try {
-        const idempotencyKey = generateUuidV7();
-        const res = await financeHttpClient.post<{
-          data: { payment: BackendCashbookEntryResponse; receipt: BackendCashbookEntryResponse };
-        }>(
-          '/cashbook/transfers',
-          {
-            fromAccountId: dto.fromAccountId,
-            toAccountId: dto.toAccountId,
-            amount: dto.amount,
-            note: dto.note,
-          },
-          {
-            headers: { 'Idempotency-Key': idempotencyKey },
-          }
-        );
-        return {
-          payment: mapBackendEntryToLedgerTransaction(res.data.data.payment),
-          receipt: mapBackendEntryToLedgerTransaction(res.data.data.receipt),
-        };
-      } catch (err) {
-        console.warn('Backend transfer failed, falling back to local:', err);
+    const res = await financeHttpClient.post<{
+      data: { payment: BackendCashbookEntryResponse; receipt: BackendCashbookEntryResponse };
+    }>(
+      '/cashbook/transfers',
+      {
+        fromAccountId: dto.fromAccountId,
+        toAccountId: dto.toAccountId,
+        amount: dto.amount,
+        note: dto.note,
+      },
+      {
+        headers: { 'Idempotency-Key': idempotencyKey },
       }
-    }
-
-    const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    const fromIndex = accounts.findIndex((a) => a.id === dto.fromAccountId);
-    const toIndex = accounts.findIndex((a) => a.id === dto.toAccountId);
-
-    if (fromIndex === -1) throw new Error('Tài khoản chuyển tiền không tồn tại');
-    if (toIndex === -1) throw new Error('Tài khoản nhận tiền không tồn tại');
-
-    const fromAcc = accounts[fromIndex];
-    const toAcc = accounts[toIndex];
-
-    if (fromAcc.accountType === 'CASH' && dto.amount > fromAcc.currentBalance) {
-      throw new Error(
-        `Số tiền chuyển (${dto.amount.toLocaleString('vi-VN')} đ) vượt quá số dư hiện có (${fromAcc.currentBalance.toLocaleString('vi-VN')} đ).`
-      );
-    }
-
-    fromAcc.currentBalance -= dto.amount;
-    toAcc.currentBalance += dto.amount;
-    accounts[fromIndex] = fromAcc;
-    accounts[toIndex] = toAcc;
-    saveState(STORAGE_KEYS.ACCOUNTS, accounts);
-
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const randCode = Math.floor(100 + Math.random() * 900);
-    const payTxId = `TX-PAY-${Date.now()}`;
-    const recTxId = `TX-REC-${Date.now() + 1}`;
-
-    const noteText = dto.note || `Chuyển tiền từ ${fromAcc.accountName} sang ${toAcc.accountName}`;
-
-    const payTx: LedgerTransaction = {
-      id: payTxId,
-      transactionCode: `PC-TRF-${dateStr}-${randCode}`,
-      accountId: fromAcc.id,
-      accountName: fromAcc.accountName,
-      branchId: fromAcc.branchId,
-      transactionType: 'PAYMENT',
-      category: 'Chuyển quỹ nội bộ',
-      amount: dto.amount,
-      balanceAfter: fromAcc.currentBalance,
-      counterpartyType: 'INTERNAL',
-      counterpartyName: toAcc.accountName,
-      description: noteText,
-      referenceDocType: 'INTERNAL_TRANSFER',
-      referenceDocId: recTxId,
-      sourceModuleName: 'INTERNAL_TRANSFER',
-      sourceType: 'INTERNAL_TRANSFER',
-      linkedTransactionId: recTxId,
-      isAutomated: true,
-      createdBy: dto.performedBy || 'Nguyễn Trường An',
-      createdAt: now.toISOString(),
-    };
-
-    const recTx: LedgerTransaction = {
-      id: recTxId,
-      transactionCode: `PT-TRF-${dateStr}-${randCode}`,
-      accountId: toAcc.id,
-      accountName: toAcc.accountName,
-      branchId: toAcc.branchId,
-      transactionType: 'RECEIPT',
-      category: 'Chuyển quỹ nội bộ',
-      amount: dto.amount,
-      balanceAfter: toAcc.currentBalance,
-      counterpartyType: 'INTERNAL',
-      counterpartyName: fromAcc.accountName,
-      description: noteText,
-      referenceDocType: 'INTERNAL_TRANSFER',
-      referenceDocId: payTxId,
-      sourceModuleName: 'INTERNAL_TRANSFER',
-      sourceType: 'INTERNAL_TRANSFER',
-      linkedTransactionId: payTxId,
-      isAutomated: true,
-      createdBy: dto.performedBy || 'Nguyễn Trường An',
-      createdAt: now.toISOString(),
-    };
-
-    const transactions = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
-    transactions.unshift(recTx);
-    transactions.unshift(payTx);
-    saveState(STORAGE_KEYS.TRANSACTIONS, transactions);
-
-    return { payment: payTx, receipt: recTx };
-  },
-
-  /**
-   * Reconciles cash drawer against physical count (Blind Cash Count - Kiểm quỹ mù 3 bước)
-   */
-  async reconcileCashAccount(dto: CashReconciliationDTO): Promise<LedgerTransaction | null> {
-    const diff = dto.actualCountedBalance - dto.systemBalance;
-
-    if (diff !== 0 && (!dto.reason || !dto.reason.trim())) {
-      throw new Error('Chênh lệch kiểm kê bắt buộc phải có lý do giải trình cụ thể theo quy tắc GBR-CSH-04');
-    }
-
-    if (!isMockMode()) {
-      try {
-        if (diff === 0) return null;
-        const idempotencyKey = generateUuidV7();
-        const res = await financeHttpClient.post<{ data: BackendCashbookEntryResponse | null }>(
-          '/cashbook/reconcile',
-          {
-            accountId: dto.accountId,
-            actualCountedBalance: dto.actualCountedBalance,
-            reason: dto.reason.trim(),
-          },
-          {
-            headers: { 'Idempotency-Key': idempotencyKey },
-          }
-        );
-        return res.data.data ? mapBackendEntryToLedgerTransaction(res.data.data) : null;
-      } catch (err) {
-        console.warn('Backend reconcile failed, falling back to local:', err);
-      }
-    }
-
-    const accounts = loadState<CashAccount[]>(STORAGE_KEYS.ACCOUNTS, INITIAL_ACCOUNTS);
-    const targetAccountIndex = accounts.findIndex((a) => a.id === dto.accountId);
-
-    if (targetAccountIndex === -1) {
-      throw new Error('Tài khoản kiểm kê không tồn tại');
-    }
-
-    const targetAccount = accounts[targetAccountIndex];
-    targetAccount.currentBalance = dto.actualCountedBalance;
-    accounts[targetAccountIndex] = targetAccount;
-    saveState(STORAGE_KEYS.ACCOUNTS, accounts);
-
-    if (diff === 0) {
-      return null;
-    }
-
-    const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-    const randCode = Math.floor(100 + Math.random() * 900);
-
-    const adjTx: LedgerTransaction = {
-      id: `TX-${Date.now()}`,
-      transactionCode: `KK-${dateStr}-${randCode}`,
-      accountId: targetAccount.id,
-      accountName: targetAccount.accountName,
-      branchId: targetAccount.branchId,
-      transactionType: 'ADJUSTMENT',
-      category: 'Kiểm kê đối soát két tiền',
-      amount: diff,
-      balanceAfter: dto.actualCountedBalance,
-      counterpartyType: 'OTHER',
-      counterpartyName: 'Hội đồng kiểm kê',
-      description: `Điều chỉnh kiểm kê kết ca: ${dto.reason.trim()} (Chênh lệch: ${diff > 0 ? '+' : ''}${diff.toLocaleString('vi-VN')} đ)`,
-      referenceDocType: 'AUDIT',
-      isAutomated: false,
-      createdBy: dto.auditedBy || 'Nguyễn Trường An',
-      createdAt: now.toISOString(),
-    };
-
-    const transactions = loadState<LedgerTransaction[]>(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
-    transactions.unshift(adjTx);
-    saveState(STORAGE_KEYS.TRANSACTIONS, transactions);
-
-    return adjTx;
-  },
-
-  /**
-   * Computes overall KPI summary for Cashbook from local state (Fallback & Testing)
-   */
-  async getSummaryKPIFromLocal(branchId?: string): Promise<CashbookSummaryKPI> {
-    const accounts = await this.getCashAccounts(branchId);
-    const { items: transactions } = this.getTransactionsFromLocal({ branchId }, 1, 1000);
-
-    let totalCashInDrawers = 0;
-    let totalBankDeposits = 0;
-    let totalSafeDepositBalance = 0;
-
-    accounts.forEach((acc) => {
-      if (acc.isSafeDeposit) {
-        totalSafeDepositBalance += acc.currentBalance;
-      } else if (acc.accountType === 'CASH') {
-        totalCashInDrawers += acc.currentBalance;
-      } else {
-        totalBankDeposits += acc.currentBalance;
-      }
-    });
-
-    let totalReceipts = 0;
-    let totalPayments = 0;
-
-    transactions.forEach((tx) => {
-      if (tx.isVoided) return;
-      if (tx.transactionType === 'RECEIPT') {
-        totalReceipts += tx.amount;
-      } else if (tx.transactionType === 'PAYMENT') {
-        totalPayments += tx.amount;
-      }
-    });
-
-    const totalClosingBalance = totalCashInDrawers + totalBankDeposits + totalSafeDepositBalance;
-    const totalOpeningBalance = totalClosingBalance - totalReceipts + totalPayments;
-
+    );
     return {
-      totalOpeningBalance,
-      totalReceipts,
-      totalPayments,
-      totalClosingBalance,
-      totalCashInDrawers,
-      totalBankDeposits,
-      totalSafeDepositBalance,
+      payment: mapBackendEntryToLedgerTransaction(res.data.data.payment),
+      receipt: mapBackendEntryToLedgerTransaction(res.data.data.receipt),
     };
   },
 
-  /**
-   * Computes overall KPI summary for Cashbook from Backend API
-   */
   async getSummaryKPI(branchId?: string): Promise<CashbookSummaryKPI> {
-    if (isMockMode()) {
-      return this.getSummaryKPIFromLocal(branchId);
-    }
-
-    try {
-      const params = branchId && branchId !== 'ALL' ? { branchId } : {};
-      const res = await financeHttpClient.get<{ data: BackendCashbookSummaryResponse }>('/cashbook/summary', { params });
-      const s = res.data?.data;
-      if (s) {
-        return {
-          totalOpeningBalance: Number(s.totalOpeningBalance),
-          totalReceipts: Number(s.totalReceipts),
-          totalPayments: Number(s.totalPayments),
-          totalClosingBalance: Number(s.totalClosingBalance),
-          totalCashInDrawers: Number(s.totalCashInDrawers),
-          totalBankDeposits: Number(s.totalBankDeposits),
-          totalSafeDepositBalance: Number(s.totalSafeDepositBalance),
-        };
-      }
-      return this.getSummaryKPIFromLocal(branchId);
-    } catch (err) {
-      console.warn('Backend /cashbook/summary unreachable, falling back to local calculation:', err);
-      return this.getSummaryKPIFromLocal(branchId);
-    }
+    const params = branchId && branchId !== 'ALL' ? { branchId } : {};
+    const res = await financeHttpClient.get<{ data: BackendCashbookSummaryResponse }>('/cashbook/summary', { params });
+    const summary = res.data.data;
+    return {
+      totalOpeningBalance: Number(summary.totalOpeningBalance),
+      totalReceipts: Number(summary.totalReceipts),
+      totalPayments: Number(summary.totalPayments),
+      totalClosingBalance: Number(summary.totalClosingBalance),
+      totalCashInDrawers: Number(summary.totalCashInDrawers),
+      totalBankDeposits: Number(summary.totalBankDeposits),
+      totalSafeDepositBalance: Number(summary.totalSafeDepositBalance),
+    };
   },
 
   /**
@@ -1334,76 +434,20 @@ export const cashbookService = {
   },
 
   // --- Phân hệ Triage Inbox & Xử lý mục không rõ ---
-  getPendingTriage: async (branchId?: string): Promise<TriageItem[]> => {
-    if (isMockMode()) {
-      const items = loadState<TriageItem[]>(STORAGE_KEYS.TRIAGE, [
-        {
-          id: 'TR-001',
-          voucherCode: 'PC-UNRESOLVED-01',
-          category: 'Chi phí vận hành',
-          beneficiaryName: 'Nhân viên',
-          description: 'Mua đá lạnh và băng keo ca trưa',
-          amount: 150000,
-          nature: 'Chưa phân loại (Unresolved)',
-          isTaxDeductible: false,
-          status: 'Unresolved',
-          createdBy: 'Nhân viên ca sáng',
-          expenseDate: new Date().toISOString(),
-        },
-      ]);
-      return items.filter((i) => i.status === 'Unresolved');
-    }
-
-    try {
-      const params: Record<string, string> = {};
-      if (branchId && branchId !== 'ALL') params.branchId = branchId;
-      const res = await financeHttpClient.get<{ data: TriageItem[] }>('/cashbook/triage/pending', { params });
-      return res.data?.data || [];
-    } catch (err) {
-      console.warn('Lỗi khi lấy Triage Inbox từ backend:', err);
-      return [];
-    }
+  async getPendingTriage(branchId?: string): Promise<TriageItem[]> {
+    const params = branchId && branchId !== 'ALL' ? { branchId } : {};
+    const res = await financeHttpClient.get<{ data: TriageItem[] }>('/cashbook/triage/pending', { params });
+    return res.data.data;
   },
 
-  resolveTriage: async (voucherId: string, data: ResolveTriageDTO): Promise<any> => {
-    if (isMockMode()) {
-      const items = loadState<TriageItem[]>(STORAGE_KEYS.TRIAGE, [
-        {
-          id: 'TR-001',
-          voucherCode: 'PC-UNRESOLVED-01',
-          category: 'Chi phí vận hành',
-          beneficiaryName: 'Nhân viên',
-          description: 'Mua đá lạnh và băng keo ca trưa',
-          amount: 150000,
-          nature: 'Chưa phân loại (Unresolved)',
-          isTaxDeductible: false,
-          status: 'Unresolved',
-          createdBy: 'Nhân viên ca sáng',
-          expenseDate: new Date().toISOString(),
-        },
-      ]);
-      const target = items.find((i) => i.id === voucherId);
-      if (target) {
-        target.status = 'PAID';
-        target.nature =
-          data.nature === 0 || data.nature === 1 ? 'Chi phí vận hành' : 'Rút vốn chủ';
-        target.isTaxDeductible = data.isTaxDeductible;
-        saveState(STORAGE_KEYS.TRIAGE, items);
-        return target;
-      }
-      return { id: voucherId, status: 'PAID' };
-    }
-
+  async resolveTriage(voucherId: string, data: ResolveTriageDTO): Promise<void> {
     const normalizedPayload = {
       ...data,
       // Normalize legacy 0 -> 1 (FinancialNature.OperatingExpense) and 4 -> 5 (FinancialNature.OwnerDraw)
       nature: data.nature === 0 ? 1 : data.nature === 4 ? 5 : data.nature,
     };
-    const idempotencyKey =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `idemp-tri-${Date.now()}`;
-    const res = await financeHttpClient.post<{ data: any }>(
+    const idempotencyKey = generateUuidV7();
+    await financeHttpClient.post(
       `/cashbook/triage/${voucherId}/resolve`,
       normalizedPayload,
       {
@@ -1412,6 +456,5 @@ export const cashbookService = {
         },
       }
     );
-    return res.data?.data;
   },
 };

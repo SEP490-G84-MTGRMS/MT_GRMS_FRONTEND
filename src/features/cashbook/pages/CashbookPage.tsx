@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
@@ -7,7 +7,6 @@ import {
   FileSpreadsheet,
   ArrowRightLeft,
   AlertTriangle,
-  Search,
   BarChart3,
   Loader2,
 } from 'lucide-react';
@@ -18,7 +17,6 @@ import type {
   CreateReceiptDTO,
   CreatePaymentDTO,
   FundTransferDTO,
-  CashReconciliationDTO,
 } from '../types/cashbook.types';
 import { cashbookService } from '../services/cashbookService';
 import { CashbookFilterToolbar } from '../components/CashbookFilterToolbar';
@@ -26,7 +24,6 @@ import { CashbookLedgerTable } from '../components/CashbookLedgerTable';
 import { CreateReceiptModal } from '../components/CreateReceiptModal';
 import { CreatePaymentModal } from '../components/CreatePaymentModal';
 import { InternalTransferModal } from '../components/InternalTransferModal';
-import { CashReconciliationModal } from '../components/CashReconciliationModal';
 import { CashbookExportModal } from '../components/CashbookExportModal';
 import { PrintReceiptModal } from '../components/PrintReceiptModal';
 import { ReverseTransactionModal } from '../components/ReverseTransactionModal';
@@ -230,7 +227,6 @@ export const CashbookPage: FC = () => {
   const [receiptInitialCategory, setReceiptInitialCategory] = useState<string | undefined>(undefined);
   const [isTriageModalOpen, setIsTriageModalOpen] = useState(false);
   const [triagePendingCount, setTriagePendingCount] = useState(0);
-  const [reconcilingAccount, setReconcilingAccount] = useState<CashAccount | null>(null);
   const [printingTx, setPrintingTx] = useState<LedgerTransaction | null>(null);
   const [voidingTx, setVoidingTx] = useState<LedgerTransaction | null>(null);
 
@@ -252,9 +248,14 @@ export const CashbookPage: FC = () => {
     setToast(null);
   }, []);
 
+  const loadVersion = useRef(0);
+  const [loadError, setLoadError] = useState('');
+
   // Load Data
   const loadData = useCallback(async () => {
+    const version = ++loadVersion.current;
     setIsLoading(true);
+    setLoadError('');
     try {
       const branchParam = filters.branchId !== 'ALL' ? filters.branchId : undefined;
       const [accs, txResult] = await Promise.all([
@@ -262,38 +263,40 @@ export const CashbookPage: FC = () => {
         cashbookService.getTransactions(filters, currentPage, pageSize),
       ]);
 
+      if (version !== loadVersion.current) return;
       setAccounts(accs);
       setTransactions(txResult.items);
       setTotalItems(txResult.totalItems);
 
       try {
         const triageItems = await cashbookService.getPendingTriage(branchParam);
-        setTriagePendingCount(triageItems.length);
+        if (version === loadVersion.current) setTriagePendingCount(triageItems.length);
       } catch {
-        // Non-blocking for triage count
+        if (version === loadVersion.current) setTriagePendingCount(0);
       }
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Lỗi tải dữ liệu sổ quỹ', 'error');
+    } catch {
+      if (version !== loadVersion.current) return;
+      setAccounts([]);
+      setTransactions([]);
+      setTotalItems(0);
+      setTriagePendingCount(0);
+      setLoadError('Không tải được dữ liệu sổ quỹ.');
     } finally {
-      setIsLoading(false);
+      if (version === loadVersion.current) setIsLoading(false);
     }
-  }, [filters, currentPage, pageSize, showToast]);
+  }, [filters, currentPage, pageSize]);
 
   useEffect(() => {
     void loadData();
+    return () => { loadVersion.current++; };
   }, [loadData]);
 
-
   // Create Receipt Handler
-  const handleCreateReceipt = async (dto: CreateReceiptDTO) => {
-    try {
-      const newTx = await cashbookService.createReceipt(dto);
-      showToast(`Đã ghi nhận Phiếu thu [${newTx.transactionCode}] thành công!`, 'success');
-      setIsReceiptModalOpen(false);
-      void loadData();
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Lỗi khi lập phiếu thu', 'error');
-    }
+  const handleCreateReceipt = async (dto: CreateReceiptDTO, idempotencyKey: string) => {
+    const newTx = await cashbookService.createReceipt(dto, idempotencyKey);
+    showToast(`Đã ghi nhận Phiếu thu [${newTx.transactionCode}] thành công!`, 'success');
+
+    void loadData();
   };
 
   const handleOwnerSafeDeposit = async () => {
@@ -324,30 +327,22 @@ export const CashbookPage: FC = () => {
   };
 
   // Create Payment Handler
-  const handleCreatePayment = async (dto: CreatePaymentDTO) => {
-    try {
-      const newTx = await cashbookService.createPayment(dto);
-      showToast(`Đã ghi nhận Phiếu chi [${newTx.transactionCode}] thành công!`, 'success');
-      setIsPaymentModalOpen(false);
-      void loadData();
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Lỗi khi lập phiếu chi', 'error');
-    }
+  const handleCreatePayment = async (dto: CreatePaymentDTO, idempotencyKey: string) => {
+    const newTx = await cashbookService.createPayment(dto, idempotencyKey);
+    showToast(`Đã ghi nhận Phiếu chi [${newTx.transactionCode}] thành công!`, 'success');
+
+    void loadData();
   };
 
   // Internal Fund Transfer Handler
-  const handleTransfer = async (dto: FundTransferDTO) => {
-    try {
-      const result = await cashbookService.transferFunds(dto);
-      showToast(
-        `Đã tạo lệnh chuyển ${result.payment.amount.toLocaleString('vi-VN')} đ sang két sắt!`,
-        'success'
-      );
-      setIsTransferModalOpen(false);
-      void loadData();
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Lỗi điều chuyển tiền', 'error');
-    }
+  const handleTransfer = async (dto: FundTransferDTO, idempotencyKey: string) => {
+    const result = await cashbookService.transferFunds(dto, idempotencyKey);
+    showToast(
+      `Đã tạo lệnh chuyển ${result.payment.amount.toLocaleString('vi-VN')} đ sang két sắt!`,
+      'success'
+    );
+
+    void loadData();
   };
 
   // Void Transaction Handler (Immutable Ledger)
@@ -367,41 +362,6 @@ export const CashbookPage: FC = () => {
     }
   };
 
-  // Reconcile Cash Account Handler (Blind Count)
-  const handleReconcileAccount = async (data: {
-    accountId: string;
-    actualBalance: number;
-    difference: number;
-    reason: string;
-    countedBy: string;
-    denominations: Record<number, number>;
-  }) => {
-    try {
-      const dto: CashReconciliationDTO = {
-        accountId: data.accountId,
-        systemBalance: reconcilingAccount?.currentBalance ?? 0,
-        actualCountedBalance: data.actualBalance,
-        differenceAmount: data.difference,
-        reason: data.reason,
-        auditedBy: data.countedBy,
-        breakdown: data.denominations,
-      };
-      const adj = await cashbookService.reconcileCashAccount(dto);
-      if (adj) {
-        showToast(
-          `Đã hoàn tất kiểm kê két và tự động lập bút toán điều chỉnh [${adj.transactionCode}]!`,
-          'warning'
-        );
-      } else {
-        showToast('Đã xác nhận kiểm kê két: Tiền mặt thực tế khớp 100% với sổ sách!', 'success');
-      }
-      setReconcilingAccount(null);
-      void loadData();
-    } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Lỗi khi đối soát két tiền mặt', 'error');
-    }
-  };
-
   const selectedAccountObj = useMemo(
     () => accounts.find((a) => a.id === filters.accountId),
     [accounts, filters.accountId]
@@ -414,23 +374,6 @@ export const CashbookPage: FC = () => {
     }
     setClosingBranch(operationBranch);
   };
-
-  // Open Blind Reconciliation Modal
-  const handleOpenBlindCountModal = () => {
-    const targetAccount =
-      (filters.accountId !== 'ALL' && accounts.find((a) => a.id === filters.accountId && a.accountType === 'CASH')) ||
-      accounts.find((a) => a.accountType === 'CASH' && !a.isSafeDeposit) ||
-      accounts.find((a) => a.accountType === 'CASH') ||
-      accounts[0] ||
-      null;
-
-    if (targetAccount) {
-      setReconcilingAccount(targetAccount);
-    } else {
-      showToast('Không tìm thấy tài khoản tiền mặt để kiểm kê', 'warning');
-    }
-  };
-
 
   return (
     <div
@@ -462,49 +405,6 @@ export const CashbookPage: FC = () => {
         </div>
 
         <div className="so-list-header-actions">
-          {!isEmployee && (
-            <button
-              type="button"
-              className="po-btn po-btn-secondary"
-              onClick={openOwnerDailySettlement}
-              title={operationBranch.id === 'ALL' ? 'Chọn một chi nhánh cụ thể trên thanh trên cùng để chốt doanh thu' : `Chốt doanh thu ${operationBranch.name}`}
-            >
-              {operationBranch.id === 'ALL' ? 'Chọn chi nhánh để chốt' : 'Chốt doanh thu ngày'}
-            </button>
-          )}
-
-          {triagePendingCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setIsTriageModalOpen(true)}
-              className="po-btn po-btn-secondary"
-              style={{ borderColor: '#fcd34d', backgroundColor: '#fffbeb', color: '#b45309' }}
-              title="Có mục chi vặt cần Chủ tiệm phân loại"
-            >
-              <AlertTriangle size={14} />
-              <span>{triagePendingCount} mục cần duyệt</span>
-            </button>
-          )}
-
-          <Link
-            to="/store-owner/finance?tab=overview"
-            className="po-btn po-btn-secondary"
-            title="Xem Báo cáo Tổng quan Dòng tiền & Két"
-          >
-            <BarChart3 size={14} />
-            <span>Báo cáo dòng tiền</span>
-          </Link>
-
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            onClick={() => setIsExportModalOpen(true)}
-            title="Xuất sổ kế toán Excel"
-          >
-            <FileSpreadsheet size={14} />
-            <span>Xuất Excel</span>
-          </button>
-
           <button
             type="button"
             id="btn-internal-transfer"
@@ -514,29 +414,6 @@ export const CashbookPage: FC = () => {
           >
             <ArrowRightLeft size={14} />
             <span>Chuyển quỹ nội bộ</span>
-          </button>
-
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            aria-pressed={filters.sourceType === 'INTERNAL_TRANSFER'}
-            onClick={() => {
-              setFilters(current => ({ ...current, sourceType: current.sourceType === 'INTERNAL_TRANSFER' ? undefined : 'INTERNAL_TRANSFER' }));
-              setCurrentPage(1);
-            }}
-          >
-            <span>{filters.sourceType === 'INTERNAL_TRANSFER' ? 'Xem toàn bộ sổ quỹ' : 'Lịch sử chuyển tiền'}</span>
-          </button>
-
-          <button
-            type="button"
-            id="btn-blind-reconcile"
-            className="po-btn po-btn-secondary"
-            onClick={handleOpenBlindCountModal}
-            title="Kiểm kê két mù (3 bước)"
-          >
-            <Search size={14} />
-            <span>Kiểm kê két</span>
           </button>
 
           <button
@@ -567,12 +444,80 @@ export const CashbookPage: FC = () => {
             <Plus size={14} />
             <span>Thu tiền</span>
           </button>
-          {!isEmployee && <button type="button" className="po-btn po-btn-secondary"
-            onClick={() => setIsOwnerDepositOpen(true)} title="Chủ bổ sung tiền mặt vào két sắt chi nhánh">
-            <Wallet size={14} /><span>Nộp tiền vào két</span>
-          </button>}
+          <details className="cb-more-actions" onClick={(event) => {
+            if (event.target instanceof Element && event.target.closest('button, a')) event.currentTarget.open = false;
+          }}>
+            <summary className="po-btn po-btn-secondary">Thao tác khác</summary>
+            <div className="cb-more-actions-menu">
+              {!isEmployee && (
+                <button
+                  type="button"
+                  className="po-btn po-btn-secondary"
+                  onClick={openOwnerDailySettlement}
+                  title={operationBranch.id === 'ALL' ? 'Chọn một chi nhánh cụ thể trên thanh trên cùng để chốt doanh thu' : `Chốt doanh thu ${operationBranch.name}`}
+                >
+                  {operationBranch.id === 'ALL' ? 'Chọn chi nhánh để chốt' : 'Chốt doanh thu ngày'}
+                </button>
+              )}
+
+              {triagePendingCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsTriageModalOpen(true)}
+                  className="po-btn po-btn-secondary"
+                  style={{ borderColor: '#fcd34d', backgroundColor: '#fffbeb', color: '#b45309' }}
+                  title="Có mục chi vặt cần Chủ tiệm phân loại"
+                >
+                  <AlertTriangle size={14} />
+                  <span>{triagePendingCount} mục cần duyệt</span>
+                </button>
+              )}
+
+              <Link
+                to="/store-owner/finance?tab=overview"
+                className="po-btn po-btn-secondary"
+                title="Xem Báo cáo Tổng quan Dòng tiền & Két"
+              >
+                <BarChart3 size={14} />
+                <span>Báo cáo dòng tiền</span>
+              </Link>
+
+              <button
+                type="button"
+                className="po-btn po-btn-secondary"
+                onClick={() => setIsExportModalOpen(true)}
+                title="Xuất sổ kế toán Excel"
+              >
+                <FileSpreadsheet size={14} />
+                <span>Xuất Excel</span>
+              </button>
+
+              <button
+                type="button"
+                className="po-btn po-btn-secondary"
+                aria-pressed={filters.sourceType === 'INTERNAL_TRANSFER'}
+                onClick={() => {
+                  setFilters(current => ({ ...current, sourceType: current.sourceType === 'INTERNAL_TRANSFER' ? undefined : 'INTERNAL_TRANSFER' }));
+                  setCurrentPage(1);
+                }}
+              >
+                <span>{filters.sourceType === 'INTERNAL_TRANSFER' ? 'Xem toàn bộ sổ quỹ' : 'Lịch sử chuyển tiền'}</span>
+              </button>
+
+              {!isEmployee && <button type="button" className="po-btn po-btn-secondary"
+                onClick={() => setIsOwnerDepositOpen(true)} title="Chủ bổ sung tiền mặt vào két sắt chi nhánh">
+                <Wallet size={14} /><span>Nộp tiền vào két</span>
+              </button>}
+            </div>
+          </details>
         </div>
       </div>
+
+      {loadError && (
+        <div role="alert" className="cb-load-error">
+          {loadError} <button type="button" className="po-btn po-btn-secondary" onClick={() => void loadData()}>Thử lại</button>
+        </div>
+      )}
 
       {/* ── Filter Toolbar: CSS Grid 4 columns x 2 rows ~86px ── */}
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
@@ -664,14 +609,6 @@ export const CashbookPage: FC = () => {
         onClose={() => setIsTransferModalOpen(false)}
         accounts={accounts}
         onSubmit={handleTransfer}
-      />
-
-      <CashReconciliationModal
-        isOpen={Boolean(reconcilingAccount)}
-        onClose={() => setReconcilingAccount(null)}
-        account={reconcilingAccount}
-        accounts={accounts}
-        onSubmit={handleReconcileAccount}
       />
 
       <CashbookExportModal

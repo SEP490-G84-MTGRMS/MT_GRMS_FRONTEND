@@ -10,6 +10,7 @@ interface VietQrDisplayCardProps {
 export const VietQrDisplayCard: FC<VietQrDisplayCardProps> = ({ config }) => {
   const [copiedAccount, setCopiedAccount] = useState(false);
   const [copiedContent, setCopiedContent] = useState(false);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, type: 'acc' | 'content') => {
     navigator.clipboard.writeText(text);
@@ -44,13 +45,16 @@ export const VietQrDisplayCard: FC<VietQrDisplayCardProps> = ({ config }) => {
 
       {/* QR Code Image */}
       <div className="vietqr-image-box">
-        <img
+        {failedUrl === config.qrDataUrl ? (
+          <p role="alert">Không tải được ảnh QR. Bạn có thể chuyển khoản theo thông tin bên dưới.</p>
+        ) : <img
           src={config.qrDataUrl}
           alt="VietQR Chuyển khoản"
-        />
-        <p style={{ margin: '6px 0 0', fontSize: '0.7rem', color: '#94a3b8', fontFamily: 'var(--font-mono, monospace)' }}>
+          onError={() => setFailedUrl(config.qrDataUrl)}
+        />}
+        {failedUrl !== config.qrDataUrl && <p style={{ margin: '6px 0 0', fontSize: '0.7rem', color: '#94a3b8', fontFamily: 'var(--font-mono, monospace)' }}>
           Tự động điền số tiền & nội dung
-        </p>
+        </p>}
       </div>
 
       {/* Bank & Account Info */}

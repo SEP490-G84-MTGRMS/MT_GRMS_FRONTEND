@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { FC } from 'react';
+import { createPortal } from 'react-dom';
 import {
   EyeIcon,
   CloseIcon,
@@ -46,21 +47,32 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   onCancel,
 }) => {
   const navigate = useNavigate();
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [openMenu, setOpenMenu] = useState<{ id: string; anchor: HTMLButtonElement } | null>(null);
+  const menuAnchor = openMenu?.anchor.getBoundingClientRect();
 
   useEffect(() => {
-    if (!openMenuId) return;
-    const handleOutsideClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.expense-row-menu')) {
-        setOpenMenuId(null);
+    if (!openMenu) return;
+    const close = () => setOpenMenu(null);
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (event.target instanceof Element && !event.target.closest('.expense-row-menu')) close();
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        close();
+        openMenu.anchor.focus();
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
     };
-  }, [openMenuId]);
+  }, [openMenu]);
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -112,7 +124,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table expense-responsive-table">
+        <table className="so-list-table so-list-table--readable expense-responsive-table">
           {tableColGroup}
           <thead>
             <tr>
@@ -172,7 +184,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
             </p>
           </div>
         ) : (
-          <table className="so-list-table expense-responsive-table">
+          <table className="so-list-table so-list-table--readable expense-responsive-table">
             {tableColGroup}
             <tbody>
               {data.map((item) => (
@@ -268,7 +280,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
 
                   {/* Chi nhánh */}
                   <td className="so-list-td" style={{ color: '#475569' }}>
-                    {item.branchName || item.branchId}
+                    {item.branchName || 'Không xác định'}
                   </td>
 
                   {/* NCC / Diễn giải */}
@@ -374,7 +386,9 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                         <div className="expense-row-menu" style={{ position: 'relative' }}>
                           <button
                             type="button"
-                            onClick={() => setOpenMenuId(openMenuId === item.expenseId ? null : item.expenseId)}
+                            aria-expanded={openMenu?.id === item.expenseId}
+                            onClick={(event) => setOpenMenu(openMenu?.id === item.expenseId
+                              ? null : { id: item.expenseId, anchor: event.currentTarget })}
                             style={{
                               background: '#f1f5f9',
                               border: '1px solid #cbd5e1',
@@ -390,13 +404,14 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                             <MoreHorizontal size={14} />
                           </button>
 
-                          {openMenuId === item.expenseId && (
-                            <div
+                          {openMenu?.id === item.expenseId && menuAnchor && createPortal(
+                            <div className="expense-row-menu"
                               style={{
-                                position: 'absolute',
-                                right: 0,
-                                top: '100%',
-                                marginTop: 4,
+                                position: 'fixed',
+                                right: Math.max(8, window.innerWidth - menuAnchor.right),
+                                ...(window.innerHeight - menuAnchor.bottom >= 100
+                                  ? { top: menuAnchor.bottom + 4 }
+                                  : { bottom: window.innerHeight - menuAnchor.top + 4 }),
                                 background: '#ffffff',
                                 border: '1px solid #e2e8f0',
                                 borderRadius: '8px',
@@ -410,7 +425,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setOpenMenuId(null);
+                                    setOpenMenu(null);
                                     onApprove(item);
                                   }}
                                   style={{
@@ -439,7 +454,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  setOpenMenuId(null);
+                                  setOpenMenu(null);
                                   onCancel(item);
                                 }}
                                 style={{
@@ -463,7 +478,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                                 <CloseIcon size={12} color="#b91c1c" />
                                 <span>Hủy khoản chi</span>
                               </button>
-                            </div>
+                            </div>, document.body
                           )}
                         </div>
                       )}

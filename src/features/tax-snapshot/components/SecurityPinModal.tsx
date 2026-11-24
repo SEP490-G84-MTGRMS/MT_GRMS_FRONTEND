@@ -83,7 +83,7 @@ export const SecurityPinModal: React.FC<SecurityPinModalProps> = ({
 
     if (verifyMethod === 'pin') {
       if (!currentPin) {
-        setErrorMessage('Vui lòng nhập mã PIN hiện tại (mặc định ban đầu là 1234).');
+        setErrorMessage('Vui lòng nhập mã PIN hiện tại.');
         return;
       }
     } else {
@@ -333,7 +333,7 @@ export const SecurityPinModal: React.FC<SecurityPinModalProps> = ({
           >
             <HelpCircle size={16} style={{ color: '#0F766E', marginTop: 2, flexShrink: 0 }} />
             <span style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.45 }}>
-              Mã PIN ban đầu khi khởi tạo hệ thống là <strong>1234</strong>. Bạn có thể sử dụng bàn phím máy tính nhập số trực tiếp để thiết lập mã PIN 4-6 chữ số.
+              Sử dụng mã PIN đã thiết lập cho tài khoản. Nếu chưa có hoặc quên mã PIN, chọn thiết lập lại bằng mật khẩu tài khoản.
             </span>
           </div>
 
@@ -375,7 +375,7 @@ export const SecurityPinModal: React.FC<SecurityPinModalProps> = ({
               {verifyMethod === 'pin' ? (
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: 6 }}>
-                    Mã PIN hiện tại (mặc định: 1234):
+                    Mã PIN hiện tại:
                   </label>
                   <div style={{ position: 'relative' }}>
                     <input

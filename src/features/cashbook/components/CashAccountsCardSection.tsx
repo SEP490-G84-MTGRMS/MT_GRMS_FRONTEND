@@ -7,14 +7,12 @@ interface CashAccountsCardSectionProps {
   accounts: CashAccount[];
   selectedAccountId?: string;
   onSelectAccount: (accountId: string) => void;
-  onOpenReconcileModal?: (account: CashAccount) => void;
 }
 
 export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
   accounts,
   selectedAccountId,
   onSelectAccount,
-  onOpenReconcileModal,
 }) => {
   return (
     <div className="cash-accounts-grid">
@@ -154,7 +152,7 @@ export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
               </span>
             </div>
 
-            {/* Bottom Status & Quick Reconcile */}
+            {/* Bottom Status */}
             <div
               style={{
                 marginTop: '8px',
@@ -181,28 +179,7 @@ export const CashAccountsCardSection: FC<CashAccountsCardSectionProps> = ({
               </span>
 
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                {isCash && onOpenReconcileModal && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenReconcileModal(acc);
-                    }}
-                    style={{
-                      background: '#F0FDFA',
-                      border: '1px solid #99F6E4',
-                      color: '#0F766E',
-                      borderRadius: '6px',
-                      padding: '2px 8px',
-                      fontSize: '10.5px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                    title="Đối soát kiểm đếm tiền mặt thực tế tại két"
-                  >
-                    Kiểm kê
-                  </button>
-                )}
+
                 <span
                   style={{
                     color: isSelected ? '#0F766E' : '#64748B',

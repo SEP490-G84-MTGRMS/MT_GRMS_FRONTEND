@@ -1228,7 +1228,8 @@ export const AppTopNav: FC = () => {
               height: 50,
               gap: 2,
               overflowX: "auto",
-              scrollbarWidth: "none",
+              scrollbarWidth: "thin",
+              minWidth: 0,
               flex: 1,
             }}
           >
@@ -1252,7 +1253,7 @@ export const AppTopNav: FC = () => {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 7,
-                      padding: "0 14px",
+                      padding: "0 clamp(6px, calc((100vw - 1240px) / 50), 14px)",
                       height: "100%",
                       textDecoration: "none",
                       fontSize: 13.5,
@@ -1320,7 +1321,7 @@ export const AppTopNav: FC = () => {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 7,
-                      padding: "0 14px",
+                      padding: "0 clamp(6px, calc((100vw - 1240px) / 50), 14px)",
                       height: "100%",
                       background: "none",
                       border: "none",

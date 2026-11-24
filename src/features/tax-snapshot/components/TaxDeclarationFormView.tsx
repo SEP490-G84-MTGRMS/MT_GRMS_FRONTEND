@@ -42,12 +42,15 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
   isLoading,
   isRefreshing,
 }) => {
-  if (isLoading || !summary) {
+  if (isLoading) {
     return (
       <div className="tax-declaration-card" style={{ padding: 48, textAlign: 'center' }}>
         <p style={{ color: '#0F766E', fontWeight: 600 }}>Đang tổng hợp số liệu tờ khai...</p>
       </div>
     );
+  }
+  if (!summary) {
+    return <div className="tax-declaration-card" style={{ padding: 48, textAlign: 'center' }}>Chưa tải được dữ liệu tờ khai.</div>;
   }
 
   const isDeclaration = calculationMethod === TaxCalculationMethod.DeclarationBased;
