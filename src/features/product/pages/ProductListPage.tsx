@@ -1102,11 +1102,6 @@ export const ProductListPage: React.FC = () => {
     }
   };
 
-  // Barcode Print mock
-  const handlePrintBarcode = () => {
-    showToast('Đang kết nối máy in tem mã vạch Barcode...');
-  };
-
   return (
     <div
       className="po-matrix-container"
@@ -1193,7 +1188,6 @@ export const ProductListPage: React.FC = () => {
           onExport={handleExport}
           onImport={handleImport}
           excelBusy={excelBusy}
-          onPrintBarcode={handlePrintBarcode}
         />
       </div>
 
