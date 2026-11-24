@@ -520,12 +520,15 @@ export const reportsPnlService = {
           const grossProfit = Number(s.grossProfit || 0);
           const grossMarginPct = Number(s.grossMarginPercentage || 0);
           const operatingExpenses = Number(s.operatingExpenses?.totalAmount || 0);
-          const shrinkageLoss = Number(s.badDebtExpense || 0);
+          const shrinkageLoss = 0;
           const netProfit = Number(s.netProfit || 0);
           const netMarginPct = Number(s.netMarginPercentage || 0);
 
           const taxConfig = getTaxRateConfig();
-          const estimatedTaxAmount = Math.round(netRevenue * (taxConfig.effectiveTotalRatePct / 100));
+          const estimatedTaxAmount =
+            typeof s.estimatedTaxAmount === 'number'
+              ? Number(s.estimatedTaxAmount)
+              : Math.round(netRevenue * (taxConfig.effectiveTotalRatePct / 100));
           const netProfitAfterTax = netProfit - estimatedTaxAmount;
           const netProfitAfterTaxMarginPct = calculateMarginPct(netProfitAfterTax, netRevenue);
 
