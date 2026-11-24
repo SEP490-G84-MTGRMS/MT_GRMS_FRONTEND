@@ -7,7 +7,7 @@ const fmtMoney = (n: number) =>
   new Intl.NumberFormat('vi-VN').format(Number.isFinite(n) ? n : 0);
 
 const STATUS_LABEL: Record<string, string> = {
-  PENDING_APPROVAL: 'Chờ duyệt',
+  PENDING_APPROVAL: 'Chờ nhập',
   APPROVED: 'Đã duyệt',
   DISPATCHED: 'Đã gửi NCC',
   SENT: 'Đã gửi NCC',

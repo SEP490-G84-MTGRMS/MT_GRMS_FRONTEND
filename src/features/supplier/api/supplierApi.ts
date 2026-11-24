@@ -11,6 +11,9 @@ import type {
   SupplierStatus,
   SupplierType,
   APLedgerEntry,
+  APLedgerQueryParams,
+  SupplierApSummary,
+  RecordAPTransactionCommand,
   SupplierSearchSuggestions,
 } from '../types/supplier.types';
 
@@ -331,40 +334,89 @@ export const supplierApi = {
   },
 
   /**
+   * Lấy tổng hợp công nợ & tuổi nợ (AP Summary + Aging Buckets) của nhà cung cấp
+   */
+  async getAPSummary(id: string): Promise<SupplierApSummary> {
+    try {
+      const res = await httpClient.get<ApiResponse<SupplierApSummary>>(`/suppliers/${id}/ap/summary`);
+      if (res.data?.success && res.data.data) {
+        const data = res.data.data;
+        const currentDebt = Number(data.currentDebt ?? 0);
+        const overdueDebt = Number(data.overdueDebt ?? 0);
+        const aging = data.aging ?? {
+          current: Math.max(0, currentDebt - overdueDebt),
+          days1To30: overdueDebt,
+          days31To60: 0,
+          days61To90: 0,
+          over90Days: 0,
+          totalOverdue: overdueDebt,
+          totalDebt: currentDebt,
+        };
+        return {
+          supplierId: data.supplierId || id,
+          currentDebt,
+          overdueDebt,
+          creditLimit: Number(data.creditLimit ?? 0),
+          paymentTermDays: Number(data.paymentTermDays ?? 0),
+          openPurchaseOrderCount: Number(data.openPurchaseOrderCount ?? 0),
+          aging: {
+            current: Number(aging.current ?? 0),
+            days1To30: Number(aging.days1To30 ?? 0),
+            days31To60: Number(aging.days31To60 ?? 0),
+            days61To90: Number(aging.days61To90 ?? 0),
+            over90Days: Number(aging.over90Days ?? 0),
+            totalOverdue: Number(aging.totalOverdue ?? overdueDebt),
+            totalDebt: Number(aging.totalDebt ?? currentDebt),
+          },
+        };
+      }
+      throw new Error(res.data?.message || 'Không thể tải tổng hợp công nợ nhà cung cấp.');
+    } catch (err: any) {
+      throw new Error(err?.response?.data?.message || err?.message || 'Không thể tải tổng hợp công nợ nhà cung cấp.');
+    }
+  },
+
+  /**
    * Lấy sổ cái công nợ AP của nhà cung cấp
    */
   async getAPLedger(
     id: string,
-    params?: { fromDate?: string; toDate?: string; pageIndex?: number; pageSize?: number }
+    params?: APLedgerQueryParams
   ): Promise<PagedResult<APLedgerEntry>> {
     try {
+      const cleanParams: Record<string, string | number> = {
+        pageIndex: params?.pageIndex || 1,
+        pageSize: params?.pageSize || 15,
+      };
+      if (params?.fromDate) cleanParams.fromDate = params.fromDate;
+      if (params?.toDate) cleanParams.toDate = params.toDate;
+      if (params?.docType) cleanParams.docType = params.docType;
+
       const res = await httpClient.get<ApiResponse<PagedResult<APLedgerEntry>>>(`/suppliers/${id}/ap/ledger`, {
-        params,
+        params: cleanParams,
       });
       if (res.data?.success && res.data.data) {
         return res.data.data;
       }
-    } catch (err) {
-      console.warn(`Backend API /suppliers/${id}/ap/ledger failed:`, err);
+      throw new Error(res.data?.message || 'Không thể tải sổ cái công nợ.');
+    } catch (err: any) {
+      throw new Error(err?.response?.data?.message || err?.message || 'Không thể tải sổ cái công nợ.');
     }
-
-    return {
-      items: [],
-      page: 1,
-      pageSize: 20,
-      totalItems: 0,
-    };
   },
 
   /**
-   * Ghi nhận giao dịch công nợ AP
+   * Ghi nhận giao dịch công nợ AP (ví dụ: thanh toán công nợ NCC)
    */
-  async recordAPTransaction(id: string, command: any): Promise<any> {
-    const res = await httpClient.post<ApiResponse<any>>(`/suppliers/${id}/ap/transactions`, command);
-    if (res.data?.success && res.data.data) {
-      return res.data.data;
+  async recordAPTransaction(id: string, command: RecordAPTransactionCommand): Promise<APLedgerEntry> {
+    try {
+      const res = await httpClient.post<ApiResponse<APLedgerEntry>>(`/suppliers/${id}/ap/transactions`, command);
+      if (res.data?.success && res.data.data) {
+        return res.data.data;
+      }
+      throw new Error(res.data?.message || 'Không thể ghi nhận giao dịch công nợ.');
+    } catch (err: any) {
+      throw new Error(err?.response?.data?.message || err?.message || 'Không thể ghi nhận giao dịch công nợ.');
     }
-    throw new Error(res.data?.message || 'Không thể ghi nhận giao dịch công nợ.');
   },
 
   /**

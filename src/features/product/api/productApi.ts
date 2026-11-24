@@ -36,6 +36,15 @@ export const productApi = {
     if (filter.searchTerm && filter.searchTerm.trim() !== '') {
       params.SearchTerm = filter.searchTerm.trim();
     }
+    if (filter.skus && filter.skus.length > 0) {
+      params.Skus = filter.skus;
+    }
+    if (filter.names && filter.names.length > 0) {
+      params.Names = filter.names;
+    }
+    if (filter.barcodes && filter.barcodes.length > 0) {
+      params.Barcodes = filter.barcodes;
+    }
 
     if (filter.categoryIds && filter.categoryIds.length > 0) {
       params.CategoryIds = filter.categoryIds;

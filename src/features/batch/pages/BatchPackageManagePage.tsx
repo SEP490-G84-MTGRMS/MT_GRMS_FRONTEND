@@ -258,16 +258,21 @@ export const BatchPackageManagePage: FC<{ defaultRole?: UserRole }> = ({
       );
   };
 
-  const handleVoid = async (pkg: PackageDto) => {
-    const isProcessing = pkg.repackType === 'PROCESSING';
-    const mode = isProcessing
-      ? 'WRITE_OFF'
-      : window.confirm('Trả về nguyên quả?\nOK = trả về nguyên quả\nCancel = ghi hủy')
-        ? 'UNPACK_TO_RAW'
-        : 'WRITE_OFF';
+  const [voidTargetPkg, setVoidTargetPkg] = useState<PackageDto | null>(null);
+
+  const handleVoid = (pkg: PackageDto) => {
+    setVoidTargetPkg(pkg);
+  };
+
+  const executeVoid = async (pkg: PackageDto, mode: 'UNPACK_TO_RAW' | 'WRITE_OFF') => {
     try {
       await repackApi.voidPackage(pkg.id, mode);
-      setToast({ id: String(Date.now()), type: 'success', message: 'Đã hủy khay.' });
+      setToast({
+        id: String(Date.now()),
+        type: 'success',
+        message: mode === 'UNPACK_TO_RAW' ? 'Đã hủy khay và trả về nguyên quả.' : 'Đã ghi hủy khay.',
+      });
+      setVoidTargetPkg(null);
       await load();
     } catch (e: unknown) {
       const msg =
@@ -570,6 +575,54 @@ export const BatchPackageManagePage: FC<{ defaultRole?: UserRole }> = ({
             });
           }}
         />
+      )}
+
+      {voidTargetPkg && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            zIndex: 10050,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 480, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+              Xác nhận hủy khay {voidTargetPkg.barcode}
+            </h3>
+            <p style={{ margin: '0 0 18px', fontSize: 13.5, color: '#475569', lineHeight: 1.5 }}>
+              {voidTargetPkg.repackType === 'PROCESSING'
+                ? 'Khay đã sơ chế chỉ có thể ghi hủy (Write-off). Bạn có chắc chắn muốn ghi hủy khay này?'
+                : 'Chọn hình thức xử lý tồn kho cho khay này. Bấm "Đóng" nếu không muốn thay đổi.'}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="po-btn po-btn-secondary" onClick={() => setVoidTargetPkg(null)}>
+                Đóng / Không làm gì
+              </button>
+              {voidTargetPkg.repackType !== 'PROCESSING' && (
+                <button
+                  type="button"
+                  className="po-btn po-btn-primary"
+                  onClick={() => void executeVoid(voidTargetPkg, 'UNPACK_TO_RAW')}
+                >
+                  Trả về nguyên quả
+                </button>
+              )}
+              <button
+                type="button"
+                className="po-btn"
+                style={{ backgroundColor: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+                onClick={() => void executeVoid(voidTargetPkg, 'WRITE_OFF')}
+              >
+                Ghi hủy (Write-off)
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <AdminToast toast={toast} onClose={() => setToast(null)} />

@@ -525,13 +525,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             });
         }
 
-        {
-          const desc = (productToEdit.description || '').trim();
-          const note = (productToEdit.internalNote || '').trim();
-          setDescription(
-            desc && note && desc !== note ? `${desc}\n${note}` : desc || note
-          );
-        }
+        setDescription((productToEdit.description || '').trim());
 
         setWarningMsg('');
         setValidationPopupMsg('');
@@ -639,7 +633,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const trimmedBarcode = barcode.trim();
   const isMainBarcodeDuplicateWithUom =
     trimmedBarcode !== '' &&
-    unitRows.some((u) => (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
+    unitRows.some((u) => !u.isBaseUnit && (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
   const barcodeError =
     barcode !== ''
       ? trimmedBarcode.length > 50 || /\s/.test(barcode)
@@ -1144,7 +1138,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         allowRepack: repackOn,
         eligibleForVatReduction,
         description: description.trim() || undefined,
-        internalNote: '',
+        internalNote: productToEdit?.internalNote ?? undefined,
         isBaseUnitPurchaseUnit: Boolean(base.isPurchaseUnit),
         purchaseUnit: purchase.unitName.trim() || base.unitName.trim(),
         uomConversions: unitsToSave,

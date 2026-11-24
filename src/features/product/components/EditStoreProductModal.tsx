@@ -254,6 +254,13 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       errors.retailPrice = 'Giá bán phải lớn hơn 0.';
     } else if (baseUnitPrice > 1_000_000_000) {
       errors.retailPrice = 'Giá bán vượt quá giới hạn.';
+    } else {
+      const invalidUnit = unitPriceDrafts.find(
+        (u) => !Number.isFinite(u.price) || u.price <= 0 || u.price > 1_000_000_000
+      );
+      if (invalidUnit) {
+        errors.retailPrice = `Giá bán của đơn vị "${invalidUnit.unitName}" phải lớn hơn 0 và không vượt quá 1 tỷ đ.`;
+      }
     }
     if (product.allowRepack) {
       if (!Number.isFinite(processedSellingPrice) || processedSellingPrice <= 0) {
@@ -495,7 +502,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputCurrentStock"
                     type="text"
                     readOnly
-                    value={`${product.currentStock} ${product.unit}`}
+                    value={`${product.currentStock} ${product.stockUnit || product.unit}`}
                     style={readOnlyInput}
                   />
                 </FieldPair>
@@ -518,7 +525,11 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputSupplierCode"
                     type="text"
                     readOnly
-                    value={product.primarySupplierCode || ''}
+                    value={
+                      product.suppliers && product.suppliers.length > 1
+                        ? product.suppliers.map((s) => s.supplierCode).filter(Boolean).join(', ')
+                        : product.primarySupplierCode || ''
+                    }
                     style={readOnlyInput}
                   />
                 </FieldPair>
@@ -528,7 +539,11 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputSupplierName"
                     type="text"
                     readOnly
-                    value={product.primarySupplierName || ''}
+                    value={
+                      product.suppliers && product.suppliers.length > 1
+                        ? product.suppliers.map((s) => s.supplierName).filter(Boolean).join(', ')
+                        : product.primarySupplierName || ''
+                    }
                     style={readOnlyInput}
                   />
                 </FieldPair>

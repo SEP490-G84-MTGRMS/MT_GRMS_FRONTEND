@@ -119,7 +119,7 @@ export const TransferListPage: React.FC = () => {
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
     const date =
-      timeRange === 'this_month' && dateField === 'transfer'
+      timeRange === 'this_month'
         ? monthStart
         : timeRange === 'custom' && customDate
         ? new Date(`${customDate}T00:00:00`).toISOString()
@@ -858,6 +858,8 @@ export const TransferListPage: React.FC = () => {
                         </button>
                       ) : t.status === 'Draft' ? (
                         <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa nhận)</span>
+                      ) : t.status === 'Pending' ? (
+                        <span style={{ fontStyle: 'italic', color: '#d97706' }}>(Chờ xuất)</span>
                       ) : (
                         <span style={{ fontStyle: 'italic', color: '#dc2626' }}>(Đã hủy)</span>
                       )}

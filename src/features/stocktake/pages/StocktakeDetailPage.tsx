@@ -790,7 +790,15 @@ export const StocktakeDetailPage: FC<{ defaultRole?: 'store_owner' | 'employee' 
                       {fmt(sr.totalRequestedQty)} SP · {fmt(sr.totalEstimatedAmount)} đ
                     </div>
                     <div style={{ fontSize: 10.5, color: '#0284c7', fontWeight: 600 }}>
-                      {sr.status}
+                      {({
+                        DRAFT: 'Bản nháp',
+                        PENDING_SUPPLIER: 'Chờ NCC duyệt',
+                        APPROVED: 'Đã xác nhận',
+                        PARTIALLY_HANDED_OVER: 'Giao một phần',
+                        COMPLETED: 'Đã bàn giao',
+                        REJECTED: 'NCC từ chối',
+                        CANCELLED: 'Đã hủy',
+                      } as Record<string, string>)[sr.status] || sr.status}
                     </div>
                   </div>
                 </div>

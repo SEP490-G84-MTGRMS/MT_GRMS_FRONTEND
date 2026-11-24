@@ -166,6 +166,12 @@ export const SupplierReturnDetailPage: FC = () => {
         note: 'Thanh toán phần cửa hàng theo chính sách đổi hàng',
       });
       setDetail(updated);
+      try {
+        const pos = await supplierReturnApi.getRelatedPurchaseOrders(detail.id);
+        setRelatedPos(pos);
+      } catch {
+        // ignore reload failure
+      }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } }; message?: string };
       setErrorMsg(e.response?.data?.message || e.message || 'Lỗi khi ghi nhận thanh toán.');

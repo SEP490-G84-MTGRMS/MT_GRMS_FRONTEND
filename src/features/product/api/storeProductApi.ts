@@ -71,6 +71,8 @@ export const storeProductApi = {
         category: x.category || '',
         // Đơn vị nhập: BE resolve DeliveryUoM → IsPurchaseUnit → BaseUnit (cùng logic màn NCC)
         unit: x.unit || x.deliveryUoM || x.baseUoM || 'Cái',
+        stockUnit: x.stockUnit || x.baseUoM || x.unit || 'Cái',
+        purchaseToStockRate: Number(x.purchaseToStockRate ?? 1) || 1,
         imageUrl: x.imageUrl || undefined,
         retailPrice: x.retailPrice,
         costPrice: x.costPrice,
@@ -138,9 +140,9 @@ export const storeProductApi = {
         id: b.id,
         code: b.code,
         name: b.name,
-        address: b.address,
-        managerName: b.managerName || 'Quản lý chi nhánh',
-        phone: b.phone || '0901 234 567',
+        address: b.address || '',
+        managerName: b.managerName || '',
+        phone: b.phone || '',
         totalProducts: b.totalProducts,
         totalStock: b.totalStock,
         lowStockCount: b.lowStockCount,
@@ -223,6 +225,7 @@ export const storeProductApi = {
   assignProducts: async (input: AssignStoreProductInput): Promise<void> => {
     await httpClient.post(`/branches/${input.storeId}/products`, {
       productIds: input.productIds,
+      items: input.items,
     });
   },
 

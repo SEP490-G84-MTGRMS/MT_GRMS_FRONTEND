@@ -114,14 +114,8 @@ export const AssignProductModal: FC<AssignProductModalProps> = ({
     return masterProducts.length > 0 ? masterProducts : localMasterProducts;
   }, [masterProducts, localMasterProducts]);
 
-  /** Chỉ cho gán mới SP master đang bán; SP Ngừng KD vẫn giữ trên list NCC–SP đã gán. */
-  const assignableCatalog = useMemo(
-    () =>
-      productCatalog.filter(
-        (p) => p.isActive !== false && p.status !== 'Inactive' && p.status !== 'Discontinued'
-      ),
-    [productCatalog]
-  );
+  /** Trạng thái Master không ảnh hưởng tới màn Sản Phẩm Theo NCC. */
+  const assignableCatalog = productCatalog;
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();

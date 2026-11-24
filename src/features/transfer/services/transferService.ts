@@ -161,8 +161,8 @@ export const transferService = {
         const stock = Number(product.currentStock ?? product.quantityOnHand ?? 0);
         const code = String(product.sku ?? product.productCode ?? product.code ?? '');
         const name = String(product.name ?? product.productName ?? '');
-        const unit = String(product.unit ?? product.baseUnit ?? product.unitName ?? 'Cái');
-        const price = Number(product.retailPrice ?? product.unitPrice ?? product.price ?? 0);
+        const unit = String(product.stockUnit ?? product.baseUnit ?? product.unit ?? product.unitName ?? 'Cái');
+        const price = Number(product.averageCost ?? product.costPrice ?? product.unitPrice ?? 0);
         const batches = Array.isArray(product.batches) ? (product.batches as Array<Record<string, unknown>>) : [];
         return {
           id,
