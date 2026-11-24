@@ -28,10 +28,17 @@ export const TaxAnalyticsSection: FC<Props> = ({ snapshots = [], year, periodTyp
     }
   }, [periodType]);
 
+  const activeSnapshots = useMemo(() => {
+    return snapshots.filter((s) => {
+      const st = String(s.status ?? '').toLowerCase();
+      return st !== 'superseded' && st !== '2';
+    });
+  }, [snapshots]);
+
   // Danh sách dữ liệu 4 Quý
   const quarterData = useMemo(() => {
     return [1, 2, 3, 4].map((q) => {
-      const snap = snapshots.find(
+      const snap = activeSnapshots.find(
         (s) =>
           (s.periodType === TaxPeriodType.Quarter || (s as any).quarter === q || !s.periodType) &&
           (s.periodNumber === q || (s as any).quarter === q)
@@ -48,12 +55,12 @@ export const TaxAnalyticsSection: FC<Props> = ({ snapshots = [], year, periodTyp
         isFinalized: Boolean(snap),
       };
     });
-  }, [snapshots, year]);
+  }, [activeSnapshots, year]);
 
   // Danh sách dữ liệu 12 Tháng
   const monthData = useMemo(() => {
     return Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
-      const snap = snapshots.find(
+      const snap = activeSnapshots.find(
         (s) => s.periodType === TaxPeriodType.Month && s.periodNumber === m
       );
       const rev = snap?.taxableRevenueInPeriod ?? (snap as any)?.taxableRevenue ?? 0;
@@ -68,7 +75,7 @@ export const TaxAnalyticsSection: FC<Props> = ({ snapshots = [], year, periodTyp
         isFinalized: Boolean(snap),
       };
     });
-  }, [snapshots, year]);
+  }, [activeSnapshots, year]);
 
   const currentData = viewMode === 'quarter' ? quarterData : monthData;
 
@@ -78,19 +85,18 @@ export const TaxAnalyticsSection: FC<Props> = ({ snapshots = [], year, periodTyp
     viewMode === 'quarter' ? 400_000_000 : 100_000_000
   );
 
-  // Tổng hợp KPI cả năm
+  // Tổng hợp KPI cả năm khớp với viewMode (không cộng trùng Superseded hay nhiều loại kỳ)
   const totalYearRevenue = useMemo(() => {
-    return snapshots.reduce(
-      (sum, s) => sum + (s.taxableRevenueInPeriod ?? (s as any).taxableRevenue ?? 0),
-      0
-    );
-  }, [snapshots]);
+    return currentData.reduce((sum, d) => sum + d.revenue, 0);
+  }, [currentData]);
 
   const totalYearTax = useMemo(() => {
-    return snapshots.reduce((sum, s) => sum + (s.totalTaxAmount ?? 0), 0);
-  }, [snapshots]);
+    return currentData.reduce((sum, d) => sum + d.tax, 0);
+  }, [currentData]);
 
-  const finalizedCount = snapshots.length;
+  const finalizedCount = useMemo(() => {
+    return currentData.filter((d) => d.isFinalized).length;
+  }, [currentData]);
 
   return (
     <div className="tax-table-card" style={{ padding: '24px 28px' }}>

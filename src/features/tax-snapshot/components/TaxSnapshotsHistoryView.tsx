@@ -177,23 +177,42 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                       </code>
                     </td>
                     <td>
-                      <span
-                        style={{
-                          background: '#ECFDF5',
-                          color: '#065F46',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          padding: '3px 8px',
-                          borderRadius: 9999,
-                          border: '1px solid #A7F3D0',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
-                      >
-                        <ShieldCheck size={12} color="#059669" />
-                        <span>Đã niêm phong</span>
-                      </span>
+                      {String(s.status ?? '').toLowerCase() === 'superseded' || String(s.status ?? '') === '2' ? (
+                        <span
+                          style={{
+                            background: '#FFFBEB',
+                            color: '#B45309',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: 9999,
+                            border: '1px solid #FDE68A',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <span>Đã thay thế{s.revisionNumber ? ` (Lần ${s.revisionNumber})` : ''}</span>
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            background: '#ECFDF5',
+                            color: '#065F46',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: 9999,
+                            border: '1px solid #A7F3D0',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <ShieldCheck size={12} color="#059669" />
+                          <span>Đã niêm phong{s.revisionNumber && s.revisionNumber > 1 ? ` (Lần ${s.revisionNumber})` : ''}</span>
+                        </span>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
