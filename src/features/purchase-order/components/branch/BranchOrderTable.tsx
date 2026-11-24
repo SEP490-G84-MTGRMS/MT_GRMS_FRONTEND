@@ -83,10 +83,16 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           valA = a.status;
           valB = b.status;
           break;
-        case 'lastUpdated':
-          valA = a.lastUpdated || '';
-          valB = b.lastUpdated || '';
+        case 'lastUpdated': {
+          const toSortKey = (s?: string) => {
+            if (!s) return '';
+            const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(.*)$/);
+            return m ? `${m[3]}-${m[2]}-${m[1]}${m[4]}` : s;
+          };
+          valA = toSortKey(a.lastUpdated);
+          valB = toSortKey(b.lastUpdated);
           break;
+        }
       }
 
       if (valA < valB) return sortDir === 'asc' ? -1 : 1;
@@ -490,8 +496,10 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                       <button
                         type="button"
                         onClick={() => onOrder(b.id)}
+                        disabled={b.status !== 'active'}
                         className="so-list-action-btn"
-                        title="Tạo ma trận đặt hàng cho chi nhánh này"
+                        style={b.status !== 'active' ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                        title={b.status !== 'active' ? 'Chi nhánh đang tạm ngưng hoạt động' : 'Tạo ma trận đặt hàng cho chi nhánh này'}
                       >
                         <ShoppingCart size={11} />
                         <span>Đặt hàng</span>
