@@ -858,6 +858,8 @@ export const TransferListPage: React.FC = () => {
                         </button>
                       ) : t.status === 'Draft' ? (
                         <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa nhận)</span>
+                      ) : t.status === 'Pending' ? (
+                        <span style={{ fontStyle: 'italic', color: '#d97706' }}>(Chờ xuất)</span>
                       ) : (
                         <span style={{ fontStyle: 'italic', color: '#dc2626' }}>(Đã hủy)</span>
                       )}

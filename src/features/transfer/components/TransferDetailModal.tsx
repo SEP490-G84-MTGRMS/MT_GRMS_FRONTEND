@@ -64,19 +64,25 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
     };
   }, [isOpen]);
 
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [returnReasonInput, setReturnReasonInput] = useState('');
+
   if (!isOpen || !currentTransfer) return null;
 
   const handleConfirmCancel = async (reason: string) => {
+    setActionError(null);
     try {
       const updated = await transferService.cancel(currentTransfer.id, reason);
       setCurrentTransfer(updated);
       onUpdateTransfer?.(updated);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Không thể hủy phiếu chuyển.');
+      setActionError(error instanceof Error ? error.message : 'Không thể hủy phiếu chuyển.');
     }
   };
 
   const applyAction = async (action: 'submit' | 'dispatch') => {
+    setActionError(null);
     try {
       const updated = action === 'submit'
         ? await transferService.submit(currentTransfer.id)
@@ -84,19 +90,30 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
       setCurrentTransfer(updated);
       onUpdateTransfer?.(updated);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Không thể cập nhật phiếu chuyển.');
+      setActionError(error instanceof Error ? error.message : 'Không thể cập nhật phiếu chuyển.');
     }
   };
 
-  const handleReturnToSource = async () => {
-    const reason = window.prompt('Xác nhận hàng đã thực tế quay về kho nguồn. Nhập lý do hoàn trả:');
-    if (!reason?.trim()) return;
+  const handleReturnToSource = () => {
+    setActionError(null);
+    setReturnReasonInput('');
+    setReturnModalOpen(true);
+  };
+
+  const confirmReturnToSource = async () => {
+    const reason = returnReasonInput.trim();
+    if (!reason) {
+      setActionError('Vui lòng nhập lý do hoàn trả hàng về kho nguồn.');
+      return;
+    }
+    setActionError(null);
     try {
-      const updated = await transferService.returnToSource(currentTransfer.id, reason.trim());
+      const updated = await transferService.returnToSource(currentTransfer.id, reason);
       setCurrentTransfer(updated);
       onUpdateTransfer?.(updated);
+      setReturnModalOpen(false);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Không thể xác nhận hoàn trả.');
+      setActionError(error instanceof Error ? error.message : 'Không thể xác nhận hoàn trả.');
     }
   };
 
@@ -493,6 +510,12 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
             </div>
           </div>
 
+          {actionError && (
+            <div style={{ margin: '0 24px 10px', padding: '8px 12px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 13 }}>
+              {actionError}
+            </div>
+          )}
+
           {/* 4. Bottom Toolbar: Các nút hành động Hủy, Sao chép, Xuất file | Nhận hàng, In */}
           <div
             style={{
@@ -595,6 +618,45 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
         onClose={() => setIsCancelModalOpen(false)}
         onConfirmCancel={handleConfirmCancel}
       />
+
+      {returnModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            zIndex: 10060,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 440, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+              Xác nhận hàng đã về kho nguồn
+            </h3>
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: '#475569' }}>
+              Nhập lý do hoàn trả hàng về chi nhánh gửi:
+            </p>
+            <textarea
+              rows={3}
+              value={returnReasonInput}
+              onChange={(e) => setReturnReasonInput(e.target.value)}
+              placeholder="Ví dụ: Chi nhánh nhận từ chối do sai lô..."
+              style={{ width: '100%', borderRadius: 8, border: '1px solid #cbd5e1', padding: 10, fontSize: 13, boxSizing: 'border-box', marginBottom: 14 }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" className="btn-secondary-white" onClick={() => setReturnModalOpen(false)}>
+                Hủy
+              </button>
+              <button type="button" className="btn-primary-teal" onClick={() => void confirmReturnToSource()}>
+                Xác nhận hoàn trả
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

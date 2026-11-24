@@ -16,10 +16,15 @@ import { getTransferErrorMessage, transferService } from '../services/transferSe
 import { SelectBatchModal } from '../components/SelectBatchModal';
 import { ImportTransferExcelModal } from '../components/ImportTransferExcelModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import '../transfer.css';
 
 export const CreateTransferPage: React.FC = () => {
   const navigate = useNavigate();
+  const currentUserName = useAuthStore((state) => state.user?.fullName || state.user?.username || 'Quản lý');
+  const [createdTime] = useState(() =>
+    new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  );
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   // Branch Selection
@@ -309,9 +314,9 @@ export const CreateTransferPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#64748b' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1e293b' }}>
             <User size={16} color="#0F766E" />
-            <span>Admin</span>
+            <span>{currentUserName}</span>
           </div>
-          <span>15/10/2025 11:37</span>
+          <span>{createdTime}</span>
         </div>
       </div>
 
