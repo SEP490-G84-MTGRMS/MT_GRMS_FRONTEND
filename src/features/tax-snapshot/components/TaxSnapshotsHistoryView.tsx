@@ -123,8 +123,8 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
           </p>
         </div>
       ) : (
-        <div className="tax-table-wrapper">
-          <table className="tax-table">
+        <div className="tax-table-wrapper" style={{ overflowX: 'auto' }}>
+          <table className="tax-table" style={{ minWidth: 960 }}>
             <thead>
               <tr>
                 <th>Kỳ thuế</th>
@@ -134,8 +134,8 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                 <th style={{ textAlign: 'right' }}>Thuế TNCN</th>
                 <th style={{ textAlign: 'right' }}>Tổng thuế</th>
                 <th>Mã HMAC</th>
-                <th>Trạng thái</th>
-                <th style={{ textAlign: 'right' }}>Thao tác</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Trạng thái</th>
+                <th style={{ textAlign: 'right', minWidth: 215, whiteSpace: 'nowrap' }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -214,13 +214,13 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                         </span>
                       )}
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'nowrap', gap: 6 }}>
                         <button
                           type="button"
                           onClick={() => handleOpenVerifyModal(s)}
                           className="tax-action-btn"
-                          style={{ color: '#0F766E', fontWeight: 700, fontSize: '0.76rem', padding: '4px 10px', whiteSpace: 'nowrap' }}
+                          style={{ color: '#0F766E', fontWeight: 700, fontSize: '0.76rem', padding: '4px 10px', whiteSpace: 'nowrap', flexShrink: 0 }}
                           title="Kiểm tra tính toàn vẹn chữ ký số HMAC-SHA256"
                         >
                           <ShieldCheck size={14} />
