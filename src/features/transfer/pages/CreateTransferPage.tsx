@@ -132,12 +132,12 @@ export const CreateTransferPage: React.FC = () => {
       items.map((it) =>
         it.id === batchModalItem.id
           ? {
-              ...it,
-              batchNumber: batch.batchNumber,
-              expiryDate: batch.expiryDate,
-              sentQty: qty,
-              amount: qty * it.unitPrice,
-            }
+            ...it,
+            batchNumber: batch.batchNumber,
+            expiryDate: batch.expiryDate,
+            sentQty: qty,
+            amount: qty * it.unitPrice,
+          }
           : it
       )
     );
@@ -171,7 +171,7 @@ export const CreateTransferPage: React.FC = () => {
   };
 
   return (
-    <div className="transfer-container">
+    <div className="transfer-container transfer-create-container">
       {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
 
       {/* Top Header Row (Khớp Ảnh 2: Create Transfer) */}
@@ -181,16 +181,16 @@ export const CreateTransferPage: React.FC = () => {
           justifyContent: 'space-between',
           alignItems: 'center',
           background: '#ffffff',
-          padding: '16px 24px',
+          padding: '16px 20px',
           borderRadius: 24,
           border: '1px solid #edf2f9',
           boxShadow: '0 4px 16px rgba(15, 118, 110, 0.05)',
           flexWrap: 'wrap',
-          gap: 16,
+          gap: 12,
         }}
       >
         {/* Trái: Link quay lại + Ô tìm kiếm hàng hóa + Nút thêm từ Excel */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, maxWidth: 750 }}>
+        <div className="transfer-create-header-left">
           <button
             type="button"
             onClick={() => navigate(transferBasePath)}
@@ -211,12 +211,12 @@ export const CreateTransferPage: React.FC = () => {
           </button>
 
           {/* Ô tìm kiếm */}
-          <div style={{ position: 'relative', flex: 1, maxWidth: 380 }}>
+          <div className="transfer-create-search-box">
             <input
               type="text"
               className="filter-input"
-              style={{ paddingLeft: 36, borderRadius: 9999 }}
-              placeholder="🔍 Tìm hàng hóa theo mã hoặc tên (F3)..."
+              style={{ width: '100%', paddingLeft: 36, borderRadius: 9999, boxSizing: 'border-box' }}
+              placeholder="Tìm hàng hóa theo mã hoặc tên (F3)..."
               value={searchKw}
               onChange={(e) => setSearchKw(e.target.value)}
             />
@@ -299,7 +299,7 @@ export const CreateTransferPage: React.FC = () => {
       </div>
 
       {/* Main 2-column Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+      <div className="transfer-create-layout">
         {/* CỘT TRÁI: Bảng hàng hóa chuyển */}
         <div
           style={{
@@ -307,10 +307,11 @@ export const CreateTransferPage: React.FC = () => {
             borderRadius: 24,
             border: '1px solid #edf2f9',
             boxShadow: '0 4px 16px rgba(15, 118, 110, 0.05)',
-            padding: 24,
+            padding: 20,
             display: 'flex',
             flexDirection: 'column',
             gap: 20,
+            minWidth: 0,
           }}
         >
           {/* Table */}
