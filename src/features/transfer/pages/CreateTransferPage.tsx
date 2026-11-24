@@ -82,6 +82,25 @@ export const CreateTransferPage: React.FC = () => {
     }).catch((error: unknown) => showToast(error instanceof Error ? error.message : 'Không tải được tồn kho theo lô.', 'warning'));
   }, [fromBranchId, products.length]);
 
+  // Tải tồn kho thực tế tại chi nhánh nhận (TRF-03) thay vì hardcode onHandReceiver = 0
+  useEffect(() => {
+    if (!toBranchId) return;
+    transferService
+      .products(toBranchId)
+      .then((destProducts) => {
+        const stockMap = new Map(destProducts.map((p) => [p.productId, p.onHandSender]));
+        setProducts((curr) =>
+          curr.map((p) => ({ ...p, onHandReceiver: stockMap.get(p.productId) ?? 0 }))
+        );
+        setItems((curr) =>
+          curr.map((it) => ({ ...it, onHandReceiver: stockMap.get(it.productId) ?? 0 }))
+        );
+      })
+      .catch(() => {
+        // Giữ 0 nếu chi nhánh nhận chưa có danh mục
+      });
+  }, [toBranchId]);
+
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3000);
