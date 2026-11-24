@@ -48,6 +48,9 @@ export const StoreOwnerDashboardPage = () => {
   }, [period, branchId, reload]);
 
   const periodLabel = periods.find((option) => option.value === period)?.label ?? 'Hôm nay';
+  const pnlLink = branchId
+    ? `/store-owner/finance?tab=pnl&branchId=${encodeURIComponent(branchId)}`
+    : '/store-owner/finance?tab=pnl';
   const hourlyTrend = period === 'today' || period === 'yesterday';
   const revenues = data?.sales.trend.map((point) => point.revenue) ?? [];
   const positiveExtent = Math.max(0, ...revenues);
@@ -93,7 +96,7 @@ export const StoreOwnerDashboardPage = () => {
       </div>
 
       <div className="owner-dash-primary-grid">
-        <section className="owner-dash-card owner-dash-chart-card"><SectionTitle title={hourlyTrend ? 'Doanh thu theo giờ' : 'Doanh thu theo ngày'} to="/store-owner/finance?tab=pnl" action="Báo cáo P&L" />
+        <section className="owner-dash-card owner-dash-chart-card"><SectionTitle title={hourlyTrend ? 'Doanh thu theo giờ' : 'Doanh thu theo ngày'} to={pnlLink} action="Báo cáo P&L" />
           {data.sales.trend.length === 0 || data.sales.trend.every((point) => point.revenue === 0)
             ? <div className="owner-dash-empty">Chưa có doanh thu trong kỳ này.</div>
             : <div className="owner-dash-chart" aria-label={hourlyTrend ? 'Biểu đồ doanh thu theo giờ' : 'Biểu đồ doanh thu theo ngày'}>
@@ -108,7 +111,7 @@ export const StoreOwnerDashboardPage = () => {
                   </div>;
                 })}
               </div>}</section>
-        <section className="owner-dash-card"><SectionTitle title="Tài chính" to="/store-owner/finance?tab=pnl" />
+        <section className="owner-dash-card"><SectionTitle title="Tài chính" to={pnlLink} />
           <div className="owner-dash-metric"><span>Lợi nhuận gộp</span><strong>{money(data.finance.grossProfit)}</strong></div>
           <div className="owner-dash-metric"><span>Chi phí vận hành</span><strong>{money(data.finance.operatingExpenses)}</strong></div>
           <div className="owner-dash-metric owner-dash-metric-total"><span>Lợi nhuận ròng</span><strong>{money(data.finance.netProfit)}</strong></div>
@@ -131,7 +134,7 @@ export const StoreOwnerDashboardPage = () => {
           <Link className="owner-dash-secondary-link" to="/store-owner/employees/schedule">Xem lịch phân ca <ArrowRight size={15} /></Link></section>
       </div>
 
-      <section className="owner-dash-card owner-dash-products"><SectionTitle title="Sản phẩm bán chạy" to="/store-owner/finance?tab=pnl" action="Xem báo cáo" />
+      <section className="owner-dash-card owner-dash-products"><SectionTitle title="Sản phẩm bán chạy" to={pnlLink} action="Xem báo cáo" />
         {data.sales.topProducts.length === 0 ? <div className="owner-dash-empty">Chưa có sản phẩm bán ra trong kỳ này.</div>
           : <div className="owner-dash-product-list">{data.sales.topProducts.map((item, index) => <div key={item.productId}><span className="owner-dash-rank">{index + 1}</span><span className="owner-dash-product-name">{item.productName}</span><span>{number(item.quantitySold)} đã bán</span><strong>{money(item.revenue)}</strong></div>)}</div>}</section>
     </>}
