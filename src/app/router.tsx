@@ -658,15 +658,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'inventory-lookup',
-        element: <InventoryLookupPage />,
+        element: <ProtectedRoute><InventoryLookupPage /></ProtectedRoute>,
       },
       {
         path: 'orders',
-        element: <InvoiceManagementPage />,
+        element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
       {
         path: 'invoices',
-        element: <InvoiceManagementPage />,
+        element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
           {
             path: 'payment-config',
@@ -806,15 +806,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'inventory-lookup',
-        element: <InventoryLookupPage />,
+        element: <ProtectedRoute><InventoryLookupPage /></ProtectedRoute>,
       },
       {
         path: 'orders',
-        element: <InvoiceManagementPage />,
+        element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
       {
         path: 'invoices',
-        element: <InvoiceManagementPage />,
+        element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
       {
         path: 'cashbook',
@@ -1161,15 +1161,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'inventory-lookup',
-        element: <InventoryLookupPage />,
+        element: <ProtectedRoute><InventoryLookupPage /></ProtectedRoute>,
       },
       {
         path: 'orders',
-        element: <InvoiceManagementPage />,
+        element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
       {
         path: 'invoices',
-        element: <InvoiceManagementPage />,
+        element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
     ],
   },
@@ -1214,15 +1214,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'inventory-lookup',
-        element: <InventoryLookupPage />,
+        element: <ProtectedRoute><InventoryLookupPage /></ProtectedRoute>,
       },
       {
         path: 'orders',
-        element: <InvoiceManagementPage />,
+        element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
       {
         path: 'invoices',
-        element: <InvoiceManagementPage />,
+        element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
       {
         path: 'purchase-orders',
