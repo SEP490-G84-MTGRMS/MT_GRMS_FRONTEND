@@ -208,6 +208,7 @@ export const productApi = {
     if (query.priceScope) params.priceScope = query.priceScope;
     if (query.fromDate) params.fromDate = query.fromDate;
     if (query.toDate) params.toDate = query.toDate;
+    if (query.searchTerm) params.searchTerm = query.searchTerm;
 
     const res = await httpClient.get<ApiResponse<ProductPriceHistoryPagedResult>>(`/products/${productId}/price-history`, {
       params,

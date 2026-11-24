@@ -662,8 +662,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       : '';
 
   const sellingPriceError =
-    sellingPrice < 0 || sellingPrice > 1_000_000_000
-      ? 'Giá bán không được nhỏ hơn 0 hoặc vượt quá 1.000.000.000 đ.'
+    sellingPrice <= 0 || sellingPrice > 1_000_000_000
+      ? 'Giá bán phải lớn hơn 0 và không vượt quá 1.000.000.000 đ.'
       : '';
 
   const trimmedBaseUnit = baseUnit.trim();
@@ -702,7 +702,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       : chain.error || '';
 
     const priceError =
-      row.sellingPrice < 0 || row.sellingPrice > 1_000_000_000 ? 'Giá bán tối đa 1.000.000.000 đ.' : '';
+      row.sellingPrice <= 0 || row.sellingPrice > 1_000_000_000 ? 'Giá bán phải lớn hơn 0 và tối đa 1.000.000.000 đ.' : '';
 
     const rowCostError =
       row.costPrice < 0 || row.costPrice > 1_000_000_000 ? 'Giá vốn tối đa 1.000.000.000 đ.' : '';
@@ -959,8 +959,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       return;
     }
 
-    if (sellingPrice < 0 || sellingPrice > 1_000_000_000) {
-      triggerValidationError('Giá bán không được nhỏ hơn 0 hoặc vượt quá 1.000.000.000 đ.');
+    if (sellingPrice <= 0 || sellingPrice > 1_000_000_000) {
+      triggerValidationError('Giá bán phải lớn hơn 0 và không vượt quá 1.000.000.000 đ.');
       return;
     }
     if (isPurchaseUnitKg && allowRepack) {
@@ -1031,8 +1031,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           triggerValidationError(`Đơn vị "${uName}": chưa quy đổi được về đơn vị cơ bản.`);
           return;
         }
-        if (row.sellingPrice < 0 || row.sellingPrice > 1_000_000_000) {
-          triggerValidationError(`Giá bán của đơn vị "${uName}" không hợp lệ (0 - 1.000.000.000 đ).`);
+        if (row.sellingPrice <= 0 || row.sellingPrice > 1_000_000_000) {
+          triggerValidationError(`Giá bán của đơn vị "${uName}" phải lớn hơn 0 và không vượt quá 1.000.000.000 đ.`);
           return;
         }
         if (row.costPrice < 0 || row.costPrice > 1_000_000_000) {
