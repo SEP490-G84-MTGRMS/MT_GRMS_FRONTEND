@@ -149,7 +149,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
             >
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.accountName} · {acc.currentBalance.toLocaleString('vi-VN')} đ
+                  {acc.accountName}{acc.branchName ? ` (${acc.branchName})` : ''} · {acc.currentBalance.toLocaleString('vi-VN')} đ
                 </option>
               ))}
             </select>
@@ -173,7 +173,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
                 .filter((a) => a.id !== fromAccountId)
                 .map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.accountName} · {acc.currentBalance.toLocaleString('vi-VN')} đ
+                    {acc.accountName}{acc.branchName ? ` (${acc.branchName})` : ''} · {acc.currentBalance.toLocaleString('vi-VN')} đ
                   </option>
                 ))}
             </select>
@@ -193,8 +193,9 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
               placeholder="0"
               value={amount}
               onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
-              min="1000"
-              step="1000"
+              min={1000}
+              max={availableBalance > 0 ? availableBalance : undefined}
+              step={1000}
               required
             />
             {Number(amount) > 0 && (
