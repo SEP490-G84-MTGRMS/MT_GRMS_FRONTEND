@@ -65,16 +65,17 @@ export const SupplierReturnFormPage: FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Fetch eligible completed GRNs
+  // Fetch eligible completed GRNs (reset selectedGrnId when branch changes — RTV-07)
   useEffect(() => {
     let isMounted = true;
+    setSelectedGrnId('');
     setIsLoadingGrns(true);
     supplierReturnApi
       .getEligibleGrns(branchId)
       .then((grns) => {
         if (!isMounted) return;
         setEligibleGrns(grns);
-        if (grns.length > 0 && !selectedGrnId) {
+        if (grns.length > 0) {
           setSelectedGrnId(grns[0].id);
         }
       })
