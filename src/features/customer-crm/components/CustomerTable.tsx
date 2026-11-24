@@ -65,10 +65,10 @@ export const CustomerTable: FC<CustomerTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '34%' }} />
+      <col style={{ width: '28%' }} />
+      <col style={{ width: '22%' }} />
+      <col style={{ width: '16%' }} />
       <col style={{ width: '12%' }} />
-      <col style={{ width: '18%' }} />
-      <col style={{ width: '14%' }} />
       <col style={{ width: '22%' }} />
     </colgroup>
   );
@@ -162,7 +162,27 @@ export const CustomerTable: FC<CustomerTableProps> = ({
 
                     {/* Cột 2: Liên hệ / Địa chỉ */}
                     <td className="so-list-td" style={{ color: '#475569', fontSize: '12.5px' }}>
-                      {c.email || sanitizeCustomerText(c.address) || '—'}
+                      {c.email && (
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.email}>
+                          {c.email}
+                        </div>
+                      )}
+                      {sanitizeCustomerText(c.address) && (
+                        <div
+                          style={{
+                            fontSize: '11.5px',
+                            color: '#64748b',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            marginTop: c.email ? 2 : 0,
+                          }}
+                          title={sanitizeCustomerText(c.address)}
+                        >
+                          {sanitizeCustomerText(c.address)}
+                        </div>
+                      )}
+                      {!c.email && !sanitizeCustomerText(c.address) && '—'}
                     </td>
 
                     {/* Cột 3: Công nợ hiện tại */}
