@@ -191,17 +191,17 @@ export const StoreProductTable: FC<StoreProductTableProps> = ({
   const tableColGroup = (
     <colgroup>
       <col style={{ width: '7%' }} />
-      <col style={{ width: '10%' }} />
+      <col style={{ width: '9%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '12%' }} />
+      <col style={{ width: '11%' }} />
       <col style={{ width: '7%' }} />
       <col style={{ width: '10%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '15%' }} />
+      <col style={{ width: '14%' }} />
       <col style={{ width: '4%' }} />
       <col style={{ width: '7%' }} />
-      <col style={{ width: '8%' }} />
+      <col style={{ width: '7%' }} />
       <col style={{ width: '6%' }} />
     </colgroup>
   );
