@@ -1393,6 +1393,7 @@ export const AppTopNav: FC = () => {
 
           {/* Right actions: Chọn chi nhánh + Hỗ trợ + Góp ý + Divider + Thông báo + Cài đặt + Profile */}
           <div
+            className="topnav-right-actions"
             style={{
               display: "flex",
               alignItems: "center",
@@ -1402,7 +1403,9 @@ export const AppTopNav: FC = () => {
             }}
           >
             {/* 0. Dropdown chọn chi nhánh */}
-            <BranchSelectorDropdown />
+            <div className="topnav-branch-desktop">
+              <BranchSelectorDropdown />
+            </div>
 
             {/* 1. Hỗ trợ */}
             <button
@@ -1458,6 +1461,7 @@ export const AppTopNav: FC = () => {
 
             {/* 5. Settings Gear icon with Interactive Dropdown */}
             <div
+              className="topnav-settings-wrap"
               style={{ position: "relative" }}
               ref={settingsMenuRef}
               onMouseEnter={handleSettingsEnter}
@@ -2120,6 +2124,9 @@ export const AppTopNav: FC = () => {
                 }}
               >
                 Quản lý Chuỗi Tạp Hóa
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <BranchSelectorDropdown />
               </div>
             </div>
             {visibleNavGroups.map((group) => (

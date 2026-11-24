@@ -1726,11 +1726,31 @@
   .so-layout-main {
     padding: 12px 12px 16px 12px !important;
   }
+  .topnav-inner {
+    padding: 0 10px !important;
+    gap: 6px !important;
+  }
   .topnav-brand-logo {
-    height: 28px !important;
+    height: 24px !important;
+  }
+  .topnav-right-actions {
+    gap: 4px !important;
+    min-width: 0;
+  }
+  .topnav-branch-desktop {
+    max-width: 126px;
+    overflow: hidden;
+  }
+  .topnav-branch-desktop button {
+    max-width: 126px !important;
+    padding: 4px 8px !important;
+    font-size: 11.5px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .topnav-support-btn,
-  .topnav-divider {
+  .topnav-divider,
+  .topnav-settings-wrap {
     display: none !important;
   }
 }
