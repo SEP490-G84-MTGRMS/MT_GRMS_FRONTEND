@@ -229,7 +229,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
                   : accounts
                 ).map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.accountName} (Hiện có: {acc.currentBalance.toLocaleString('vi-VN')} đ)
+                    {acc.accountName}{acc.branchName ? ` — ${acc.branchName}` : ''} (Hiện có: {acc.currentBalance.toLocaleString('vi-VN')} đ)
                   </option>
                 ))}
               </select>
