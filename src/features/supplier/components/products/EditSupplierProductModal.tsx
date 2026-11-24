@@ -319,7 +319,7 @@ const EditSupplierProductForm: FC<EditSupplierProductFormProps> = ({
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, height: 38 }}>
               <StatusToggle checked={isActive} onChange={setIsActive} />
               <span style={{ fontSize: 13.5, color: isActive ? '#15803d' : '#64748b', fontWeight: 600 }}>
-                {isActive ? 'Enable' : 'Disable'}
+                {isActive ? 'Hoạt động' : 'Tạm ngưng'}
               </span>
             </div>
           </FieldRow>
