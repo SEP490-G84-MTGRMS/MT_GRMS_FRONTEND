@@ -511,14 +511,7 @@ export const TransferListPage: React.FC = () => {
       {/* ── 2. FILTER CARD CSS GRID 4 CỘT x 2 DÒNG (~86px) ── */}
       <div className="so-list-filter" style={{ marginBottom: 8 }}>
         {/* ROW 1: Tìm kiếm mã/ghi chú, Kho gửi, Kho nhận, Trạng thái chuyển */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '10px 14px',
-            alignItems: 'center',
-          }}
-        >
+        <div className="so-filter-grid-4">
           {/* Cột 1: Tìm kiếm mã phiếu / ghi chú */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 65 }}>
@@ -613,16 +606,7 @@ export const TransferListPage: React.FC = () => {
         </div>
 
         {/* ROW 2: Tình trạng nhận/hư hại, Thời gian/kỳ lọc, Lọc theo ngày, Nút Tìm kiếm & Đặt lại */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '10px 14px',
-            alignItems: 'center',
-            paddingTop: 8,
-            borderTop: '1px dashed #f1f5f9',
-          }}
-        >
+        <div className="so-filter-grid-4 so-filter-grid-row2">
           {/* Cột 1: Tình trạng nhận hàng / lệch hàng */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 65 }}>

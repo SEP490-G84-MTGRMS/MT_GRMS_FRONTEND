@@ -135,15 +135,8 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
 
   return (
     <div className="so-list-filter">
-      {/* ── ROW 1: 4 columns CSS Grid ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '10px 14px',
-          alignItems: 'center',
-        }}
-      >
+      {/* ── ROW 1: Responsive CSS Grid ── */}
+      <div className="so-filter-grid-4">
         {/* Col 1: Mã chứng từ / diễn giải */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span className="so-list-filter-label" style={{ minWidth: 65 }}>Chứng từ:</span>
@@ -210,17 +203,8 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
         </div>
       </div>
 
-      {/* ── ROW 2: 4 columns CSS Grid ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '10px 14px',
-          alignItems: 'center',
-          paddingTop: 8,
-          borderTop: '1px dashed #f1f5f9',
-        }}
-      >
+      {/* ── ROW 2: Responsive CSS Grid ── */}
+      <div className="so-filter-grid-4 so-filter-grid-row2">
         {/* Col 1: Chi nhánh */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span className="so-list-filter-label" style={{ minWidth: 65 }}>Chi nhánh:</span>
