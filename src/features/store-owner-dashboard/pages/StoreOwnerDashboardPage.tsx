@@ -58,7 +58,7 @@ export const StoreOwnerDashboardPage = () => {
 
   return <main className="owner-dash">
     <header className="owner-dash-header">
-      <div><p className="owner-dash-eyebrow">TỔNG QUAN CỬA HÀNG</p><h1>Tình hình kinh doanh</h1><p className="owner-dash-subtitle">{user?.tenantName || 'Cửa hàng của bạn'} · {data?.scope.branchName || 'Toàn bộ chi nhánh'}</p></div>
+      <div><p className="owner-dash-eyebrow">TỔNG QUAN CỬA HÀNG</p><h1>Tình hình kinh doanh</h1><p className="owner-dash-subtitle">{user?.tenantName || branches[0]?.name?.split(' - ')[0] || 'Hệ thống cửa hàng'} · {data?.scope.branchName || 'Toàn bộ chi nhánh'}</p></div>
       <div className="owner-dash-controls">
         <label><span>Thời gian</span><select value={period} onChange={(event) => { startLoad(); setPeriod(event.target.value as DashboardPeriod); }}>{periods.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         <label><span>Chi nhánh</span><select value={branchId ?? ''} onChange={(event) => { startLoad(); setBranchId(event.target.value || null); }}><option value="">Toàn bộ chi nhánh</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
