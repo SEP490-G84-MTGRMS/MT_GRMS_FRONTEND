@@ -378,7 +378,7 @@ export const InventoryLookupPage: FC = () => {
               onHoldStock: batchReservedSum,
               availableStock: avail,
               minSafetyThreshold: minThreshold,
-              unitName: item.unit || selectedProduct.baseUnit,
+              unitName: selectedProduct.baseUnit || item.unit,
               isCurrentBranch: br.id === activeBranchGuid,
               status,
             });

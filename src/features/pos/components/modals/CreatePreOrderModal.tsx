@@ -133,7 +133,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
           setAppliedPromoLabels((res.appliedPromotions || []).filter((p) => !p.startsWith('Voucher [')));
           setGiftItems(res.giftItems || []);
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 300);
 
     return () => {
@@ -385,7 +385,10 @@ export const CreatePreOrderModal: React.FC<Props> = ({
         customerId: selectedCustomerId,
         customerName: customerName.trim() || 'Khách lẻ',
         customerPhone: normalizedPhone,
-        expectedPickupDate: expectedDate,
+        expectedPickupDate:
+          expectedDate && !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(expectedDate)
+            ? `${expectedDate.length === 16 ? `${expectedDate}:00` : expectedDate}+07:00`
+            : expectedDate,
         items: [...paidPayloadItems, ...giftPayloadItems],
         depositAmount,
         paymentMethod,

@@ -300,8 +300,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       removeVietnameseTones(c.name).includes(kwNoTone);
     const codeMatch = Boolean(
       c.code &&
-        (c.code.toLowerCase().includes(kw) ||
-          removeVietnameseTones(c.code).includes(kwNoTone))
+      (c.code.toLowerCase().includes(kw) ||
+        removeVietnameseTones(c.code).includes(kwNoTone))
     );
     return nameMatch || codeMatch;
   });
@@ -628,8 +628,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       ? trimmedProductCode.length > 50
         ? 'Mã hàng không được vượt quá 50 ký tự.'
         : /\s/.test(productCode) || !/^[A-Za-z0-9_-]+$/.test(trimmedProductCode)
-        ? 'Mã hàng chỉ gồm chữ cái không dấu, số, gạch ngang (-) hoặc gạch dưới (_).'
-        : ''
+          ? 'Mã hàng chỉ gồm chữ cái không dấu, số, gạch ngang (-) hoặc gạch dưới (_).'
+          : ''
       : '';
 
   const trimmedBarcode = barcode.trim();
@@ -641,8 +641,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       ? trimmedBarcode.length > 50 || /\s/.test(barcode)
         ? 'Mã vạch không được chứa khoảng trắng và tối đa 50 ký tự.'
         : isMainBarcodeDuplicateWithUom
-        ? 'Mã vạch đang trùng với mã vạch của đơn vị.'
-        : ''
+          ? 'Mã vạch đang trùng với mã vạch của đơn vị.'
+          : ''
       : '';
 
   const trimmedProductName = productName.trim();
@@ -650,8 +650,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     touched.productName && !trimmedProductName
       ? 'Vui lòng nhập tên sản phẩm (Bắt buộc).'
       : trimmedProductName.length > 200
-      ? 'Tên sản phẩm không được vượt quá 200 ký tự.'
-      : '';
+        ? 'Tên sản phẩm không được vượt quá 200 ký tự.'
+        : '';
 
   const categoryError =
     touched.categoryId && !categoryId ? 'Vui lòng chọn nhóm hàng (Bắt buộc).' : '';
@@ -671,8 +671,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     (touched.baseUnit || unitRows.length > 1) && !trimmedBaseUnit
       ? 'Vui lòng nhập tên đơn vị cơ bản (Bắt buộc).'
       : trimmedBaseUnit.length > 30
-      ? 'Tên đơn vị cơ bản tối đa 30 ký tự.'
-      : '';
+        ? 'Tên đơn vị cơ bản tối đa 30 ký tự.'
+        : '';
 
   const descriptionError =
     description.trim().length > 1000 ? 'Mô tả / ghi chú không được vượt quá 1000 ký tự.' : '';
@@ -687,19 +687,19 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const unitNameError = !uName
       ? 'Vui lòng nhập tên đơn vị.'
       : uName.length > 30
-      ? 'Tối đa 30 ký tự.'
-      : isDuplicateName
-      ? 'Trùng tên đơn vị tính.'
-      : '';
+        ? 'Tối đa 30 ký tự.'
+        : isDuplicateName
+          ? 'Trùng tên đơn vị tính.'
+          : '';
 
     const chain = resolveUnitChain(row.id, unitRows);
     const conversionError = row.isBaseUnit
       ? ''
       : !row.convertsToQty || row.convertsToQty <= 0
-      ? 'Số lượng phải > 0.'
-      : !row.convertsToId
-      ? 'Chọn đơn vị quy về.'
-      : chain.error || '';
+        ? 'Số lượng phải > 0.'
+        : !row.convertsToId
+          ? 'Chọn đơn vị quy về.'
+          : chain.error || '';
 
     const priceError =
       row.sellingPrice <= 0 || row.sellingPrice > 1_000_000_000 ? 'Giá bán phải lớn hơn 0 và tối đa 1.000.000.000 đ.' : '';
@@ -721,8 +721,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       row.barcode && (/\s/.test(row.barcode) || uBarcode.length > 50)
         ? 'Không chứa khoảng trắng (tối đa 50 ký tự).'
         : uBarcode && (isDuplicateBarcodeWithMain || isDuplicateBarcodeWithOther)
-        ? 'Trùng mã vạch.'
-        : '';
+          ? 'Trùng mã vạch.'
+          : '';
 
     return {
       unitNameError,
@@ -1005,7 +1005,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           triggerValidationError('Vui lòng nhập tên cho tất cả các đơn vị.');
           return;
         }
-        if (isTrayUnitName(uName)) {
+        if ((!row.isBaseUnit || allowRepack) && isTrayUnitName(uName)) {
           triggerValidationError(
             'Không dùng ĐVT "Khay" trong quy đổi. Dùng "Giá khi đóng khay (đ/kg)" khi bật chia khay / chế biến.'
           );
@@ -1173,1511 +1173,1511 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   return (
     <>
-    <div className="custom-modal-backdrop">
-      <div
-        className="custom-modal-box"
-        style={{
-          maxWidth: 1160,
-          width: '96vw',
-          height: 'min(88vh, 900px)',
-          maxHeight: '88vh',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          borderRadius: 16,
-        }}
-      >
-        {/* ========================================================= */}
-        {/* HEADER: Tiêu đề & Nút đóng (19)                           */}
-        {/* ========================================================= */}
-        <div className="custom-modal-header" style={{ padding: '16px 24px', flexShrink: 0 }}>
-          <div style={{ minWidth: 0 }}>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
-              {isEditing ? `Chỉnh sửa hàng hóa - ${productToEdit?.productName}` : 'Thêm hàng hóa'}
-            </h3>
-            {isEditing && productToEdit && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12.5, color: '#64748B' }}>
-                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontWeight: 600, color: '#334155' }}>
-                  {productToEdit.productCode}
-                </span>
-                <span
-                  style={{
-                    padding: '1px 8px',
-                    borderRadius: 999,
-                    fontWeight: 600,
-                    fontSize: 11.5,
-                    ...(productStatus === 'Active'
-                      ? { background: '#DCFCE7', color: '#15803D' }
-                      : { background: '#F1F5F9', color: '#64748B' }),
-                  }}
-                >
-                  {productStatus === 'Active' ? 'Đang kinh doanh' : 'Ngừng kinh doanh'}
-                </span>
-                {hasTransactions && <span>· Đã có giao dịch</span>}
-              </div>
-            )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {isEditing && productToEdit && (
-              <button
-                type="button"
-                onClick={() => setShowPriceHistory(true)}
-                disabled={isSubmitting}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  height: 34,
-                  padding: '0 12px',
-                  borderRadius: 8,
-                  border: '1px solid #ddd6fe',
-                  background: '#f5f3ff',
-                  color: '#6d28d9',
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                }}
-                title="Xem lịch sử thay đổi giá trước khi chỉnh sửa"
-              >
-                <History size={15} />
-                Lịch sử giá
-              </button>
-            )}
-            <button
-              type="button"
-              className="custom-modal-close"
-              onClick={onClose}
-              disabled={isSubmitting}
-              title="Đóng"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* BODY FORM                                                 */}
-        {/* ========================================================= */}
+      <div className="custom-modal-backdrop">
         <div
-          className="custom-modal-body"
+          className="custom-modal-box"
           style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            padding: '20px 24px',
+            maxWidth: 1160,
+            width: '96vw',
+            height: 'min(88vh, 900px)',
+            maxHeight: '88vh',
             display: 'flex',
             flexDirection: 'column',
-            gap: 16,
-            backgroundColor: '#F8FAFC',
+            overflow: 'hidden',
+            borderRadius: 16,
           }}
         >
-          {warningMsg && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 14px',
-                backgroundColor: '#FEF3C7',
-                color: '#B45309',
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 500,
-              }}
-            >
-              <AlertCircle size={16} />
-              <span>{warningMsg}</span>
+          {/* ========================================================= */}
+          {/* HEADER: Tiêu đề & Nút đóng (19)                           */}
+          {/* ========================================================= */}
+          <div className="custom-modal-header" style={{ padding: '16px 24px', flexShrink: 0 }}>
+            <div style={{ minWidth: 0 }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
+                {isEditing ? `Chỉnh sửa hàng hóa - ${productToEdit?.productName}` : 'Thêm hàng hóa'}
+              </h3>
+              {isEditing && productToEdit && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 12.5, color: '#64748B' }}>
+                  <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontWeight: 600, color: '#334155' }}>
+                    {productToEdit.productCode}
+                  </span>
+                  <span
+                    style={{
+                      padding: '1px 8px',
+                      borderRadius: 999,
+                      fontWeight: 600,
+                      fontSize: 11.5,
+                      ...(productStatus === 'Active'
+                        ? { background: '#DCFCE7', color: '#15803D' }
+                        : { background: '#F1F5F9', color: '#64748B' }),
+                    }}
+                  >
+                    {productStatus === 'Active' ? 'Đang kinh doanh' : 'Ngừng kinh doanh'}
+                  </span>
+                  {hasTransactions && <span>· Đã có giao dịch</span>}
+                </div>
+              )}
             </div>
-          )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {isEditing && productToEdit && (
+                <button
+                  type="button"
+                  onClick={() => setShowPriceHistory(true)}
+                  disabled={isSubmitting}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    height: 34,
+                    padding: '0 12px',
+                    borderRadius: 8,
+                    border: '1px solid #ddd6fe',
+                    background: '#f5f3ff',
+                    color: '#6d28d9',
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  }}
+                  title="Xem lịch sử thay đổi giá trước khi chỉnh sửa"
+                >
+                  <History size={15} />
+                  Lịch sử giá
+                </button>
+              )}
+              <button
+                type="button"
+                className="custom-modal-close"
+                onClick={onClose}
+                disabled={isSubmitting}
+                title="Đóng"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
 
-          {/* ───────────────────────────────────────────────────────── */}
-          {/* 1. THÔNG TIN CƠ BẢN (1, 2, 3, 4, 5, 17)                   */}
-          {/* ───────────────────────────────────────────────────────── */}
+          {/* ========================================================= */}
+          {/* BODY FORM                                                 */}
+          {/* ========================================================= */}
           <div
+            className="custom-modal-body"
             style={{
-              border: '1px solid #E2E8F0',
-              borderRadius: 10,
-              padding: '18px 20px',
-              backgroundColor: '#FFFFFF',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              padding: '20px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+              backgroundColor: '#F8FAFC',
             }}
           >
-            <h4
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: '#0F172A',
-                margin: '0 0 16px 0',
-                paddingBottom: 8,
-                borderBottom: '1px solid #F1F5F9',
-              }}
-            >
-              1. Thông tin chung
-            </h4>
+            {warningMsg && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  backgroundColor: '#FEF3C7',
+                  color: '#B45309',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 500,
+                }}
+              >
+                <AlertCircle size={16} />
+                <span>{warningMsg}</span>
+              </div>
+            )}
 
+            {/* ───────────────────────────────────────────────────────── */}
+            {/* 1. THÔNG TIN CƠ BẢN (1, 2, 3, 4, 5, 17)                   */}
+            {/* ───────────────────────────────────────────────────────── */}
             <div
               style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 280px',
-                gap: 24,
-                alignItems: 'start',
+                border: '1px solid #E2E8F0',
+                borderRadius: 10,
+                padding: '18px 20px',
+                backgroundColor: '#FFFFFF',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
               }}
             >
-              {/* Cột trái: (1) Mã hàng, (2) Mã vạch, (3) Tên hàng, (4) Nhóm hàng */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                  {/* (1) Mã hàng */}
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                        Mã hàng
-                      </label>
-                      {!isEditing && (
-                        <span style={{ fontSize: 11, color: productCode.length > 50 ? '#DC2626' : '#94A3B8' }}>
-                          {productCode.length}/50
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      className="filter-input"
-                      placeholder="Mã tự động sinh"
-                      value={productCode}
-                      onChange={(e) => {
-                        setProductCode(e.target.value);
-                        setTouched((prev) => ({ ...prev, productCode: true }));
-                      }}
-                      onBlur={() => setTouched((prev) => ({ ...prev, productCode: true }))}
-                      disabled={isEditing}
-                      style={{
-                        ...(isEditing ? { backgroundColor: '#F1F5F9', cursor: 'not-allowed', color: '#64748B' } : {}),
-                        ...(productCodeError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : {}),
-                      }}
-                      title={isEditing ? 'Mã hàng không thể thay đổi sau khi tạo' : undefined}
-                    />
-                    {productCodeError && (
-                      <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                        <span>{productCodeError}</span>
-                      </div>
-                    )}
-                  </div>
+              <h4
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: '#0F172A',
+                  margin: '0 0 16px 0',
+                  paddingBottom: 8,
+                  borderBottom: '1px solid #F1F5F9',
+                }}
+              >
+                1. Thông tin chung
+              </h4>
 
-                  {/* (2) Mã vạch */}
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 280px',
+                  gap: 24,
+                  alignItems: 'start',
+                }}
+              >
+                {/* Cột trái: (1) Mã hàng, (2) Mã vạch, (3) Tên hàng, (4) Nhóm hàng */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    {/* (1) Mã hàng */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                         <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                          Mã vạch
+                          Mã hàng
                         </label>
-                        {isLookingUpMaster && (
-                          <span style={{ fontSize: 11, color: '#0066FF', fontStyle: 'italic' }}>
-                            (Đang tra mẫu...)
+                        {!isEditing && (
+                          <span style={{ fontSize: 11, color: productCode.length > 50 ? '#DC2626' : '#94A3B8' }}>
+                            {productCode.length}/50
                           </span>
                         )}
                       </div>
-                      <span style={{ fontSize: 11, color: barcode.length > 50 ? '#DC2626' : '#94A3B8' }}>
-                        {barcode.length}/50
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      className="filter-input"
-                      placeholder="Nhập mã vạch (Barcode)"
-                      value={barcode}
-                      onChange={(e) => {
-                        setBarcode(e.target.value);
-                        setTouched((prev) => ({ ...prev, barcode: true }));
-                      }}
-                      onBlur={() => setTouched((prev) => ({ ...prev, barcode: true }))}
-                      style={barcodeError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                    />
-                    {barcodeError && (
-                      <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                        <span>{barcodeError}</span>
-                      </div>
-                    )}
-                    {masterSuggestion && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          padding: '8px 12px',
-                          background: '#F0F6FF',
-                          border: '1px solid #BFDBFE',
-                          borderRadius: '10px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 8,
+                      <input
+                        type="text"
+                        className="filter-input"
+                        placeholder="Mã tự động sinh"
+                        value={productCode}
+                        onChange={(e) => {
+                          setProductCode(e.target.value);
+                          setTouched((prev) => ({ ...prev, productCode: true }));
                         }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
-                          {masterSuggestion.imageUrl ? (
-                            <img
-                              src={masterSuggestion.imageUrl}
-                              alt=""
-                              style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
-                            />
-                          ) : (
-                            <Tag size={16} color="#0066FF" style={{ flexShrink: 0 }} />
-                          )}
-                          <div style={{ fontSize: 12, color: '#1E40AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            Thư viện mẫu: <strong>{masterSuggestion.name}</strong>
-                          </div>
+                        onBlur={() => setTouched((prev) => ({ ...prev, productCode: true }))}
+                        disabled={isEditing}
+                        style={{
+                          ...(isEditing ? { backgroundColor: '#F1F5F9', cursor: 'not-allowed', color: '#64748B' } : {}),
+                          ...(productCodeError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : {}),
+                        }}
+                        title={isEditing ? 'Mã hàng không thể thay đổi sau khi tạo' : undefined}
+                      />
+                      {productCodeError && (
+                        <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                          <span>{productCodeError}</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleApplyMasterSuggestion}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: '9999px',
-                            background: '#0066FF',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            fontSize: 11.5,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          Tự động điền
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* (3) Tên hàng */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                      Tên hàng <span style={{ color: '#EF4444' }}>*</span>
-                    </label>
-                    <span style={{ fontSize: 11, color: productName.length > 200 ? '#DC2626' : '#94A3B8' }}>
-                      {productName.length}/200
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    className="filter-input"
-                    placeholder="Nhập tên sản phẩm (Bắt buộc)"
-                    value={productName}
-                    onChange={(e) => {
-                      setProductName(e.target.value);
-                      setTouched((prev) => ({ ...prev, productName: true }));
-                    }}
-                    onBlur={() => setTouched((prev) => ({ ...prev, productName: true }))}
-                    style={productNameError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
-                  />
-                  {productNameError && (
-                    <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                      <span>{productNameError}</span>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* (4) Nhóm hàng & (17) Tạo mới - Searchable Dropdown */}
-                <div ref={categoryDropdownRef} style={{ position: 'relative' }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 6,
-                    }}
-                  >
-                    <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                      Nhóm hàng <span style={{ color: '#EF4444' }}>*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={onOpenCreateCategoryModal}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#0F766E',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        padding: 0,
-                      }}
-                    >
-                      + Tạo mới
-                    </button>
-                  </div>
-
-                  {/* Trigger Box */}
-                  <div
-                    onClick={() => {
-                      setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
-                      setTouched((prev) => ({ ...prev, categoryId: true }));
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      minHeight: 38,
-                      padding: '6px 12px',
-                      background: '#FFFFFF',
-                      border: categoryError
-                        ? '1.5px solid #EF4444'
-                        : isCategoryDropdownOpen
-                        ? '1.5px solid #0D9488'
-                        : '1px solid #CBD5E1',
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                      boxShadow: categoryError
-                        ? '0 0 0 2px rgba(239, 68, 68, 0.12)'
-                        : isCategoryDropdownOpen
-                        ? '0 0 0 3px rgba(13, 148, 136, 0.12)'
-                        : 'none',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                      <Folder size={16} color={selectedCategory ? '#0F766E' : '#94A3B8'} style={{ flexShrink: 0 }} />
-                      {selectedCategory ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                          <span
-                            style={{
-                              fontSize: 13.5,
-                              fontWeight: 600,
-                              color: '#0F172A',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {selectedCategory.name}
-                          </span>
-                          {selectedCategory.code && (
-                            <span
-                              style={{
-                                fontSize: 11,
-                                padding: '1px 6px',
-                                background: '#F1F5F9',
-                                color: '#64748B',
-                                borderRadius: 4,
-                                flexShrink: 0,
-                              }}
-                            >
-                              {selectedCategory.code}
+                    {/* (2) Mã vạch */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                            Mã vạch
+                          </label>
+                          {isLookingUpMaster && (
+                            <span style={{ fontSize: 11, color: '#0066FF', fontStyle: 'italic' }}>
+                              (Đang tra mẫu...)
                             </span>
                           )}
                         </div>
-                      ) : (
-                        <span style={{ fontSize: 13, color: '#94A3B8' }}>
-                          Chọn nhóm hàng (Bắt buộc)...
+                        <span style={{ fontSize: 11, color: barcode.length > 50 ? '#DC2626' : '#94A3B8' }}>
+                          {barcode.length}/50
                         </span>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {selectedCategory && (
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCategoryId('');
-                            setTouched((prev) => ({ ...prev, categoryId: true }));
-                          }}
-                          title="Bỏ chọn"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: 18,
-                            height: 18,
-                            borderRadius: '50%',
-                            color: '#94A3B8',
-                            cursor: 'pointer',
-                            transition: 'color 0.15s',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
-                        >
-                          <X size={13} />
-                        </span>
-                      )}
-                      <ChevronDown
-                        size={16}
-                        color="#64748B"
-                        style={{
-                          transform: isCategoryDropdownOpen ? 'rotate(180deg)' : 'none',
-                          transition: 'transform 0.2s ease',
-                          flexShrink: 0,
+                      </div>
+                      <input
+                        type="text"
+                        className="filter-input"
+                        placeholder="Nhập mã vạch (Barcode)"
+                        value={barcode}
+                        onChange={(e) => {
+                          setBarcode(e.target.value);
+                          setTouched((prev) => ({ ...prev, barcode: true }));
                         }}
+                        onBlur={() => setTouched((prev) => ({ ...prev, barcode: true }))}
+                        style={barcodeError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
                       />
-                    </div>
-                  </div>
-                  {categoryError && (
-                    <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                      <span>{categoryError}</span>
-                    </div>
-                  )}
-
-                  {/* Dropdown Menu Panel */}
-                  {isCategoryDropdownOpen && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: 6,
-                        background: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
-                        borderRadius: 10,
-                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                        zIndex: 1050,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {/* Search Bar */}
-                      <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
+                      {barcodeError && (
+                        <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                          <span>{barcodeError}</span>
+                        </div>
+                      )}
+                      {masterSuggestion && (
                         <div
                           style={{
+                            marginTop: 8,
+                            padding: '8px 12px',
+                            background: '#F0F6FF',
+                            border: '1px solid #BFDBFE',
+                            borderRadius: '10px',
                             display: 'flex',
                             alignItems: 'center',
+                            justifyContent: 'space-between',
                             gap: 8,
-                            background: '#FFFFFF',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: 6,
-                            padding: '6px 10px',
                           }}
                         >
-                          <Search size={14} color="#94A3B8" style={{ flexShrink: 0 }} />
-                          <input
-                            type="text"
-                            value={categorySearchKeyword}
-                            onChange={(e) => setCategorySearchKeyword(e.target.value)}
-                            placeholder="Tìm kiếm nhóm hàng theo tên, mã..."
-                            style={{
-                              border: 'none',
-                              background: 'transparent',
-                              outline: 'none',
-                              width: '100%',
-                              fontSize: 13,
-                              color: '#1E293B',
-                            }}
-                            autoFocus
-                          />
-                          {categorySearchKeyword && (
-                            <button
-                              type="button"
-                              onClick={() => setCategorySearchKeyword('')}
-                              style={{
-                                border: 'none',
-                                background: 'transparent',
-                                cursor: 'pointer',
-                                color: '#94A3B8',
-                                padding: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                              }}
-                            >
-                              <X size={13} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Danh sách categories */}
-                      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-                        {filteredCategories.length === 0 ? (
-                          <div style={{ padding: '24px 16px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
-                            <div>Không tìm thấy nhóm hàng nào phù hợp.</div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsCategoryDropdownOpen(false);
-                                onOpenCreateCategoryModal();
-                              }}
-                              style={{
-                                marginTop: 8,
-                                background: 'none',
-                                border: 'none',
-                                color: '#0F766E',
-                                fontSize: 13,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                textDecoration: 'underline',
-                              }}
-                            >
-                              + Bấm vào đây để tạo nhóm mới
-                            </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                            {masterSuggestion.imageUrl ? (
+                              <img
+                                src={masterSuggestion.imageUrl}
+                                alt=""
+                                style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
+                              />
+                            ) : (
+                              <Tag size={16} color="#0066FF" style={{ flexShrink: 0 }} />
+                            )}
+                            <div style={{ fontSize: 12, color: '#1E40AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              Thư viện mẫu: <strong>{masterSuggestion.name}</strong>
+                            </div>
                           </div>
-                        ) : (
-                          filteredCategories.map((c) => {
-                            const isSelected = c.id === categoryId;
-                            return (
-                              <div
-                                key={c.id}
-                                data-testid={`category-option-${c.id}`}
-                                onClick={() => {
-                                  setCategoryId(c.id);
-                                  setIsCategoryDropdownOpen(false);
-                                }}
+                          <button
+                            type="button"
+                            onClick={handleApplyMasterSuggestion}
+                            style={{
+                              padding: '4px 10px',
+                              borderRadius: '9999px',
+                              background: '#0066FF',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            Tự động điền
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* (3) Tên hàng */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                        Tên hàng <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <span style={{ fontSize: 11, color: productName.length > 200 ? '#DC2626' : '#94A3B8' }}>
+                        {productName.length}/200
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      className="filter-input"
+                      placeholder="Nhập tên sản phẩm (Bắt buộc)"
+                      value={productName}
+                      onChange={(e) => {
+                        setProductName(e.target.value);
+                        setTouched((prev) => ({ ...prev, productName: true }));
+                      }}
+                      onBlur={() => setTouched((prev) => ({ ...prev, productName: true }))}
+                      style={productNameError ? { borderColor: '#EF4444', boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.12)' } : undefined}
+                    />
+                    {productNameError && (
+                      <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                        <span>{productNameError}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* (4) Nhóm hàng & (17) Tạo mới - Searchable Dropdown */}
+                  <div ref={categoryDropdownRef} style={{ position: 'relative' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 6,
+                      }}
+                    >
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                        Nhóm hàng <span style={{ color: '#EF4444' }}>*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={onOpenCreateCategoryModal}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#0F766E',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        + Tạo mới
+                      </button>
+                    </div>
+
+                    {/* Trigger Box */}
+                    <div
+                      onClick={() => {
+                        setIsCategoryDropdownOpen(!isCategoryDropdownOpen);
+                        setTouched((prev) => ({ ...prev, categoryId: true }));
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        minHeight: 38,
+                        padding: '6px 12px',
+                        background: '#FFFFFF',
+                        border: categoryError
+                          ? '1.5px solid #EF4444'
+                          : isCategoryDropdownOpen
+                            ? '1.5px solid #0D9488'
+                            : '1px solid #CBD5E1',
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+                        boxShadow: categoryError
+                          ? '0 0 0 2px rgba(239, 68, 68, 0.12)'
+                          : isCategoryDropdownOpen
+                            ? '0 0 0 3px rgba(13, 148, 136, 0.12)'
+                            : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                        <Folder size={16} color={selectedCategory ? '#0F766E' : '#94A3B8'} style={{ flexShrink: 0 }} />
+                        {selectedCategory ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                            <span
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 600,
+                                color: '#0F172A',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {selectedCategory.name}
+                            </span>
+                            {selectedCategory.code && (
+                              <span
                                 style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  padding: '9px 12px',
-                                  cursor: 'pointer',
-                                  background: isSelected ? '#F0FDFA' : 'transparent',
-                                  borderLeft: isSelected ? '3px solid #0D9488' : '3px solid transparent',
-                                  transition: 'background 0.15s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                  if (!isSelected) e.currentTarget.style.backgroundColor = '#F8FAFC';
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                                  fontSize: 11,
+                                  padding: '1px 6px',
+                                  background: '#F1F5F9',
+                                  color: '#64748B',
+                                  borderRadius: 4,
+                                  flexShrink: 0,
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                                  <Folder
-                                    size={15}
-                                    color={isSelected ? '#0F766E' : '#94A3B8'}
-                                    style={{ flexShrink: 0 }}
-                                  />
-                                  <span
-                                    style={{
-                                      fontSize: 13,
-                                      fontWeight: isSelected ? 600 : 400,
-                                      color: isSelected ? '#0F766E' : '#1E293B',
-                                      whiteSpace: 'nowrap',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                    }}
-                                  >
-                                    {c.name}
-                                  </span>
-                                  {c.code && (
-                                    <span
-                                      style={{
-                                        fontSize: 11,
-                                        padding: '1px 5px',
-                                        background: isSelected ? '#CCFBF1' : '#F1F5F9',
-                                        color: isSelected ? '#0F766E' : '#64748B',
-                                        borderRadius: 4,
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      {c.code}
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  {c.productCount !== undefined && (
-                                    <span style={{ fontSize: 11, color: '#94A3B8' }}>
-                                      {c.productCount} SP
-                                    </span>
-                                  )}
-                                  {isSelected && <Check size={16} color="#0D9488" style={{ flexShrink: 0 }} />}
-                                </div>
-                              </div>
-                            );
-                          })
+                                {selectedCategory.code}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 13, color: '#94A3B8' }}>
+                            Chọn nhóm hàng (Bắt buộc)...
+                          </span>
                         )}
                       </div>
 
-                      {/* Footer tạo mới nhanh */}
-                      <div
-                        style={{
-                          padding: '8px 12px',
-                          borderTop: '1px solid #F1F5F9',
-                          background: '#F8FAFC',
-                          display: 'flex',
-                          justifyContent: 'flex-end',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsCategoryDropdownOpen(false);
-                            onOpenCreateCategoryModal();
-                          }}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {selectedCategory && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCategoryId('');
+                              setTouched((prev) => ({ ...prev, categoryId: true }));
+                            }}
+                            title="Bỏ chọn"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 18,
+                              height: 18,
+                              borderRadius: '50%',
+                              color: '#94A3B8',
+                              cursor: 'pointer',
+                              transition: 'color 0.15s',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = '#94A3B8')}
+                          >
+                            <X size={13} />
+                          </span>
+                        )}
+                        <ChevronDown
+                          size={16}
+                          color="#64748B"
                           style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#0F766E',
-                            fontSize: 12.5,
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            padding: '4px 6px',
+                            transform: isCategoryDropdownOpen ? 'rotate(180deg)' : 'none',
+                            transition: 'transform 0.2s ease',
+                            flexShrink: 0,
                           }}
-                        >
-                          <Plus size={14} />
-                          Tạo mới nhóm hàng
-                        </button>
+                        />
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
+                    {categoryError && (
+                      <div style={{ color: '#DC2626', fontSize: 11.5, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                        <span>{categoryError}</span>
+                      </div>
+                    )}
 
-              {/* Cột phải: (5) Khung tải ảnh lên Cloudinary */}
-              <div
-                style={{
-                  border: isUploadingImage ? '1.5px dashed #0D9488' : '1px solid #CBD5E1',
-                  borderRadius: 12,
-                  padding: 14,
-                  backgroundColor: isUploadingImage ? '#F0FDFA' : '#FFFFFF',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  minHeight: 180,
-                  boxSizing: 'border-box',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={handleImageUpload}
-                  disabled={isUploadingImage || isSubmitting}
-                />
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: images.length > 0 ? '6px 8px' : '14px 10px',
-                    width: '100%',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  {isUploadingImage ? (
-                    <>
-                      <Loader2
-                        size={28}
-                        color="#0D9488"
-                        style={{
-                          marginBottom: 8,
-                          animation: 'spin 1s linear infinite',
-                        }}
-                      />
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#0F766E', marginBottom: 4 }}>
-                        Đang tải lên Cloudinary...
-                      </span>
-                      <span style={{ fontSize: 11, color: '#64748B' }}>
-                        Vui lòng chờ trong giây lát
-                      </span>
-                    </>
-                  ) : images.length > 0 ? (
-                    <div
-                      style={{
-                        position: 'relative',
-                        width: '100%',
-                        height: 120,
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                        backgroundColor: '#F8FAFC',
-                        border: '1px solid #E2E8F0',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      onClick={() => setPreviewImageModalUrl(images[0])}
-                      title="Bấm để xem ảnh phóng to"
-                    >
-                      <img
-                        src={images[0]}
-                        alt="Ảnh hàng hóa chính"
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          objectFit: 'contain',
-                        }}
-                      />
+                    {/* Dropdown Menu Panel */}
+                    {isCategoryDropdownOpen && (
                       <div
                         style={{
                           position: 'absolute',
-                          bottom: 6,
-                          display: 'flex',
-                          gap: 6,
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          type="button"
-                          className="btn-secondary-white"
-                          style={{
-                            padding: '3px 8px',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            borderRadius: 6,
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                          }}
-                          disabled={isSubmitting}
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <Plus size={12} style={{ marginRight: 4 }} /> Thêm ảnh
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <Camera size={26} color="#475569" style={{ marginBottom: 8 }} />
-                      <button
-                        type="button"
-                        className="btn-secondary-white"
-                        style={{
-                          padding: '5px 14px',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          borderColor: '#94A3B8',
-                          marginBottom: 6,
-                          cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                        }}
-                        disabled={isSubmitting}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        + Thêm ảnh
-                      </button>
-                      <span style={{ fontSize: 11, color: '#64748B' }}>
-                        (Tối đa 5MB)
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Hàng ảnh thumbnail preview */}
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    marginTop: 10,
-                    width: '100%',
-                    paddingTop: 10,
-                    borderTop: '1px solid #E2E8F0',
-                    justifyContent: 'center',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  {images.length > 0 ? (
-                    images.map((img, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setPreviewImageModalUrl(img)}
-                        style={{
-                          width: 52,
-                          height: 52,
-                          borderRadius: 6,
-                          border: idx === 0 ? '2px solid #0D9488' : '1.5px solid #CBD5E1',
+                          top: '100%',
+                          left: 0,
+                          right: 0,
+                          marginTop: 6,
+                          background: '#FFFFFF',
+                          border: '1px solid #E2E8F0',
+                          borderRadius: 10,
+                          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                          zIndex: 1050,
                           overflow: 'hidden',
-                          position: 'relative',
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                         }}
-                        title={idx === 0 ? 'Ảnh đại diện (Bấm để xem to)' : 'Bấm để xem to'}
                       >
-                        <img
-                          src={img}
-                          alt={`thumb-${idx}`}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                        {idx === 0 ? (
-                          <span
+                        {/* Search Bar */}
+                        <div style={{ padding: '8px 10px', borderBottom: '1px solid #F1F5F9', background: '#FAFAFA' }}>
+                          <div
                             style={{
-                              position: 'absolute',
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              backgroundColor: '#0D9488',
-                              color: '#FFFFFF',
-                              fontSize: 9,
-                              fontWeight: 700,
-                              textAlign: 'center',
-                              lineHeight: '13px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              background: '#FFFFFF',
+                              border: '1px solid #CBD5E1',
+                              borderRadius: 6,
+                              padding: '6px 10px',
                             }}
                           >
-                            Chính
-                          </span>
-                        ) : (
+                            <Search size={14} color="#94A3B8" style={{ flexShrink: 0 }} />
+                            <input
+                              type="text"
+                              value={categorySearchKeyword}
+                              onChange={(e) => setCategorySearchKeyword(e.target.value)}
+                              placeholder="Tìm kiếm nhóm hàng theo tên, mã..."
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                outline: 'none',
+                                width: '100%',
+                                fontSize: 13,
+                                color: '#1E293B',
+                              }}
+                              autoFocus
+                            />
+                            {categorySearchKeyword && (
+                              <button
+                                type="button"
+                                onClick={() => setCategorySearchKeyword('')}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  color: '#94A3B8',
+                                  padding: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <X size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Danh sách categories */}
+                        <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                          {filteredCategories.length === 0 ? (
+                            <div style={{ padding: '24px 16px', textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
+                              <div>Không tìm thấy nhóm hàng nào phù hợp.</div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsCategoryDropdownOpen(false);
+                                  onOpenCreateCategoryModal();
+                                }}
+                                style={{
+                                  marginTop: 8,
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#0F766E',
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  textDecoration: 'underline',
+                                }}
+                              >
+                                + Bấm vào đây để tạo nhóm mới
+                              </button>
+                            </div>
+                          ) : (
+                            filteredCategories.map((c) => {
+                              const isSelected = c.id === categoryId;
+                              return (
+                                <div
+                                  key={c.id}
+                                  data-testid={`category-option-${c.id}`}
+                                  onClick={() => {
+                                    setCategoryId(c.id);
+                                    setIsCategoryDropdownOpen(false);
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '9px 12px',
+                                    cursor: 'pointer',
+                                    background: isSelected ? '#F0FDFA' : 'transparent',
+                                    borderLeft: isSelected ? '3px solid #0D9488' : '3px solid transparent',
+                                    transition: 'background 0.15s ease',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isSelected) e.currentTarget.style.backgroundColor = '#F8FAFC';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                >
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                    <Folder
+                                      size={15}
+                                      color={isSelected ? '#0F766E' : '#94A3B8'}
+                                      style={{ flexShrink: 0 }}
+                                    />
+                                    <span
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: isSelected ? 600 : 400,
+                                        color: isSelected ? '#0F766E' : '#1E293B',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                      }}
+                                    >
+                                      {c.name}
+                                    </span>
+                                    {c.code && (
+                                      <span
+                                        style={{
+                                          fontSize: 11,
+                                          padding: '1px 5px',
+                                          background: isSelected ? '#CCFBF1' : '#F1F5F9',
+                                          color: isSelected ? '#0F766E' : '#64748B',
+                                          borderRadius: 4,
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        {c.code}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    {c.productCount !== undefined && (
+                                      <span style={{ fontSize: 11, color: '#94A3B8' }}>
+                                        {c.productCount} SP
+                                      </span>
+                                    )}
+                                    {isSelected && <Check size={16} color="#0D9488" style={{ flexShrink: 0 }} />}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        {/* Footer tạo mới nhanh */}
+                        <div
+                          style={{
+                            padding: '8px 12px',
+                            borderTop: '1px solid #F1F5F9',
+                            background: '#F8FAFC',
+                            display: 'flex',
+                            justifyContent: 'flex-end',
+                          }}
+                        >
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSetMainImage(idx);
+                            onClick={() => {
+                              setIsCategoryDropdownOpen(false);
+                              onOpenCreateCategoryModal();
                             }}
                             style={{
-                              position: 'absolute',
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              backgroundColor: 'rgba(15, 23, 42, 0.75)',
-                              color: '#F8FAFC',
-                              fontSize: 8,
-                              fontWeight: 600,
-                              textAlign: 'center',
-                              lineHeight: '13px',
+                              background: 'none',
                               border: 'none',
+                              color: '#0F766E',
+                              fontSize: 12.5,
+                              fontWeight: 600,
                               cursor: 'pointer',
-                              padding: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '4px 6px',
                             }}
-                            title="Đặt làm ảnh đại diện"
                           >
-                            Đặt chính
+                            <Plus size={14} />
+                            Tạo mới nhóm hàng
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveImage(idx);
-                          }}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            right: 0,
-                            background: 'rgba(0,0,0,0.6)',
-                            color: '#FFFFFF',
-                            border: 'none',
-                            fontSize: 10,
-                            cursor: 'pointer',
-                            padding: '1px 4px',
-                            lineHeight: 1,
-                            borderRadius: '0 0 0 4px',
-                          }}
-                          title="Xóa ảnh"
-                        >
-                          &times;
-                        </button>
+                        </div>
                       </div>
-                    ))
-                  ) : (
-                    // 4 ô thumbnail placeholder như wireframe
-                    [1, 2, 3, 4].map((i) => (
+                    )}
+                  </div>
+                </div>
+
+                {/* Cột phải: (5) Khung tải ảnh lên Cloudinary */}
+                <div
+                  style={{
+                    border: isUploadingImage ? '1.5px dashed #0D9488' : '1px solid #CBD5E1',
+                    borderRadius: 12,
+                    padding: 14,
+                    backgroundColor: isUploadingImage ? '#F0FDFA' : '#FFFFFF',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    minHeight: 180,
+                    boxSizing: 'border-box',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    ref={fileInputRef}
+                    style={{ display: 'none' }}
+                    onChange={handleImageUpload}
+                    disabled={isUploadingImage || isSubmitting}
+                  />
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: images.length > 0 ? '6px 8px' : '14px 10px',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {isUploadingImage ? (
+                      <>
+                        <Loader2
+                          size={28}
+                          color="#0D9488"
+                          style={{
+                            marginBottom: 8,
+                            animation: 'spin 1s linear infinite',
+                          }}
+                        />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#0F766E', marginBottom: 4 }}>
+                          Đang tải lên Cloudinary...
+                        </span>
+                        <span style={{ fontSize: 11, color: '#64748B' }}>
+                          Vui lòng chờ trong giây lát
+                        </span>
+                      </>
+                    ) : images.length > 0 ? (
                       <div
-                        key={i}
                         style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 6,
-                          border: '1px solid #E2E8F0',
+                          position: 'relative',
+                          width: '100%',
+                          height: 120,
+                          borderRadius: 8,
+                          overflow: 'hidden',
                           backgroundColor: '#F8FAFC',
+                          border: '1px solid #E2E8F0',
+                          cursor: 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
+                        onClick={() => setPreviewImageModalUrl(images[0])}
+                        title="Bấm để xem ảnh phóng to"
                       >
-                        <span style={{ fontSize: 14, opacity: 0.4 }}>🖼️</span>
+                        <img
+                          src={images[0]}
+                          alt="Ảnh hàng hóa chính"
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            objectFit: 'contain',
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            bottom: 6,
+                            display: 'flex',
+                            gap: 6,
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="btn-secondary-white"
+                            style={{
+                              padding: '3px 8px',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              borderRadius: 6,
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                            }}
+                            disabled={isSubmitting}
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            <Plus size={12} style={{ marginRight: 4 }} /> Thêm ảnh
+                          </button>
+                        </div>
                       </div>
-                    ))
-                  )}
+                    ) : (
+                      <>
+                        <Camera size={26} color="#475569" style={{ marginBottom: 8 }} />
+                        <button
+                          type="button"
+                          className="btn-secondary-white"
+                          style={{
+                            padding: '5px 14px',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            borderColor: '#94A3B8',
+                            marginBottom: 6,
+                            cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                          }}
+                          disabled={isSubmitting}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          + Thêm ảnh
+                        </button>
+                        <span style={{ fontSize: 11, color: '#64748B' }}>
+                          (Tối đa 5MB)
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Hàng ảnh thumbnail preview */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      marginTop: 10,
+                      width: '100%',
+                      paddingTop: 10,
+                      borderTop: '1px solid #E2E8F0',
+                      justifyContent: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {images.length > 0 ? (
+                      images.map((img, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => setPreviewImageModalUrl(img)}
+                          style={{
+                            width: 52,
+                            height: 52,
+                            borderRadius: 6,
+                            border: idx === 0 ? '2px solid #0D9488' : '1.5px solid #CBD5E1',
+                            overflow: 'hidden',
+                            position: 'relative',
+                            cursor: 'pointer',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                          }}
+                          title={idx === 0 ? 'Ảnh đại diện (Bấm để xem to)' : 'Bấm để xem to'}
+                        >
+                          <img
+                            src={img}
+                            alt={`thumb-${idx}`}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                          {idx === 0 ? (
+                            <span
+                              style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                backgroundColor: '#0D9488',
+                                color: '#FFFFFF',
+                                fontSize: 9,
+                                fontWeight: 700,
+                                textAlign: 'center',
+                                lineHeight: '13px',
+                              }}
+                            >
+                              Chính
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSetMainImage(idx);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                                color: '#F8FAFC',
+                                fontSize: 8,
+                                fontWeight: 600,
+                                textAlign: 'center',
+                                lineHeight: '13px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: 0,
+                              }}
+                              title="Đặt làm ảnh đại diện"
+                            >
+                              Đặt chính
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveImage(idx);
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              right: 0,
+                              background: 'rgba(0,0,0,0.6)',
+                              color: '#FFFFFF',
+                              border: 'none',
+                              fontSize: 10,
+                              cursor: 'pointer',
+                              padding: '1px 4px',
+                              lineHeight: 1,
+                              borderRadius: '0 0 0 4px',
+                            }}
+                            title="Xóa ảnh"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      // 4 ô thumbnail placeholder như wireframe
+                      [1, 2, 3, 4].map((i) => (
+                        <div
+                          key={i}
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 6,
+                            border: '1px solid #E2E8F0',
+                            backgroundColor: '#F8FAFC',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <span style={{ fontSize: 14, opacity: 0.4 }}>🖼️</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* ───────────────────────────────────────────────────────── */}
-          {/* 2. ĐƠN VỊ & GIÁ — một bảng duy nhất                         */}
-          {/* ───────────────────────────────────────────────────────── */}
-          <div style={sectionCardStyle}>
-            <h4 style={sectionTitleStyle}>2. Đơn vị &amp; giá</h4>
-            <p style={{ margin: '0 0 12px', fontSize: 12, color: '#64748B', lineHeight: 1.45 }}>
-              Ví dụ: 1 Lốc = 4 Hộp, 1 Thùng = 5 Lốc → hệ thống tự ra 1 Thùng = 20 Hộp (đơn vị cơ bản).
-            </p>
+            {/* ───────────────────────────────────────────────────────── */}
+            {/* 2. ĐƠN VỊ & GIÁ — một bảng duy nhất                         */}
+            {/* ───────────────────────────────────────────────────────── */}
+            <div style={sectionCardStyle}>
+              <h4 style={sectionTitleStyle}>2. Đơn vị &amp; giá</h4>
+              <p style={{ margin: '0 0 12px', fontSize: 12, color: '#64748B', lineHeight: 1.45 }}>
+                Ví dụ: 1 Lốc = 4 Hộp, 1 Thùng = 5 Lốc → hệ thống tự ra 1 Thùng = 20 Hộp (đơn vị cơ bản).
+              </p>
 
-            <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569' }}>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: 120 }}>Đơn vị</th>
-                    <th style={{ ...thStyle, textAlign: 'left', minWidth: 320 }}>Quy đổi</th>
-                    {userRole === 'StoreOwner' && (
-                      <th style={{ ...thStyle, textAlign: 'right', width: 110 }}>Giá vốn</th>
-                    )}
-                    <th style={{ ...thStyle, textAlign: 'right', width: 120 }}>
-                      Giá bán <span style={{ color: '#EF4444' }}>*</span>
-                    </th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: 72 }}>Cơ bản</th>
-                    <th style={{ ...thStyle, textAlign: 'center', width: 72 }}>ĐV nhập</th>
-                    <th style={{ ...thStyle, width: 44 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unitRows.map((row) => {
-                    const rowErr = getUnitRowErrors(row);
-                    const lockBaseName = hasTransactions && row.isBaseUnit;
-                    const showBaseErr = row.isBaseUnit && baseUnitError;
-                    const convertTargets = unitRows.filter((o) => o.id !== row.id);
-                    return (
-                      <tr key={row.id} style={{ borderBottom: '1px solid #F1F5F9', verticalAlign: 'top' }}>
-                        <td style={tdStyle}>
-                          <input
-                            type="text"
-                            className="filter-input"
-                            placeholder="Hộp, Lốc, Thùng..."
-                            value={row.unitName}
-                            disabled={lockBaseName}
-                            title={lockBaseName ? 'Đã có giao dịch — không đổi tên đơn vị cơ bản' : undefined}
-                            onChange={(e) => {
-                              handleUpdateUnitRow(row.id, 'unitName', e.target.value);
-                              if (row.isBaseUnit) setTouched((prev) => ({ ...prev, baseUnit: true }));
-                            }}
-                            onBlur={() => {
-                              if (row.isBaseUnit) setTouched((prev) => ({ ...prev, baseUnit: true }));
-                            }}
-                            style={{
-                              ...cellInputStyle,
-                              ...(lockBaseName
-                                ? { backgroundColor: '#F1F5F9', color: '#64748B', cursor: 'not-allowed' }
-                                : {}),
-                              ...(rowErr.unitNameError || showBaseErr ? errorBorderStyle : {}),
-                            }}
-                          />
-                          {(rowErr.unitNameError || showBaseErr) && (
-                            <div style={cellErrorStyle}>{rowErr.unitNameError || baseUnitError}</div>
-                          )}
-                        </td>
-                        <td style={tdStyle}>
-                          {row.isBaseUnit ? (
-                            <div style={{ paddingTop: 8, color: '#94A3B8', fontSize: 12.5 }}>
-                              Đơn vị tồn kho (chuẩn = 1)
-                            </div>
-                          ) : (
-                            <div>
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 6,
-                                  flexWrap: 'nowrap',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
-                                  1 {row.unitName.trim() || '…'} =
-                                </span>
-                                <input
-                                  type="number"
-                                  className="filter-input"
-                                  min={0.0001}
-                                  step="any"
-                                  placeholder="4"
-                                  value={row.convertsToQty === 0 ? '' : row.convertsToQty}
-                                  onChange={(e) =>
-                                    handleUpdateUnitRow(
-                                      row.id,
-                                      'convertsToQty',
-                                      e.target.value === '' ? 0 : Number(e.target.value)
-                                    )
-                                  }
-                                  onFocus={(e) => e.target.select()}
+              <div style={{ border: '1px solid #E2E8F0', borderRadius: 8, overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569' }}>
+                      <th style={{ ...thStyle, textAlign: 'left', minWidth: 120 }}>Đơn vị</th>
+                      <th style={{ ...thStyle, textAlign: 'left', minWidth: 320 }}>Quy đổi</th>
+                      {userRole === 'StoreOwner' && (
+                        <th style={{ ...thStyle, textAlign: 'right', width: 110 }}>Giá vốn</th>
+                      )}
+                      <th style={{ ...thStyle, textAlign: 'right', width: 120 }}>
+                        Giá bán <span style={{ color: '#EF4444' }}>*</span>
+                      </th>
+                      <th style={{ ...thStyle, textAlign: 'center', width: 72 }}>Cơ bản</th>
+                      <th style={{ ...thStyle, textAlign: 'center', width: 72 }}>ĐV nhập</th>
+                      <th style={{ ...thStyle, width: 44 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unitRows.map((row) => {
+                      const rowErr = getUnitRowErrors(row);
+                      const lockBaseName = hasTransactions && row.isBaseUnit;
+                      const showBaseErr = row.isBaseUnit && baseUnitError;
+                      const convertTargets = unitRows.filter((o) => o.id !== row.id);
+                      return (
+                        <tr key={row.id} style={{ borderBottom: '1px solid #F1F5F9', verticalAlign: 'top' }}>
+                          <td style={tdStyle}>
+                            <input
+                              type="text"
+                              className="filter-input"
+                              placeholder="Hộp, Lốc, Thùng..."
+                              value={row.unitName}
+                              disabled={lockBaseName}
+                              title={lockBaseName ? 'Đã có giao dịch — không đổi tên đơn vị cơ bản' : undefined}
+                              onChange={(e) => {
+                                handleUpdateUnitRow(row.id, 'unitName', e.target.value);
+                                if (row.isBaseUnit) setTouched((prev) => ({ ...prev, baseUnit: true }));
+                              }}
+                              onBlur={() => {
+                                if (row.isBaseUnit) setTouched((prev) => ({ ...prev, baseUnit: true }));
+                              }}
+                              style={{
+                                ...cellInputStyle,
+                                ...(lockBaseName
+                                  ? { backgroundColor: '#F1F5F9', color: '#64748B', cursor: 'not-allowed' }
+                                  : {}),
+                                ...(rowErr.unitNameError || showBaseErr ? errorBorderStyle : {}),
+                              }}
+                            />
+                            {(rowErr.unitNameError || showBaseErr) && (
+                              <div style={cellErrorStyle}>{rowErr.unitNameError || baseUnitError}</div>
+                            )}
+                          </td>
+                          <td style={tdStyle}>
+                            {row.isBaseUnit ? (
+                              <div style={{ paddingTop: 8, color: '#94A3B8', fontSize: 12.5 }}>
+                                Đơn vị tồn kho (chuẩn = 1)
+                              </div>
+                            ) : (
+                              <div>
+                                <div
                                   style={{
-                                    ...cellInputStyle,
-                                    width: 64,
-                                    flexShrink: 0,
-                                    textAlign: 'center',
-                                    ...(rowErr.conversionError ? errorBorderStyle : {}),
-                                  }}
-                                />
-                                <select
-                                  className="filter-input"
-                                  value={row.convertsToId || ''}
-                                  onChange={(e) =>
-                                    handleUpdateUnitRow(row.id, 'convertsToId', e.target.value || null)
-                                  }
-                                  style={{
-                                    ...cellInputStyle,
-                                    width: 110,
-                                    flexShrink: 0,
-                                    ...(rowErr.conversionError ? errorBorderStyle : {}),
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    flexWrap: 'nowrap',
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
-                                  <option value="">Chọn ĐVT</option>
-                                  {convertTargets.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                      {t.unitName.trim() || '(chưa đặt tên)'}
-                                    </option>
-                                  ))}
-                                </select>
-                                {rowErr.pathLabel && !rowErr.conversionError && (
-                                  <span
-                                    style={{
-                                      fontSize: 11.5,
-                                      color: '#0F766E',
-                                      fontWeight: 600,
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                    }}
-                                    title={rowErr.pathLabel}
-                                  >
-                                    · {rowErr.pathLabel}
+                                  <span style={{ color: '#64748B', fontWeight: 600, flexShrink: 0 }}>
+                                    1 {row.unitName.trim() || '…'} =
                                   </span>
+                                  <input
+                                    type="number"
+                                    className="filter-input"
+                                    min={0.0001}
+                                    step="any"
+                                    placeholder="4"
+                                    value={row.convertsToQty === 0 ? '' : row.convertsToQty}
+                                    onChange={(e) =>
+                                      handleUpdateUnitRow(
+                                        row.id,
+                                        'convertsToQty',
+                                        e.target.value === '' ? 0 : Number(e.target.value)
+                                      )
+                                    }
+                                    onFocus={(e) => e.target.select()}
+                                    style={{
+                                      ...cellInputStyle,
+                                      width: 64,
+                                      flexShrink: 0,
+                                      textAlign: 'center',
+                                      ...(rowErr.conversionError ? errorBorderStyle : {}),
+                                    }}
+                                  />
+                                  <select
+                                    className="filter-input"
+                                    value={row.convertsToId || ''}
+                                    onChange={(e) =>
+                                      handleUpdateUnitRow(row.id, 'convertsToId', e.target.value || null)
+                                    }
+                                    style={{
+                                      ...cellInputStyle,
+                                      width: 110,
+                                      flexShrink: 0,
+                                      ...(rowErr.conversionError ? errorBorderStyle : {}),
+                                    }}
+                                  >
+                                    <option value="">Chọn ĐVT</option>
+                                    {convertTargets.map((t) => (
+                                      <option key={t.id} value={t.id}>
+                                        {t.unitName.trim() || '(chưa đặt tên)'}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {rowErr.pathLabel && !rowErr.conversionError && (
+                                    <span
+                                      style={{
+                                        fontSize: 11.5,
+                                        color: '#0F766E',
+                                        fontWeight: 600,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                      }}
+                                      title={rowErr.pathLabel}
+                                    >
+                                      · {rowErr.pathLabel}
+                                    </span>
+                                  )}
+                                </div>
+                                {rowErr.conversionError && (
+                                  <div style={cellErrorStyle}>{rowErr.conversionError}</div>
                                 )}
                               </div>
-                              {rowErr.conversionError && (
-                                <div style={cellErrorStyle}>{rowErr.conversionError}</div>
+                            )}
+                          </td>
+                          {userRole === 'StoreOwner' && (
+                            <td style={tdStyle}>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                className="filter-input"
+                                placeholder="0"
+                                value={formatCurrencyInput(row.costPrice)}
+                                onChange={(e) => {
+                                  handleUpdateUnitRow(row.id, 'costPrice', parseCurrencyInput(e.target.value));
+                                  if (row.isBaseUnit) setTouched((prev) => ({ ...prev, costPrice: true }));
+                                }}
+                                onFocus={(e) => e.target.select()}
+                                style={{
+                                  ...cellInputStyle,
+                                  textAlign: 'right',
+                                  ...(rowErr.rowCostError || (row.isBaseUnit && costPriceError) ? errorBorderStyle : {}),
+                                }}
+                              />
+                              {(rowErr.rowCostError || (row.isBaseUnit && costPriceError)) && (
+                                <div style={cellErrorStyle}>{rowErr.rowCostError || costPriceError}</div>
                               )}
-                            </div>
+                            </td>
                           )}
-                        </td>
-                        {userRole === 'StoreOwner' && (
                           <td style={tdStyle}>
                             <input
                               type="text"
                               inputMode="numeric"
                               className="filter-input"
                               placeholder="0"
-                              value={formatCurrencyInput(row.costPrice)}
+                              value={formatCurrencyInput(row.sellingPrice)}
                               onChange={(e) => {
-                                handleUpdateUnitRow(row.id, 'costPrice', parseCurrencyInput(e.target.value));
-                                if (row.isBaseUnit) setTouched((prev) => ({ ...prev, costPrice: true }));
+                                handleUpdateUnitRow(row.id, 'sellingPrice', parseCurrencyInput(e.target.value));
+                                if (row.isBaseUnit) setTouched((prev) => ({ ...prev, sellingPrice: true }));
                               }}
                               onFocus={(e) => e.target.select()}
                               style={{
                                 ...cellInputStyle,
                                 textAlign: 'right',
-                                ...(rowErr.rowCostError || (row.isBaseUnit && costPriceError) ? errorBorderStyle : {}),
+                                fontWeight: row.isBaseUnit ? 600 : 400,
+                                ...(rowErr.priceError || (row.isBaseUnit && sellingPriceError) ? errorBorderStyle : {}),
                               }}
                             />
-                            {(rowErr.rowCostError || (row.isBaseUnit && costPriceError)) && (
-                              <div style={cellErrorStyle}>{rowErr.rowCostError || costPriceError}</div>
+                            {(rowErr.priceError || (row.isBaseUnit && sellingPriceError)) && (
+                              <div style={cellErrorStyle}>{rowErr.priceError || sellingPriceError}</div>
                             )}
+                            {row.costPrice > 0 &&
+                              row.sellingPrice > 0 &&
+                              row.sellingPrice < row.costPrice && (
+                                <div style={cellWarnStyle}>Thấp hơn giá vốn</div>
+                              )}
                           </td>
-                        )}
-                        <td style={tdStyle}>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            className="filter-input"
-                            placeholder="0"
-                            value={formatCurrencyInput(row.sellingPrice)}
-                            onChange={(e) => {
-                              handleUpdateUnitRow(row.id, 'sellingPrice', parseCurrencyInput(e.target.value));
-                              if (row.isBaseUnit) setTouched((prev) => ({ ...prev, sellingPrice: true }));
-                            }}
-                            onFocus={(e) => e.target.select()}
-                            style={{
-                              ...cellInputStyle,
-                              textAlign: 'right',
-                              fontWeight: row.isBaseUnit ? 600 : 400,
-                              ...(rowErr.priceError || (row.isBaseUnit && sellingPriceError) ? errorBorderStyle : {}),
-                            }}
-                          />
-                          {(rowErr.priceError || (row.isBaseUnit && sellingPriceError)) && (
-                            <div style={cellErrorStyle}>{rowErr.priceError || sellingPriceError}</div>
-                          )}
-                          {row.costPrice > 0 &&
-                            row.sellingPrice > 0 &&
-                            row.sellingPrice < row.costPrice && (
-                              <div style={cellWarnStyle}>Thấp hơn giá vốn</div>
-                            )}
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 16 }}>
-                          <input
-                            type="radio"
-                            name="product-base-unit"
-                            checked={row.isBaseUnit}
-                            disabled={hasTransactions}
-                            onChange={() => handleSelectBaseUnit(row.id)}
-                            title="Đơn vị cơ bản (tồn kho)"
-                            style={radioStyle}
-                          />
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 16 }}>
-                          <input
-                            type="radio"
-                            name="product-purchase-unit"
-                            checked={row.isPurchaseUnit}
-                            onChange={() => handleSelectPurchaseUnit(row.id)}
-                            title="Đơn vị nhập hàng"
-                            style={radioStyle}
-                          />
-                        </td>
-                        <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 12 }}>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveUnitRow(row.id)}
-                            disabled={unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)}
-                            title={
-                              unitRows.length <= 1
-                                ? 'Cần ít nhất một đơn vị'
-                                : hasTransactions && row.isBaseUnit
-                                ? 'Không xóa đơn vị cơ bản khi đã có giao dịch'
-                                : 'Xóa đơn vị'
-                            }
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              cursor:
-                                unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)
-                                  ? 'not-allowed'
-                                  : 'pointer',
-                              color:
-                                unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)
-                                  ? '#CBD5E1'
-                                  : '#64748B',
-                              padding: 4,
-                              display: 'inline-flex',
-                            }}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-              <button
-                type="button"
-                onClick={handleAddUnitRow}
-                title="Thêm đơn vị"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#0F766E',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  padding: '4px 0',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <Plus size={14} /> Thêm đơn vị
-              </button>
-            </div>
-          </div>
-
-          {/* ───────────────────────────────────────────────────────── */}
-          {/* 3. BÁN & TỒN KHO                                          */}
-          {/* ───────────────────────────────────────────────────────── */}
-          <div style={sectionCardStyle}>
-            <h4 style={sectionTitleStyle}>3. Bán &amp; tồn kho</h4>
-
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={toggleRowStyle}>
-                <div>
-                  <div style={toggleTitleStyle}>Quản lý theo lô &amp; hạn sử dụng (FEFO)</div>
-                  <div style={toggleHintStyle}>
-                    {allowRepack && isPurchaseUnitKg
-                      ? 'Bắt buộc bật khi cho chia khay.'
-                      : 'Mỗi lần nhập tạo một lô có HSD; xuất bán lô hết hạn trước.'}
-                  </div>
-                </div>
-                <ToggleSwitch
-                  label="Quản lý theo lô & hạn sử dụng (FEFO)"
-                  checked={hasBatches || (allowRepack && isPurchaseUnitKg)}
-                  disabled={allowRepack && isPurchaseUnitKg}
-                  onChange={setHasBatches}
-                />
+                          <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 16 }}>
+                            <input
+                              type="radio"
+                              name="product-base-unit"
+                              checked={row.isBaseUnit}
+                              disabled={hasTransactions}
+                              onChange={() => handleSelectBaseUnit(row.id)}
+                              title="Đơn vị cơ bản (tồn kho)"
+                              style={radioStyle}
+                            />
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 16 }}>
+                            <input
+                              type="radio"
+                              name="product-purchase-unit"
+                              checked={row.isPurchaseUnit}
+                              onChange={() => handleSelectPurchaseUnit(row.id)}
+                              title="Đơn vị nhập hàng"
+                              style={radioStyle}
+                            />
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: 'center', paddingTop: 12 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveUnitRow(row.id)}
+                              disabled={unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)}
+                              title={
+                                unitRows.length <= 1
+                                  ? 'Cần ít nhất một đơn vị'
+                                  : hasTransactions && row.isBaseUnit
+                                    ? 'Không xóa đơn vị cơ bản khi đã có giao dịch'
+                                    : 'Xóa đơn vị'
+                              }
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor:
+                                  unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)
+                                    ? 'not-allowed'
+                                    : 'pointer',
+                                color:
+                                  unitRows.length <= 1 || (hasTransactions && row.isBaseUnit)
+                                    ? '#CBD5E1'
+                                    : '#64748B',
+                                padding: 4,
+                                display: 'inline-flex',
+                              }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
-              <div style={toggleRowStyle}>
-                <div>
-                  <div style={{ ...toggleTitleStyle, color: isPurchaseUnitKg ? '#0F172A' : '#94A3B8' }}>
-                    Cho chia khay / chế biến
-                  </div>
-                  <div style={toggleHintStyle}>
-                    {isPurchaseUnitKg
-                      ? 'Hàng nhập theo KG có thể đóng khay; giá khay tính theo khối lượng thực tế lúc đóng.'
-                      : `Chỉ áp dụng khi đơn vị nhập là KG (hiện tại: ${effectivePurchaseUnitName || 'chưa chọn'}).`}
-                  </div>
-                </div>
-                <ToggleSwitch
-                  checked={allowRepack && isPurchaseUnitKg}
-                  disabled={!isPurchaseUnitKg}
-                  onChange={handleAllowRepackChange}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                <button
+                  type="button"
+                  onClick={handleAddUnitRow}
+                  title="Thêm đơn vị"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#0F766E',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: '4px 0',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Plus size={14} /> Thêm đơn vị
+                </button>
               </div>
+            </div>
 
-              {isPurchaseUnitKg && allowRepack && (
-                <div style={{ padding: '12px 14px', margin: '0 0 6px 0', background: '#F0FDFA', border: '1px solid #CCFBF1', borderRadius: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                    <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', minWidth: 170 }}>
-                      Giá khi đóng khay (đ/kg)
-                    </label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 200 }}>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        className="filter-input"
-                        style={{ paddingRight: 32, fontWeight: 600 }}
-                        placeholder="Mặc định = giá nguyên quả"
-                        value={formatCurrencyInput(processedSellingPrice)}
-                        onChange={(e) => {
-                          setProcessedPriceDirty(true);
-                          setProcessedSellingPrice(parseCurrencyInput(e.target.value));
-                        }}
-                        onFocus={(e) => e.target.select()}
-                      />
-                      <span style={{ position: 'absolute', right: 12, fontSize: 13, fontWeight: 600, color: '#64748B', pointerEvents: 'none' }}>
-                        đ
-                      </span>
+            {/* ───────────────────────────────────────────────────────── */}
+            {/* 3. BÁN & TỒN KHO                                          */}
+            {/* ───────────────────────────────────────────────────────── */}
+            <div style={sectionCardStyle}>
+              <h4 style={sectionTitleStyle}>3. Bán &amp; tồn kho</h4>
+
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={toggleRowStyle}>
+                  <div>
+                    <div style={toggleTitleStyle}>Quản lý theo lô &amp; hạn sử dụng (FEFO)</div>
+                    <div style={toggleHintStyle}>
+                      {allowRepack && isPurchaseUnitKg
+                        ? 'Bắt buộc bật khi cho chia khay.'
+                        : 'Mỗi lần nhập tạo một lô có HSD; xuất bán lô hết hạn trước.'}
                     </div>
-                    {processedSellingPrice > 0 && (
-                      <span style={{ fontSize: 12.5, color: '#0F766E', fontWeight: 600 }}>
-                        Ví dụ: khay 0,5 kg → {(Math.round((0.5 * processedSellingPrice) / 100) * 100).toLocaleString('vi-VN')} đ
-                      </span>
+                  </div>
+                  <ToggleSwitch
+                    label="Quản lý theo lô & hạn sử dụng (FEFO)"
+                    checked={hasBatches || (allowRepack && isPurchaseUnitKg)}
+                    disabled={allowRepack && isPurchaseUnitKg}
+                    onChange={setHasBatches}
+                  />
+                </div>
+
+                <div style={toggleRowStyle}>
+                  <div>
+                    <div style={{ ...toggleTitleStyle, color: isPurchaseUnitKg ? '#0F172A' : '#94A3B8' }}>
+                      Cho chia khay / chế biến
+                    </div>
+                    <div style={toggleHintStyle}>
+                      {isPurchaseUnitKg
+                        ? 'Hàng nhập theo KG có thể đóng khay; giá khay tính theo khối lượng thực tế lúc đóng.'
+                        : `Chỉ áp dụng khi đơn vị nhập là KG (hiện tại: ${effectivePurchaseUnitName || 'chưa chọn'}).`}
+                    </div>
+                  </div>
+                  <ToggleSwitch
+                    checked={allowRepack && isPurchaseUnitKg}
+                    disabled={!isPurchaseUnitKg}
+                    onChange={handleAllowRepackChange}
+                  />
+                </div>
+
+                {isPurchaseUnitKg && allowRepack && (
+                  <div style={{ padding: '12px 14px', margin: '0 0 6px 0', background: '#F0FDFA', border: '1px solid #CCFBF1', borderRadius: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', minWidth: 170 }}>
+                        Giá khi đóng khay (đ/kg)
+                      </label>
+                      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: 200 }}>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="filter-input"
+                          style={{ paddingRight: 32, fontWeight: 600 }}
+                          placeholder="Mặc định = giá nguyên quả"
+                          value={formatCurrencyInput(processedSellingPrice)}
+                          onChange={(e) => {
+                            setProcessedPriceDirty(true);
+                            setProcessedSellingPrice(parseCurrencyInput(e.target.value));
+                          }}
+                          onFocus={(e) => e.target.select()}
+                        />
+                        <span style={{ position: 'absolute', right: 12, fontSize: 13, fontWeight: 600, color: '#64748B', pointerEvents: 'none' }}>
+                          đ
+                        </span>
+                      </div>
+                      {processedSellingPrice > 0 && (
+                        <span style={{ fontSize: 12.5, color: '#0F766E', fontWeight: 600 }}>
+                          Ví dụ: khay 0,5 kg → {(Math.round((0.5 * processedSellingPrice) / 100) * 100).toLocaleString('vi-VN')} đ
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ ...toggleHintStyle, marginTop: 6 }}>
+                      Dưa/gọt sẵn: đặt khác giá nguyên quả. Thịt chỉ chia khay: để trùng giá nguyên quả.
+                    </div>
+                    {costPrice > 0 && processedSellingPrice > 0 && processedSellingPrice < costPrice && (
+                      <div style={{ ...cellWarnStyle, fontSize: 12 }}>
+                        Giá đóng khay đang thấp hơn giá vốn ({costPrice.toLocaleString('vi-VN')} đ/kg).
+                      </div>
                     )}
                   </div>
-                  <div style={{ ...toggleHintStyle, marginTop: 6 }}>
-                    Dưa/gọt sẵn: đặt khác giá nguyên quả. Thịt chỉ chia khay: để trùng giá nguyên quả.
-                  </div>
-                  {costPrice > 0 && processedSellingPrice > 0 && processedSellingPrice < costPrice && (
-                    <div style={{ ...cellWarnStyle, fontSize: 12 }}>
-                      Giá đóng khay đang thấp hơn giá vốn ({costPrice.toLocaleString('vi-VN')} đ/kg).
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+
+            {/* ───────────────────────────────────────────────────────── */}
+            {/* 4. MÔ TẢ & GHI CHÚ (thu gọn mặc định)                      */}
+            {/* ───────────────────────────────────────────────────────── */}
+            <div style={sectionCardStyle}>
+              <h4 style={sectionTitleStyle}>4. Mô tả / ghi chú</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Nội dung</label>
+                <span style={{ fontSize: 11, color: description.length > 1000 ? '#DC2626' : '#94A3B8' }}>
+                  {description.length}/1000
+                </span>
+              </div>
+              <textarea
+                className="filter-input"
+                rows={3}
+                placeholder="Ghi chú cho thu ngân, thủ kho, hoặc mô tả ngắn về hàng hóa..."
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  setTouched((prev) => ({ ...prev, description: true }));
+                }}
+                style={descriptionError ? errorBorderStyle : undefined}
+              />
+              {descriptionError && <div style={cellErrorStyle}>{descriptionError}</div>}
             </div>
           </div>
 
-          {/* ───────────────────────────────────────────────────────── */}
-          {/* 4. MÔ TẢ & GHI CHÚ (thu gọn mặc định)                      */}
-          {/* ───────────────────────────────────────────────────────── */}
-          <div style={sectionCardStyle}>
-            <h4 style={sectionTitleStyle}>4. Mô tả / ghi chú</h4>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Nội dung</label>
-              <span style={{ fontSize: 11, color: description.length > 1000 ? '#DC2626' : '#94A3B8' }}>
-                {description.length}/1000
+          {/* ========================================================= */}
+          {/* FOOTER: (14) Bỏ qua, (15) Lưu & Thêm mới, (16) Lưu        */}
+          {/* ========================================================= */}
+          <div
+            className="custom-modal-footer"
+            style={{
+              padding: '16px 28px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              borderTop: '1px solid #E2E8F0',
+              backgroundColor: '#F8FAFC',
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
+                {productStatus === 'Active' ? 'Đang bán' : 'Ngừng KD'}
               </span>
+              <ToggleSwitch
+                checked={productStatus === 'Active'}
+                disabled={isSubmitting}
+                onChange={(next) => setProductStatus(next ? 'Active' : 'Discontinued')}
+              />
             </div>
-            <textarea
-              className="filter-input"
-              rows={3}
-              placeholder="Ghi chú cho thu ngân, thủ kho, hoặc mô tả ngắn về hàng hóa..."
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                setTouched((prev) => ({ ...prev, description: true }));
-              }}
-              style={descriptionError ? errorBorderStyle : undefined}
-            />
-            {descriptionError && <div style={cellErrorStyle}>{descriptionError}</div>}
-          </div>
-        </div>
 
-        {/* ========================================================= */}
-        {/* FOOTER: (14) Bỏ qua, (15) Lưu & Thêm mới, (16) Lưu        */}
-        {/* ========================================================= */}
-        <div
-          className="custom-modal-footer"
-          style={{
-            padding: '16px 28px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            borderTop: '1px solid #E2E8F0',
-            backgroundColor: '#F8FAFC',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-              {productStatus === 'Active' ? 'Đang bán' : 'Ngừng KD'}
-            </span>
-            <ToggleSwitch
-              checked={productStatus === 'Active'}
-              disabled={isSubmitting}
-              onChange={(next) => setProductStatus(next ? 'Active' : 'Discontinued')}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            {/* (14) Bỏ qua */}
-            <button
-              type="button"
-              className="btn-secondary-white"
-              onClick={onClose}
-              disabled={isSubmitting}
-              style={{ borderRadius: 8, padding: '8px 18px' }}
-            >
-              Bỏ qua
-            </button>
-
-            {/* (15) Lưu & Thêm hàng mới */}
-            {!isEditing && (
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              {/* (14) Bỏ qua */}
               <button
                 type="button"
                 className="btn-secondary-white"
+                onClick={onClose}
+                disabled={isSubmitting}
+                style={{ borderRadius: 8, padding: '8px 18px' }}
+              >
+                Bỏ qua
+              </button>
+
+              {/* (15) Lưu & Thêm hàng mới */}
+              {!isEditing && (
+                <button
+                  type="button"
+                  className="btn-secondary-white"
+                  style={{
+                    borderRadius: 8,
+                    padding: '8px 18px',
+                    borderColor: '#CBD5E1',
+                  }}
+                  disabled={isSubmitting}
+                  onClick={() => handleSubmit(true)}
+                >
+                  {isSubmitting ? 'Đang lưu...' : 'Lưu & thêm mới'}
+                </button>
+              )}
+
+              {/* (16) 💾 Lưu */}
+              <button
+                type="button"
+                className="btn-primary-teal"
                 style={{
                   borderRadius: 8,
-                  padding: '8px 18px',
-                  borderColor: '#CBD5E1',
+                  padding: '8px 20px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
                 }}
                 disabled={isSubmitting}
-                onClick={() => handleSubmit(true)}
+                onClick={() => handleSubmit(false)}
               >
-                {isSubmitting ? 'Đang lưu...' : 'Lưu & thêm mới'}
+                <Save size={16} />
+                <span>{isSubmitting ? 'Đang lưu...' : (isEditing ? 'Cập nhật' : 'Lưu')}</span>
               </button>
-            )}
-
-            {/* (16) 💾 Lưu */}
-            <button
-              type="button"
-              className="btn-primary-teal"
-              style={{
-                borderRadius: 8,
-                padding: '8px 20px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-              disabled={isSubmitting}
-              onClick={() => handleSubmit(false)}
-            >
-              <Save size={16} />
-              <span>{isSubmitting ? 'Đang lưu...' : (isEditing ? 'Cập nhật' : 'Lưu')}</span>
-            </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Lightbox Popup Xem Chi Tiết Ảnh Phóng To */}
-      {previewImageModalUrl && (
-        <div
-          className="custom-modal-backdrop"
-          style={{ zIndex: 10002, backgroundColor: 'rgba(15, 23, 42, 0.85)' }}
-          onClick={() => setPreviewImageModalUrl(null)}
-        >
+        {/* Lightbox Popup Xem Chi Tiết Ảnh Phóng To */}
+        {previewImageModalUrl && (
           <div
-            style={{
-              position: 'relative',
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              background: '#FFFFFF',
-              borderRadius: 14,
-              padding: 12,
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setPreviewImageModalUrl(null)}
-              style={{
-                position: 'absolute',
-                top: -14,
-                right: -14,
-                background: '#0F172A',
-                color: '#FFFFFF',
-                border: '2px solid #FFFFFF',
-                borderRadius: '50%',
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-              }}
-              title="Đóng xem ảnh"
-            >
-              <X size={18} />
-            </button>
-            <img
-              src={previewImageModalUrl}
-              alt="Chi tiết ảnh hàng hóa"
-              style={{
-                maxWidth: '82vw',
-                maxHeight: '80vh',
-                objectFit: 'contain',
-                borderRadius: 8,
-                display: 'block',
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Validation Alert Popup */}
-      {validationPopupMsg && (
-        <div
-          className="custom-modal-backdrop"
-          style={{ zIndex: 10001, backgroundColor: 'rgba(15, 23, 42, 0.65)' }}
-          onClick={() => setValidationPopupMsg('')}
-        >
-          <div
-            style={{
-              background: '#FFFFFF',
-              borderRadius: 14,
-              padding: '24px 28px',
-              maxWidth: 420,
-              width: '90%',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
-              textAlign: 'center',
-            }}
-            onClick={(e) => e.stopPropagation()}
+            className="custom-modal-backdrop"
+            style={{ zIndex: 10002, backgroundColor: 'rgba(15, 23, 42, 0.85)' }}
+            onClick={() => setPreviewImageModalUrl(null)}
           >
             <div
               style={{
-                width: 52,
-                height: 52,
-                borderRadius: '50%',
-                background: '#FEF2F2',
+                position: 'relative',
+                maxWidth: '90vw',
+                maxHeight: '90vh',
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: 12,
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 14px',
               }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <AlertCircle size={28} color="#EF4444" />
+              <button
+                type="button"
+                onClick={() => setPreviewImageModalUrl(null)}
+                style={{
+                  position: 'absolute',
+                  top: -14,
+                  right: -14,
+                  background: '#0F172A',
+                  color: '#FFFFFF',
+                  border: '2px solid #FFFFFF',
+                  borderRadius: '50%',
+                  width: 32,
+                  height: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                }}
+                title="Đóng xem ảnh"
+              >
+                <X size={18} />
+              </button>
+              <img
+                src={previewImageModalUrl}
+                alt="Chi tiết ảnh hàng hóa"
+                style={{
+                  maxWidth: '82vw',
+                  maxHeight: '80vh',
+                  objectFit: 'contain',
+                  borderRadius: 8,
+                  display: 'block',
+                }}
+              />
             </div>
-            <h4 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
-              Thông tin chưa hợp lệ
-            </h4>
-            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#475569', lineHeight: 1.5 }}>
-              {validationPopupMsg}
-            </p>
-            <button
-              type="button"
-              className="btn-primary-teal"
-              style={{
-                width: '100%',
-                padding: '10px 16px',
-                fontWeight: 600,
-                fontSize: 14,
-                borderRadius: 8,
-                justifyContent: 'center',
-              }}
-              onClick={() => setValidationPopupMsg('')}
-              autoFocus
-            >
-              Đã hiểu
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-    </div>
-    {showPriceHistory && productToEdit && (
-      <PriceHistoryModal
-        isOpen={showPriceHistory}
-        onClose={() => setShowPriceHistory(false)}
-        productId={productToEdit.id}
-        productName={productToEdit.productName}
-      />
-    )}
+        {/* Validation Alert Popup */}
+        {validationPopupMsg && (
+          <div
+            className="custom-modal-backdrop"
+            style={{ zIndex: 10001, backgroundColor: 'rgba(15, 23, 42, 0.65)' }}
+            onClick={() => setValidationPopupMsg('')}
+          >
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '24px 28px',
+                maxWidth: 420,
+                width: '90%',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+                textAlign: 'center',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: '50%',
+                  background: '#FEF2F2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 14px',
+                }}
+              >
+                <AlertCircle size={28} color="#EF4444" />
+              </div>
+              <h4 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
+                Thông tin chưa hợp lệ
+              </h4>
+              <p style={{ margin: '0 0 20px', fontSize: 14, color: '#475569', lineHeight: 1.5 }}>
+                {validationPopupMsg}
+              </p>
+              <button
+                type="button"
+                className="btn-primary-teal"
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  borderRadius: 8,
+                  justifyContent: 'center',
+                }}
+                onClick={() => setValidationPopupMsg('')}
+                autoFocus
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>
+      {showPriceHistory && productToEdit && (
+        <PriceHistoryModal
+          isOpen={showPriceHistory}
+          onClose={() => setShowPriceHistory(false)}
+          productId={productToEdit.id}
+          productName={productToEdit.productName}
+        />
+      )}
     </>
   );
 };

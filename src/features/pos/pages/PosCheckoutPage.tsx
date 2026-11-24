@@ -1222,7 +1222,8 @@ export const PosCheckoutPage: FC = () => {
             phone: currentTab.customer.phone,
             address: currentTab.customer.address,
             loyaltyPoints:
-              (currentTab.customer.loyaltyPoints - (pointsDeduction > 0 ? maxPointsCanUse : 0)) +
+              (currentTab.customer.loyaltyPoints -
+                (backendOrder?.pointsRedeemed ?? (pointsDeduction > 0 ? effectivePointsToRedeem : 0))) +
               (isLoyaltyEnabled
                 ? Math.floor((backendOrder?.finalAmount ?? finalAmount) / (loyaltyConfig?.earningRateAmount || 10000)) * (loyaltyConfig?.earningPoints || 1)
                 : 0),
@@ -1231,7 +1232,9 @@ export const PosCheckoutPage: FC = () => {
       items: receiptItems,
       totalItemAmount: backendOrder?.totalAmount ?? currentTab.cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0),
       itemDiscountAmount: backendOrder?.items?.length
-        ? backendOrder.items.reduce((sum, it) => sum + (it.discountAmount || 0), 0)
+        ? backendOrder.items
+            .filter((it) => !it.isGift)
+            .reduce((sum, it) => sum + (it.discountAmount || 0), 0)
         : currentTab.cart.reduce((sum, c) => sum + Math.max(0, (c.unitPrice - c.actualPrice) * c.quantity), 0),
       orderDiscountAmount:
         backendOrder?.promotionDiscountAmount ??
@@ -1242,7 +1245,7 @@ export const PosCheckoutPage: FC = () => {
         backendOrder?.appliedPromotionSummary ||
         (effectivePromoLabels.length > 0 ? effectivePromoLabels.join('; ') : undefined),
       pointsDiscountAmount: backendOrder?.pointsDiscountAmount ?? pointsDeduction,
-      pointsRedeemed: backendOrder?.pointsRedeemed ?? (pointsDeduction > 0 ? maxPointsCanUse : undefined),
+      pointsRedeemed: backendOrder?.pointsRedeemed ?? (pointsDeduction > 0 ? effectivePointsToRedeem : undefined),
       vatAmount: 0,
       finalAmount: backendOrder?.finalAmount ?? finalAmount,
       finalAmountInWords: '',
@@ -1514,6 +1517,13 @@ export const PosCheckoutPage: FC = () => {
           }
         }).catch(() => {});
       }
+
+      // Làm mới danh sách khách hàng (số dư điểm tích lũy & công nợ mới nhất) sau khi chốt đơn
+      posOrderApi.getAllCustomers().then((freshCustomers) => {
+        if (freshCustomers && freshCustomers.length > 0) {
+          setCustomers(freshCustomers);
+        }
+      }).catch(() => {});
 
       setIsReceiptModalOpen(true);
     } catch (apiErr: unknown) {
