@@ -116,7 +116,6 @@ import { StaffManagementGate } from '../pages/store/components/StaffManagementGa
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { CashControlHubPage } from '../features/cash-control';
-import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 /**
  * Application client-side router configuration across public, store-owner, POS, and admin portals.
