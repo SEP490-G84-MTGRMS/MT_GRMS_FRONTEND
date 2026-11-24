@@ -123,7 +123,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
     if (isInsufficientBalance) {
       setErrorMessage(
         paymentMethod === 'Cash'
-          ? `Số tiền chi (${formatCurrency(item.amount)}) vượt quá số dư két hiện có (${formatCurrency(selectedAccount?.currentBalance || 0)}). Không thể xuất quỹ âm tiền theo Rule GBR-CSH-03.`
+          ? `Số tiền chi (${formatCurrency(item.amount)}) vượt quá số dư két hiện có (${formatCurrency(selectedAccount?.currentBalance || 0)}). Không thể xuất quỹ vượt số dư khả dụng.`
           : `Số dư tài khoản ngân hàng (${formatCurrency(selectedAccount?.currentBalance || 0)}) không đủ để thanh toán khoản chi (${formatCurrency(item.amount)}).`
       );
       return;
@@ -204,8 +204,10 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
-                <span>Mã chi phí:</span>
-                <span style={{ fontWeight: 700, color: 'var(--blue-primary, #0F766E)' }}>{item.expenseId}</span>
+                <span>Mã phiếu chi:</span>
+                <span style={{ fontWeight: 700, color: 'var(--blue-primary, #0F766E)', fontFamily: 'var(--font-mono, monospace)' }}>
+                  {item.voucherCode || item.expenseId}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
                 <span>Danh mục:</span>
@@ -364,7 +366,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, color: '#B91C1C', marginBottom: '2px' }}>
-                    Vi phạm Rule GBR-CSH-03 (Chống âm két tiền mặt)
+                    Số dư két tiền mặt không đủ để chi trả
                   </div>
                   <div>
                     Số tiền chi (<strong>{formatCurrency(item.amount)}</strong>) vượt quá số dư két tiền mặt hiện có (<strong>{formatCurrency(selectedAccount?.currentBalance || 0)}</strong>).
@@ -450,7 +452,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 style={{ width: '16px', height: '16px', cursor: 'not-allowed' }}
               />
               <label htmlFor="cashbook-check" style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 500 }}>
-                Tự động tạo phiếu chi trong Sổ quỹ (FE-17 Cashbook) — bắt buộc hạch toán đồng bộ
+                Tự động tạo phiếu chi trong Sổ quỹ — bắt buộc hạch toán đồng bộ
               </label>
             </div>
 
