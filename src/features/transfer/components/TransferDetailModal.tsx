@@ -43,13 +43,17 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
   // Search filter on items
   const [filterCode, setFilterCode] = useState('');
   const [filterName, setFilterName] = useState('');
-  const [receiveNote, setReceiveNote] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isReturnPromptOpen, setIsReturnPromptOpen] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
 
   useEffect(() => {
     setCurrentTransfer(initialTransfer);
-    setReceiveNote(initialTransfer?.discrepancyNote || '');
     setFilterCode('');
     setFilterName('');
+    setActionError(null);
+    setIsReturnPromptOpen(false);
+    setReturnReason('');
   }, [initialTransfer, isOpen]);
 
   // Prevent scroll when modal is open
@@ -67,16 +71,18 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
   if (!isOpen || !currentTransfer) return null;
 
   const handleConfirmCancel = async (reason: string) => {
+    setActionError(null);
     try {
       const updated = await transferService.cancel(currentTransfer.id, reason);
       setCurrentTransfer(updated);
       onUpdateTransfer?.(updated);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Không thể hủy phiếu chuyển.');
+      setActionError(error instanceof Error ? error.message : 'Không thể hủy phiếu chuyển.');
     }
   };
 
   const applyAction = async (action: 'submit' | 'dispatch') => {
+    setActionError(null);
     try {
       const updated = action === 'submit'
         ? await transferService.submit(currentTransfer.id)
@@ -84,19 +90,31 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
       setCurrentTransfer(updated);
       onUpdateTransfer?.(updated);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Không thể cập nhật phiếu chuyển.');
+      setActionError(error instanceof Error ? error.message : 'Không thể cập nhật phiếu chuyển.');
     }
   };
 
-  const handleReturnToSource = async () => {
-    const reason = window.prompt('Xác nhận hàng đã thực tế quay về kho nguồn. Nhập lý do hoàn trả:');
-    if (!reason?.trim()) return;
+  const handleReturnToSource = () => {
+    setActionError(null);
+    setReturnReason('');
+    setIsReturnPromptOpen(true);
+  };
+
+  const handleConfirmReturnToSource = async () => {
+    const trimmed = returnReason.trim();
+    if (!trimmed) {
+      setActionError('Vui lòng nhập lý do hoàn trả hàng về kho nguồn.');
+      return;
+    }
+    setActionError(null);
     try {
-      const updated = await transferService.returnToSource(currentTransfer.id, reason.trim());
+      const updated = await transferService.returnToSource(currentTransfer.id, trimmed);
       setCurrentTransfer(updated);
       onUpdateTransfer?.(updated);
+      setIsReturnPromptOpen(false);
+      setReturnReason('');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : 'Không thể xác nhận hoàn trả.');
+      setActionError(error instanceof Error ? error.message : 'Không thể xác nhận hoàn trả.');
     }
   };
 
@@ -238,10 +256,6 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <input type="checkbox" style={{ accentColor: '#0F766E', cursor: 'pointer' }} />
-              <span style={{ color: currentTransfer.isFavorite ? '#eab308' : '#94a3b8', fontSize: 16 }}>
-                {currentTransfer.isFavorite ? '★' : '☆'}
-              </span>
               <span style={{ fontSize: 15, fontWeight: 700, color: '#0F766E' }}>
                 {currentTransfer.transferCode}
               </span>
@@ -300,6 +314,29 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
 
           {/* 3. Modal Body (Scrollable) */}
           <div style={{ padding: 24, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {actionError && (
+              <div role="alert" style={{ padding: '10px 14px', borderRadius: 10, backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 13, fontWeight: 600 }}>
+                {actionError}
+              </div>
+            )}
+            {isReturnPromptOpen && (
+              <div style={{ padding: '14px 16px', borderRadius: 12, backgroundColor: '#fffbeb', border: '1px solid #fde68a', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: '#92400e' }}>
+                  Xác nhận hoàn trả hàng về kho nguồn
+                </div>
+                <input
+                  type="text"
+                  className="filter-input"
+                  placeholder="Nhập lý do hoàn trả (bắt buộc)..."
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                />
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button type="button" className="btn-secondary-white" onClick={() => setIsReturnPromptOpen(false)}>Hủy</button>
+                  <button type="button" className="btn-primary-teal" onClick={() => void handleConfirmReturnToSource()}>Xác nhận hoàn trả</button>
+                </div>
+              </div>
+            )}
             {/* Header thông tin phiếu */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -449,22 +486,13 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
             >
               <div>
                 <div style={{ fontSize: 13, color: '#64748b', marginBottom: 6 }}>
-                  ✏ {currentTransfer.note ? `Ghi chú chuyển: ${currentTransfer.note}` : 'Chưa có ghi chú chuyển'}
+                  {currentTransfer.note ? `Ghi chú chuyển: ${currentTransfer.note}` : 'Chưa có ghi chú chuyển'}
                 </div>
-                <textarea
-                  className="filter-input"
-                  style={{
-                    width: '100%',
-                    minHeight: 70,
-                    borderRadius: 12,
-                    resize: 'vertical',
-                    fontSize: 13,
-                    boxSizing: 'border-box',
-                  }}
-                  placeholder="Ghi chú nhận..."
-                  value={receiveNote}
-                  onChange={(e) => setReceiveNote(e.target.value)}
-                />
+                {currentTransfer.discrepancyNote && (
+                  <div style={{ fontSize: 13, color: '#b45309', backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '8px 12px' }}>
+                    Ghi chú nhận / chênh lệch: {currentTransfer.discrepancyNote}
+                  </div>
+                )}
               </div>
 
               <div

@@ -16,10 +16,12 @@ import { getTransferErrorMessage, transferService } from '../services/transferSe
 import { SelectBatchModal } from '../components/SelectBatchModal';
 import { ImportTransferExcelModal } from '../components/ImportTransferExcelModal';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import '../transfer.css';
 
 export const CreateTransferPage: React.FC = () => {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   // Branch Selection
@@ -290,9 +292,9 @@ export const CreateTransferPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#64748b' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1e293b' }}>
             <User size={16} color="#0F766E" />
-            <span>Admin</span>
+            <span>{user?.fullName || user?.username || 'Chủ cửa hàng'}</span>
           </div>
-          <span>15/10/2025 11:37</span>
+          <span>{new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
         </div>
       </div>
 
@@ -359,12 +361,9 @@ export const CreateTransferPage: React.FC = () => {
                       <span className="transfer-link">{it.productCode}</span>
                     </td>
 
-                    {/* Tên hàng + Ghi chú dòng + Lô */}
+                    {/* Tên hàng + Lô */}
                     <td>
                       <div style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</div>
-                      <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-                        ✏ Ghi chú...
-                      </div>
 
                       {/* Thông tin Lô & Link chọn lô khác */}
                       {(it.hasBatchManagement || Boolean(it.batches?.length)) && (

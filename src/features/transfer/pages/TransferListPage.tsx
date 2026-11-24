@@ -603,11 +603,11 @@ export const TransferListPage: React.FC = () => {
               onChange={(e) => handleStatusDropdownChange(e.target.value)}
             >
               <option value="ALL">Tất cả trạng thái</option>
-              <option value="Draft">Phiếu tạm (Draft)</option>
-              <option value="Pending">Chờ xử lý (Pending)</option>
-              <option value="InTransit">Đang chuyển (InTransit)</option>
-              <option value="Completed">Hoàn tất (Completed)</option>
-              <option value="Cancelled">Đã hủy (Cancelled)</option>
+              <option value="Draft">Phiếu tạm</option>
+              <option value="Pending">Chờ xử lý</option>
+              <option value="InTransit">Đang chuyển</option>
+              <option value="Completed">Hoàn tất</option>
+              <option value="Cancelled">Đã hủy</option>
             </select>
           </div>
         </div>
