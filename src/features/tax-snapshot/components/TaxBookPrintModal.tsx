@@ -1,12 +1,16 @@
-import { useRef, type FC } from 'react';
+import { useEffect, useRef, useState, type FC } from 'react';
 import { Printer, X } from 'lucide-react';
 import {
   AccountingBookType,
+  TaxPeriodType,
   type HouseholdTaxSummaryDto,
   type AccountingBookEntryDto,
+  type TaxpayerProfileDto,
 } from '../types/taxSnapshot';
 import { formatMoney } from '../../finance/utils/formatters';
 import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
+import { taxSnapshotApi } from '../api/taxSnapshotApi';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 export interface BookTabMetadata {
   type: AccountingBookType;
@@ -65,8 +69,36 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
   onPrint,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const user = useAuthStore((state) => state.user);
+  const [taxpayer, setTaxpayer] = useState<TaxpayerProfileDto | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    taxSnapshotApi
+      .getDeclarationPreview({
+        year: summary?.year ?? year,
+        periodType: summary?.periodType ?? TaxPeriodType.Quarter,
+        periodNumber: summary?.periodNumber ?? 1,
+        branchId: summary?.branchId,
+      })
+      .then((res) => {
+        if (active && res?.taxpayer) setTaxpayer(res.taxpayer);
+      })
+      .catch(() => {
+        // fallback to summary/auth store fields
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, summary?.year, summary?.periodType, summary?.periodNumber, summary?.branchId, year]);
+
   useDialogFocusTrap(isOpen, dialogRef, onClose);
   if (!isOpen) return null;
+
+  const displayHouseholdName = taxpayer?.taxpayerName || user?.tenantName || summary?.branchName || 'Hộ kinh doanh';
+  const displayTaxCode = taxpayer?.taxCode || 'Chưa cập nhật';
+  const displayAddress = taxpayer?.businessLocation || 'Chưa cập nhật';
 
   const cashEntries = entries.filter(
     (e) =>
@@ -220,9 +252,9 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
             {/* A4 National Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
               <div style={{ width: '48%', fontSize: '8.5pt', lineHeight: 1.45 }}>
-                <div><strong>HỘ KINH DOANH:</strong> {summary?.branchName || 'Tạp Hóa Tuấn Minh'}</div>
-                <div><strong>Mã số thuế:</strong> 8301928374-001</div>
-                <div><strong>Địa chỉ:</strong> TP. Hồ Chí Minh</div>
+                <div><strong>HỘ KINH DOANH:</strong> {displayHouseholdName}</div>
+                <div><strong>Mã số thuế:</strong> {displayTaxCode}</div>
+                <div><strong>Địa chỉ:</strong> {displayAddress}</div>
                 <div><strong>Kỳ hạch toán:</strong> {periodDisplayName}</div>
               </div>
               <div style={{ width: '50%', textAlign: 'center', fontSize: '8.5pt', lineHeight: 1.4 }}>
@@ -645,21 +677,19 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
                   <div style={{ fontWeight: 800 }}>NGƯỜI LẬP BIỂU</div>
                   <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, ghi rõ họ tên)</div>
                   <div style={{ height: 60 }}></div>
-                  <div style={{ fontWeight: 600 }}>Nguyễn Thị Thu Ngân</div>
                 </div>
 
                 <div>
                   <div style={{ fontWeight: 800 }}>KẾ TOÁN TRƯỞNG</div>
                   <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, ghi rõ họ tên)</div>
                   <div style={{ height: 60 }}></div>
-                  <div style={{ fontWeight: 600 }}>Trần Văn Kế Toán</div>
                 </div>
 
                 <div>
                   <div style={{ fontWeight: 800 }}>NGƯỜI ĐẠI DIỆN HỘ KINH DOANH</div>
                   <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, đóng dấu nếu có)</div>
                   <div style={{ height: 60 }}></div>
-                  <div style={{ fontWeight: 700 }}>{summary?.branchName || 'Đại diện HKD'}</div>
+                  <div style={{ fontWeight: 700 }}>{displayHouseholdName}</div>
                 </div>
               </div>
             </div>
