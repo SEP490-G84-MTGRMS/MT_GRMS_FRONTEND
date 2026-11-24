@@ -212,7 +212,8 @@ const mapListItemDto = (dto: any): StocktakeListItem => ({
   approvedAt: dto.reviewedAt || dto.approvedAt || null,
   lineCount: Number(dto.totalLines ?? dto.lineCount ?? 0),
   abnormalLineCount: Number(dto.anomalyLines ?? dto.abnormalLineCount ?? 0),
-  totalDefectiveQty: Number(dto.returnEligibleLines ?? dto.totalDefectiveQty ?? 0),
+  returnEligibleLines: Number(dto.returnEligibleLines ?? 0),
+  totalDefectiveQty: Number(dto.totalDefectiveQty ?? 0),
   totalDamagedAndExpiredQty: Number(dto.totalDamagedAndExpiredQty ?? 0),
   totalVarianceQty: Number(dto.totalVarianceQty ?? 0),
 });

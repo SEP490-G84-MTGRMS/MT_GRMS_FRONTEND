@@ -705,7 +705,9 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                   const canEdit = item.status === 'DRAFT' || item.status === 'NEEDS_RECOUNT';
                   const canApprove = isStoreOwner && item.status === 'PENDING_APPROVAL';
                   const canCreateReturn =
-                    isStoreOwner && item.status === 'APPROVED' && item.totalDefectiveQty > 0;
+                    isStoreOwner &&
+                    item.status === 'APPROVED' &&
+                    ((item.returnEligibleLines ?? 0) > 0 || item.totalDefectiveQty > 0);
                   const isHighlighted = highlightId === item.id;
 
                   return (
