@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { FC, FormEvent } from 'react';
 import { X, QrCode, Banknote, AlertTriangle } from 'lucide-react';
 import type { CollectDebtInput, CustomerDto } from '../types/customer.types';
@@ -52,8 +52,12 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
     };
   }, [isOpen]);
 
-  const filteredAccounts = accounts.filter((a) =>
-    method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
+  const filteredAccounts = useMemo(
+    () =>
+      accounts.filter((a) =>
+        method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
+      ),
+    [accounts, method]
   );
 
   useEffect(() => {

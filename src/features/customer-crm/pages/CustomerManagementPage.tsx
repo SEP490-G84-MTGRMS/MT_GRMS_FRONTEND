@@ -252,12 +252,18 @@ export const CustomerManagementPage: FC = () => {
         return;
       }
 
+      const escapeCsvCell = (raw: string | number | null | undefined): string => {
+        const str = String(raw ?? '');
+        const neutralized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+        return `"${neutralized.replace(/"/g, '""')}"`;
+      };
+
       const headers = [
         'Mã Khách Hàng',
         'Họ và Tên',
         'Số Điện Thoại',
-        'Mã Số Thuế',
-        'Công Ty',
+        'Hạng Thành Viên',
+        'Email',
         'Công Nợ Hiện Tại (đ)',
         'Điểm Tích Lũy',
         'Trạng Thái',
@@ -268,14 +274,14 @@ export const CustomerManagementPage: FC = () => {
       for (const c of processedCustomers) {
         const code = c.customerCode || c.id.slice(0, 8).toUpperCase();
         const row = [
-          `"${code.replace(/"/g, '""')}"`,
-          `"${(c.fullName || '').replace(/"/g, '""')}"`,
-          `"${(c.phoneNumber || '').replace(/"/g, '""')}"`,
-          `"${(c.taxCode || '').replace(/"/g, '""')}"`,
-          `"${(c.companyName || '').replace(/"/g, '""')}"`,
+          escapeCsvCell(code),
+          escapeCsvCell(c.fullName || ''),
+          escapeCsvCell(c.phoneNumber || ''),
+          escapeCsvCell(c.membershipTier || 'Standard'),
+          escapeCsvCell(c.email || ''),
           Math.max(0, Number(c.currentDebtAR) || 0),
           c.loyaltyPoints || 0,
-          `"${c.status === 'Active' ? 'Hoạt động' : 'Tạm ngừng'}"`,
+          escapeCsvCell(c.status === 'Active' ? 'Hoạt động' : 'Tạm ngừng'),
         ];
         csvRows.push(row.join(','));
       }
