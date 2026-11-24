@@ -1610,6 +1610,11 @@
   color: #15803D;
 }
 
+.legend-badge.red {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+
 .waterfall-bar-group {
   cursor: pointer;
   transition: opacity 0.15s ease;

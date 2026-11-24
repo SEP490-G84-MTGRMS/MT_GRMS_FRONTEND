@@ -524,11 +524,10 @@ export const reportsPnlService = {
           const netProfit = Number(s.netProfit || 0);
           const netMarginPct = Number(s.netMarginPercentage || 0);
 
-          const taxConfig = getTaxRateConfig();
           const estimatedTaxAmount =
             typeof s.estimatedTaxAmount === 'number'
               ? Number(s.estimatedTaxAmount)
-              : Math.round(netRevenue * (taxConfig.effectiveTotalRatePct / 100));
+              : 0;
           const netProfitAfterTax = netProfit - estimatedTaxAmount;
           const netProfitAfterTaxMarginPct = calculateMarginPct(netProfitAfterTax, netRevenue);
 
