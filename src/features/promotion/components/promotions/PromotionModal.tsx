@@ -94,20 +94,20 @@ export const PromotionModal: FC<PromotionModalProps> = ({
       setTiers(
         editingPromo.tiers?.length
           ? editingPromo.tiers.map((t) => ({
-              ...t,
-              giftUnit: t.giftUnit || "Cái",
-            }))
+            ...t,
+            giftUnit: t.giftUnit || "Cái",
+          }))
           : [
-              {
-                id: "tier-1",
-                tierLevel: 1,
-                minOrderValue: 200000,
-                discountType: "PERCENT",
-                discountValue: 5,
-                maxDiscount: 30000,
-                giftUnit: "Cái",
-              },
-            ]
+            {
+              id: "tier-1",
+              tierLevel: 1,
+              minOrderValue: 200000,
+              discountType: "PERCENT",
+              discountValue: 5,
+              maxDiscount: 30000,
+              giftUnit: "Cái",
+            },
+          ]
       );
     } else {
       setCode(
@@ -115,9 +115,9 @@ export const PromotionModal: FC<PromotionModalProps> = ({
       );
       setName("");
       setType("ORDER_DISCOUNT");
-      setStartDate(new Date().toISOString().slice(0, 10));
+      setStartDate(new Date().toLocaleDateString("en-CA"));
       setEndDate(
-        new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+        new Date(Date.now() + 30 * 86400000).toLocaleDateString("en-CA"),
       );
       setSelectedBranches(["ALL"]);
       setDescription("");
@@ -676,7 +676,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                           >
                             Sản phẩm quà tặng (Y)
                           </label>
-                          <ProductPicker products={availableProducts} value={tier.giftProductId} selectedName={tier.giftProductName}  onChange={(p) => handleUpdateTier(idx, { giftProductId: p?.id, giftProductName: p?.name, giftUnit: p?.baseUnit || "Cái", giftProductSku: p?.productCode })} />
+                          <ProductPicker products={availableProducts} value={tier.giftProductId} selectedName={tier.giftProductName} onChange={(p) => handleUpdateTier(idx, { giftProductId: p?.id, giftProductName: p?.name, giftUnit: p?.baseUnit || "Cái", giftProductSku: p?.productCode })} />
                           {(!tier.giftProductId || !availableProducts.some((p) => p.id === tier.giftProductId)) && (
                             <input
                               type="text"

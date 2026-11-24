@@ -316,12 +316,28 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                       </td>
                       <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         <div className="promo-status-cell">
-                          <div
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={item.status === 'ACTIVE'}
+                            aria-label={
+                              item.status === 'EXPIRED'
+                                ? 'Chương trình đã hết hạn, không thể bật/tắt'
+                                : item.status === 'ACTIVE'
+                                  ? `Tạm ngưng CTKM ${item.code}`
+                                  : `Kích hoạt CTKM ${item.code}`
+                            }
+                            disabled={item.status === 'EXPIRED'}
                             className="switch-container"
                             onClick={() => {
                               if (item.status !== 'EXPIRED') onToggleStatus(item.id);
                             }}
-                            style={item.status === 'EXPIRED' ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              padding: 0,
+                              ...(item.status === 'EXPIRED' ? { opacity: 0.45, cursor: 'not-allowed' } : {}),
+                            }}
                             title={
                               item.status === 'EXPIRED'
                                 ? 'Chương trình đã hết hạn, không thể bật/tắt'
@@ -333,7 +349,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                             <div className={`switch-track ${item.status === 'ACTIVE' ? 'switch-active' : ''}`}>
                               <div className="switch-thumb" />
                             </div>
-                          </div>
+                          </button>
                           {renderStatusBadge(item.status)}
                         </div>
                       </td>

@@ -88,9 +88,9 @@ export const LoyaltyConfigPage: FC = () => {
     setConfig((prev) => ({ ...prev, isEnabled: nextState }));
     showToast(
       nextState
-        ? 'Đã kích hoạt hệ thống tích điểm & đổi thưởng!'
-        : 'Đã tạm ngưng tích điểm tại toàn bộ chuỗi!',
-      nextState ? 'success' : 'info'
+        ? 'Đã chọn bật tích điểm — nhấn "Lưu thiết lập" để áp dụng.'
+        : 'Đã chọn tạm ngưng tích điểm — nhấn "Lưu thiết lập" để áp dụng.',
+      'info'
     );
   };
 
