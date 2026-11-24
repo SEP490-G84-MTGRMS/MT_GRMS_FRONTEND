@@ -120,7 +120,9 @@ export const getServiceExpenses = async (
         );
       }
       if (params?.category) {
-        const catLabel = EXPENSE_CATEGORY_LABELS[params.category] || params.category;
+        const catLabel =
+          EXPENSE_CATEGORY_LABELS[params.category as keyof typeof EXPENSE_CATEGORY_LABELS] ||
+          params.category;
         items = items.filter((i) => i.category === params.category || i.category === catLabel);
       }
       if (params?.status) {

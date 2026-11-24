@@ -18,7 +18,19 @@ export interface ExpenseFilterBarProps {
   onReset: () => void;
   onPeriodLabelChange?: (label: string) => void;
   branches?: { id: string; name: string }[];
+  categories?: string[];
 }
+
+const DEFAULT_CATEGORY_OPTIONS: string[] = [
+  'Thuê mặt bằng',
+  'Điện nước',
+  'Internet & Viễn thông',
+  'Bảo trì sửa chữa',
+  'Vệ sinh môi trường',
+  'Tiền điện',
+  'Tiền nước',
+  'Chi phí khác',
+];
 
 export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
   filters,
@@ -26,6 +38,7 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
   onReset,
   onPeriodLabelChange,
   branches,
+  categories,
 }) => {
   const currentMonthIso = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const [searchInput, setSearchInput] = useState(filters.keyword || '');
@@ -208,14 +221,19 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
             style={{ width: '100%', minWidth: 0 }}
             value={filters.category || ''}
             onChange={(e) =>
-              onFilterChange({ category: (e.target.value as ExpenseCategory) || undefined })
+              onFilterChange({ category: e.target.value || undefined })
             }
             title="Lọc theo danh mục chi phí"
           >
             <option value="">-- Tất cả danh mục chi --</option>
-            {(Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => (
+            {Array.from(
+              new Set([
+                ...(categories || []),
+                ...DEFAULT_CATEGORY_OPTIONS,
+              ])
+            ).map((cat) => (
               <option key={cat} value={cat}>
-                {EXPENSE_CATEGORY_LABELS[cat]}
+                {EXPENSE_CATEGORY_LABELS[cat as ExpenseCategory] || cat}
               </option>
             ))}
           </select>

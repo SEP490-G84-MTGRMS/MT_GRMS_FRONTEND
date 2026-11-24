@@ -85,7 +85,7 @@ export interface ExpenseFilterParams {
   page?: number;
   pageSize?: number;
   branchId?: string;
-  category?: ExpenseCategory | '';
+  category?: string;
   status?: ExpenseStatus | '';
   quickStatus?: ExpenseQuickStatus | '';
   fromDate?: string;

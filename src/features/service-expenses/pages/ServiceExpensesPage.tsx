@@ -499,6 +499,7 @@ export const ServiceExpensesPage: FC = () => {
         onFilterChange={handleFilterChange}
         onReset={handleResetFilters}
         branches={branches}
+        categories={Array.from(new Set(expenseRows.map((row) => row.category).filter(Boolean)))}
       />
 
       {/* ── 3. Standardized Expense Table (.so-list-table-card with pinned pagination) ── */}
