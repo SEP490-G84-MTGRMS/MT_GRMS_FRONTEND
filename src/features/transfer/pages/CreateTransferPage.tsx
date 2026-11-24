@@ -292,7 +292,7 @@ export const CreateTransferPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#64748b' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1e293b' }}>
             <User size={16} color="#0F766E" />
-            <span>{user?.fullName || user?.username || 'Chủ cửa hàng'}</span>
+            <span>{user?.fullName || user?.email || 'Chủ cửa hàng'}</span>
           </div>
           <span>{new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
         </div>
