@@ -126,10 +126,16 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Xóa kỳ nghỉ này?')) return;
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => {
+    setConfirmDeleteId(id);
+  };
+
+  const executeDelete = async (id: string) => {
     try {
       await persist(holidays.filter((item) => item.id !== id));
+      setConfirmDeleteId(null);
       showToast(`Đã xóa kỳ nghỉ khỏi ${supplier.name}.`);
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Không thể xóa kỳ nghỉ.', 'error');
@@ -308,6 +314,30 @@ export const SupplierHolidaysTab: FC<Props> = ({ supplier, initialConfig, onSave
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            zIndex: 10050,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 400, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Xác nhận xóa kỳ nghỉ</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 13.5, color: '#475569' }}>Bạn có chắc chắn muốn xóa kỳ nghỉ này khỏi nhà cung cấp?</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" className="admin-btn" onClick={() => setConfirmDeleteId(null)}>Hủy</button>
+              <button type="button" className="admin-btn admin-btn-primary" style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }} onClick={() => void executeDelete(confirmDeleteId)}>Xóa</button>
+            </div>
           </div>
         </div>
       )}
