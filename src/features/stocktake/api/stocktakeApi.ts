@@ -477,7 +477,7 @@ export const stocktakeApi = {
 
   async update(id: string, payload: CreateStocktakePayload): Promise<StocktakeDetail> {
     const command = {
-      reasonType: 'PERIODIC',
+      reasonType: null,
       note: payload.note || null,
       lines: payload.lines.map((l) => ({
         id: null,
