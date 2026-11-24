@@ -146,11 +146,11 @@ export const EmployeeListPage: React.FC = () => {
 
       const filteredItems = trimmedKeyword
         ? res.items.filter((emp) =>
-            matchesAnyVietnameseSearch(
-              [emp.fullName, emp.employeeCode, emp.phone, emp.citizenId, emp.email],
-              trimmedKeyword
-            )
+          matchesAnyVietnameseSearch(
+            [emp.fullName, emp.employeeCode, emp.phone, emp.citizenId, emp.email],
+            trimmedKeyword
           )
+        )
         : res.items;
 
       // Ưu tiên nhân viên đang làm việc (active) hiển thị lên đầu
@@ -635,28 +635,6 @@ export const EmployeeListPage: React.FC = () => {
                     alignItems: 'center',
                     gap: 8,
                   }}
-                  onClick={() => {
-                    setShowImportModal(true);
-                    setShowActionDropdown(false);
-                  }}
-                >
-                  <Upload size={15} />
-                  <span>Nhập file Excel</span>
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
                   onClick={handleExportExcel}
                 >
                   <Download size={15} />
@@ -809,7 +787,7 @@ export const EmployeeListPage: React.FC = () => {
                       </div>
                     </td>
                     <td style={{ fontWeight: 600, color: '#0F766E' }}>{emp.employeeCode}</td>
-                                        <td>
+                    <td>
                       <div className="emp-name-badge">
                         <span>{emp.fullName}</span>
                         {emp.hasFaceId && (
@@ -845,9 +823,8 @@ export const EmployeeListPage: React.FC = () => {
                     </td>
                     <td>
                       <span
-                        className={`emp-status-pill ${
-                          emp.status === 'active' ? 'active' : 'inactive'
-                        }`}
+                        className={`emp-status-pill ${emp.status === 'active' ? 'active' : 'inactive'
+                          }`}
                       >
                         {emp.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ'}
                       </span>
@@ -890,20 +867,20 @@ export const EmployeeListPage: React.FC = () => {
           </table>
         </div>
 
-          {/* Enterprise Standard TablePagination */}
-          <TablePagination
-            currentPage={page}
-            pageSize={pageSize}
-            totalItems={totalItems}
-            pageSizeOptions={[10, 20, 50]}
-            onPageChange={(newPage) => setPage(newPage)}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setPage(1);
-            }}
-            itemLabel="nhân viên"
-            isLoading={isLoading}
-          />
+        {/* Enterprise Standard TablePagination */}
+        <TablePagination
+          currentPage={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          pageSizeOptions={[10, 20, 50]}
+          onPageChange={(newPage) => setPage(newPage)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+          itemLabel="nhân viên"
+          isLoading={isLoading}
+        />
       </div>
 
       {/* ─── MODALS ─── */}

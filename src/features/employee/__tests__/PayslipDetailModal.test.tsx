@@ -112,4 +112,76 @@ describe('PayslipDetailModal — Base salary breakdown modal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bỏ qua' }));
     expect(screen.queryByRole('dialog', { name: 'Chi tiết lương chính' })).toBeNull();
   });
+
+  it('opens formatted printable payslip form when clicking In', async () => {
+    const mockWrite = vi.fn();
+    const mockOpen = vi.fn();
+    const mockClose = vi.fn();
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue({
+      document: { open: mockOpen, write: mockWrite, close: mockClose },
+    } as unknown as Window);
+
+    render(
+      <PayslipDetailModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onPayNow={vi.fn()}
+        payslip={{
+          id: 'p1',
+          payslipCode: 'PL001',
+          employeeId: 'emp-1',
+          employeeCode: 'NV000001',
+          employeeName: 'Nguyen Minh Tam',
+          branchId: 'br-1',
+          branchName: 'Chi nhánh trung tâm',
+          periodMonth: '2026-11',
+          salaryType: 'MONTHLY',
+          baseRate: 10_000_000,
+          standardDays: 30,
+          workedDays: 0.5,
+          totalWorkHours: 4,
+          otHours: 0,
+          contractBaseSalary: 10_000_000,
+          lunchAllowance: 0,
+          travelAllowance: 0,
+          baseSalaryEarned: 166_667,
+          overtimePay: 0,
+          bonus: 0,
+          violationDeduction: 0,
+          allowances: [],
+          totalAllowance: 0,
+          totalEarnings: 166_667,
+          advanceDeduction: 0,
+          socialInsurance: 0,
+          totalDeductions: 0,
+          netSalary: 166_667,
+          status: 'UNPAID',
+          note: 'Lương tháng 11',
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'In' }));
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    const writtenHtml = mockWrite.mock.calls[0]?.[0] as string;
+    expect(writtenHtml).toContain('PHIẾU LƯƠNG NHÂN VIÊN');
+    expect(writtenHtml).toContain('Bảng lương tháng 11/2026');
+    expect(writtenHtml).toContain('Chi nhánh trả lương: Chi nhánh trung tâm');
+    expect(writtenHtml).toContain('NV000001:');
+    expect(writtenHtml).toContain('Nguyen Minh Tam');
+    expect(writtenHtml).toContain('10,000,000');
+    expect(writtenHtml).toContain('Các khoản thu nhập');
+    expect(writtenHtml).toContain('Lương chính');
+    expect(writtenHtml).toContain('Các khoản giảm trừ');
+    expect(writtenHtml).toContain('Tổng lương (I) - (II)');
+    expect(writtenHtml).toContain('Thanh toán lương');
+    expect(writtenHtml).toContain('Ngày công chuẩn:');
+    expect(writtenHtml).toContain('30.00');
+    expect(writtenHtml).not.toContain('Thưởng');
+    expect(writtenHtml).not.toContain('Ghi chú:');
+    expect(writtenHtml).toContain('Người lập phiếu');
+
+    openSpy.mockRestore();
+  });
 });

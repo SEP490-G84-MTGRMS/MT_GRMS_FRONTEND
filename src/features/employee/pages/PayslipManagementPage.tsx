@@ -3,7 +3,6 @@ import {
   Search,
   Plus,
   CreditCard,
-  Printer,
   MoreHorizontal,
   Download,
   RefreshCw,

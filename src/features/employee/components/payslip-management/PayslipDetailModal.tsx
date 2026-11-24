@@ -9,6 +9,7 @@ import {
 import { scheduleApi, type ScheduleResponse } from '../../api/scheduleApi';
 import { cashbookService } from '../../../cashbook/services/cashbookService';
 import type { LedgerTransaction } from '../../../cashbook/types/cashbook.types';
+import { printPayslipForm } from './printPayslipForm';
 
 interface PayslipDetailModalProps {
   isOpen: boolean;
@@ -666,7 +667,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
             type="button"
             className="emp-btn emp-btn-secondary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}
-            onClick={() => window.print()}
+            onClick={() => effectivePayslip && printPayslipForm(effectivePayslip)}
             disabled={!effectivePayslip || isLoading}
           >
             <Printer size={15} />
