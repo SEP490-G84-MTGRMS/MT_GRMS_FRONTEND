@@ -280,7 +280,9 @@ export const TransferListPage: React.FC = () => {
     return () => window.removeEventListener('resize', updateScrollState);
   }, [filteredTransfers]);
 
-  const totalTransferValue = filteredTransfers.reduce((sum, t) => sum + t.totalAmount, 0);
+  const totalTransferValue = filteredTransfers
+    .filter((t) => t.status !== 'Cancelled')
+    .reduce((sum, t) => sum + t.totalAmount, 0);
 
   const exportExcel = async () => {
     if (!filteredTransfers.length) {
@@ -484,7 +486,7 @@ export const TransferListPage: React.FC = () => {
             title="Tổng giá trị các phiếu chuyển theo bộ lọc"
           >
             Tổng giá trị:{' '}
-            <strong style={{ marginLeft: 4 }}>{totalTransferValue.toLocaleString()} đ</strong>
+            <strong style={{ marginLeft: 4 }}>{totalTransferValue.toLocaleString('vi-VN')} đ</strong>
           </span>}
           <button
             type="button"
@@ -854,12 +856,20 @@ export const TransferListPage: React.FC = () => {
                     </td>
 
                     {/* Kho gửi */}
-                    <td className="so-list-td" style={{ fontWeight: 600, color: '#1e293b' }}>
+                    <td
+                      className="so-list-td"
+                      style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'normal', lineHeight: 1.35 }}
+                      title={t.fromBranchName}
+                    >
                       {t.fromBranchName}
                     </td>
 
                     {/* Kho nhận */}
-                    <td className="so-list-td" style={{ fontWeight: 600, color: '#1e293b' }}>
+                    <td
+                      className="so-list-td"
+                      style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'normal', lineHeight: 1.35 }}
+                      title={t.toBranchName}
+                    >
                       {t.toBranchName}
                     </td>
 
@@ -873,7 +883,7 @@ export const TransferListPage: React.FC = () => {
                         fontVariantNumeric: 'tabular-nums',
                       }}
                     >
-                      {t.totalAmount.toLocaleString()} đ
+                      {t.totalAmount.toLocaleString('vi-VN')} đ
                     </td>}
 
                     {/* Trạng thái */}
