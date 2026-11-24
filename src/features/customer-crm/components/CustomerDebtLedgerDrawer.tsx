@@ -41,16 +41,31 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
   const [filterType, setFilterType] = useState<'ALL' | 'INCREASE' | 'DECREASE'>('ALL');
 
   const [ledgers, setLedgers] = useState<CustomerDebtLedgerDto[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (customer) {
-      void customerApi.getCustomerDebtLedger(customer.id).then((data) => {
-        setLedgers(data);
-      });
-    } else {
+    if (!isOpen || !customer) {
       setLedgers([]);
+      setIsLoading(false);
+      return;
     }
-  }, [customer]);
+    let isMounted = true;
+    setIsLoading(true);
+    customerApi
+      .getCustomerDebtLedger(customer.id)
+      .then((data) => {
+        if (isMounted) setLedgers(data);
+      })
+      .catch(() => {
+        if (isMounted) setLedgers([]);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [customer?.id, isOpen]);
 
   if (!isOpen || !customer) return null;
 
@@ -268,7 +283,13 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
 
         {/* Timeline / Ledger Items Body */}
         <div className="customer-drawer-body" style={{ padding: '20px 24px', flex: 1, overflowY: 'auto' }}>
-          {filteredLedgers.length === 0 ? (
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: '48px 0', color: '#64748b' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+                Đang tải lịch sử biến động công nợ...
+              </div>
+            </div>
+          ) : filteredLedgers.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 0', color: '#94a3b8' }}>
               <Receipt className="w-12 h-12" style={{ margin: '0 auto 12px', opacity: 0.4 }} />
               <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#64748b' }}>
