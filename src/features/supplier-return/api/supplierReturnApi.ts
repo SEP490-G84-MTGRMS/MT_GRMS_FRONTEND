@@ -11,14 +11,11 @@ import type {
   CancelSupplierReturnPayload,
   ExchangePurchaseOrderSummary,
 } from '../types/supplierReturn.types';
-import {
-  MOCK_SUPPLIER_RETURNS,
-  MOCK_ELIGIBLE_GRNS,
-  MOCK_GRN_RETURNABLE_LINES,
-} from '../lib/mockSupplierReturnData';
 
-// Local cache for mutations when offline or fallback
-let localReturns: SupplierReturnDetail[] = [...MOCK_SUPPLIER_RETURNS];
+function extractApiError(err: unknown, fallback: string): Error {
+  const e = err as { response?: { data?: { message?: string } }; message?: string };
+  return new Error(e.response?.data?.message || e.message || fallback);
+}
 
 export const supplierReturnApi = {
   async getList(filters: SupplierReturnFilterState): Promise<{
@@ -42,82 +39,20 @@ export const supplierReturnApi = {
 
     try {
       const res = await httpClient.get(`/supplier-returns?${params.toString()}`);
-      if (res.data?.data) {
-        const paged = res.data.data;
-        const items = paged.items || [];
-        return {
-          // Backend (PagedResult) trả `totalItems` & `page`
-          items,
-          totalCount: paged.totalItems ?? paged.totalCount ?? items.length,
-          pageIndex: paged.page ?? paged.pageIndex ?? filters.pageIndex,
-          pageSize: paged.pageSize || filters.pageSize,
-        };
+      const paged = res.data?.data;
+      if (!paged) {
+        throw new Error(res.data?.message || 'Không thể tải danh sách phiếu trả hàng.');
       }
+      const items = paged.items || [];
+      return {
+        items,
+        totalCount: paged.totalItems ?? paged.totalCount ?? items.length,
+        pageIndex: paged.page ?? paged.pageIndex ?? filters.pageIndex,
+        pageSize: paged.pageSize || filters.pageSize,
+      };
     } catch (err: unknown) {
-      // Backend có phản hồi lỗi (4xx/5xx) → báo lỗi thật, KHÔNG rơi về dữ liệu mock
-      // (mock che mất phiếu thật như RTV tự sinh từ GRN). Chỉ dùng mock khi không kết nối được server.
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      if (e.response) {
-        throw new Error(e.response.data?.message || e.message || 'Không thể tải danh sách phiếu trả hàng.');
-      }
+      throw extractApiError(err, 'Không thể tải danh sách phiếu trả hàng.');
     }
-
-    let filtered = [...localReturns];
-    if (filters.keyword) {
-      const kw = filters.keyword.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.code.toLowerCase().includes(kw) ||
-          r.goodsReceiptCode.toLowerCase().includes(kw) ||
-          r.supplierCode.toLowerCase().includes(kw) ||
-          r.supplierName.toLowerCase().includes(kw)
-      );
-    }
-    if (filters.returnCodes?.length) {
-      const terms = filters.returnCodes.map((t) => t.toLowerCase());
-      filtered = filtered.filter((r) => terms.some((t) => r.code.toLowerCase().includes(t)));
-    }
-    if (filters.grnCodes?.length) {
-      const terms = filters.grnCodes.map((t) => t.toLowerCase());
-      filtered = filtered.filter((r) => terms.some((t) => r.goodsReceiptCode.toLowerCase().includes(t)));
-    }
-    if (filters.supplierCodes?.length) {
-      const terms = filters.supplierCodes.map((t) => t.toLowerCase());
-      filtered = filtered.filter((r) => terms.some((t) => r.supplierCode.toLowerCase().includes(t)));
-    }
-    if (filters.supplierNames?.length) {
-      const terms = filters.supplierNames.map((t) => t.toLowerCase());
-      filtered = filtered.filter((r) => terms.some((t) => r.supplierName.toLowerCase().includes(t)));
-    }
-    if (filters.branchNames?.length) {
-      const terms = filters.branchNames.map((t) => t.toLowerCase());
-      filtered = filtered.filter((r) =>
-        terms.some(
-          (t) =>
-            r.branchName.toLowerCase().includes(t) ||
-            r.branchCode.toLowerCase().includes(t)
-        )
-      );
-    }
-    if (filters.branchId) {
-      filtered = filtered.filter((r) => r.branchId === filters.branchId);
-    }
-    if (filters.supplierId) {
-      filtered = filtered.filter((r) => r.supplierId === filters.supplierId);
-    }
-    if (filters.status) {
-      filtered = filtered.filter((r) => r.status === filters.status);
-    }
-
-    const start = (filters.pageIndex - 1) * filters.pageSize;
-    const paged = filtered.slice(start, start + filters.pageSize);
-
-    return {
-      items: paged,
-      totalCount: filtered.length,
-      pageIndex: filters.pageIndex,
-      pageSize: filters.pageSize,
-    };
   },
 
   async getById(id: string): Promise<SupplierReturnDetail> {
@@ -126,15 +61,10 @@ export const supplierReturnApi = {
       if (res.data?.data) {
         return res.data.data;
       }
-    } catch {
-      // Fallback
+      throw new Error(res.data?.message || `Không tìm thấy phiếu trả hàng #${id}`);
+    } catch (err: unknown) {
+      throw extractApiError(err, `Không thể tải chi tiết phiếu trả hàng #${id}.`);
     }
-
-    const found = localReturns.find((r) => r.id === id);
-    if (!found) {
-      throw new Error(`Không tìm thấy phiếu trả hàng #${id}`);
-    }
-    return found;
   },
 
   async getEligibleGrns(branchId?: string, supplierId?: string): Promise<EligibleGrnLookup[]> {
@@ -143,37 +73,25 @@ export const supplierReturnApi = {
       if (branchId) params.append('branchId', branchId);
       if (supplierId) params.append('supplierId', supplierId);
       const res = await httpClient.get(`/supplier-returns/eligible-grns?${params.toString()}`);
-      if (res.data?.data) {
-        return res.data.data;
-      }
-    } catch {
-      // Fallback
+      return res.data?.data || [];
+    } catch (err: unknown) {
+      throw extractApiError(err, 'Không thể tải danh sách phiếu nhập kho đủ điều kiện trả hàng.');
     }
-
-    let list = [...MOCK_ELIGIBLE_GRNS];
-    if (branchId) list = list.filter((g) => g.branchId === branchId);
-    if (supplierId) list = list.filter((g) => g.supplierId === supplierId);
-    return list;
   },
 
   async getGrnReturnableLines(grnId: string): Promise<GrnReturnableLine[]> {
     try {
       const res = await httpClient.get(`/supplier-returns/grn-lines/${grnId}`);
-      if (res.data?.data) {
-        return res.data.data;
-      }
-    } catch {
-      // Fallback
+      return res.data?.data || [];
+    } catch (err: unknown) {
+      throw extractApiError(err, 'Không thể tải danh sách sản phẩm có thể trả từ phiếu nhập kho.');
     }
-
-    return MOCK_GRN_RETURNABLE_LINES[grnId] || [];
   },
 
   async create(
     payload: CreateSupplierReturnPayload,
-    opts?: { allowMock?: boolean }
+    _opts?: { allowMock?: boolean }
   ): Promise<SupplierReturnDetail> {
-    const allowMock = opts?.allowMock !== false;
     try {
       const res = await httpClient.post('/supplier-returns', {
         ...payload,
@@ -184,164 +102,48 @@ export const supplierReturnApi = {
       }
       throw new Error(res.data?.message || 'Không tạo được phiếu trả hàng.');
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      if (e.response || !allowMock) {
-        throw new Error(
-          e.response?.data?.message || e.message || 'Không tạo được phiếu trả hàng.'
-        );
-      }
+      throw extractApiError(err, 'Không tạo được phiếu trả hàng.');
     }
-
-    const grn = MOCK_ELIGIBLE_GRNS.find((g) => g.id === payload.goodsReceiptId);
-    const code = `RTV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(localReturns.length + 1).padStart(3, '0')}`;
-    const totalRequestedQty = payload.lines.reduce((sum, l) => sum + l.requestedQty, 0);
-    const totalEstimatedAmount = payload.lines.reduce((sum, l) => sum + l.requestedQty * l.unitCost, 0);
-
-    const newReturn: SupplierReturnDetail = {
-      id: `rtv-${Date.now()}`,
-      code,
-      goodsReceiptId: payload.goodsReceiptId,
-      goodsReceiptCode: grn?.code || 'GRN-MOCK',
-      supplierId: payload.supplierId || grn?.supplierId || '',
-      supplierCode: 'SUP-CODE',
-      supplierName: grn?.supplierName || 'Nhà cung cấp',
-      branchId: payload.branchId || grn?.branchId || '',
-      branchCode: payload.branchId || grn?.branchId || '',
-      branchName: grn?.branchName || 'Chi nhánh',
-      status: payload.autoSubmit || payload.submitImmediately ? 'PENDING_SUPPLIER' : 'DRAFT',
-      reason: payload.reason,
-      reasonNotes: payload.reasonNotes,
-      attachmentUrl: payload.attachmentUrl,
-      totalRequestedQty,
-      totalApprovedQty: 0,
-      totalHandedOverQty: 0,
-      totalEstimatedAmount,
-      createdAt: new Date().toISOString(),
-      submittedAt: payload.submitImmediately ? new Date().toISOString() : undefined,
-      lines: payload.lines.map((l, idx) => ({
-        id: `rtvl-${Date.now()}-${idx}`,
-        productId: l.productId,
-        sku: 'SKU-' + (idx + 1),
-        productName: 'Sản phẩm ' + (idx + 1),
-        unit: 'Cái',
-        goodsReceiptLineId: l.goodsReceiptLineId,
-        batchCode: l.batchCode,
-        expiryDate: l.expiryDate,
-        receivedQty: l.requestedQty + 10,
-        returnedQty: 0,
-        pendingReturnQty: l.requestedQty,
-        availableReturnQty: 10,
-        requestedQty: l.requestedQty,
-        approvedQty: 0,
-        rejectedQty: 0,
-        handedOverQty: 0,
-        unitCost: l.unitCost,
-        lineTotal: l.requestedQty * l.unitCost,
-        notes: l.notes,
-      })),
-    };
-
-    localReturns.unshift(newReturn);
-    return newReturn;
   },
 
   async submit(id: string, notes?: string): Promise<SupplierReturnDetail> {
     try {
       const res = await httpClient.post(`/supplier-returns/${id}/submit`, { notes });
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+      throw new Error(res.data?.message || 'Không gửi được yêu cầu trả hàng.');
+    } catch (err: unknown) {
+      throw extractApiError(err, 'Không gửi được yêu cầu trả hàng.');
     }
-
-    const ret = localReturns.find((r) => r.id === id);
-    if (!ret) throw new Error('Không tìm thấy phiếu trả');
-    ret.status = 'PENDING_SUPPLIER';
-    ret.submittedAt = new Date().toISOString();
-    if (notes) ret.reasonNotes = (ret.reasonNotes ? ret.reasonNotes + ' | ' : '') + notes;
-    return ret;
   },
 
   async recordResponse(id: string, payload: RecordSupplierResponsePayload): Promise<SupplierReturnDetail> {
     try {
       const res = await httpClient.post(`/supplier-returns/${id}/supplier-response`, payload);
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+      throw new Error(res.data?.message || 'Không ghi nhận được phản hồi của nhà cung cấp.');
+    } catch (err: unknown) {
+      throw extractApiError(err, 'Không ghi nhận được phản hồi của nhà cung cấp.');
     }
-
-    const ret = localReturns.find((r) => r.id === id);
-    if (!ret) throw new Error('Không tìm thấy phiếu trả');
-    ret.supplierResponseNote = payload.supplierResponseNote;
-    ret.respondedAt = new Date().toISOString();
-
-    if (payload.resultType === 'REJECTED') {
-      ret.status = 'REJECTED';
-      ret.totalApprovedQty = 0;
-      ret.lines.forEach((l) => {
-        l.approvedQty = 0;
-        l.rejectedQty = l.requestedQty;
-      });
-    } else {
-      ret.status = 'APPROVED';
-      let totalApproved = 0;
-      ret.lines.forEach((l) => {
-        const item = payload.lineResponses.find((pl) => pl.lineId === l.id);
-        if (item) {
-          l.approvedQty = item.approvedQty;
-          l.rejectedQty = Math.max(0, l.requestedQty - item.approvedQty);
-          l.rejectionReason = item.rejectionReason;
-        } else if (payload.resultType === 'APPROVED_FULL') {
-          l.approvedQty = l.requestedQty;
-          l.rejectedQty = 0;
-        }
-        totalApproved += l.approvedQty;
-      });
-      ret.totalApprovedQty = totalApproved;
-    }
-    return ret;
   },
 
   async completeHandover(id: string, payload: CompleteHandoverPayload): Promise<SupplierReturnDetail> {
     try {
       const res = await httpClient.post(`/supplier-returns/${id}/complete-handover`, payload);
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+      throw new Error(res.data?.message || 'Không hoàn tất được bàn giao hàng.');
+    } catch (err: unknown) {
+      throw extractApiError(err, 'Không hoàn tất được bàn giao hàng.');
     }
-
-    const ret = localReturns.find((r) => r.id === id);
-    if (!ret) throw new Error('Không tìm thấy phiếu trả');
-    ret.status = 'COMPLETED';
-    ret.handedOverAt = new Date().toISOString();
-    ret.handedOverBy = payload.handedOverBy;
-
-    let totalHanded = 0;
-    ret.lines.forEach((l) => {
-      const item = payload.lines.find((pl) => pl.lineId === l.id);
-      if (item) {
-        l.handedOverQty = item.handedOverQty;
-      } else {
-        l.handedOverQty = l.approvedQty;
-      }
-      totalHanded += l.handedOverQty;
-    });
-    ret.totalHandedOverQty = totalHanded;
-    return ret;
   },
 
   async cancel(id: string, payload: CancelSupplierReturnPayload): Promise<SupplierReturnDetail> {
     try {
       const res = await httpClient.post(`/supplier-returns/${id}/cancel`, payload);
       if (res.data?.data) return res.data.data;
-    } catch {
-      // Fallback
+      throw new Error(res.data?.message || 'Không hủy được phiếu trả hàng.');
+    } catch (err: unknown) {
+      throw extractApiError(err, 'Không hủy được phiếu trả hàng.');
     }
-
-    const ret = localReturns.find((r) => r.id === id);
-    if (!ret) throw new Error('Không tìm thấy phiếu trả');
-    ret.status = 'CANCELLED';
-    ret.cancellationReason = payload.reason;
-    return ret;
   },
 
   async createExchangePurchaseOrders(id: string): Promise<ExchangePurchaseOrderSummary[]> {

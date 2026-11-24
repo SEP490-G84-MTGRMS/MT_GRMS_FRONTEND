@@ -44,14 +44,10 @@ export const SupplierReturnFormPage: FC = () => {
           }
         }
       })
-      .catch(() => {
-        // Fallback
-        if (isMounted && branches.length === 0) {
-          setBranches([
-            { id: 'BR-01', name: 'BR-01 Main Store' },
-            { id: 'BR-02', name: 'BR-02 Thu Duc Hub' },
-          ]);
-        }
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+        setBranches([]);
+        setErrorMsg(err instanceof Error ? err.message : 'Không thể tải danh sách chi nhánh.');
       });
 
     return () => {
