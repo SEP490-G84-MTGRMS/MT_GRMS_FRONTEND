@@ -635,4 +635,16 @@
     grid-template-columns: 1fr;
     gap: 6px;
   }
+  .po-matrix-container {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .so-list-table-card {
+    max-height: none !important;
+  }
+  .so-list-table-body {
+    min-height: 260px;
+    max-height: 60vh;
+  }
 }
