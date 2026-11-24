@@ -142,25 +142,16 @@ export const SupplierBranchManagementPage: FC = () => {
     setAppliedFilters((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }));
   };
 
-  // Assign & Unassign Handlers
+  // Assign & Unassign Handlers (SBA-02: atomic 1-step creation & rethrow error so modal stays open)
   const handleAssignBranches = async (input: AssignSuppliersToBranchInput) => {
     try {
       await supplierBranchApi.assignSuppliersToBranch(input);
-      if (input.status === 'Inactive') {
-        for (const supplierId of input.supplierIds) {
-          await supplierBranchApi.updateAssignmentStatus(
-            supplierId,
-            input.branchId,
-            'Inactive',
-            input.inactiveReason
-          );
-        }
-      }
       showToast(`Đã phân bổ thành công ${input.supplierIds.length} nhà cung cấp cho cửa hàng.`);
       setIsAssignModalOpen(false);
       await fetchAssignments();
     } catch (err: any) {
       showToast(err.message || 'Không thể thực hiện gán nhà cung cấp cho cửa hàng.', 'error');
+      throw err;
     }
   };
 
