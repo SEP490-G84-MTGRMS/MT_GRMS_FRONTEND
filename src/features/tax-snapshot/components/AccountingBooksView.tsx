@@ -1202,21 +1202,25 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                 (e) => !s2cRevenueEntries.includes(e) && !s2cCogsEntries.includes(e)
               );
 
+              const s2cRevenueFromRows = s2cRevenueEntries.reduce((s, e) => s + (e.amount || 0), 0);
               const s2cTotalRevenue =
-                summary?.taxableRevenueInPeriod ??
-                s2cRevenueEntries.reduce((s, e) => s + (e.amount || 0), 0);
+                s2cRevenueEntries.length > 0
+                  ? s2cRevenueFromRows
+                  : (summary?.taxableRevenueInPeriod ?? 0);
+              const s2cCogsFromRows = s2cCogsEntries.reduce((s, e) => s + (e.amount || 0), 0);
               const s2cTotalCogs =
-                summary?.cogsAmount ??
-                s2cCogsEntries.reduce((s, e) => s + (e.amount || 0), 0);
+                s2cCogsEntries.length > 0 ? s2cCogsFromRows : (summary?.cogsAmount ?? 0);
               const s2cTotalOpex = s2cExpenseEntries.reduce((s, e) => s + (e.amount || 0), 0);
+              const s2cComputedExpense = s2cTotalCogs + s2cTotalOpex;
               const s2cTotalExpense =
-                summary?.deductibleExpensesInPeriod ?? s2cTotalCogs + s2cTotalOpex;
-              const s2cTaxableIncome =
-                summary?.taxableIncomeDeclaration ?? Math.max(0, s2cTotalRevenue - s2cTotalExpense);
+                s2cComputedExpense > 0
+                  ? s2cComputedExpense
+                  : (summary?.deductibleExpensesInPeriod ?? 0);
+              const s2cTaxableIncome = Math.max(0, s2cTotalRevenue - s2cTotalExpense);
               const s2cPitAmount =
-                summary?.declarationPitAmount ??
-                summary?.pitAmount ??
-                Math.round(s2cTaxableIncome * 0.15);
+                summary?.declarationPitAmount && summary.declarationPitAmount > 0
+                  ? summary.declarationPitAmount
+                  : Math.round(s2cTaxableIncome * 0.15);
 
               return (
                 <table className="tax-data-table">
