@@ -52,9 +52,10 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
         message: res.message,
       });
     } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Không thể kết nối máy chủ để xác minh chữ ký HMAC-SHA256.';
       setVerificationResult({
-        isIntegrityValid: true, // Default to valid in dev/fallback
-        message: '✓ Chữ ký HMAC-SHA256 hợp lệ — Dữ liệu 7 sổ TT152 chưa bị chỉnh sửa sau khi chốt.',
+        isIntegrityValid: false,
+        message: `Không thể xác minh tính toàn vẹn chữ ký: ${errorMessage}`,
       });
     } finally {
       setIsVerifying(false);
@@ -142,7 +143,7 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                 const label = formatTaxPeriodLabel(s.periodType, s.periodNumber ?? (s as any).quarter, s.year);
                 const sealedDate = s.finalizedAtUtc || (s as any).generatedAt || s.submittedAt;
                 const dateStr = sealedDate ? new Date(sealedDate).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-                const hash = s.auditSignatureHash || (s as any).hmacHash || 'a94f2c8d1e7b043a6c551f88b204d9e17f3a884c';
+                const hash = s.auditSignatureHash || (s as any).hmacHash || '';
 
                 return (
                   <tr key={s.id}>
@@ -357,7 +358,7 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                         <input
                           type="text"
                           readOnly
-                          value={verifyingSnapshot.auditSignatureHash || (verifyingSnapshot as any).hmacHash || 'a94f2c8d1e7b043a6c551f88b204d9e17f3a884c90e12d44b71a6c30e58f219d'}
+                          value={verifyingSnapshot.auditSignatureHash || (verifyingSnapshot as any).hmacHash || 'Chưa có chữ ký HMAC'}
                           style={{
                             flex: 1,
                             fontFamily: 'monospace',
