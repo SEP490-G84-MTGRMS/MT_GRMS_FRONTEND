@@ -173,6 +173,34 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
 
   const totalQty = currentTransfer.items.reduce((sum, it) => sum + it.sentQty, 0);
 
+  const TRANSFER_ACTION_LABELS: Record<string, string> = {
+    Created: 'Tạo phiếu',
+    Submitted: 'Gửi duyệt',
+    Dispatched: 'Xuất kho gửi',
+    Received: 'Đã nhận hàng',
+    Cancelled: 'Hủy phiếu',
+    ReturnedToSource: 'Hoàn trả kho nguồn',
+  };
+
+  const TRANSFER_STATUS_LABELS: Record<string, string> = {
+    Draft: 'Phiếu tạm',
+    Pending: 'Chờ xử lý',
+    InTransit: 'Đang chuyển',
+    Completed: 'Hoàn tất',
+    Cancelled: 'Đã hủy',
+  };
+
+  const formatDateOnly = (raw?: string | null): string => {
+    if (!raw) return '—';
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    return raw.slice(0, 10);
+  };
+
+  const formatVnd = (amount: number): string => `${amount.toLocaleString('vi-VN')} đ`;
+
   const renderStatus = (status: TransferStatus) => {
     switch (status) {
       case 'Draft':
@@ -248,14 +276,14 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '14px 24px',
+              padding: '14px 20px',
               borderBottom: '1px solid #e2e8f0',
               backgroundColor: '#ffffff',
-              flexWrap: 'wrap',
+              flexWrap: 'nowrap',
               gap: 12,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 12px', minWidth: 0, flex: 1 }}>
               <span style={{ fontSize: 15, fontWeight: 700, color: '#0F766E' }}>
                 {currentTransfer.transferCode}
               </span>
@@ -267,8 +295,8 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
               <span style={{ fontSize: 13.5, fontWeight: 600, color: '#1e293b' }}>
                 {currentTransfer.toBranchName}
               </span>
-              {isOwner && <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>
-                {currentTransfer.totalAmount.toLocaleString()} đ
+              {isOwner && <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                {formatVnd(currentTransfer.totalAmount)}
               </span>}
               {renderStatus(currentTransfer.status)}
             </div>
@@ -283,13 +311,15 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
                 borderRadius: 6,
                 cursor: 'pointer',
                 color: '#475569',
-                padding: '4px 6px',
+                padding: '6px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
                 transition: 'all 0.15s ease',
               }}
               title="Đóng (X)"
+              aria-label="Đóng"
             >
               <X size={16} />
             </button>
@@ -358,7 +388,12 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
                 {currentTransfer.history.map((entry) => (
                   <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: '145px 1fr', gap: 10, padding: '7px 0', fontSize: 12.5 }}>
                     <span style={{ color: '#64748b' }}>{new Date(entry.createdAt).toLocaleString('vi-VN')}</span>
-                    <span><b>{entry.action}</b> · {entry.fromStatus ?? 'Khởi tạo'} → {entry.toStatus}{entry.reason ? ` · ${entry.reason}` : ''}</span>
+                    <span>
+                      <b>{TRANSFER_ACTION_LABELS[entry.action] || entry.action}</b> ·{' '}
+                      {entry.fromStatus ? (TRANSFER_STATUS_LABELS[entry.fromStatus] || entry.fromStatus) : 'Khởi tạo'} →{' '}
+                      {TRANSFER_STATUS_LABELS[entry.toStatus] || entry.toStatus}
+                      {entry.reason ? ` · ${entry.reason}` : ''}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -446,18 +481,18 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
                         <div style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</div>
                         {it.batchNumber && (
                           <div style={{ fontSize: 11.5, color: '#0284c7', marginTop: 2 }}>
-                            Lô: {it.batchNumber} &bull; HSD: {it.expiryDate}
+                            Lô: {it.batchNumber} &bull; HSD: {formatDateOnly(it.expiryDate)}
                           </div>
                         )}
                       </td>
                       <td style={{ textAlign: 'center', fontWeight: 700, fontSize: 14 }}>
                         {it.sentQty}
                       </td>
-                      {isOwner && <td style={{ textAlign: 'right' }}>
-                        {it.unitPrice.toLocaleString()} đ
+                      {isOwner && <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {formatVnd(it.unitPrice)}
                       </td>}
-                      {isOwner && <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F766E' }}>
-                        {it.amount.toLocaleString()} đ
+                      {isOwner && <td style={{ textAlign: 'right', fontWeight: 700, color: '#0F766E', whiteSpace: 'nowrap' }}>
+                        {formatVnd(it.amount)}
                       </td>}
                     </tr>
                   ))}
@@ -513,8 +548,8 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
                 </div>
                 {isOwner && <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 8, marginTop: 4 }}>
                   Tổng giá trị chuyển:&nbsp;
-                  <b style={{ fontSize: 17, color: '#0F766E' }}>
-                    {currentTransfer.totalAmount.toLocaleString()} đ
+                  <b style={{ fontSize: 17, color: '#0F766E', whiteSpace: 'nowrap' }}>
+                    {formatVnd(currentTransfer.totalAmount)}
                   </b>
                 </div>}
               </div>
