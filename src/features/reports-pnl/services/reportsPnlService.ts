@@ -626,7 +626,7 @@ export const reportsPnlService = {
           };
 
           const rawCategories = s.operatingExpenses?.categories || [];
-          const pnlTree = buildPnlStatementTree(liveKpiSummary, rawCategories, taxConfig);
+          const pnlTree = buildPnlStatementTree(liveKpiSummary, rawCategories, getTaxRateConfig());
           const expenseBreakdown = buildLiveExpenseBreakdown(rawCategories, operatingExpenses, shrinkageLoss);
 
           let trendData: PnlTrendPoint[] = [];
