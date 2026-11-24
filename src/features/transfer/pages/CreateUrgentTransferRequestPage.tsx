@@ -59,17 +59,35 @@ export const CreateUrgentTransferRequestPage = () => {
       && `${item.productCode} ${item.productName}`.toLowerCase().includes(keyword)).slice(0, 8);
   }, [catalog, rows, search]);
 
-  const payload = () => ({
-    toBranchId: destinationBranchId,
-    requiredAt: requiredAt || undefined,
-    relatedOrderId: relatedOrderId.trim() || undefined,
-    note: note.trim() || undefined,
-    items: rows.map((row) => ({ productId: row.productId, quantity: row.requestedQty, unit: row.unitName })),
-  });
+  const isUuid = (val: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+  const payload = () => {
+    let requiredAtIso: string | undefined;
+    if (requiredAt) {
+      const parsed = new Date(requiredAt);
+      if (!Number.isNaN(parsed.getTime())) {
+        requiredAtIso = parsed.toISOString();
+      }
+    }
+    const trimmedOrderId = relatedOrderId.trim();
+    return {
+      toBranchId: destinationBranchId,
+      requiredAt: requiredAtIso,
+      relatedOrderId: trimmedOrderId && isUuid(trimmedOrderId) ? trimmedOrderId : undefined,
+      note: note.trim() || undefined,
+      items: rows.map((row) => ({ productId: row.productId, quantity: row.requestedQty, unit: row.unitName })),
+    };
+  };
 
   const handlePreview = async () => {
     if (!rows.length || rows.some((row) => row.requestedQty <= 0)) {
       setError('Hãy thêm sản phẩm và nhập số lượng cần lớn hơn 0.');
+      return;
+    }
+    const trimmedOrderId = relatedOrderId.trim();
+    if (trimmedOrderId && !isUuid(trimmedOrderId)) {
+      setError('Mã đơn hàng liên quan phải là định dạng UUID hợp lệ (hoặc để trống).');
       return;
     }
     setError('');
@@ -84,6 +102,11 @@ export const CreateUrgentTransferRequestPage = () => {
   };
 
   const handleConfirm = async () => {
+    const trimmedOrderId = relatedOrderId.trim();
+    if (trimmedOrderId && !isUuid(trimmedOrderId)) {
+      setError('Mã đơn hàng liên quan phải là định dạng UUID hợp lệ (hoặc để trống).');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
