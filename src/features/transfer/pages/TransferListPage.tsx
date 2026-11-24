@@ -119,7 +119,7 @@ export const TransferListPage: React.FC = () => {
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
     const date =
-      timeRange === 'this_month' && dateField === 'transfer'
+      timeRange === 'this_month'
         ? monthStart
         : timeRange === 'custom' && customDate
         ? new Date(`${customDate}T00:00:00`).toISOString()
