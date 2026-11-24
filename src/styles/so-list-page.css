@@ -593,3 +593,46 @@
     flex-wrap: wrap;
   }
 }
+
+/* ── Compact KPI Summary Strip (FE-07) ── */
+.so-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.so-kpi-strip-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.so-kpi-strip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.so-kpi-strip-value {
+  font-size: 15px;
+  font-weight: 800;
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .so-kpi-strip {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}

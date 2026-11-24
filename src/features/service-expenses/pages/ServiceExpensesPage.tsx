@@ -493,6 +493,30 @@ export const ServiceExpensesPage: FC = () => {
         </div>
       </div>
 
+      {/* ── 1.5 KPI Summary Strip (Live from /api/expenses/summary) ── */}
+      {summaryData && (
+        <div className="so-kpi-strip" aria-label="Tổng hợp chi phí trong kỳ">
+          <div className="so-kpi-strip-card">
+            <span className="so-kpi-strip-label">Tổng chi phí trong kỳ</span>
+            <span className="so-kpi-strip-value" style={{ color: '#0f172a' }}>
+              {summaryData.totalExpenseThisMonth.toLocaleString('vi-VN')} đ
+            </span>
+          </div>
+          <div className="so-kpi-strip-card">
+            <span className="so-kpi-strip-label">Đã thanh toán</span>
+            <span className="so-kpi-strip-value" style={{ color: '#0f766e' }}>
+              {summaryData.totalPaidAmount.toLocaleString('vi-VN')} đ
+            </span>
+          </div>
+          <div className="so-kpi-strip-card">
+            <span className="so-kpi-strip-label">Chờ duyệt / Chờ chi</span>
+            <span className="so-kpi-strip-value" style={{ color: '#b45309' }}>
+              {summaryData.totalPendingAmount.toLocaleString('vi-VN')} đ
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── 2. Standardized Filter Bar (CSS Grid 4x2 ~86px) ── */}
       <ExpenseFilterBar
         filters={filters}
