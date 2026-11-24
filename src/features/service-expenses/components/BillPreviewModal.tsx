@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { CloseIcon, ExportIcon } from '../../admin/components';
 
 interface BillPreviewModalProps {
@@ -15,6 +15,10 @@ export const BillPreviewModal: FC<BillPreviewModalProps> = ({
   title,
 }) => {
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [imageUrl, isOpen]);
 
   if (!isOpen || !imageUrl) return null;
 

@@ -188,7 +188,7 @@ export const getExpenseSummary = async (
         totalExpenseThisMonth: Number(s.totalAmount || 0),
         totalPendingAmount: Number(s.pendingApprovalAmount || 0),
         totalPaidAmount: Number(s.paidAmount || 0),
-        overdueCount: 0,
+        overdueCount: Number(s.overdueCount || 0),
         suspiciousAmount: Number(s.suspiciousAmount || 0),
         suspiciousCount: Number(s.suspiciousCount || 0),
       };

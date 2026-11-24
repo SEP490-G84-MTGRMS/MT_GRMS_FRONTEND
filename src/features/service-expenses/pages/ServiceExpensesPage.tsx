@@ -19,6 +19,7 @@ import {
   useCreateExpense,
   useExpenseSummary,
   usePayExpense,
+  useRejectExpense,
   useServiceExpenses,
 } from '../hooks/useServiceExpenses';
 import { getServiceExpenses } from '../api/expenseApi';
@@ -129,6 +130,7 @@ export const ServiceExpensesPage: FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [payingItem, setPayingItem] = useState<ServiceExpenseDto | null>(null);
   const [cancelingItem, setCancelingItem] = useState<ServiceExpenseDto | null>(null);
+  const [rejectingItem, setRejectingItem] = useState<ServiceExpenseDto | null>(null);
   const [previewBill, setPreviewBill] = useState<{
     url: string;
     title: string;
@@ -164,6 +166,7 @@ export const ServiceExpensesPage: FC = () => {
   const createExpenseMutation = useCreateExpense();
   const payExpenseMutation = usePayExpense();
   const cancelExpenseMutation = useCancelExpense();
+  const rejectExpenseMutation = useRejectExpense();
   const approveExpenseMutation = useApproveExpense();
 
   const handleCreateSubmit = async (data: CreateExpenseRequest) => {
@@ -264,12 +267,34 @@ export const ServiceExpensesPage: FC = () => {
     try {
       await cancelExpenseMutation.mutateAsync({
         expenseId: cancelingItem.expenseId,
-        reason: 'Người dùng hủy thao tác trên hệ thống quản lý',
+        reason:
+          cancelingItem.status === 'Paid'
+            ? 'Chủ cửa hàng yêu cầu đảo bút toán hoàn tiền phiếu chi'
+            : 'Người dùng hủy thao tác trên hệ thống quản lý',
       });
-      showToast('Đã hủy khoản chi phí thành công.', 'info');
+      showToast(
+        cancelingItem.status === 'Paid'
+          ? 'Đã đảo bút toán và hoàn tiền vào quỹ nguồn thành công.'
+          : 'Đã hủy khoản chi phí thành công.',
+        'info'
+      );
       setCancelingItem(null);
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : 'Lỗi khi hủy khoản chi', 'error');
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectingItem) return;
+    try {
+      await rejectExpenseMutation.mutateAsync({
+        expenseId: rejectingItem.expenseId,
+        reason: 'Chủ cửa hàng từ chối phê duyệt phiếu chi',
+      });
+      showToast('Đã từ chối phê duyệt phiếu chi.', 'info');
+      setRejectingItem(null);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Lỗi khi từ chối phiếu chi', 'error');
     }
   };
 
@@ -492,6 +517,7 @@ export const ServiceExpensesPage: FC = () => {
         onViewBill={(url, title) => setPreviewBill({ url, title })}
         onPay={(item) => setPayingItem(item)}
         onApprove={handleApproveClick}
+        onReject={(item) => setRejectingItem(item)}
         onCancel={handleCancelClick}
         canManageExpenses={canManageExpenses}
       />
@@ -523,18 +549,36 @@ export const ServiceExpensesPage: FC = () => {
         title={previewBill?.title || ''}
       />
 
-      {/* ── 7. Cancel Confirmation Modal ── */}
+      {/* ── 7. Cancel / Reverse Confirmation Modal ── */}
       <ConfirmModal
         isOpen={Boolean(cancelingItem)}
         onClose={() => setCancelingItem(null)}
         onConfirm={handleConfirmCancel}
-        title="Xác nhận hủy khoản chi phí"
-        itemName={cancelingItem ? `${cancelingItem.expenseId} - ${cancelingItem.vendorName}` : ''}
-        message="Khoản chi sau khi hủy sẽ không thể hoàn tác hoặc tiếp tục thanh toán. Bạn có chắc chắn muốn hủy không?"
-        confirmText="Đồng ý hủy"
+        title={cancelingItem?.status === 'Paid' ? 'Xác nhận đảo bút toán phiếu chi' : 'Xác nhận hủy khoản chi phí'}
+        itemName={cancelingItem ? `${cancelingItem.voucherCode || cancelingItem.expenseId} - ${cancelingItem.vendorName}` : ''}
+        message={
+          cancelingItem?.status === 'Paid'
+            ? 'Thao tác này sẽ tạo bút toán đảo hoàn tiền về tài khoản quỹ nguồn và chuyển phiếu sang trạng thái Đã đảo. Bạn có chắc chắn muốn tiếp tục?'
+            : 'Khoản chi sau khi hủy sẽ không thể hoàn tác hoặc tiếp tục thanh toán. Bạn có chắc chắn muốn hủy không?'
+        }
+        confirmText={cancelingItem?.status === 'Paid' ? 'Xác nhận đảo bút toán' : 'Đồng ý hủy'}
         cancelText="Đóng"
         variant="danger"
         isLoading={cancelExpenseMutation.isPending}
+      />
+
+      {/* ── 8. Reject Approval Confirmation Modal ── */}
+      <ConfirmModal
+        isOpen={Boolean(rejectingItem)}
+        onClose={() => setRejectingItem(null)}
+        onConfirm={handleConfirmReject}
+        title="Xác nhận từ chối phê duyệt phiếu chi"
+        itemName={rejectingItem ? `${rejectingItem.voucherCode || rejectingItem.expenseId} - ${rejectingItem.vendorName}` : ''}
+        message="Phiếu chi sẽ bị từ chối duyệt và chuyển sang trạng thái Đã hủy. Bạn có chắc chắn muốn từ chối không?"
+        confirmText="Từ chối duyệt"
+        cancelText="Đóng"
+        variant="danger"
+        isLoading={rejectExpenseMutation.isPending}
       />
     </div>
   );

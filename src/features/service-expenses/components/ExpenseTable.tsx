@@ -29,6 +29,7 @@ export interface ExpenseTableProps {
   onViewBill: (url: string, title: string) => void;
   onPay: (item: ServiceExpenseDto) => void;
   onApprove?: (item: ServiceExpenseDto) => void;
+  onReject?: (item: ServiceExpenseDto) => void;
   onCancel: (item: ServiceExpenseDto) => void;
 }
 
@@ -44,6 +45,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
   onViewBill,
   onPay,
   onApprove,
+  onReject,
   onCancel,
 }) => {
   const navigate = useNavigate();
@@ -381,8 +383,8 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                         </button>
                       )}
 
-                      {/* Danger action (Cancel) hidden in ⋯ menu */}
-                      {item.status === 'Pending' && canManageExpenses && (
+                      {/* Danger / lifecycle actions (Approve, Reject, Cancel/Reverse) in ⋯ menu */}
+                      {(item.status === 'Pending' || item.status === 'Paid') && canManageExpenses && (
                         <div className="expense-row-menu" style={{ position: 'relative' }}>
                           <button
                             type="button"
@@ -409,7 +411,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                               style={{
                                 position: 'fixed',
                                 right: Math.max(8, window.innerWidth - menuAnchor.right),
-                                ...(window.innerHeight - menuAnchor.bottom >= 100
+                                ...(window.innerHeight - menuAnchor.bottom >= 140
                                   ? { top: menuAnchor.bottom + 4 }
                                   : { bottom: window.innerHeight - menuAnchor.top + 4 }),
                                 background: '#ffffff',
@@ -417,11 +419,11 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                                 borderRadius: '8px',
                                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                                 zIndex: 30,
-                                minWidth: '150px',
+                                minWidth: '170px',
                                 padding: '4px',
                               }}
                             >
-                              {item.approvalStatus !== 'Approved' && onApprove && (
+                              {item.status === 'Pending' && item.approvalStatus !== 'Approved' && onApprove && (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -451,6 +453,36 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                                 </button>
                               )}
 
+                              {item.status === 'Pending' && item.approvalStatus !== 'Approved' && onReject && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenu(null);
+                                    onReject(item);
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    textAlign: 'left',
+                                    padding: '8px 12px',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    color: '#c2410c',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    borderRadius: '4px',
+                                  }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = '#fff7ed')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                  <CloseIcon size={12} color="#c2410c" />
+                                  <span>Từ chối duyệt</span>
+                                </button>
+                              )}
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -476,7 +508,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                               >
                                 <CloseIcon size={12} color="#b91c1c" />
-                                <span>Hủy khoản chi</span>
+                                <span>{item.status === 'Paid' ? 'Đảo bút toán / Hủy' : 'Hủy khoản chi'}</span>
                               </button>
                             </div>, document.body
                           )}
