@@ -86,7 +86,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
           <thead>
             <tr>
               <th className="so-list-th">Khách hàng</th>
-              <th className="so-list-th">Hạng thành viên</th>
+              <th className="so-list-th">Liên hệ / Địa chỉ</th>
               <th className="so-list-th" style={{ textAlign: 'right' }}>Công nợ hiện tại</th>
               <th className="so-list-th" style={{ textAlign: 'right' }}>Điểm tích lũy</th>
               <th className="so-list-th" style={{ textAlign: 'right', paddingRight: '16px' }}>Thao tác</th>
@@ -160,9 +160,9 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                       </div>
                     </td>
 
-                    {/* Cột 2: Hạng thành viên */}
-                    <td className="so-list-td" style={{ color: '#334155', fontWeight: 600 }}>
-                      {c.membershipTier || 'Standard'}
+                    {/* Cột 2: Liên hệ / Địa chỉ */}
+                    <td className="so-list-td" style={{ color: '#475569', fontSize: '12.5px' }}>
+                      {c.email || sanitizeCustomerText(c.address) || '—'}
                     </td>
 
                     {/* Cột 3: Công nợ hiện tại */}
