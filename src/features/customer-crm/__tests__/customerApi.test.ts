@@ -42,13 +42,13 @@ describe('customerApi Live Neon Integration Tests', () => {
         params: {
           search: 'Nguyễn',
           tier: 'Gold',
-          debtStatus: undefined,
+          debtStatus: 'DEBT',
         },
       });
       expect(result).toEqual(mockList);
     });
 
-    it('should omit debtStatus param when DEBT is specified to support client-side filtering', async () => {
+    it('should forward debtStatus=DEBT param to backend for server-side filtering', async () => {
       vi.mocked(financeHttpClient.get).mockResolvedValueOnce({
         data: { success: true, data: [] },
       } as any);
@@ -61,7 +61,7 @@ describe('customerApi Live Neon Integration Tests', () => {
         params: {
           search: undefined,
           tier: undefined,
-          debtStatus: undefined,
+          debtStatus: 'DEBT',
         },
       });
     });

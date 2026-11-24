@@ -45,7 +45,7 @@ export const customerApi = {
         search: params?.search || undefined,
         tier: params?.tier && params.tier !== 'ALL' ? params.tier : undefined,
         debtStatus:
-          params?.debtStatus && params.debtStatus !== 'ALL' && params.debtStatus !== 'DEBT'
+          params?.debtStatus && params.debtStatus !== 'ALL'
             ? params.debtStatus
             : undefined,
       },

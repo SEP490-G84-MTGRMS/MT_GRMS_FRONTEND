@@ -25,13 +25,11 @@ export interface CustomerFilterBarProps {
 export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
   searchTerm,
   onSearchChange,
-  selectedTier: _selectedTier = 'ALL',
+  selectedTier = 'ALL',
   onTierChange,
   selectedDebtStatus,
   onDebtStatusChange,
-  selectedBranch = 'ALL',
   onBranchChange,
-  branches = [],
   sortOrder = 'name_asc',
   onSortOrderChange,
   timeRange = 'ALL',
@@ -72,7 +70,7 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
   const isFiltered =
     Boolean(searchTerm) ||
     selectedDebtStatus !== 'ALL' ||
-    (selectedBranch && selectedBranch !== 'ALL') ||
+    (selectedTier && selectedTier !== 'ALL') ||
     timeRange !== 'ALL' ||
     sortOrder !== 'name_asc';
 
@@ -154,22 +152,21 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
           </select>
         </div>
 
-        {/* Col 3: Branch selector */}
+        {/* Col 3: Membership tier selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Chi nhánh:</span>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Hạng thẻ:</span>
           <select
-            className={`so-list-filter-select ${selectedBranch && selectedBranch !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            className={`so-list-filter-select ${selectedTier && selectedTier !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
             style={{ width: '100%', minWidth: 0 }}
-            value={selectedBranch}
-            onChange={(e) => onBranchChange?.(e.target.value)}
-            title="Lọc theo chi nhánh"
+            value={selectedTier}
+            onChange={(e) => onTierChange?.(e.target.value)}
+            title="Lọc theo hạng thành viên"
           >
-            <option value="ALL">-- Toàn hệ thống --</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
+            <option value="ALL">-- Tất cả hạng --</option>
+            <option value="Standard">Standard (Chuẩn)</option>
+            <option value="Silver">Silver (Bạc)</option>
+            <option value="Gold">Gold (Vàng)</option>
+            <option value="VIP">VIP</option>
           </select>
         </div>
       </div>
