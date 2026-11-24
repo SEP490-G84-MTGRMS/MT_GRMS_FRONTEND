@@ -34,18 +34,21 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
   const [transactionRef, setTransactionRef] = useState('');
   const [bankPaymentConfirmed, setBankPaymentConfirmed] = useState(false);
   const [accountLoadFailed, setAccountLoadFailed] = useState(false);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     let isMounted = true;
-    setAccounts([]);
     setAccountLoadFailed(false);
+    setIsLoadingAccounts(true);
     cashbookService.getCashAccounts().then((accs) => {
       if (isMounted) {
         setAccounts(accs);
       }
     }).catch(() => {
       if (isMounted) setAccountLoadFailed(true);
+    }).finally(() => {
+      if (isMounted) setIsLoadingAccounts(false);
     });
     return () => {
       isMounted = false;
@@ -54,9 +57,10 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
 
   const filteredAccounts = useMemo(
     () =>
-      accounts.filter((a) =>
-        method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
-      ),
+      accounts.filter((a) => {
+        const type = String(a.accountType || '').toUpperCase();
+        return method === 'Cash' ? type === 'CASH' : type === 'BANK';
+      }),
     [accounts, method]
   );
 
@@ -287,9 +291,12 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                   id="target-account-select"
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
+                  disabled={isLoadingAccounts}
                   className="w-full h-10 px-3 text-sm font-medium rounded-xl border border-gray-300 bg-white text-gray-800 focus:border-teal-600 focus:ring-1 focus:ring-teal-500 outline-none transition-colors"
                 >
-                  {filteredAccounts.length === 0 ? (
+                  {isLoadingAccounts ? (
+                    <option value="">Đang tải danh sách tài khoản...</option>
+                  ) : filteredAccounts.length === 0 ? (
                     <option value="" disabled>
                       {method === 'Cash'
                         ? '-- Không có két tiền mặt khả dụng --'
@@ -298,7 +305,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                   ) : (
                     filteredAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.accountName}
+                        {acc.accountName}{acc.branchName ? ` — ${acc.branchName}` : ''}
                       </option>
                     ))
                   )}
