@@ -54,6 +54,9 @@ export const TaxSnapshotPage: FC = () => {
   const { user } = useAuthStore();
   const canManageTax = user?.role === 'STORE_OWNER';
 
+  const currentYear = new Date().getFullYear();
+  const selectableYears = [currentYear + 1, currentYear, currentYear - 1, currentYear - 2];
+
   const {
     summary,
     isSummaryLoading,
@@ -72,7 +75,7 @@ export const TaxSnapshotPage: FC = () => {
     updateTaxRates,
     resetTaxRatesToDefault,
     createSnapshot,
-  } = useTaxSnapshots(2026);
+  } = useTaxSnapshots(currentYear);
 
   // Modals & Drawers
   const [isRateConfigOpen, setIsRateConfigOpen] = useState<boolean>(false);
@@ -348,8 +351,9 @@ export const TaxSnapshotPage: FC = () => {
                     outline: 'none',
                   }}
                 >
-                  <option value={2026}>2026</option>
-                  <option value={2025}>2025</option>
+                  {selectableYears.map((yr) => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
                 </select>
               </div>
 

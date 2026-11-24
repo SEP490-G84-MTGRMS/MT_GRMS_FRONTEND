@@ -77,7 +77,9 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
       : `Cả năm ${summary.year}`;
 
   const baseVatAmount = Math.round(summary.taxableRevenueInPeriod * (baseVatRate / 100));
-  const vatDiscount = applyVatReduction ? Math.round(baseVatAmount * (reductionPct / 100)) : 0;
+  const vatDiscount = applyVatReduction
+    ? Math.max(0, baseVatAmount - summary.vatAmount)
+    : 0;
 
   return (
     <div className="tax-declaration-card">
