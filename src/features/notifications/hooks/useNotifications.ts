@@ -72,6 +72,9 @@ export function useNotifications(enabled = true) {
       if (disposed || connection.state !== 'Disconnected' || startPromise) return;
       startPromise = connection
         .start()
+        .then(() => {
+          if (!disposed) scheduleRefresh();
+        })
         .catch(() => {
           // Ignore transient negotiation errors when unmounting or offline
         })
