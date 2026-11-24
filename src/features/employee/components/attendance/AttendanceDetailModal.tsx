@@ -615,8 +615,13 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: '#0F766E', fontWeight: 600 }}>TỔNG GIỜ LÀM TÍNH LƯƠNG</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0F766E', marginTop: 2 }}>
-                    {actualHours.toFixed(2)} giờ
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0F766E', marginTop: 2, display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    <span>{actualHours.toFixed(2)} giờ</span>
+                    {scheduleDetail?.workUnits !== undefined && scheduleDetail?.workUnits !== null && (
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#047857', backgroundColor: '#CCFBF1', padding: '2px 8px', borderRadius: 12 }}>
+                        = {scheduleDetail.workUnits} công
+                      </span>
+                    )}
                   </div>
                 </div>
 

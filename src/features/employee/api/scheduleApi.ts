@@ -36,6 +36,7 @@ export interface ScheduleResponse {
   approvedBy?: string | null;
   approvedAt?: string | null;
   createdAt: string;
+  workUnits?: number | null;
 }
 
 export interface ScheduleQueryFilter {
