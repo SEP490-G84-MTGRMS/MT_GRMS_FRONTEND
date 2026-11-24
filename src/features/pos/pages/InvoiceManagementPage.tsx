@@ -45,20 +45,73 @@ import './invoice-management-list.css';
  * Tách và làm sạch thời gian hẹn nhận hàng từ Note đơn đặt trước
  * Tránh hiển thị chuỗi dài gồm cả SĐT, ghi chú xuất hàng và tag hệ thống [CHỐT CUỐI NGÀY: ...]
  */
-const parsePreOrderPickupAndNotes = (rawNote?: string | null) => {
+const parseOrderDateToLocal = (raw?: string | null): Date | null => {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  const d = new Date(hasTz ? trimmed : `${trimmed}Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const matchesTimePreset = (
+  rawDate: string | undefined,
+  preset: 'all' | 'today' | 'yesterday' | 'week' | 'month',
+): boolean => {
+  if (preset === 'all') return true;
+  const d = parseOrderDateToLocal(rawDate);
+  if (!d) return false;
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  if (preset === 'today') {
+    return d >= startOfToday && d <= endOfToday;
+  }
+  if (preset === 'yesterday') {
+    const startYesterday = new Date(startOfToday);
+    startYesterday.setDate(startYesterday.getDate() - 1);
+    const endYesterday = new Date(startOfToday.getTime() - 1);
+    return d >= startYesterday && d <= endYesterday;
+  }
+  if (preset === 'week') {
+    const dayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+    return d >= startOfWeek && d <= endOfToday;
+  }
+  if (preset === 'month') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    return d >= startOfMonth && d <= endOfToday;
+  }
+  return true;
+};
+
+const parsePreOrderPickupAndNotes = (rawNote?: string | null, expectedPickupDate?: string | null) => {
+  const formattedPickup = expectedPickupDate
+    ? (parseOrderDateToLocal(expectedPickupDate)?.toLocaleString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }) ?? '')
+    : '';
+
   if (!rawNote || !rawNote.trim()) {
     return {
-      pickupAppointment: '17:30 - Hôm nay',
+      pickupAppointment: formattedPickup || '—',
       fulfillmentNote: null as string | null,
       notes: null as string | null,
     };
   }
 
-  // 1. Trích xuất thời gian hẹn nhận (VD: "Hẹn nhận: 12/11/2026 15:40" hoặc "12/11/2026 15:40")
-  let pickupAppointment = '';
-  const matchAppt = rawNote.match(/Hẹn nhận:\s*([^.|]+)/i);
-  if (matchAppt && matchAppt[1]) {
-    pickupAppointment = matchAppt[1].trim();
+  // 1. Ưu tiên dùng expectedPickupDate từ DB; chỉ fallback regex cho đơn cũ chưa có cột riêng
+  let pickupAppointment = formattedPickup;
+  if (!pickupAppointment) {
+    const matchAppt = rawNote.match(/Hẹn nhận:\s*([^.|]+)/i);
+    if (matchAppt && matchAppt[1]) {
+      pickupAppointment = matchAppt[1].trim();
+    }
   }
 
   // 2. Trích xuất ghi chú xuất hàng/bàn giao nếu có
@@ -74,16 +127,12 @@ const parsePreOrderPickupAndNotes = (rawNote?: string | null) => {
     .replace(/Khách:\s*[^.|]+[.]?/i, '')
     .replace(/\|\s*Xuất hàng:[^|]*/gi, '')
     .replace(/\[CHỐT CUỐI NGÀY:[^\]]*\]/gi, '')
+    .replace(/\[ĐÃ VÀO KÉT SẮT\]/gi, '')
     .replace(/[|]/g, '')
     .trim();
 
-  if (!pickupAppointment) {
-    const firstPart = rawNote.split(/[|.]/)[0]?.trim();
-    pickupAppointment = firstPart || '17:30 - Hôm nay';
-  }
-
   return {
-    pickupAppointment,
+    pickupAppointment: pickupAppointment || '—',
     fulfillmentNote,
     notes: cleanNote.length > 0 ? cleanNote : null,
   };
@@ -111,6 +160,7 @@ export const InvoiceManagementPage: FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || searchParams.get('orderId') || '';
+  const urlTab = searchParams.get('tab');
   const showPendingPayments = searchParams.get('status') === 'PENDING_PAYMENT';
   const pendingBranchId = searchParams.get('branchId');
 
@@ -122,11 +172,13 @@ export const InvoiceManagementPage: FC = () => {
       : '/pos';
 
   // Chế độ xem: 'invoices' (Hóa đơn bán lẻ) vs 'preorders' (Đơn đặt trước)
-  const [activeTab, setActiveTab] = useState<'invoices' | 'preorders'>('invoices');
+  const [activeTab, setActiveTab] = useState<'invoices' | 'preorders'>(() =>
+    urlTab === 'preorders' ? 'preorders' : 'invoices'
+  );
 
   // Bộ lọc
   const [searchQuery, setSearchQuery] = useState('');
-  const [timePreset, setTimePreset] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
+  const [timePreset, setTimePreset] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH' | 'DEBT' | 'CREDIT'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'RETURNED' | 'PENDING_PAYMENT'>(showPendingPayments ? 'PENDING_PAYMENT' : 'ALL');
   const [returnRecordsByOrder, setReturnRecordsByOrder] = useState<Record<string, ReturnRecord[]>>({});
@@ -179,6 +231,7 @@ export const InvoiceManagementPage: FC = () => {
   const [invoices, setInvoices] = useState<InvoiceDTO[]>([]);
   const [preOrders, setPreOrders] = useState<PreOrderDTO[]>([]);
   const [activeShiftCash, setActiveShiftCash] = useState<number | undefined>(undefined);
+  const [activeShiftId, setActiveShiftId] = useState<string | undefined>(undefined);
   const returnRequestRef = useRef<{ signature: string; key: string } | null>(null);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [catalogCustomers, setCatalogCustomers] = useState<Customer[]>([]);
@@ -236,7 +289,9 @@ export const InvoiceManagementPage: FC = () => {
     return {
       orderUuid: o.id,
       invoiceId: o.orderCode || o.id,
-      createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
+      isOutsideShift: !isPreOrderFlag && o.shiftId === null,
+      createdAt: o.orderDate ? (parseOrderDateToLocal(o.orderDate)?.toLocaleString('vi-VN') ?? '') : '',
+      createdAtIso: o.orderDate || '',
       branchId: o.branchId || '',
       branchName: o.branchName || '—',
       cashierId: '',
@@ -289,10 +344,18 @@ export const InvoiceManagementPage: FC = () => {
   };
 
   const mapPreOrderToInvoice = (pre: PreOrderDTO): InvoiceDTO => {
+    const rawMethod = pre.paymentMethod || 'CASH';
+    const isBankMethod = rawMethod === 'VIETQR' || rawMethod === 'BANK';
+    const isDebtMethod = rawMethod === 'DEBT' || rawMethod === 'CREDIT';
+    const resolvedMethodLabel =
+      pre.paymentMethodLabel ||
+      (isBankMethod ? 'Chuyển khoản VietQR' : isDebtMethod ? 'Ghi nợ' : 'Tiền mặt');
+
     return {
       orderUuid: pre.orderUuid,
       invoiceId: pre.preOrderId,
       createdAt: pre.createdAt,
+      createdAtIso: pre.createdAtIso,
       branchId: pre.branchId,
       branchName: pre.branchName,
       cashierId: '',
@@ -306,8 +369,8 @@ export const InvoiceManagementPage: FC = () => {
       debtAmount: 0,
       paidDebtAmount: 0,
       debtPaymentRecords: [],
-      paymentMethod: 'CASH',
-      paymentMethodLabel: 'Tiền mặt',
+      paymentMethod: rawMethod,
+      paymentMethodLabel: resolvedMethodLabel,
       status: pre.status === 'CANCELLED' ? 'CANCELLED' : 'COMPLETED',
       statusLabel: pre.status === 'CANCELLED' ? 'Đã hủy' : 'Hoàn thành',
       isPreOrder: true,
@@ -316,12 +379,14 @@ export const InvoiceManagementPage: FC = () => {
     };
   };
 
-  // Nạp tiền mặt trong két ca làm việc đang mở của chi nhánh
+  // Nạp tiền mặt và shiftId trong két ca làm việc đang mở của chi nhánh
   useEffect(() => {
     const targetBranchId = branchFilter !== 'ALL' ? branchFilter : assignedBranch.id;
     setActiveShiftCash(undefined);
+    setActiveShiftId(undefined);
     posShiftApi.getCurrentShift(targetBranchId).then((s) => {
       setActiveShiftCash(s?.expectedCash);
+      setActiveShiftId(s?.id);
     }).catch(() => { });
   }, [branchFilter, assignedBranch.id]);
 
@@ -367,19 +432,26 @@ export const InvoiceManagementPage: FC = () => {
             const totalOrderAmount = o.finalAmount ?? o.totalAmount ?? 0;
             const depositAmount = o.depositAmount || 0;
             const remainingAmount = Math.max(0, totalOrderAmount - depositAmount);
-            const parsedNoteInfo = parsePreOrderPickupAndNotes(o.note);
+            const parsedNoteInfo = parsePreOrderPickupAndNotes(o.note, o.expectedPickupDate);
+            const rawMethod = (o.paymentMethod || 'CASH') as PreOrderDTO['paymentMethod'];
+            const isBankMethod = rawMethod === 'VIETQR' || rawMethod === 'BANK';
+            const isDebtMethod = rawMethod === 'DEBT' || rawMethod === 'CREDIT';
             return {
               orderUuid: o.id,
               preOrderId: o.orderCode || o.id,
-              createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
+              createdAt: o.orderDate ? (parseOrderDateToLocal(o.orderDate)?.toLocaleString('vi-VN') ?? '') : '',
+              createdAtIso: o.orderDate || '',
               branchId: o.branchId || '',
               branchName: o.branchName || '—',
               cashierName: o.cashierName || 'Thu ngân POS',
               fulfilledByCashierName: o.fulfilledByCashierName,
-              fulfilledAt: o.fulfilledAtUtc ? new Date(o.fulfilledAtUtc).toLocaleString('vi-VN') : undefined,
+              fulfilledAt: o.fulfilledAtUtc ? (parseOrderDateToLocal(o.fulfilledAtUtc)?.toLocaleString('vi-VN') ?? undefined) : undefined,
+              expectedPickupDate: o.expectedPickupDate || null,
               pickupAppointment: parsedNoteInfo.pickupAppointment,
               fulfillmentNote: parsedNoteInfo.fulfillmentNote,
               notes: parsedNoteInfo.notes,
+              paymentMethod: rawMethod,
+              paymentMethodLabel: isBankMethod ? 'Chuyển khoản VietQR' : isDebtMethod ? 'Ghi nợ' : 'Tiền mặt',
               customerName: o.customerName || 'Khách quen',
               customerPhone: o.customerPhone || '0987654321',
               totalMerchandiseAmount: o.totalAmount || totalOrderAmount,
@@ -562,6 +634,17 @@ export const InvoiceManagementPage: FC = () => {
   const [preOrderPage, setPreOrderPage] = useState(1);
   const [preOrderPageSize, setPreOrderPageSize] = useState(15);
 
+  // Đồng bộ tab từ URL query param ?tab=preorders (DEF-SC71-003)
+  useEffect(() => {
+    if (urlTab === 'preorders') {
+      setActiveTab('preorders');
+      setPreOrderPage(1);
+    } else if (urlTab === 'invoices') {
+      setActiveTab('invoices');
+      setInvoicePage(1);
+    }
+  }, [urlTab]);
+
   // Đồng bộ tham số tìm kiếm từ URL (khi điều hướng từ trang Khách nợ CRM hoặc Sổ quỹ sang)
   useEffect(() => {
     if (urlSearch) {
@@ -627,19 +710,23 @@ export const InvoiceManagementPage: FC = () => {
     setCancelNote('');
   };
 
-  // Hủy đơn đặt trước và hoàn lại tồn kho giữ
+  // Hủy đơn đặt trước và hoàn lại tồn kho giữ (Chủ cửa hàng được phép xác nhận hoàn cọc & hủy đơn - DEF-SC71-001)
   const handleCancelPreOrder = async (pre: PreOrderDTO) => {
-    if (pre.depositAmount > 0) {
-      alert('Đơn đã nhận tiền cọc cần được hoàn tiền và đối soát trước khi hủy. Vui lòng liên hệ Chủ cửa hàng.');
+    if (pre.depositAmount > 0 && !isStoreOwner) {
+      showToast('Chỉ Chủ cửa hàng mới có quyền xác nhận hoàn cọc và hủy đơn đặt trước đã nhận cọc.');
       return;
     }
-    if (!window.confirm(`Bạn có chắc chắn muốn hủy đơn đặt trước ${pre.preOrderId}? Tồn kho đã giữ sẽ được tự động hoàn lại vào kho hàng.`)) {
+    const confirmText =
+      pre.depositAmount > 0
+        ? `Xác nhận hoàn trả tiền cọc ${pre.depositAmount.toLocaleString('vi-VN')} đ và hủy đơn đặt trước ${pre.preOrderId}? Tồn kho giữ FEFO sẽ được giải phóng ngay.`
+        : `Bạn có chắc chắn muốn hủy đơn đặt trước ${pre.preOrderId}? Tồn kho đã giữ sẽ được tự động hoàn lại vào kho hàng.`;
+    if (!window.confirm(confirmText)) {
       return;
     }
     try {
       await posOrderApi.cancelOrder(pre.orderUuid || pre.preOrderId, {
-        reason: 'Khách hàng hủy đơn đặt trước',
-        note: 'Hủy đơn đặt trước từ màn hình Quản lý Đơn hàng',
+        reason: pre.depositAmount > 0 ? 'Chủ cửa hàng xác nhận hoàn cọc và hủy đơn đặt trước' : 'Khách hàng hủy đơn đặt trước',
+        note: pre.depositAmount > 0 ? `Hoàn cọc ${pre.depositAmount.toLocaleString('vi-VN')} đ` : 'Hủy đơn đặt trước từ màn hình Quản lý Đơn hàng',
         userRole: user?.role || 'CASHIER',
       });
       setPreOrders((prev) =>
@@ -649,10 +736,10 @@ export const InvoiceManagementPage: FC = () => {
             : p
         )
       );
-      showToast(`Đã hủy thành công đơn đặt trước ${pre.preOrderId}!`);
+      showToast(`Đã hủy thành công đơn đặt trước ${pre.preOrderId} và giải phóng tồn kho giữ!`);
     } catch (e: any) {
       console.error('Cancel PreOrder failed:', e);
-      alert(`Lỗi khi hủy đơn đặt trước: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`);
+      showToast(`Lỗi khi hủy đơn đặt trước: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`);
     }
   };
 
@@ -800,6 +887,7 @@ export const InvoiceManagementPage: FC = () => {
         orderUuid: createdUuid,
         preOrderId,
         createdAt: new Date().toLocaleString('vi-VN'),
+        createdAtIso: backendRes?.orderDate || new Date().toISOString(),
         branchId: branchFilter !== 'ALL' ? branchFilter : assignedBranch.id,
         branchName:
           branchFilter !== 'ALL'
@@ -808,6 +896,7 @@ export const InvoiceManagementPage: FC = () => {
         cashierName: creatorCashier,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
+        expectedPickupDate: backendRes?.expectedPickupDate || data.expectedPickupDate,
         pickupAppointment: new Date(data.expectedPickupDate).toLocaleString('vi-VN', {
           hour: '2-digit',
           minute: '2-digit',
@@ -815,6 +904,11 @@ export const InvoiceManagementPage: FC = () => {
           month: '2-digit',
           year: 'numeric',
         }),
+        paymentMethod: (backendRes?.paymentMethod || data.paymentMethod || 'CASH') as PreOrderDTO['paymentMethod'],
+        paymentMethodLabel:
+          (backendRes?.paymentMethod || data.paymentMethod) === 'BANK' || (backendRes?.paymentMethod || data.paymentMethod) === 'VIETQR'
+            ? 'Chuyển khoản VietQR'
+            : 'Tiền mặt',
         notes: data.note?.trim() || null,
         totalMerchandiseAmount: merchandiseAmount,
         discountAmount,
@@ -876,16 +970,20 @@ export const InvoiceManagementPage: FC = () => {
         paymentMethodFilter === 'ALL' ||
         (paymentMethodFilter === 'DEBT'
           ? inv.paymentMethod === 'DEBT' || inv.paymentMethod === 'CREDIT'
-          : inv.paymentMethod === paymentMethodFilter);
+          : paymentMethodFilter === 'VIETQR'
+            ? inv.paymentMethod === 'VIETQR' || inv.paymentMethod === 'BANK'
+            : inv.paymentMethod === paymentMethodFilter);
+
+      const matchTime = matchesTimePreset(inv.createdAtIso, timePreset);
 
       const hasReturn = (returnRecordsByOrder[inv.invoiceId]?.length ?? 0) > 0;
       const matchStatus = statusFilter === 'ALL' ||
         (statusFilter === 'RETURNED' ? inv.status !== 'CANCELLED' && hasReturn :
           statusFilter === 'COMPLETED' ? inv.status === 'COMPLETED' && !hasReturn : inv.status === statusFilter);
 
-      return matchBranch && matchSearch && matchMethod && matchStatus;
+      return matchBranch && matchSearch && matchMethod && matchStatus && matchTime;
     });
-  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, branchFilter, isStoreOwner, availableBranches, returnRecordsByOrder]);
+  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, timePreset, branchFilter, isStoreOwner, availableBranches, returnRecordsByOrder]);
 
   // Phân trang dữ liệu Hóa đơn
   const paginatedInvoices = useMemo(() => {
@@ -908,9 +1006,11 @@ export const InvoiceManagementPage: FC = () => {
         p.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.customerPhone.includes(searchQuery.trim());
 
-      return matchBranch && matchSearch;
+      const matchTime = matchesTimePreset(p.createdAtIso, timePreset);
+
+      return matchBranch && matchSearch && matchTime;
     });
-  }, [preOrders, searchQuery, branchFilter, isStoreOwner, availableBranches]);
+  }, [preOrders, searchQuery, timePreset, branchFilter, isStoreOwner, availableBranches]);
 
   // Phân trang Đơn đặt trước
   const paginatedPreOrders = useMemo(() => {
@@ -945,10 +1045,11 @@ export const InvoiceManagementPage: FC = () => {
     const targetPreOrder = preOrders.find((p) => p.preOrderId === preOrderId);
     try {
       await posOrderApi.fulfillPreOrder(targetPreOrder?.orderUuid || preOrderId, {
-        paymentMethod: data.paymentMethod,
+        paymentMethod: data.paymentMethod === 'VIETQR' ? 'BANK' : 'CASH',
         amountPaid: data.amountPaid,
         note: data.note,
         cashierName: fulfillingCashier,
+        shiftId: activeShiftId,
       });
     } catch (e) {
       throw e;
@@ -960,6 +1061,8 @@ export const InvoiceManagementPage: FC = () => {
           ? {
             ...p,
             remainingAmount: 0,
+            paymentMethod: data.paymentMethod === 'VIETQR' ? 'BANK' : 'CASH',
+            paymentMethodLabel: data.paymentMethod === 'VIETQR' ? 'Chuyển khoản VietQR' : 'Tiền mặt',
             status: 'COMPLETED',
             statusLabel: 'Đã hoàn thành',
             fulfilledByCashierName: fulfillingCashier,
@@ -992,7 +1095,9 @@ export const InvoiceManagementPage: FC = () => {
             <h1 className="unified-header-title">Quản Lý Hóa Đơn &amp; Đơn Đặt Hàng</h1>
             <div className="unified-header-subtitle">
               {branchFilter === 'ALL'
-                ? 'Toàn chuỗi cửa hàng (3 Chi nhánh)'
+                ? dbBranches.length > 0
+                  ? `Toàn chuỗi cửa hàng (${dbBranches.length} Chi nhánh)`
+                  : 'Toàn chuỗi cửa hàng'
                 : availableBranches.find((b) => b.id === branchFilter)?.name || '—'}{' '}
               &bull; Bán lẻ &bull; Đơn đặt trước giữ kho
             </div>
@@ -1158,29 +1263,36 @@ export const InvoiceManagementPage: FC = () => {
               <div className="time-preset-buttons">
                 <button
                   type="button"
+                  className={`preset-btn ${timePreset === 'all' ? 'active' : ''}`}
+                  onClick={() => { setTimePreset('all'); setInvoicePage(1); setPreOrderPage(1); }}
+                >
+                  Tất cả
+                </button>
+                <button
+                  type="button"
                   className={`preset-btn ${timePreset === 'today' ? 'active' : ''}`}
-                  onClick={() => setTimePreset('today')}
+                  onClick={() => { setTimePreset('today'); setInvoicePage(1); setPreOrderPage(1); }}
                 >
                   Hôm nay
                 </button>
                 <button
                   type="button"
                   className={`preset-btn ${timePreset === 'yesterday' ? 'active' : ''}`}
-                  onClick={() => setTimePreset('yesterday')}
+                  onClick={() => { setTimePreset('yesterday'); setInvoicePage(1); setPreOrderPage(1); }}
                 >
                   Hôm qua
                 </button>
                 <button
                   type="button"
                   className={`preset-btn ${timePreset === 'week' ? 'active' : ''}`}
-                  onClick={() => setTimePreset('week')}
+                  onClick={() => { setTimePreset('week'); setInvoicePage(1); setPreOrderPage(1); }}
                 >
                   Tuần này
                 </button>
                 <button
                   type="button"
                   className={`preset-btn ${timePreset === 'month' ? 'active' : ''}`}
-                  onClick={() => setTimePreset('month')}
+                  onClick={() => { setTimePreset('month'); setInvoicePage(1); setPreOrderPage(1); }}
                 >
                   Tháng này
                 </button>
@@ -1217,7 +1329,7 @@ export const InvoiceManagementPage: FC = () => {
               )}
               <button type="button" className="so-list-filter-reset" onClick={() => {
                 setSearchQuery('');
-                setTimePreset('today');
+                setTimePreset('all');
                 setPaymentMethodFilter('ALL');
                 setStatusFilter('ALL');
                 if (isStoreOwner) setBranchFilter('ALL');
@@ -1278,6 +1390,7 @@ export const InvoiceManagementPage: FC = () => {
                           <td>
                             <span style={{ fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'flex-start', gap: 4, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
                               <span>{inv.invoiceId}</span>
+                              {inv.isOutsideShift && <small style={{ color: '#475569' }}>Ngoài ca</small>}
                               {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                             </span>
                             <div style={{ display: 'block', marginTop: 5 }}>
@@ -1409,7 +1522,7 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td style={{ textAlign: 'left' }}>
                             <span
-                              className={`pos-method-pill ${inv.paymentMethod === 'VIETQR' ? 'vietqr' : isDebtMethod ? 'debt' : 'cash'
+                              className={`pos-method-pill ${inv.paymentMethod === 'VIETQR' || inv.paymentMethod === 'BANK' ? 'vietqr' : isDebtMethod ? 'debt' : 'cash'
                                 }`}
                               style={
                                 isDebtMethod
@@ -1417,7 +1530,7 @@ export const InvoiceManagementPage: FC = () => {
                                   : undefined
                               }
                             >
-                              {inv.paymentMethod === 'VIETQR' ? (
+                              {inv.paymentMethod === 'VIETQR' || inv.paymentMethod === 'BANK' ? (
                                 <QrCode size={12} />
                               ) : isDebtMethod ? (
                                 <CreditCard size={12} />

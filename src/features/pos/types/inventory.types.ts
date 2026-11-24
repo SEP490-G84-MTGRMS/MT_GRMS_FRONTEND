@@ -182,7 +182,9 @@ export class DebtPaymentRecordDTO {
 export class InvoiceDTO {
   orderUuid?: string = '';          // Guid gốc trên Backend
   invoiceId: string = '';           // HD000041
+  isOutsideShift?: boolean;
   createdAt: string = '';           // DD/MM/YYYY HH:mm
+  createdAtIso?: string = '';       // ISO datetime gốc để lọc/sắp xếp chuẩn xác
   branchId: string = '';
   branchName: string = '';
   cashierId: string = '';
@@ -212,7 +214,7 @@ export class InvoiceDTO {
   debtPaymentRecords: DebtPaymentRecordDTO[] = []; // Lịch sử các đợt thu nợ
   
   // Phương thức thanh toán
-  paymentMethod: 'VIETQR' | 'CASH' | 'DEBT' | 'CREDIT' | 'MIXED' = 'VIETQR';
+  paymentMethod: 'VIETQR' | 'BANK' | 'CASH' | 'DEBT' | 'CREDIT' | 'MIXED' = 'VIETQR';
   paymentMethodLabel: string = 'VietQR (MBBank)';
   referenceCode?: string = '';         // Mã tham chiếu giao dịch ngân hàng
   
@@ -240,14 +242,18 @@ export class PreOrderDTO {
   orderUuid?: string = '';          // Guid gốc trên Backend
   preOrderId: string = '';          // PRE-2026-008
   createdAt: string = '';           // Ngày tạo
+  createdAtIso?: string = '';       // ISO datetime gốc
   branchId: string = 'BR-01';
   branchName: string = 'Chi nhánh Cầu Giấy (Trung tâm)';
   cashierName: string = '';         // Người lập đơn cọc
   fulfilledByCashierName?: string;  // Người giao hàng & hoàn tất
   fulfilledAt?: string;             // Thời gian giao hàng
+  expectedPickupDate?: string | null = null; // ISO datetime hẹn nhận từ DB
   pickupAppointment: string = '';   // Thời gian hẹn đến quầy lấy hàng
   fulfillmentNote?: string | null = null; // Ghi chú xuất hàng / bàn giao
   notes?: string | null = null;     // Ghi chú đơn hàng khác
+  paymentMethod?: 'VIETQR' | 'BANK' | 'CASH' | 'DEBT' | 'CREDIT' = 'CASH';
+  paymentMethodLabel?: string = 'Tiền mặt';
   customerName: string = '';
   customerPhone: string = '';
   
