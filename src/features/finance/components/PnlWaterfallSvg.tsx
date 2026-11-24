@@ -39,12 +39,19 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
   periodLabel = 'Tháng này',
   accountingBasis = 'CASH',
 }) => {
+  const formatCompactVnd = (amount: number): string => {
+    const abs = Math.abs(amount);
+    if (abs >= 1_000_000) return `${(abs / 1_000_000).toFixed(1).replace('.', ',')}tr`;
+    if (abs >= 1_000) return `${Math.round(abs / 1_000)}k`;
+    return `${Math.round(abs)}đ`;
+  };
+
   const rev = Math.max(netRevenue, 0);
   const absCogs = Math.abs(cogs);
-  const absGross = Math.max(0, grossProfit);
+  const absGross = Math.abs(grossProfit);
   const absOpex = Math.abs(opExpenses);
   const absTax = Math.abs(estTax);
-  const absNet = Math.max(0, netProfit);
+  const absNet = Math.abs(netProfit);
 
   const bars: WaterfallBarDescriptor[] = [
     {
@@ -72,7 +79,7 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
       label2: 'gộp',
       value: absGross,
       delta: grossProfit,
-      color: '#0F766E', // Teal
+      color: grossProfit < 0 ? '#DC2626' : '#0F766E',
       isNeg: grossProfit < 0,
       operator: '=',
     },
@@ -98,11 +105,11 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
     },
     {
       type: 'net',
-      label1: 'Lãi ròng',
-      label2: 'giữ lại',
+      label1: netProfit < 0 ? 'Lỗ ròng' : 'Lãi ròng',
+      label2: netProfit < 0 ? 'trong kỳ' : 'giữ lại',
       value: absNet,
       delta: netProfit,
-      color: '#16A34A', // Emerald
+      color: netProfit < 0 ? '#DC2626' : '#16A34A',
       isNeg: netProfit < 0,
       operator: '=',
     },
@@ -147,10 +154,10 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
           {/* Value Labels for reference lines */}
           <text x="736" y="215" fontSize="10" fill="#94a3b8" textAnchor="start">0</text>
           <text x="736" y="127" fontSize="10" fill="#94a3b8" textAnchor="start">
-            {(maxVal / 2000000).toFixed(0)}tr
+            {formatCompactVnd(maxVal / 2)}
           </text>
           <text x="736" y="40" fontSize="10" fill="#94a3b8" textAnchor="start">
-            {(maxVal / 1000000).toFixed(0)}tr
+            {formatCompactVnd(maxVal)}
           </text>
 
           {/* 6 Step Grounded Waterfall Bars (all anchored at baselineY = 211) */}
@@ -160,8 +167,8 @@ export const PnlWaterfallSvg: React.FC<PnlWaterfallSvgProps> = ({
             const h = bar.value === 0 ? 3 : Math.max(6, rawHeight);
             const y = baselineY - h;
             const absDelta = Math.abs(bar.delta);
-            const deltaMillions = (absDelta / 1000000).toFixed(1).replace('.', ',') + 'tr';
-            const labelVal = (bar.isNeg && absDelta > 0 ? '-' : '') + deltaMillions;
+            const compactVal = formatCompactVnd(absDelta);
+            const labelVal = (bar.isNeg && absDelta > 0 ? '-' : '') + compactVal;
             const valY = Math.max(18, y - 8);
 
             const prevBar = idx > 0 ? bars[idx - 1] : null;

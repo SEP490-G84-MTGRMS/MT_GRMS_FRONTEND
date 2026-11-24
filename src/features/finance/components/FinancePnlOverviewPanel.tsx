@@ -30,14 +30,19 @@ function formatDisplayDate(value: string): string {
 function TrendMiniChart({ data }: { data: PnlReportResponse['trendData'] }) {
   if (data.length === 0) return <div className="finance-pnl-mini-empty">Không có dữ liệu xu hướng trong kỳ.</div>;
   const visible = data.length > 12 ? data.filter((_, index) => index % Math.ceil(data.length / 12) === 0) : data;
-  const maximum = Math.max(...visible.flatMap((point) => [point.netRevenue, Math.max(0, point.netProfit)]), 1);
+  const maximum = Math.max(...visible.flatMap((point) => [Math.abs(point.netRevenue), Math.abs(point.netProfit)]), 1);
   return (
     <div className="finance-pnl-trend" role="img" aria-label="Xu hướng doanh thu và lợi nhuận trong kỳ">
       {visible.map((point) => (
-        <div className="finance-pnl-trend-column" key={point.dateLabel}>
+        <div className="finance-pnl-trend-column" key={point.dateLabel} title={`DT: ${formatMoney(point.netRevenue)} · LN: ${formatMoney(point.netProfit)}`}>
           <div className="finance-pnl-trend-bars">
-            <i style={{ height: `${Math.max(3, (point.netRevenue / maximum) * 100)}%` }} />
-            <i style={{ height: `${Math.max(3, (Math.max(0, point.netProfit) / maximum) * 100)}%` }} />
+            <i style={{ height: `${Math.max(3, (Math.abs(point.netRevenue) / maximum) * 100)}%` }} />
+            <i
+              style={{
+                height: `${Math.max(3, (Math.abs(point.netProfit) / maximum) * 100)}%`,
+                backgroundColor: point.netProfit < 0 ? '#DC2626' : undefined,
+              }}
+            />
           </div>
           <span>{point.dateLabel}</span>
         </div>
@@ -62,7 +67,7 @@ function ExpenseMiniChart({ data }: { data: PnlReportResponse['expenseBreakdown'
     <div className="finance-pnl-expense-row">
       <div className="finance-pnl-donut" style={{ background: `conic-gradient(${slices.values.join(', ')})` }} role="img" aria-label="Cơ cấu chi phí vận hành" />
       <div className="finance-pnl-expense-legend">
-        {data.slice(0, 6).map((item, index) => (
+        {data.map((item, index) => (
           <span key={item.categoryCode}>
             <i style={{ background: item.color || ['#0F766E', '#14B8A6', '#3B82F6', '#F59E0B'][index % 4] }} />
             {item.categoryName} · {formatMoney(item.amount)}
