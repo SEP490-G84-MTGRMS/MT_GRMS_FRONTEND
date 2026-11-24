@@ -1705,9 +1705,34 @@
   transform: rotate(180deg) !important;
 }
 
-@media (max-width: 768px) {
-  .topnav-hamburger { display: flex !important; }
-  .topnav-primary   { display: none; }
+@media (max-width: 1024px) {
+  .topnav-primary {
+    display: block;
+  }
+  .topnav-inner {
+    justify-content: space-between;
+    padding: 0 12px !important;
+    gap: 8px !important;
+  }
+  .topnav-menus-desktop {
+    display: none !important;
+  }
+  .topnav-hamburger {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .so-layout-main {
+    padding: 12px 12px 16px 12px !important;
+  }
+  .topnav-brand-logo {
+    height: 28px !important;
+  }
+  .topnav-support-btn,
+  .topnav-divider {
+    display: none !important;
+  }
 }
 
 /* ── Filter Toolbar Responsive ── */

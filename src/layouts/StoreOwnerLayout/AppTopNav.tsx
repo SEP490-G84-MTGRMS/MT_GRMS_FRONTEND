@@ -1188,6 +1188,7 @@ export const AppTopNav: FC = () => {
         aria-label="Điều hướng chính"
       >
         <div
+          className="topnav-inner"
           style={{
             display: "flex",
             alignItems: "center",
@@ -1214,6 +1215,7 @@ export const AppTopNav: FC = () => {
             }}
           >
             <img
+              className="topnav-brand-logo"
               src="/logo/thviet_logo_white.png"
               alt="THViet - Quản Lý Tạp Hóa Việt"
               style={{ height: 38, width: "auto", objectFit: "contain" }}
@@ -1222,6 +1224,7 @@ export const AppTopNav: FC = () => {
 
           {/* Menus List */}
           <div
+            className="topnav-menus-desktop"
             style={{
               display: "flex",
               alignItems: "stretch",
@@ -1404,6 +1407,7 @@ export const AppTopNav: FC = () => {
             {/* 1. Hỗ trợ */}
             <button
               type="button"
+              className="topnav-support-btn"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -1438,6 +1442,7 @@ export const AppTopNav: FC = () => {
 
             {/* 2. Divider */}
             <div
+              className="topnav-divider"
               style={{
                 width: 1,
                 height: 18,
@@ -2056,6 +2061,8 @@ export const AppTopNav: FC = () => {
             }}
             className="topnav-hamburger"
             title="Menu"
+            aria-label="Mở menu điều hướng"
+            aria-expanded={mobileOpen}
           >
             <MenuIcon size={16} />
           </button>
