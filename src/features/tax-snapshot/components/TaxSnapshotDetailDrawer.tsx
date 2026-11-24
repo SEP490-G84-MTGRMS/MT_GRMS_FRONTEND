@@ -152,15 +152,13 @@ export const TaxSnapshotDetailDrawer: FC<Props> = ({
             <span>Tổng quan nghĩa vụ thuế</span>
           </button>
 
-          {ordersList.length > 0 && (
-            <button
-              onClick={() => setActiveTab('invoices')}
-              className={'tax-drawer-tab-btn ' + (activeTab === 'invoices' || activeTab === 'orders' ? 'active' : '')}
-            >
-              <Layers size={16} />
-              <span>Bảng kê hóa đơn ({ordersList.length})</span>
-            </button>
-          )}
+          <button
+            onClick={() => setActiveTab('invoices')}
+            className={'tax-drawer-tab-btn ' + (activeTab === 'invoices' || activeTab === 'orders' ? 'active' : '')}
+          >
+            <Layers size={16} />
+            <span>Bảng kê hóa đơn ({snapshot.ordersCount ?? 0})</span>
+          </button>
         </div>
 
         {/* Content Body */}
