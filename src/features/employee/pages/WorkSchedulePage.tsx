@@ -1986,7 +1986,6 @@ export const WorkSchedulePage: React.FC = () => {
         onClose={() => setSelectedDetailEmployee(null)}
         employee={selectedDetailEmployee}
         initialTab="schedule"
-        onEdit={() => { }}
         onToggleStatus={handleToggleEmployeeStatus}
       />
 

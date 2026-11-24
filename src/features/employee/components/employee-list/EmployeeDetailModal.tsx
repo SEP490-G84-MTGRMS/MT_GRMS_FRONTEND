@@ -8,7 +8,7 @@ interface EmployeeDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
-  onEdit: (employee: Employee) => void;
+  onEdit?: (employee: Employee) => void;
   onToggleStatus: (employeeId: string) => void;
   onDelete?: (employeeId: string) => void;
   initialTab?: 'info' | 'schedule' | 'salary' | 'payslip' | 'debt';
@@ -304,15 +304,17 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
                 <div className="emp-section-card">
                   <div className="emp-section-title">
                     <span>Mức lương chính hiện hành</span>
-                    <button
-                      type="button"
-                      className="emp-btn emp-btn-outline-teal"
-                      style={{ height: 32, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                      onClick={() => onEdit(employee)}
-                    >
-                      <Pencil size={13} />
-                      <span>Điều chỉnh mức lương</span>
-                    </button>
+                    {onEdit && (
+                      <button
+                        type="button"
+                        className="emp-btn emp-btn-outline-teal"
+                        style={{ height: 32, fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        onClick={() => onEdit(employee)}
+                      >
+                        <Pencil size={13} />
+                        <span>Điều chỉnh mức lương</span>
+                      </button>
+                    )}
                   </div>
                   <div className="emp-grid-2" style={{ fontSize: 14 }}>
                     <div>
@@ -437,13 +439,15 @@ export const EmployeeDetailModal: React.FC<EmployeeDetailModalProps> = ({
             >
               {employee.status === 'active' ? 'Ngừng làm việc' : 'Kích hoạt lại'}
             </button>
-            <button
-              type="button"
-              className="emp-btn emp-btn-outline-teal"
-              onClick={() => onEdit(employee)}
-            >
-              Cập nhật
-            </button>
+            {onEdit && (
+              <button
+                type="button"
+                className="emp-btn emp-btn-outline-teal"
+                onClick={() => onEdit(employee)}
+              >
+                Cập nhật
+              </button>
+            )}
             <button type="button" className="emp-btn emp-btn-secondary" onClick={onClose}>
               Đóng chi tiết
             </button>
