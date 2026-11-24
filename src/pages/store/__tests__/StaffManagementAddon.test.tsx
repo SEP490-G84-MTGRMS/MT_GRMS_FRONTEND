@@ -66,7 +66,14 @@ describe("Tiện ích Quản lý nhân viên", () => {
   });
 
   it("đổi nút mua trên thẻ Gói Thường thành trạng thái đã mở khóa", async () => {
-    vi.spyOn(storeApi, "getPricingPlans").mockResolvedValue({ success: true, data: [] });
+    vi.spyOn(storeApi, "getPricingPlans").mockResolvedValue({
+      success: true,
+      data: [
+        { id: "plan_trial", code: "TRIAL", name: "Gói Dùng Thử", monthlyPrice: 0, yearlyPrice: 0, status: "ACTIVE" },
+        { id: "plan_standard", code: "STANDARD", name: "Gói Thường", monthlyPrice: 120000, yearlyPrice: 1200000, status: "ACTIVE" },
+        { id: "plan_pro", code: "PRO", name: "Gói Pro", monthlyPrice: 280000, yearlyPrice: 2800000, status: "ACTIVE" },
+      ],
+    });
     const onBuyStaffAddon = vi.fn();
     const onSelectPlan = vi.fn();
     const { rerender } = render(

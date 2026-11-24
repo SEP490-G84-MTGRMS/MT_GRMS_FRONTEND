@@ -40,6 +40,9 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
   const [activeModal, setActiveModal] = useState<'create' | 'edit' | 'upgrade' | 'detail' | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<BranchItemResponse | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<BranchItemResponse | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // 1. Tải hạn mức chi nhánh (Quota) - chỉ cần gọi 1 lần khi mount hoặc khi thêm/sửa chi nhánh
   const fetchQuota = async () => {
@@ -98,49 +101,92 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
   const handleToggleStatus = async (branch: BranchItemResponse) => {
     const isCurrentlyActive = branch.status.toLowerCase() === 'active';
     const nextActive = !isCurrentlyActive;
+    setActionError(null);
     try {
       const res = await branchManagementApi.toggleStatus(branch.id, nextActive);
       if (res.success) {
         await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter, pageIndex, pageSize)]);
       } else {
-        alert(res.message || 'Không thể thay đổi trạng thái chi nhánh.');
+        setActionError(res.message || 'Không thể thay đổi trạng thái chi nhánh.');
       }
     } catch (err: unknown) {
       console.error('Toggle status error:', err);
       const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
       const msg = anyErr?.response?.data?.message || anyErr?.message || 'Lỗi khi thay đổi trạng thái chi nhánh.';
-      alert(msg);
+      setActionError(msg);
     }
   };
 
-  const handleDeleteBranch = async (branch: BranchItemResponse) => {
+  const handleDeleteBranch = (branch: BranchItemResponse) => {
+    setActionError(null);
     if (branch.isHeadquarter || hasOnlyBranch) {
-      alert('Không thể xóa chi nhánh chính (Trụ sở chính) của chuỗi cửa hàng.');
+      setActionError('Không thể xóa chi nhánh chính (Trụ sở chính) của chuỗi cửa hàng.');
       return;
     }
+    setBranchToDelete(branch);
+  };
 
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa chi nhánh "${branch.name}" (${branch.code})?\n\nHành động này sẽ xóa chi nhánh và giải phóng hạn mức chi nhánh đang sử dụng của chuỗi cửa hàng.`
-    );
-    if (!confirmed) return;
-
+  const confirmDeleteBranch = async () => {
+    if (!branchToDelete) return;
+    setIsDeleting(true);
+    setActionError(null);
     try {
-      const res = await branchManagementApi.deleteBranch(branch.id);
+      const res = await branchManagementApi.deleteBranch(branchToDelete.id);
       if (res.success) {
+        setBranchToDelete(null);
         await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter, pageIndex, pageSize)]);
       } else {
-        alert(res.message || 'Không thể xóa chi nhánh.');
+        setActionError(res.message || 'Không thể xóa chi nhánh.');
+        setBranchToDelete(null);
       }
     } catch (err: unknown) {
       console.error('Delete branch error:', err);
       const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
       const msg = anyErr?.response?.data?.message || anyErr?.message || 'Lỗi khi xóa chi nhánh.';
-      alert(msg);
+      setActionError(msg);
+      setBranchToDelete(null);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      {actionError && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '10px 14px',
+            marginBottom: 12,
+            borderRadius: 12,
+            backgroundColor: '#FFF0F0',
+            border: '1px solid #FFD6D6',
+            color: '#B91C1C',
+            fontSize: 13,
+            fontWeight: 500,
+          }}
+        >
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#B91C1C',
+              fontWeight: 700,
+              cursor: 'pointer',
+              padding: '2px 8px',
+            }}
+          >
+            Đóng
+          </button>
+        </div>
+      )}
       {/* 1. Quota Bar */}
       <BranchQuotaBar
         quota={quota}
@@ -539,6 +585,80 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
           }}
           onSuccess={loadData}
         />
+      )}
+      {/* Modal xác nhận xóa chi nhánh */}
+      {branchToDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1300,
+            backgroundColor: 'rgba(15, 23, 42, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => !isDeleting && setBranchToDelete(null)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 440,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 24,
+              padding: 24,
+              boxShadow: '0 20px 40px rgba(15, 23, 42, 0.16)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 10px 0', fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
+              Xác nhận xóa chi nhánh
+            </h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: 14, lineHeight: 1.55, color: '#475569' }}>
+              Bạn có chắc chắn muốn xóa chi nhánh <strong>"{branchToDelete.name}" ({branchToDelete.code})</strong>?
+              Hành động này sẽ xóa chi nhánh và giải phóng hạn mức chi nhánh đang sử dụng của chuỗi cửa hàng.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setBranchToDelete(null)}
+                style={{
+                  padding: '9px 18px',
+                  borderRadius: 9999,
+                  border: '1px solid #CBD5E1',
+                  backgroundColor: '#FFFFFF',
+                  color: '#475569',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Bỏ qua
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={confirmDeleteBranch}
+                style={{
+                  padding: '9px 20px',
+                  borderRadius: 9999,
+                  border: 'none',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {isDeleting ? 'Đang xóa...' : 'Xóa chi nhánh'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,6 @@ import { useSearchParams } from 'react-router-dom';
 import {
   INITIAL_STORE_INFO,
   INITIAL_USER_PROFILE,
-  INITIAL_SESSIONS,
   type StoreInfo,
   type UserProfile,
   type UserSessionItem,
@@ -42,7 +41,37 @@ export const AccountManagementPage: FC = () => {
         }
       : INITIAL_USER_PROFILE
   );
-  const [sessions, setSessions] = useState<UserSessionItem[]>(INITIAL_SESSIONS);
+  const [sessions, setSessions] = useState<UserSessionItem[]>(() => {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const browser = /Edg\//.test(ua)
+      ? 'Microsoft Edge'
+      : /Chrome\//.test(ua)
+        ? 'Chrome'
+        : /Firefox\//.test(ua)
+          ? 'Firefox'
+          : /Safari\//.test(ua)
+            ? 'Safari'
+            : 'Trình duyệt hiện tại';
+    const deviceName = /Windows/i.test(ua)
+      ? 'Máy tính Windows'
+      : /Mac/i.test(ua)
+        ? 'Máy tính macOS'
+        : /Android|iPhone|iPad/i.test(ua)
+          ? 'Thiết bị di động'
+          : 'Thiết bị hiện tại';
+    const today = new Date().toLocaleDateString('vi-VN');
+    return [
+      {
+        id: 'current-session',
+        deviceName,
+        browser,
+        ipAddress: 'Phiên hiện tại',
+        lastActive: today,
+        isCurrent: true,
+        status: 'active',
+      },
+    ];
+  });
   const [storeInfo, setStoreInfo] = useState<StoreInfo>(INITIAL_STORE_INFO);
   const [walletRefreshKey, setWalletRefreshKey] = useState<number>(0);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
@@ -107,7 +136,11 @@ export const AccountManagementPage: FC = () => {
     setUserProfile((prev) => ({ ...prev, ...updated }));
   };
 
-  const handleTerminateSession = (sessionId: string) => {
+  const handleTerminateSession = async (sessionId: string) => {
+    if (sessionId === 'current-session') {
+      await useAuthStore.getState().logout();
+      return;
+    }
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
   };
 

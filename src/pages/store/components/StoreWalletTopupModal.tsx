@@ -155,7 +155,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
   // 4. Người dùng bấm "Xác nhận đã chuyển khoản" để check ngay lập tức
   const handleManualCheck = async () => {
     if (amountToTopup < 50000) {
-      alert('Số tiền nạp tối thiểu là 50.000 đ');
+      setErrorMessage('Số tiền nạp tối thiểu là 50.000 đ.');
       return;
     }
 

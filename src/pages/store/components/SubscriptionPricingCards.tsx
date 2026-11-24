@@ -5,7 +5,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { SUBSCRIPTION_PLANS, type SubscriptionPlanItem } from "../storeData";
+import { type SubscriptionPlanItem } from "../storeData";
 import { storeApi, type BackendPricingPlanResponse } from "../api/storeApi";
 
 interface SubscriptionPricingCardsProps {
@@ -128,8 +128,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   hasStaffAddon,
   trialState,
 }) => {
-  const [plans, setPlans] =
-    useState<SubscriptionPlanItem[]>(SUBSCRIPTION_PLANS);
+  const [plans, setPlans] = useState<SubscriptionPlanItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -184,17 +183,17 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
           );
           setPlans(mappedPlans);
         } else {
-          setPlans(SUBSCRIPTION_PLANS);
+          setPlans([]);
+          setLoadError("Hiện chưa có gói dịch vụ nào khả dụng từ hệ thống.");
         }
       } else {
-        setPlans(SUBSCRIPTION_PLANS);
+        setPlans([]);
+        setLoadError("Không thể tải danh sách gói dịch vụ từ máy chủ.");
       }
     } catch (err: unknown) {
-      console.warn(
-        "Không thể kết nối API gói cước, sử dụng danh sách gói chuẩn cục bộ:",
-        err,
-      );
-      setPlans(SUBSCRIPTION_PLANS);
+      console.warn("Không thể kết nối API gói cước:", err);
+      setPlans([]);
+      setLoadError("Không thể kết nối máy chủ để tải bảng giá gói dịch vụ. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
