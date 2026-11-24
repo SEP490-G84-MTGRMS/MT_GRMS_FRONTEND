@@ -8,6 +8,7 @@ import type {
 } from '../../types/supplier.types';
 import type { BranchListItem } from '../../../purchase-order/types/po.types';
 import { supplierApi } from '../../api/supplierApi';
+import { supplierBranchApi } from '../../api/supplierBranchApi';
 import { StatusToggle } from '../StatusToggle';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -111,15 +112,49 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
     return branches.find((b) => b.id === selectedBranchId);
   }, [branches, selectedBranchId]);
 
-  // Tập hợp các ID nhà cung cấp ĐÃ ĐƯỢC GÁN và đang ACTIVE tại chi nhánh được chọn (SUP-02)
+  // Tải toàn bộ phân bổ Active của chi nhánh được chọn (SBA-01) thay vì chỉ kiểm tra 15 dòng trang hiện tại
+  const [branchActiveSupplierIds, setBranchActiveSupplierIds] = useState<string[] | null>(null);
+  useEffect(() => {
+    if (!isOpen || !selectedBranchId) {
+      setBranchActiveSupplierIds(null);
+      return;
+    }
+    let alive = true;
+    supplierBranchApi
+      .getAssignments({
+        branchId: selectedBranchId,
+        status: 'Active',
+        pageIndex: 1,
+        pageSize: 500,
+      })
+      .then((res) => {
+        if (alive) {
+          setBranchActiveSupplierIds(res.items.map((a) => a.supplierId));
+        }
+      })
+      .catch(() => {
+        if (alive) setBranchActiveSupplierIds(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isOpen, selectedBranchId]);
+
+  // Tập hợp các ID nhà cung cấp ĐÃ ĐƯỢC GÁN và đang ACTIVE tại chi nhánh được chọn (SUP-02 / SBA-01)
   const activeAssignedSupplierIdsForBranch = useMemo(() => {
     if (!selectedBranchId) return new Set<string>();
-    return new Set(
+    const ids = new Set(
       assignments
         .filter((a) => a.branchId === selectedBranchId && a.status === 'Active')
         .map((a) => a.supplierId)
     );
-  }, [assignments, selectedBranchId]);
+    if (branchActiveSupplierIds) {
+      for (const sid of branchActiveSupplierIds) {
+        ids.add(sid);
+      }
+    }
+    return ids;
+  }, [assignments, selectedBranchId, branchActiveSupplierIds]);
 
   // Danh sách nhà cung cấp khả dụng cho chi nhánh:
   // - NCC đang hoạt động (Active) trên toàn hệ thống (SUP-03)
