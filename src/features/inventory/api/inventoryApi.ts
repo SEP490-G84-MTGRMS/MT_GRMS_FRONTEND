@@ -101,6 +101,7 @@ export const inventoryApi = {
         batchCount: Number(i.batchCount ?? i.batches?.length ?? 0),
         quarantined,
         reserved,
+        expiredQty: Number(i.expiredQty ?? 0),
       };
     });
 

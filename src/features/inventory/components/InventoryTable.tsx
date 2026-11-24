@@ -300,10 +300,16 @@ export const InventoryTable: FC<Props> = ({
                       style={{
                         ...tdBase,
                         textAlign: 'right',
-                        color: item.committed > 0 ? '#dc2626' : '#64748b',
+                        color: item.committed > 0 || (item.expiredQty ?? 0) > 0 ? '#dc2626' : '#64748b',
                       }}
+                      title={`Giữ chỗ: ${fmt(item.reserved ?? 0)} | Cách ly: ${fmt(item.quarantined ?? 0)} | Hết hạn: ${fmt(item.expiredQty ?? 0)}`}
                     >
-                      {fmt(item.committed)}
+                      <div>{fmt(item.committed)}</div>
+                      {(item.expiredQty ?? 0) > 0 && (
+                        <div style={{ fontSize: 10, color: '#b91c1c', fontWeight: 600 }}>
+                          Hết hạn: {fmt(item.expiredQty ?? 0)}
+                        </div>
+                      )}
                     </td>
                     <td
                       style={{

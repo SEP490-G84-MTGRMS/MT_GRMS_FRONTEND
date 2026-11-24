@@ -36,6 +36,8 @@ export interface InventoryItem {
   quarantined?: number;
   /** RULE-01: giữ chỗ */
   reserved?: number;
+  /** Hàng đã hết hạn (không tính vào khả dụng) */
+  expiredQty?: number;
 }
 
 /** Chip filter — OR trong field, AND giữa các field (giống SP theo NCC). */
