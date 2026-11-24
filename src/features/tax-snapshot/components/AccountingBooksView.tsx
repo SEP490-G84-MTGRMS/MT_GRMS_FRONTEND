@@ -1412,7 +1412,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                           {(entry.inQuantity ?? 0).toLocaleString('vi-VN')}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, background: '#FAFCFA', color: '#166534' }}>
-                          {formatMoney(entry.inAmount ?? entry.amount)}
+                          {formatMoney(entry.inAmount ?? 0)}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 600, background: '#FCFAFA', color: '#991B1B' }}>
                           {(entry.outQuantity ?? 0).toLocaleString('vi-VN')}
@@ -1444,7 +1444,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                       {filteredEntries.reduce((s, e) => s + (e.inQuantity ?? 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td style={{ textAlign: 'right', padding: '12px 6px', color: '#166534' }}>
-                      {formatMoney(filteredEntries.reduce((s, e) => s + (e.inAmount ?? e.amount ?? 0), 0))}
+                      {formatMoney(filteredEntries.reduce((s, e) => s + (e.inAmount ?? 0), 0))}
                     </td>
                     <td style={{ textAlign: 'right', padding: '12px 6px', color: '#991B1B' }}>
                       {filteredEntries.reduce((s, e) => s + (e.outQuantity ?? 0), 0).toLocaleString('vi-VN')}
