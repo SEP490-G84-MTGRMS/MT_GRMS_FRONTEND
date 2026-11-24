@@ -385,7 +385,7 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   </td>
 
                   <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9', fontSize: 11, color: '#334155', fontFamily: 'var(--font-mono, monospace)' }}>
-                    {b.phone || '—'}
+                    {(b as { phone?: string; managerPhone?: string }).phone || (b as { managerPhone?: string }).managerPhone || '—'}
                   </td>
 
                   <td

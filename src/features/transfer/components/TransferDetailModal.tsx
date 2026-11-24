@@ -4,7 +4,6 @@ import ExcelJS from 'exceljs';
 import {
   X,
   Trash2,
-  Copy,
   Download,
   ExternalLink,
   Printer,
@@ -115,11 +114,6 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Không thể xác nhận hoàn trả.');
     }
-  };
-
-  const handleDuplicate = () => {
-    onClose();
-    navigate(window.location.pathname.startsWith('/employee') ? `${transferBasePath}/request` : `${transferBasePath}/create`);
   };
 
   const handleExport = async () => {

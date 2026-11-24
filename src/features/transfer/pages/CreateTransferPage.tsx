@@ -21,7 +21,7 @@ import '../transfer.css';
 
 export const CreateTransferPage: React.FC = () => {
   const navigate = useNavigate();
-  const currentUserName = useAuthStore((state) => state.user?.fullName || state.user?.username || 'Quản lý');
+  const currentUserName = useAuthStore((state) => state.user?.fullName || state.user?.email || 'Quản lý');
   const [createdTime] = useState(() =>
     new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   );

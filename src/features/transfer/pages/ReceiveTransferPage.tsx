@@ -5,7 +5,6 @@ import {
   Search,
   User,
   Check,
-  Save,
   AlertTriangle,
 } from 'lucide-react';
 import type { TransferOrder, TransferItem } from '../types';
@@ -18,7 +17,7 @@ export const ReceiveTransferPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const canViewFinancials = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
-  const currentUserName = useAuthStore((state) => state.user?.fullName || state.user?.username || 'Nhân viên');
+  const currentUserName = useAuthStore((state) => state.user?.fullName || state.user?.email || 'Nhân viên');
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   const [transfer, setTransfer] = useState<TransferOrder | null>(null);

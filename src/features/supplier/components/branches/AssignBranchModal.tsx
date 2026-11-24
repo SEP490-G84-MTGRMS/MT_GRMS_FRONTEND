@@ -121,7 +121,12 @@ export const AssignBranchModal: FC<AssignBranchModalProps> = ({
     }
     let alive = true;
     supplierBranchApi
-      .getAssignments({
+      .getBranchAssignments({
+        supplierCodes: [],
+        supplierNames: [],
+        branchCodes: [],
+        branchNames: [],
+        supplierId: 'ALL',
         branchId: selectedBranchId,
         status: 'Active',
         pageIndex: 1,

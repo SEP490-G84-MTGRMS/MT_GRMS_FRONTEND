@@ -592,7 +592,7 @@ export const BatchPackageManagePage: FC<{ defaultRole?: UserRole }> = ({
         >
           <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 480, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
-              Xác nhận hủy khay {voidTargetPkg.packageCode}
+              Xác nhận hủy khay {voidTargetPkg.barcode}
             </h3>
             <p style={{ margin: '0 0 18px', fontSize: 13.5, color: '#475569', lineHeight: 1.5 }}>
               {voidTargetPkg.repackType === 'PROCESSING'

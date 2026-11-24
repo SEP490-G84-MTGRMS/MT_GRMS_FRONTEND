@@ -205,8 +205,8 @@ export const ProductListPage: React.FC = () => {
               }
               uomConversions = rawUnitPrices
                 .filter((u) => !u.isBaseUnit)
-                .map((u) => ({
-                  id: u.id,
+                .map((u, idx) => ({
+                  id: u.id || `${p.id}-u-${idx}`,
                   unitName: u.unitName,
                   conversionRate: u.conversionRate,
                   price: u.price,
