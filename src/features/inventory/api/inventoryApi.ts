@@ -79,7 +79,7 @@ export const inventoryApi = {
       const quarantined = Number(i.quarantinedQty ?? 0);
       const reserved = Number(i.reservedQty ?? 0);
       return {
-        id: i.productId || i.id || `${i.sku}-${i.branchId}`,
+        id: `${i.productId || i.id || i.sku}-${i.branchId}`,
         productId: i.productId,
         sku: i.sku,
         productName: i.productName,
