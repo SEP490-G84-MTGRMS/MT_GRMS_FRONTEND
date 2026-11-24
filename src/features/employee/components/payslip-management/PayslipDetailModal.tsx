@@ -40,11 +40,13 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
   const [paymentHistory, setPaymentHistory] = useState<LedgerTransaction[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [showBaseSalaryModal, setShowBaseSalaryModal] = useState<boolean>(false);
 
   useEffect(() => {
     let isMounted = true;
     if (isOpen) {
       setActiveTab('payment');
+      setShowBaseSalaryModal(false);
       setSchedules([]);
       setScheduleError(null);
       setPaymentHistory([]);
@@ -131,7 +133,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
   }, [isOpen, activeTab, effectivePayslip?.id, effectivePayslip?.branchId, effectivePayslip?.payslipCode]);
 
   useEffect(() => {
-    if (!isOpen || activeTab !== 'attendance' || !effectivePayslip?.periodMonth) {
+    if (!isOpen || !effectivePayslip?.periodMonth) {
       return;
     }
 
@@ -180,7 +182,7 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, activeTab, effectivePayslip?.employeeId, effectivePayslip?.branchId, effectivePayslip?.periodMonth, canManage]);
+  }, [isOpen, effectivePayslip?.employeeId, effectivePayslip?.branchId, effectivePayslip?.periodMonth, canManage]);
 
   if (!isOpen) return null;
 
@@ -579,7 +581,24 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 15, fontSize: 13.5 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                     <span style={{ color: '#475569' }}>Lương chính :</span>
-                    <span style={{ color: 'var(--blue-primary, #0F766E)', fontWeight: 500 }}>{formatAmount(effectivePayslip.baseSalaryEarned)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowBaseSalaryModal(true)}
+                      title="Xem chi tiết cách tính lương chính"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        color: 'var(--blue-primary, #0F766E)',
+                        fontWeight: 600,
+                        fontSize: 'inherit',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                        textUnderlineOffset: 3,
+                      }}
+                    >
+                      {formatAmount(effectivePayslip.baseSalaryEarned)}
+                    </button>
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -700,6 +719,222 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Modal chi tiết Lương chính */}
+      {showBaseSalaryModal && effectivePayslip && (() => {
+        const isHourly = effectivePayslip.salaryType === 'HOURLY';
+        const isShift = effectivePayslip.salaryType === 'SHIFT';
+        const baseRate = effectivePayslip.baseRate || 0;
+        const standardDays = effectivePayslip.standardDays || 26;
+        const standardDayHours = effectivePayslip.standardDayHours || 8;
+        const paidLeaveDays = effectivePayslip.paidLeaveDays || 0;
+
+        const salaryTypeTitle = isHourly
+          ? 'Theo giờ làm việc'
+          : isShift
+            ? 'Theo ca làm việc'
+            : 'Theo ngày công chuẩn';
+
+        const unitRate = isHourly
+          ? baseRate
+          : isShift
+            ? baseRate
+            : standardDays > 0
+              ? Math.round(baseRate / standardDays)
+              : 0;
+
+        const attendedSchedules = schedules.filter((s) => {
+          const isLeaveShift =
+            s.status === 'OnLeave' ||
+            s.status === 'Cancelled' ||
+            s.approvalType === 'PAID_LEAVE' ||
+            s.approvalType === 'UNPAID_LEAVE';
+          if (isLeaveShift) return false;
+          return s.status === 'Completed' || Boolean(s.checkInTime);
+        });
+
+        const hasLoadedSchedules = schedules.length > 0;
+        const attendedDaysCount = new Set(
+          attendedSchedules.map((s) => (s.workDate || '').slice(0, 10)).filter(Boolean)
+        ).size;
+        const attendedHoursSum =
+          Math.round(
+            attendedSchedules.reduce((sum, s) => sum + (s.actualWorkHours || 0), 0) * 100
+          ) / 100;
+
+        const attendanceQty = isHourly
+          ? hasLoadedSchedules
+            ? attendedHoursSum
+            : effectivePayslip.totalWorkHours || 0
+          : isShift
+            ? hasLoadedSchedules
+              ? attendedSchedules.length
+              : effectivePayslip.totalShifts || 0
+            : hasLoadedSchedules
+              ? attendedDaysCount
+              : effectivePayslip.workedDays || 0;
+
+        const basePaidQty = isHourly
+          ? effectivePayslip.totalWorkHours || 0
+          : isShift
+            ? effectivePayslip.totalShifts || 0
+            : effectivePayslip.workedDays || 0;
+
+        const paidQty = isHourly
+          ? Math.round((basePaidQty + paidLeaveDays * standardDayHours) * 100) / 100
+          : Math.round((basePaidQty + paidLeaveDays) * 100) / 100;
+
+        const col1Label = isHourly ? 'Lương mỗi giờ' : isShift ? 'Lương mỗi ca' : 'Lương mỗi ngày';
+        const col2Label = isHourly ? 'Số giờ chấm công' : isShift ? 'Số ca chấm công' : 'Số ngày chấm công';
+        const col3Label = isHourly ? 'Số giờ tính lương' : isShift ? 'Số ca tính lương' : 'Số ngày tính lương';
+
+        return (
+          <div
+            className="emp-modal-overlay"
+            style={{ zIndex: 1200, padding: 16, boxSizing: 'border-box' }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowBaseSalaryModal(false);
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Chi tiết lương chính"
+              style={{
+                width: '100%',
+                maxWidth: 780,
+                backgroundColor: '#FFFFFF',
+                borderRadius: 12,
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              {/* Header */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
+                    Lương chính
+                  </h3>
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 13,
+                      color: '#475569',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '4px 8px',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>Nhân viên: {effectivePayslip.employeeName}</span>
+                    <span style={{ color: '#CBD5E1' }}>|</span>
+                    <span>Loại lương: {salaryTypeTitle}</span>
+                    {!isHourly && (
+                      <>
+                        <span style={{ color: '#CBD5E1' }}>|</span>
+                        <span>Ngày công chuẩn: {standardDays}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="emp-modal-close-btn"
+                  onClick={() => setShowBaseSalaryModal(false)}
+                  aria-label="Đóng chi tiết lương chính"
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: '4px 24px 20px', overflowX: 'auto' }}>
+                <div style={{ fontSize: 13.5, color: '#1E293B', marginBottom: 14 }}>
+                  Mức lương: <span>{formatAmount(baseRate)}</span>
+                </div>
+
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13.5 }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#F1F5F9', color: '#0F172A' }}>
+                      <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, borderTopLeftRadius: 6, borderBottomLeftRadius: 6 }}>
+                        {col1Label}
+                      </th>
+                      <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600 }}>
+                        {col2Label}
+                      </th>
+                      <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600 }}>
+                        {col3Label}
+                      </th>
+                      <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, borderTopRightRadius: 6, borderBottomRightRadius: 6 }}>
+                        Thành tiền
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #E2E8F0' }}>
+                      <td style={{ padding: '14px', textAlign: 'right', color: '#1E293B' }}>
+                        {formatAmount(unitRate)}
+                      </td>
+                      <td style={{ padding: '14px', textAlign: 'right', color: '#1E293B' }}>
+                        {attendanceQty}
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            minWidth: 110,
+                            padding: '6px 12px',
+                            backgroundColor: '#F1F5F9',
+                            borderRadius: 6,
+                            color: '#64748B',
+                            textAlign: 'right',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {paidQty}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px', textAlign: 'right', color: '#0F172A', fontWeight: 500 }}>
+                        {formatAmount(effectivePayslip.baseSalaryEarned)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Footer */}
+              <div
+                style={{
+                  padding: '12px 24px',
+                  borderTop: '1px solid #E2E8F0',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  backgroundColor: '#FFFFFF',
+                }}
+              >
+                <button
+                  type="button"
+                  className="emp-btn emp-btn-secondary"
+                  style={{ fontSize: 13, minWidth: 84 }}
+                  onClick={() => setShowBaseSalaryModal(false)}
+                >
+                  Bỏ qua
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
