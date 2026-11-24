@@ -254,6 +254,13 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       errors.retailPrice = 'Giá bán phải lớn hơn 0.';
     } else if (baseUnitPrice > 1_000_000_000) {
       errors.retailPrice = 'Giá bán vượt quá giới hạn.';
+    } else {
+      const invalidUnit = unitPriceDrafts.find(
+        (u) => !Number.isFinite(u.price) || u.price <= 0 || u.price > 1_000_000_000
+      );
+      if (invalidUnit) {
+        errors.retailPrice = `Giá bán của đơn vị "${invalidUnit.unitName}" phải lớn hơn 0 và không vượt quá 1 tỷ đ.`;
+      }
     }
     if (product.allowRepack) {
       if (!Number.isFinite(processedSellingPrice) || processedSellingPrice <= 0) {
