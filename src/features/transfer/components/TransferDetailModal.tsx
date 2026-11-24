@@ -508,7 +508,7 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
           >
             {/* Trái */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {(currentTransfer.status === 'Draft' || currentTransfer.status === 'Pending') && (
+              {(currentTransfer.status === 'Draft' || currentTransfer.status === 'Pending') && canOperateSource && (
                 <button
                   type="button"
                   className="btn-secondary-white"

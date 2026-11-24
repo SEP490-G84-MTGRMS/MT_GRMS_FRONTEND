@@ -840,24 +840,30 @@ export const TransferListPage: React.FC = () => {
                       {t.receiveDate ? (
                         t.receiveDate
                       ) : isReceiving ? (
-                        <button
-                          type="button"
-                          className="so-list-action-btn so-list-action-btn--success"
-                          style={{
-                            height: 26,
-                            padding: '0 8px',
-                            fontSize: 11.5,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`${transferBasePath}/${t.id}/receive`);
-                          }}
-                        >
-                          <CheckCircle size={12} />
-                          <span>Nhận hàng</span>
-                        </button>
+                        isStoreOwner || user?.branchId === t.toBranchId ? (
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--success"
+                            style={{
+                              height: 26,
+                              padding: '0 8px',
+                              fontSize: 11.5,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`${transferBasePath}/${t.id}/receive`);
+                            }}
+                          >
+                            <CheckCircle size={12} />
+                            <span>Nhận hàng</span>
+                          </button>
+                        ) : (
+                          <span style={{ fontStyle: 'italic', color: '#0284c7' }}>(Đang vận chuyển)</span>
+                        )
+                      ) : t.status === 'Pending' ? (
+                        <span style={{ fontStyle: 'italic', color: '#d97706' }}>(Chờ xuất kho)</span>
                       ) : t.status === 'Draft' ? (
-                        <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa nhận)</span>
+                        <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa gửi)</span>
                       ) : (
                         <span style={{ fontStyle: 'italic', color: '#dc2626' }}>(Đã hủy)</span>
                       )}
