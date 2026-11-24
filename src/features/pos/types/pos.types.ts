@@ -118,6 +118,7 @@ export class OrderTabDTO {
   couponCode: string = '';
   couponDiscount: number = 0;
   usePoints: boolean = false;
+  pointsToRedeem?: number;
   note: string = '';
   paymentMethod: 'cash' | 'vietqr' | 'debt' = 'cash';
   cashTendered: number = 0;

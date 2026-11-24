@@ -35,6 +35,8 @@ export const LoyaltyConfigPage: FC = () => {
             redemptionRatePoints: data.redemptionRatePoints,
             redemptionRateAmount: data.redemptionRateAmount,
             minRedemptionPoints: data.minRedemptionPoints,
+            pointsExpiryMonths: data.pointsExpiryMonths ?? prev.pointsExpiryMonths ?? 12,
+            maxRedemptionPercent: data.maxRedemptionPercent ?? prev.maxRedemptionPercent ?? 50,
             allowPointsWithPromotions: data.allowPointsWithPromotions,
           }));
         }
@@ -95,6 +97,9 @@ export const LoyaltyConfigPage: FC = () => {
     if (!Number.isInteger(config.redemptionRatePoints) || config.redemptionRatePoints <= 0) errors.push('Điểm quy đổi phải là số nguyên dương');
     if (config.redemptionRateAmount <= 0) errors.push('Giá trị quy đổi phải lớn hơn 0');
     if (!Number.isInteger(config.minRedemptionPoints) || config.minRedemptionPoints < 0) errors.push('Điểm đổi tối thiểu phải là số nguyên không âm');
+    if (!Number.isInteger(config.pointsExpiryMonths) || config.pointsExpiryMonths < 0) errors.push('Thời hạn sử dụng điểm (tháng) phải là số nguyên không âm');
+    const maxPct = config.maxRedemptionPercent ?? 50;
+    if (!Number.isInteger(maxPct) || maxPct < 1 || maxPct > 100) errors.push('Giới hạn % hóa đơn được đổi điểm phải từ 1% đến 100%');
     if (errors.length) {
       setValidationErrors(errors);
       return;
@@ -109,11 +114,14 @@ export const LoyaltyConfigPage: FC = () => {
         redemptionRatePoints: config.redemptionRatePoints,
         redemptionRateAmount: config.redemptionRateAmount,
         minRedemptionPoints: config.minRedemptionPoints,
+        pointsExpiryMonths: config.pointsExpiryMonths,
+        maxRedemptionPercent: maxPct,
         allowPointsWithPromotions: config.allowPointsWithPromotions,
       });
       showToast('Đã lưu thành công chính sách tích điểm & đổi thưởng!');
-    } catch {
-      showToast('Lỗi khi lưu cấu hình tích điểm', 'error');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Lỗi khi lưu cấu hình tích điểm';
+      showToast(msg, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -213,7 +221,7 @@ export const LoyaltyConfigPage: FC = () => {
               <button
                 onClick={handleSaveConfig}
                 className="btn-primary-pill loyalty-save-btn-top"
-                disabled={!config.isEnabled || isSaving}
+                disabled={isSaving}
               >
                 <Save size={15} />
                 <span>{isSaving ? 'Đang lưu...' : 'Lưu thiết lập'}</span>

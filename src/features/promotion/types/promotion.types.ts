@@ -138,6 +138,7 @@ export class LoyaltySystemConfigDTO {
   redemptionRateAmount: number = 1000; // 1 điểm = 1,000 đ
   minRedemptionPoints: number = 20; // Điểm tối thiểu để đổi
   pointsExpiryMonths: number = 12; // 0 = không hết hạn
+  maxRedemptionPercent: number = 50; // Giới hạn tối đa % hóa đơn được đổi điểm
   allowPointsWithPromotions: boolean = false;
   tiers: MembershipTierRuleDTO[] = [];
 

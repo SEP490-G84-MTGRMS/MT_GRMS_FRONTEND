@@ -962,27 +962,43 @@ export const PosCheckoutPage: FC = () => {
     currentTab.customer.name.trim().toLowerCase() === 'khách lẻ' ||
     currentTab.customer.name.trim().toLowerCase() === 'khách hàng lẻ';
 
+  const redemptionRatePoints = loyaltyConfig?.redemptionRatePoints || 1;
   const redemptionRateAmount = loyaltyConfig?.redemptionRateAmount || 1000;
   const minPointsRequired = loyaltyConfig?.minRedemptionPoints || 20;
+  const maxRedemptionPercent = loyaltyConfig?.maxRedemptionPercent && loyaltyConfig.maxRedemptionPercent > 0
+    ? Math.min(100, loyaltyConfig.maxRedemptionPercent)
+    : 50;
   const isPointsBlockedByPromo =
     isLoyaltyEnabled &&
     loyaltyConfig?.allowPointsWithPromotions === false &&
     (orderDiscountAmount > 0 || couponDiscountAmount > 0 || effectiveGiftItems.length > 0);
+  const maxPointsByInvoiceCap = Math.floor(
+    ((subTotalBeforePoints * (maxRedemptionPercent / 100)) / redemptionRateAmount) * redemptionRatePoints
+  );
   const maxPointsCanUse =
     isLoyaltyEnabled &&
     !isPointsBlockedByPromo &&
     !isWalkInCustomer &&
     currentTab.customer &&
     currentTab.customer.loyaltyPoints >= minPointsRequired
-      ? Math.min(currentTab.customer.loyaltyPoints, Math.floor(subTotalBeforePoints / redemptionRateAmount))
+      ? Math.max(0, Math.min(currentTab.customer.loyaltyPoints, maxPointsByInvoiceCap))
       : 0;
-  const pointsDeduction =
+  const isPointsEligible = maxPointsCanUse >= minPointsRequired && maxPointsCanUse > 0;
+  const rawPointsInput = currentTab.pointsToRedeem ?? maxPointsCanUse;
+  const effectivePointsToRedeem =
     isLoyaltyEnabled &&
     !isPointsBlockedByPromo &&
     !isWalkInCustomer &&
     currentTab.usePoints &&
-    currentTab.customer
-      ? maxPointsCanUse * redemptionRateAmount
+    currentTab.customer &&
+    isPointsEligible
+      ? Math.max(0, Math.min(Math.floor(rawPointsInput), maxPointsCanUse))
+      : 0;
+  const isCustomPointsBelowMin =
+    Boolean(currentTab.usePoints && isPointsEligible && effectivePointsToRedeem > 0 && effectivePointsToRedeem < minPointsRequired);
+  const pointsDeduction =
+    effectivePointsToRedeem >= minPointsRequired
+      ? Math.round((effectivePointsToRedeem / redemptionRatePoints) * redemptionRateAmount)
       : 0;
   const finalAmount = Math.max(0, subTotalBeforePoints - pointsDeduction);
 
@@ -1279,7 +1295,7 @@ export const PosCheckoutPage: FC = () => {
       creatorRole: user?.role,
       cashierName: isStoreOwner ? `Chủ cửa hàng: ${user?.fullName || 'Admin'}` : (user?.fullName || 'Thu ngân POS'),
       shiftId: effectiveShiftId,
-      pointsRedeemed: pointsDeduction > 0 && currentTab.usePoints && currentTab.customer ? maxPointsCanUse : undefined,
+      pointsRedeemed: pointsDeduction > 0 && currentTab.usePoints && currentTab.customer ? effectivePointsToRedeem : undefined,
       voucherCode: effectiveVoucherCode,
       appliedPromotionId: effectivePromoId || null,
       appliedPromotionSummary: effectivePromoLabels.length > 0 ? effectivePromoLabels.join('; ') : null,
@@ -1767,9 +1783,18 @@ export const PosCheckoutPage: FC = () => {
             isValidatingCoupon={isValidatingCoupon}
             couponStatusText={couponStatusText}
             usePoints={currentTab.usePoints}
-            onToggleUsePoints={(use) => updateCurrentTab({ usePoints: use })}
+            onToggleUsePoints={(use) =>
+              updateCurrentTab({
+                usePoints: use,
+                pointsToRedeem: use ? maxPointsCanUse : undefined,
+              })
+            }
             pointsDeduction={pointsDeduction}
-            pointsToRedeem={maxPointsCanUse}
+            pointsToRedeem={currentTab.usePoints ? (currentTab.pointsToRedeem ?? maxPointsCanUse) : maxPointsCanUse}
+            maxPointsCanUse={maxPointsCanUse}
+            maxRedemptionPercent={maxRedemptionPercent}
+            onPointsToRedeemChange={(pts) => updateCurrentTab({ pointsToRedeem: pts })}
+            isCustomPointsBelowMin={isCustomPointsBelowMin}
             minPointsRequired={minPointsRequired}
             isPointsBlockedByPromo={isPointsBlockedByPromo}
             isLoyaltyEnabled={isLoyaltyEnabled}

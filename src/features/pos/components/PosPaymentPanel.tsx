@@ -22,6 +22,10 @@ interface Props {
   onToggleUsePoints: (use: boolean) => void;
   pointsDeduction?: number;
   pointsToRedeem?: number;
+  maxPointsCanUse?: number;
+  maxRedemptionPercent?: number;
+  onPointsToRedeemChange?: (points: number) => void;
+  isCustomPointsBelowMin?: boolean;
   minPointsRequired?: number;
   isPointsBlockedByPromo?: boolean;
   isLoyaltyEnabled?: boolean;
@@ -56,6 +60,10 @@ export const PosPaymentPanel: FC<Props> = ({
   onToggleUsePoints,
   pointsDeduction: externalPointsDeduction,
   pointsToRedeem = 0,
+  maxPointsCanUse: externalMaxPointsCanUse,
+  maxRedemptionPercent = 50,
+  onPointsToRedeemChange,
+  isCustomPointsBelowMin = false,
   minPointsRequired = 20,
   isPointsBlockedByPromo = false,
   isLoyaltyEnabled = true,
@@ -392,11 +400,18 @@ export const PosPaymentPanel: FC<Props> = ({
                   <input
                     type="checkbox"
                     checked={usePoints && !isPointsBlockedByPromo && isLoyaltyEnabled !== false && !isWalkIn}
-                    disabled={isLoyaltyEnabled === false || isWalkIn || !customer || customer.loyaltyPoints < minPointsRequired || isPointsBlockedByPromo}
+                    disabled={
+                      isLoyaltyEnabled === false ||
+                      isWalkIn ||
+                      !customer ||
+                      customer.loyaltyPoints < minPointsRequired ||
+                      (externalMaxPointsCanUse !== undefined && externalMaxPointsCanUse < minPointsRequired) ||
+                      isPointsBlockedByPromo
+                    }
                     onChange={(e) => onToggleUsePoints(e.target.checked)}
                   />
                   <span>
-                    Dùng điểm ({pointsToRedeem} điểm):
+                    Dùng điểm (tối đa {externalMaxPointsCanUse ?? pointsToRedeem} đ. / trần {maxRedemptionPercent}%):
                     {isLoyaltyEnabled === false ? (
                       <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
                         (Cấu hình tích/tiêu điểm đang tắt)
@@ -409,15 +424,48 @@ export const PosPaymentPanel: FC<Props> = ({
                       <span style={{ display: 'block', fontSize: 10.5, color: '#d97706' }}>
                         (Không áp dụng cùng khuyến mãi)
                       </span>
-                    ) : (
-                      customer && customer.loyaltyPoints < minPointsRequired && (
-                        <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
-                          (Tối thiểu {minPointsRequired} điểm)
-                        </span>
-                      )
-                    )}
+                    ) : customer && customer.loyaltyPoints < minPointsRequired ? (
+                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                        (Tối thiểu {minPointsRequired} điểm)
+                      </span>
+                    ) : externalMaxPointsCanUse !== undefined && externalMaxPointsCanUse < minPointsRequired && customer ? (
+                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                        (Trần {maxRedemptionPercent}% hóa đơn chưa đạt mức tối thiểu {minPointsRequired} điểm)
+                      </span>
+                    ) : null}
                   </span>
                 </label>
+                {usePoints && !isPointsBlockedByPromo && isLoyaltyEnabled !== false && !isWalkIn && customer && onPointsToRedeemChange && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, paddingLeft: 20 }}>
+                    <input
+                      type="number"
+                      aria-label="Số điểm muốn đổi"
+                      min={0}
+                      max={externalMaxPointsCanUse ?? pointsToRedeem}
+                      step={1}
+                      value={pointsToRedeem ?? 0}
+                      onChange={(e) => {
+                        const raw = Math.floor(Number(e.target.value) || 0);
+                        const cap = externalMaxPointsCanUse ?? pointsToRedeem;
+                        onPointsToRedeemChange(Math.max(0, Math.min(raw, cap)));
+                      }}
+                      className="pos-input"
+                      style={{ width: 84, textAlign: 'right', padding: '2px 6px', fontSize: 12, fontWeight: 700 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onPointsToRedeemChange(externalMaxPointsCanUse ?? pointsToRedeem)}
+                      style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer' }}
+                    >
+                      Tối đa
+                    </button>
+                    {isCustomPointsBelowMin && (
+                      <span style={{ fontSize: 10.5, color: '#dc2626' }}>
+                        Tối thiểu {minPointsRequired} điểm
+                      </span>
+                    )}
+                  </div>
+                )}
               </td>
               <td style={{ textAlign: 'right', color: '#16a34a' }}>
                 -{pointsDeduction.toLocaleString('vi-VN')} đ
