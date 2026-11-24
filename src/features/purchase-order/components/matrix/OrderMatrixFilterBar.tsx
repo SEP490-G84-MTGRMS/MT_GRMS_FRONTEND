@@ -679,11 +679,13 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
     onProductNamesChange(names);
   };
 
+  const [pendingBranchSwitchId, setPendingBranchSwitchId] = useState<string | null>(null);
+
   const handleBranchChange = (newId: string) => {
     if (newId === selectedBranchId) return true;
     if (isDirty) {
-      const ok = window.confirm('Bạn có số lượng chưa lưu! Chuyển Chi nhánh sẽ làm mới ma trận. Tiếp tục?');
-      if (!ok) return false;
+      setPendingBranchSwitchId(newId);
+      return false;
     }
     onSelectBranch?.(newId);
     return true;
@@ -1008,6 +1010,44 @@ export const OrderMatrixFilterBar: FC<OrderMatrixFilterBarProps> = ({
           />
         </div>
       </div>
+
+      {pendingBranchSwitchId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            zIndex: 10050,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 420, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Xác nhận chuyển chi nhánh</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 13.5, color: '#475569' }}>
+              Bạn có số lượng chưa lưu! Chuyển Chi nhánh sẽ làm mới ma trận. Bạn có chắc muốn tiếp tục?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" className="po-btn po-btn-secondary" onClick={() => setPendingBranchSwitchId(null)}>
+                Ở lại
+              </button>
+              <button
+                type="button"
+                className="po-btn po-btn-primary"
+                onClick={() => {
+                  const target = pendingBranchSwitchId;
+                  setPendingBranchSwitchId(null);
+                  onSelectBranch?.(target);
+                }}
+              >
+                Tiếp tục chuyển
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
