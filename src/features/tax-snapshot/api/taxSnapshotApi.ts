@@ -247,7 +247,7 @@ export const taxSnapshotApi = {
     try {
       await financeHttpClient.post('/tax/household/pin/change', {
         currentPin: req.currentPin || null,
-        password: req.password || null,
+        currentPassword: req.password || null,
         newPin: req.newPin,
         confirmNewPin: req.confirmNewPin,
       });
