@@ -1188,14 +1188,11 @@
 .finance-subtabs-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   border-bottom: 2px solid #E2E8F0;
   margin-top: 14px;
-  overflow-x: auto;
-}
-
-.finance-subtabs-bar::-webkit-scrollbar {
-  display: none;
+  overflow: visible;
 }
 
 .finance-subtab-btn {
@@ -1208,6 +1205,7 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.15s ease;
   white-space: nowrap;
   display: inline-flex;
