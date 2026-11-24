@@ -400,9 +400,13 @@ export const TaxSnapshotPage: FC = () => {
                   type="button"
                   onClick={() => setIsCreateOpen(true)}
                   disabled={!summary || isSummaryLoading || isSummaryRefetching || Boolean(summaryError)}
-                  className="btn-primary-pill"
+                  className={existingFinalizedSnapshot ? 'btn-secondary-pill' : 'btn-primary-pill'}
                 >
-                  <span>Chốt kỳ sổ {periodLabel}</span>
+                  <span>
+                    {existingFinalizedSnapshot
+                      ? `Đã chốt · Chốt bổ sung ${periodLabel}`
+                      : `Chốt kỳ sổ ${periodLabel}`}
+                  </span>
                 </button>
               )}
             </div>
@@ -517,7 +521,7 @@ export const TaxSnapshotPage: FC = () => {
         <div className="tax-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAuxiliaryView(null); }}>
           <section ref={auxiliaryDialogRef} className="tax-auxiliary-modal" role="dialog" aria-modal="true" aria-labelledby="tax-auxiliary-title">
             <header className="tax-auxiliary-header">
-              <div><h2 id="tax-auxiliary-title">{auxiliaryView === 'history' ? 'Lịch sử chốt kỳ' : 'Phân tích doanh thu & thuế'}</h2><p>{periodLabel}</p></div>
+              <div><h2 id="tax-auxiliary-title">{auxiliaryView === 'history' ? 'Lịch sử chốt kỳ' : 'Phân tích doanh thu & thuế'}</h2><p>{auxiliaryView === 'history' ? `Năm ${filterParams.year}` : periodLabel}</p></div>
               <button type="button" className="tax-drawer-close-btn" aria-label="Đóng" onClick={() => setAuxiliaryView(null)}><X size={18} /></button>
             </header>
             <div className="tax-auxiliary-body">

@@ -46,10 +46,11 @@ export function useTaxSnapshots(initialYear: number = 2026) {
   const queryClient = useQueryClient();
   const storedRates = loadStoredTaxRates();
 
+  const currentQuarter = Math.floor(new Date().getMonth() / 3) + 1;
   const [filterParams, setFilterParams] = useState<HouseholdTaxFilterDto>({
     year: initialYear,
     periodType: TaxPeriodType.Quarter,
-    periodNumber: 1,
+    periodNumber: currentQuarter,
     branchId: undefined,
     calculationMethod: TaxCalculationMethod.RevenuePercentage,
     applyVatReduction2026: storedRates.applyVatReduction2026 ?? false,
