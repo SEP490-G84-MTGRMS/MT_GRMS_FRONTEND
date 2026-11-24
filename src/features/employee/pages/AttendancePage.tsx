@@ -16,8 +16,9 @@ import {
   Camera,
   Store,
 } from 'lucide-react';
-import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
+import type { AttendanceRecord, Branch } from '../types';
 import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
+import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { attendancePolicyApi, type AttendancePolicyDto } from '../api/attendancePolicyApi';
 import { employeeApi } from '../api/employeeApi';
@@ -26,6 +27,7 @@ import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalR
 import { CreateScheduleRequestModal } from '../components/approval-requests/CreateScheduleRequestModal';
 import { ScheduleRequestsHistoryModal } from '../components/approval-requests/ScheduleRequestsHistoryModal';
 import { FaceIdAttendanceModal } from '../components/attendance/FaceIdAttendanceModal';
+import { NotificationModal } from '../../../components/common';
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { getVietnamToday, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -291,8 +293,14 @@ export const AttendancePage: React.FC = () => {
   const [todayMySchedules, setTodayMySchedules] = useState<ScheduleResponse[]>([]);
   const [selfCheckInNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [shifts, setShifts] = useState<ShiftRowItem[]>([]);
-  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
+  const [pendingAttendanceCount, setPendingAttendanceCount] = useState<number>(0);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type?: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
 
   // Lắng nghe thay đổi chi nhánh từ StoreOwnerLayout (BranchSelectorDropdown)
   const [activeBranch, setActiveBranch] = useState<{ id: string; name: string } | null>(() => {
@@ -529,30 +537,6 @@ export const AttendancePage: React.FC = () => {
         mapScheduleToAttendanceRecord(s, policyMap)
       );
       setRecords(mappedRecords);
-
-      // Map yêu cầu duyệt chấm công
-      const pendingRequests: ApprovalRequest[] = rawSchedules
-        .filter(
-          (s) =>
-            s.approvalStatus === 'Pending' ||
-            (s.approvalStatus as unknown) === 1 ||
-            String(s.approvalStatus).toLowerCase() === 'pending'
-        )
-        .map((s) => ({
-          id: s.id,
-          type: 'attendance',
-          employeeId: s.employeeId,
-          employeeName: s.employeeName || 'Nhân viên',
-          avatarUrl: s.employeeAvatarUrl || undefined,
-          branchName: s.branchName || 'Chi nhánh',
-          title: s.approvalType || 'Yêu cầu duyệt công',
-          description:
-            s.approvalReason ||
-            `Chấm công ca ${s.shiftName} (${s.workDate ? s.workDate.substring(0, 10) : ''})`,
-          createdAt: s.createdAt || new Date().toISOString(),
-          status: 'pending',
-        }));
-      setApprovalRequests(pendingRequests);
     } catch (error: any) {
       console.error('Lỗi khi tải dữ liệu chấm công từ backend:', error);
       setErrorMessage(
@@ -560,15 +544,33 @@ export const AttendancePage: React.FC = () => {
       );
       setRecords([]);
       setShifts([]);
-      setApprovalRequests([]);
     } finally {
       setIsLoading(false);
     }
   }, [weekData.fromDateIso, weekData.toDateIso, activeBranch, isEmployeeRole]);
 
+  // Đồng bộ số lượng phiếu yêu cầu chờ duyệt từ Backend (scheduleApprovalApi)
+  const fetchPendingApprovalCount = useCallback(async () => {
+    if (!isStoreOwnerOrAdmin) {
+      setPendingAttendanceCount(0);
+      return;
+    }
+    try {
+      const branchParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
+      const res = await scheduleApprovalApi.getPendingRequests(branchParam);
+      setPendingAttendanceCount(res.total ?? res.items.length);
+    } catch {
+      // Giữ nguyên số đếm hiện tại nếu lỗi mạng tạm thời
+    }
+  }, [activeBranch, isStoreOwnerOrAdmin]);
+
   useEffect(() => {
     fetchAttendanceData();
   }, [fetchAttendanceData]);
+
+  useEffect(() => {
+    fetchPendingApprovalCount();
+  }, [fetchPendingApprovalCount]);
 
   // Client-side filtering by employee name/code or shift name/date/note (không phân biệt dấu/hoa-thường)
   const filteredRecords = useMemo(() => {
@@ -587,7 +589,7 @@ export const AttendancePage: React.FC = () => {
     });
   }, [records, searchEmployee, isEmployeeRole]);
 
-  // Cập nhật trạng thái thủ công từ modal chi tiết
+  // Đồng bộ UI tức thời sau khi AttendanceDetailModal đã lưu API thành công (kèm onSaved={fetchAttendanceData})
   const handleUpdateRecordStatus = (recordId: string, newStatus: AttendanceRecord['status']) => {
     setRecords((prev) =>
       prev.map((r) => (r.id === recordId ? { ...r, status: newStatus } : r))
@@ -596,28 +598,6 @@ export const AttendancePage: React.FC = () => {
       setSelectedRecord((prev) => (prev ? { ...prev, status: newStatus } : null));
     }
   };
-
-  const handleApproveRequests = (ids: string[]) => {
-    setApprovalRequests((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'approved' } : r))
-    );
-    // Đồng bộ lại trạng thái của các record được duyệt
-    setRecords((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'ontime' } : r))
-    );
-    alert(`Đã duyệt ${ids.length} yêu cầu chấm công thành công!`);
-  };
-
-  const handleRejectRequests = (ids: string[]) => {
-    setApprovalRequests((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'rejected' } : r))
-    );
-    alert(`Đã từ chối ${ids.length} yêu cầu!`);
-  };
-
-  const pendingAttendanceCount = approvalRequests.filter(
-    (r) => r.type === 'attendance' && r.status === 'pending'
-  ).length;
 
   const activeCheckedInToday = useMemo(
     () =>
@@ -665,7 +645,12 @@ export const AttendancePage: React.FC = () => {
               className="emp-btn emp-btn-primary"
               onClick={() => {
                 if (!user) {
-                  alert('Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.');
+                  setNotification({
+                    isOpen: true,
+                    type: 'warning',
+                    title: 'Chưa đăng nhập tài khoản',
+                    message: 'Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.',
+                  });
                   return;
                 }
                 setIsFaceIdModalOpen(true);
@@ -1483,9 +1468,17 @@ export const AttendancePage: React.FC = () => {
       <ApprovalRequestsModal
         isOpen={showApprovalModal}
         onClose={() => setShowApprovalModal(false)}
-        requests={approvalRequests}
-        onApprove={handleApproveRequests}
-        onReject={handleRejectRequests}
+        branchId={activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined}
+        onSuccess={() => {
+          fetchAttendanceData();
+          fetchPendingApprovalCount();
+          setNotification({
+            isOpen: true,
+            type: 'success',
+            title: 'Đã xử lý yêu cầu',
+            message: 'Trạng thái phiếu yêu cầu đã được cập nhật vào hệ thống.',
+          });
+        }}
       />
 
       {/* Modal Tạo yêu cầu (Xin nghỉ, Đổi ca, Sự cố FaceID, Làm thêm giờ OT) */}
@@ -1530,6 +1523,16 @@ export const AttendancePage: React.FC = () => {
           fetchAttendanceData();
         }}
       />
+
+      {notification && (
+        <NotificationModal
+          isOpen={notification.isOpen}
+          onClose={() => setNotification(null)}
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+        />
+      )}
     </div>
   );
 };

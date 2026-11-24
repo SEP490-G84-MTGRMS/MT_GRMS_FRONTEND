@@ -15,9 +15,6 @@ export interface ApprovalRequestsModalProps {
   onClose: () => void;
   branchId?: string;
   request?: ScheduleApprovalRequestDto | null;
-  requests?: any[];
-  onApprove?: (ids: string[]) => void;
-  onReject?: (ids: string[]) => void;
   onSuccess?: () => void;
 }
 
