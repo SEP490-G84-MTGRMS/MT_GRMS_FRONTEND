@@ -161,7 +161,8 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            className="dcm-close-btn"
+            aria-label="Đóng"
           >
             <X size={20} />
           </button>
@@ -217,14 +218,14 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleSetQuickAmount(0.5)}
-                    className="py-2.5 px-3 rounded-xl border border-teal-300 bg-teal-50 text-teal-900 text-xs font-semibold hover:bg-teal-100 transition-colors"
+                    className="dcm-quick-btn dcm-quick-btn--half"
                   >
                     Thu một nửa ({formatMoney(Math.round(currentDebt * 0.5))})
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSetQuickAmount(1)}
-                    className="py-2.5 px-3 rounded-xl border border-emerald-400 bg-emerald-50 text-emerald-900 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                    className="dcm-quick-btn dcm-quick-btn--full"
                   >
                     Thu hết ({formatMoney(currentDebt)})
                   </button>
@@ -255,15 +256,11 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
             {/* Right Column (7/12): Payment Method & VietQR Display */}
             <div className="md:col-span-7 bg-gray-50/70 p-5 rounded-2xl border border-gray-200 space-y-4">
               {/* Method Switcher */}
-              <div className="flex rounded-xl bg-gray-200 p-1">
+              <div className="dcm-method-group">
                 <button
                   type="button"
                   onClick={() => setMethod('VietQR')}
-                  className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${
-                    method === 'VietQR'
-                      ? 'bg-white text-emerald-800 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`dcm-method-btn ${method === 'VietQR' ? 'dcm-method-btn--active' : ''}`}
                 >
                   <QrCode size={18} />
                   <span>Chuyển khoản QR</span>
@@ -271,11 +268,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setMethod('Cash')}
-                  className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${
-                    method === 'Cash'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`dcm-method-btn ${method === 'Cash' ? 'dcm-method-btn--active' : ''}`}
                 >
                   <Banknote size={18} />
                   <span>Tiền mặt tại quầy</span>
@@ -348,7 +341,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                       maxLength={100}
                       value={transactionRef}
                       onChange={(event) => setTransactionRef(event.target.value)}
-                      className="h-9 rounded-lg border border-gray-300 px-3 font-mono"
+                      className="dcm-text-input font-mono"
                     />
                   </label>
                 </div>
@@ -379,7 +372,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="btn-text-cancel"
+              className="dcm-cancel-btn"
             >
               Hủy bỏ
             </button>

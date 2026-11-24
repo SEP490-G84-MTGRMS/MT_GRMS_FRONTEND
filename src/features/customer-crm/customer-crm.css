@@ -1128,3 +1128,129 @@
 .text-green { color: #16a34a !important; }
 .text-faint { color: #94a3b8 !important; }
 .text-right { text-align: right !important; }
+
+/* ── DebtCollectionModal Dedicated Styles (Replaces missing Tailwind utilities) ── */
+.dcm-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #d1fae5;
+  background: #ffffff;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.dcm-close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.dcm-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+  box-sizing: border-box;
+}
+
+.dcm-quick-btn--half {
+  border: 1px solid #5eead4;
+  background: #f0fdfa;
+  color: #134e4a;
+}
+
+.dcm-quick-btn--half:hover {
+  background: #ccfbf1;
+}
+
+.dcm-quick-btn--full {
+  border: 1px solid #34d399;
+  background: #ecfdf5;
+  color: #064e3b;
+}
+
+.dcm-quick-btn--full:hover {
+  background: #d1fae5;
+}
+
+.dcm-method-group {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #e2e8f0;
+}
+
+.dcm-method-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.dcm-method-btn:hover {
+  color: #0f172a;
+}
+
+.dcm-method-btn--active {
+  background: #ffffff;
+  color: #065f46;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.dcm-text-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.dcm-text-input:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.dcm-cancel-btn {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dcm-cancel-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #0f172a;
+}
