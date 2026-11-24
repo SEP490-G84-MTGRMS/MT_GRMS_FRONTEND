@@ -178,7 +178,7 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
             <option value="ALL">-- Tất cả tài khoản --</option>
             {accounts.map((acc) => (
               <option key={acc.id} value={acc.id}>
-                {acc.accountName}
+                {acc.accountName}{acc.branchName ? ` — ${acc.branchName}` : ''}
               </option>
             ))}
           </select>

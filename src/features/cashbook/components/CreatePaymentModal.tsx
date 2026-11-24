@@ -240,7 +240,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
               <input
                 type="text"
                 className="cb-form-input"
-                placeholder="Ví dụ: 500,000"
+                placeholder="Ví dụ: 500.000"
                 value={amountStr ? Number(amountStr.replace(/\D/g, '')).toLocaleString('vi-VN') : ''}
                 onChange={(e) => setAmountStr(e.target.value)}
                 required
