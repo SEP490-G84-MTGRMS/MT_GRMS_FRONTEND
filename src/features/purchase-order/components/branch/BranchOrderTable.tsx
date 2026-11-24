@@ -131,14 +131,16 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '18%' }} />
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '11%' }} />
-      <col style={{ width: '11%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '15%' }} />
+      <col style={{ width: '9%' }} />
       <col style={{ width: '10%' }} />
-      <col style={{ width: '16%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '13%' }} />
     </colgroup>
   );
 
@@ -218,6 +220,14 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   <span>Tên CN</span>
                   {sortIcon('name')}
                 </div>
+              </th>
+
+              <th style={thBaseStyle}>
+                <span>Địa chỉ</span>
+              </th>
+
+              <th style={thBaseStyle}>
+                <span>SĐT</span>
               </th>
 
               <th
@@ -362,6 +372,14 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                     <div className="so-list-name" title={b.name}>
                       {b.name}
                     </div>
+                  </td>
+
+                  <td className="so-list-td--wrap" style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9', fontSize: 11, color: '#475569' }}>
+                    {b.address || '—'}
+                  </td>
+
+                  <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9', fontSize: 11, color: '#334155', fontFamily: 'var(--font-mono, monospace)' }}>
+                    {b.phone || '—'}
                   </td>
 
                   <td
