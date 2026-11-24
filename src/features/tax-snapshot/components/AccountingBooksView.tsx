@@ -258,6 +258,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
   const loadBookData = useCallback(async () => {
     setIsLoadingBooks(true);
     setBookError(null);
+    setBookEntries([]);
     try {
       const data = await taxSnapshotApi.getBookDetails({
         year,
@@ -365,15 +366,16 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
         return;
       }
 
+      const sg = entry.sectionGroup || '';
+      const isExplicitBankBlock = sg.includes('Khối II') || sg.startsWith('II.');
+      const isExplicitCashBlock = !isExplicitBankBlock && (sg.includes('Khối I') || sg.startsWith('I.'));
       const isBank =
-        !entry.sectionGroup?.includes('Khối I') &&
-        !entry.sectionGroup?.includes('I.') &&
-        (entry.category?.toLowerCase().includes('ngân hàng') ||
-          entry.category?.toLowerCase().includes('bank') ||
-          entry.sectionGroup?.includes('Khối II') ||
-          entry.sectionGroup?.includes('II.') ||
-          entry.beneficiaryName?.toLowerCase().includes('vietcombank') ||
-          entry.beneficiaryName?.toLowerCase().includes('bank'));
+        isExplicitBankBlock ||
+        (!isExplicitCashBlock &&
+          (entry.category?.toLowerCase().includes('ngân hàng') ||
+            entry.category?.toLowerCase().includes('bank') ||
+            entry.beneficiaryName?.toLowerCase().includes('vietcombank') ||
+            entry.beneficiaryName?.toLowerCase().includes('bank')));
 
       const { inAmt, outAmt } = getEntryFundAmounts(entry);
 
