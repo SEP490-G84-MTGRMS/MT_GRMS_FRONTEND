@@ -487,11 +487,20 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       return;
     }
 
-    // Chỉ đưa vào phiếu các lô có hư hỏng hoặc hết hạn.
-    const abnormalLines = lines.filter((l) => l.damagedQty > 0 || l.expiredQty > 0);
+    // Lưu các dòng có bất thường (hư hỏng/hết hạn/lỗi NCC/cận hạn) HOẶC có chênh lệch thiếu/thừa (STK-05).
+    const abnormalLines = lines.filter((l) => {
+      const actual = lineActualQty(l);
+      return (
+        l.damagedQty > 0 ||
+        l.expiredQty > 0 ||
+        l.defectiveQty > 0 ||
+        l.nearExpiryQty > 0 ||
+        actual !== l.systemQty
+      );
+    });
     if (abnormalLines.length === 0) {
       showToast(
-        'Chỉ lưu các lô có số lượng hư hỏng hoặc hết hạn. Hãy nhập hư hỏng/hết hạn trước khi lưu.',
+        'Phiếu kiểm kê chưa có dòng nào chênh lệch hoặc hư hỏng/hết hạn để ghi nhận.',
         'error'
       );
       return;
@@ -500,7 +509,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     const skipped = lines.length - abnormalLines.length;
     if (skipped > 0) {
       showToast(
-        `Đã bỏ ${skipped} lô không có hư hỏng/hết hạn khỏi phiếu kiểm kê.`,
+        `Đã bỏ ${skipped} lô khớp tồn không có bất thường khỏi phiếu kiểm kê.`,
         'warning'
       );
     }
@@ -514,7 +523,7 @@ export const StocktakeFormPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         );
         return;
       }
-      if (!l.evidenceUrl) {
+      if ((l.expiredQty > 0 || l.damagedQty > 0) && !l.evidenceUrl) {
         showToast(
           `Dòng "${l.productName}": cần ảnh minh chứng khi có số lượng hết hạn hoặc hư hỏng.`,
           'error'
