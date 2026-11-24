@@ -74,6 +74,15 @@ function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): Su
     cutoffDayOffset,
     cutoffTime: data.orderCutoffTime || data.cutoffTime || fallback.cutoffTime,
     activeDeliveryDays: mapDeliveryDaysToJs(data.deliveryDays),
+    allowStoreEdit:
+      typeof data.allowStoreEdit === 'boolean' ? data.allowStoreEdit : fallback.allowStoreEdit,
+    editWindowType: data.editWindowType || fallback.editWindowType,
+    hoursBeforeDelivery:
+      typeof data.hoursBeforeDelivery === 'number'
+        ? data.hoursBeforeDelivery
+        : fallback.hoursBeforeDelivery,
+    hoursAfterOrder:
+      typeof data.hoursAfterOrder === 'number' ? data.hoursAfterOrder : fallback.hoursAfterOrder,
     holidays: Array.isArray(data.blackoutDates)
       ? data.blackoutDates.map((item: any) => ({
           id: String(item.id || `hol-${item.startDate}`),
@@ -92,6 +101,10 @@ function mapDeliveryConfigToApi(cfg: SupplierDeliveryConfig) {
     orderCutoffTime: cfg.cutoffTime,
     deliveryDays: mapJsDaysToNames(cfg.activeDeliveryDays),
     minOrderQuantity: cfg.minOrderQuantity,
+    allowStoreEdit: cfg.allowStoreEdit,
+    editWindowType: cfg.editWindowType,
+    hoursBeforeDelivery: Math.max(0, Number(cfg.hoursBeforeDelivery) || 0),
+    hoursAfterOrder: Math.max(0, Number(cfg.hoursAfterOrder) || 0),
     blackoutDates: cfg.holidays.map((holiday) => ({
       startDate: holiday.fromDate,
       endDate: holiday.toDate,
