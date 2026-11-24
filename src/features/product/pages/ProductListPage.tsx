@@ -106,20 +106,15 @@ export const ProductListPage: React.FC = () => {
 
   // RBAC switch (StoreOwner vs Staff) for BR-SEC-01 verification
   const currentUser = useAuthStore((state) => state.user);
+  const isOwnerRole = (role?: string | null) =>
+    role === 'STORE_OWNER' || role === 'ADMIN';
   const initialRole: 'StoreOwner' | 'Cashier' =
-    currentUser?.role === 'STAFF' ? 'Cashier' : 'StoreOwner';
+    isOwnerRole(currentUser?.role) ? 'StoreOwner' : 'Cashier';
   const [userRole, setUserRole] = useState<'StoreOwner' | 'Cashier'>(initialRole);
 
   // Sync role if auth state changes
   useEffect(() => {
-    if (currentUser?.role === 'STAFF') {
-      setUserRole('Cashier');
-    } else if (
-      currentUser?.role === 'ADMIN' ||
-      currentUser?.role === 'STORE_OWNER'
-    ) {
-      setUserRole('StoreOwner');
-    }
+    setUserRole(isOwnerRole(currentUser?.role) ? 'StoreOwner' : 'Cashier');
   }, [currentUser?.role]);
 
   // Filter state (chip-token — layout giống Sản phẩm theo NCC)
