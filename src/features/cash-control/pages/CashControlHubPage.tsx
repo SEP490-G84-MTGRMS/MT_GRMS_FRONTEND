@@ -757,10 +757,11 @@ export const CashControlHubPage: FC = () => {
         width: '100%',
         maxWidth: 1360,
         margin: '0 auto',
-        padding: '20px 24px 48px',
+        padding: '16px 0 40px',
         display: 'flex',
         flexDirection: 'column',
         gap: 20,
+        boxSizing: 'border-box',
         fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif",
       }}
     >
@@ -802,7 +803,7 @@ export const CashControlHubPage: FC = () => {
         </div>
 
         {/* Branch Selection & Refresh Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', maxWidth: '100%', minWidth: 0 }}>
           {branches.length > 0 && (
             <div
               style={{
@@ -810,14 +811,17 @@ export const CashControlHubPage: FC = () => {
                 alignItems: 'center',
                 gap: 8,
                 backgroundColor: '#ffffff',
-                padding: '4px 12px',
+                padding: '4px 10px',
                 borderRadius: 8,
                 border: '1px solid #cbd5e1',
                 boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                maxWidth: '100%',
+                minWidth: 0,
+                boxSizing: 'border-box',
               }}
             >
-              <Building2 size={16} className="text-teal-700" />
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569' }}>Chi nhánh:</span>
+              <Building2 size={16} className="text-teal-700" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#475569', whiteSpace: 'nowrap' }}>Chi nhánh:</span>
               <select
                 value={selectedBranchId}
                 onChange={(e) => handleBranchChange(e.target.value)}
@@ -829,6 +833,8 @@ export const CashControlHubPage: FC = () => {
                   color: '#0f172a',
                   backgroundColor: 'transparent',
                   cursor: 'pointer',
+                  minWidth: 0,
+                  maxWidth: '100%',
                 }}
               >
                 <option value="ALL">Toàn bộ chi nhánh</option>
@@ -2051,8 +2057,10 @@ export const CashControlHubPage: FC = () => {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'minmax(340px, 680px)',
+              gridTemplateColumns: 'minmax(0, 680px)',
               gap: 20,
+              width: '100%',
+              boxSizing: 'border-box',
             }}
           >
             <form
@@ -2061,11 +2069,14 @@ export const CashControlHubPage: FC = () => {
                 backgroundColor: '#ffffff',
                 borderRadius: 12,
                 border: '1px solid #e2e8f0',
-                padding: 24,
+                padding: 20,
                 boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 22,
+                gap: 20,
+                boxSizing: 'border-box',
+                minWidth: 0,
+                width: '100%',
               }}
             >
               <div
