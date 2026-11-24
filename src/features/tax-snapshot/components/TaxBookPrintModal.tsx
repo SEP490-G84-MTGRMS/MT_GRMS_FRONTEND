@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type FC } from 'react';
 import { Printer, X } from 'lucide-react';
 import {
   AccountingBookType,
+  TaxCalculationMethod,
   TaxPeriodType,
+  type HouseholdTaxDeclarationPreviewDto,
   type HouseholdTaxSummaryDto,
   type AccountingBookEntryDto,
-  type TaxpayerProfileDto,
 } from '../types/taxSnapshot';
 import { formatMoney } from '../../finance/utils/formatters';
 import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
@@ -70,7 +71,7 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((state) => state.user);
-  const [taxpayer, setTaxpayer] = useState<TaxpayerProfileDto | null>(null);
+  const [taxpayer, setTaxpayer] = useState<HouseholdTaxDeclarationPreviewDto['taxpayer'] | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,6 +82,7 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
         periodType: summary?.periodType ?? TaxPeriodType.Quarter,
         periodNumber: summary?.periodNumber ?? 1,
         branchId: summary?.branchId,
+        calculationMethod: summary?.calculationMethod ?? TaxCalculationMethod.RevenuePercentage,
       })
       .then((res) => {
         if (active && res?.taxpayer) setTaxpayer(res.taxpayer);
