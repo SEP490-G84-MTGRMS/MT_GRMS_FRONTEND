@@ -45,6 +45,9 @@ export interface ProductResponse {
 
 export interface ProductQueryFilter {
   searchTerm?: string;
+  skus?: string[];
+  names?: string[];
+  barcodes?: string[];
   categoryId?: string;
   categoryIds?: string[];
   status?: string;

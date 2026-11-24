@@ -166,19 +166,18 @@ export const ProductListPage: React.FC = () => {
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const searchBits = [
-        ...appliedFilters.skus,
-        ...appliedFilters.names,
-        ...appliedFilters.barcodes,
-      ].filter(Boolean);
       const res = await productApi.getProductsPaged({
         pageIndex,
         pageSize,
-        searchTerm: searchBits[0] || undefined,
+        skus: appliedFilters.skus.length > 0 ? appliedFilters.skus : undefined,
+        names: appliedFilters.names.length > 0 ? appliedFilters.names : undefined,
+        barcodes: appliedFilters.barcodes.length > 0 ? appliedFilters.barcodes : undefined,
         categoryId:
           appliedFilters.categoryId !== 'ALL' ? appliedFilters.categoryId : undefined,
         categoryIds:
           appliedFilters.categoryId !== 'ALL' ? [appliedFilters.categoryId] : undefined,
+        status:
+          appliedFilters.statusFilter !== 'ALL' ? appliedFilters.statusFilter : undefined,
       });
       if (res && res.items) {
         const mapped: ProductItem[] = await Promise.all(
@@ -807,14 +806,10 @@ export const ProductListPage: React.FC = () => {
 
 
   const buildExcelApiFilter = () => {
-    const searchBits = [
-      ...appliedFilters.skus,
-      ...appliedFilters.names,
-      ...appliedFilters.barcodes,
-    ].filter(Boolean);
-
     return {
-      searchTerm: searchBits[0] || undefined,
+      skus: appliedFilters.skus.length > 0 ? appliedFilters.skus : undefined,
+      names: appliedFilters.names.length > 0 ? appliedFilters.names : undefined,
+      barcodes: appliedFilters.barcodes.length > 0 ? appliedFilters.barcodes : undefined,
       categoryId: appliedFilters.categoryId !== 'ALL' ? appliedFilters.categoryId : undefined,
       categoryIds: appliedFilters.categoryId !== 'ALL' ? [appliedFilters.categoryId] : undefined,
       status: appliedFilters.statusFilter !== 'ALL' ? appliedFilters.statusFilter : undefined,
