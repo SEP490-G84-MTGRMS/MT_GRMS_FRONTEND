@@ -209,7 +209,7 @@ export const SupplierBranchManagementPage: FC = () => {
         <div>
           <h1 className="so-list-title">
             <Store size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Cửa Hàng với nhà cung cấp</span>
+            <span>Cửa hàng với nhà cung cấp</span>
             {isLoading && (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
             )}
