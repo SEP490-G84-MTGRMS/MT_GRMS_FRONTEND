@@ -28,7 +28,7 @@ import { AdminToast, type ToastState } from '../../admin/components';
 import { productApi } from '../../product/api/productApi';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
-import { useAuthStore } from '../../../stores/useAuthStore';
+import { useBranchScope } from '../../../hooks/useBranchScope';
 
 const DEFAULT_FILTERS: BatchFilterState = {
   keyword: '',
@@ -48,18 +48,28 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const roleParam = searchParams.get('role') as UserRole | null;
   const skuParam = searchParams.get('sku');
   const fromInventory = searchParams.get('from') === 'inventory';
-  const role: UserRole = roleParam || defaultRole;
-  const employeeBranchId = searchParams.get('branch') || '';
-  const isStoreOwner = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
+  const {
+    isStoreOwner,
+    isEmployee,
+    lockedBranchId,
+    scopedBranchIdOrAll,
+  } = useBranchScope(defaultRole);
+  const role: UserRole = isEmployee ? 'employee' : 'store_owner';
+  const employeeBranchId = isEmployee ? lockedBranchId : '';
 
   const [batches, setBatches] = useState<BatchItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [filterInputs, setFilterInputs] = useState<BatchFilterState>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<BatchFilterState>(DEFAULT_FILTERS);
+  const [filterInputs, setFilterInputs] = useState<BatchFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    branchId: scopedBranchIdOrAll,
+  }));
+  const [appliedFilters, setAppliedFilters] = useState<BatchFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    branchId: scopedBranchIdOrAll,
+  }));
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [catalogProducts, setCatalogProducts] = useState<BatchSuggestProduct[]>([]);
@@ -165,16 +175,28 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     if (statusParam && ['Expired', 'Critical', 'Warning', 'Normal'].includes(statusParam)) {
       updated.status = statusParam;
     }
-    if (role === 'employee' && branchParam) {
-      updated.branchId = branchParam;
+    if (isEmployee) {
+      updated.branchId = lockedBranchId || 'ALL';
     } else if (branchParam && branchParam !== 'ALL') {
       updated.branchId = branchParam;
+    } else {
+      updated.branchId = scopedBranchIdOrAll;
     }
 
     setFilterInputs(updated);
     setAppliedFilters(updated);
     setPageIndex(1);
-  }, [searchParams, role]);
+  }, [searchParams, isEmployee, lockedBranchId, scopedBranchIdOrAll]);
+
+  // Đồng bộ Topbar branch selector (Store Owner) / khóa chi nhánh (Employee)
+  const prevScopedBranchRef = useRef<string>(scopedBranchIdOrAll);
+  useEffect(() => {
+    if (prevScopedBranchRef.current === scopedBranchIdOrAll) return;
+    prevScopedBranchRef.current = scopedBranchIdOrAll;
+    setFilterInputs((prev) => ({ ...prev, branchId: scopedBranchIdOrAll }));
+    setAppliedFilters((prev) => ({ ...prev, branchId: scopedBranchIdOrAll }));
+    setPageIndex(1);
+  }, [scopedBranchIdOrAll]);
 
   const loadBatches = useCallback(async () => {
     const fetchId = ++fetchIdRef.current;
@@ -231,7 +253,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   };
 
   const handleReset = () => {
-    const resetBranch = role === 'employee' && employeeBranchId ? employeeBranchId : 'ALL';
+    const resetBranch = scopedBranchIdOrAll;
     const resetState: BatchFilterState = {
       ...DEFAULT_FILTERS,
       branchId: resetBranch,

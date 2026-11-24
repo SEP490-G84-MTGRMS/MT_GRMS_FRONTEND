@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { RotateCcw, Truck, Plus, Loader2, ClipboardList } from 'lucide-react';
-import { useAuthStore } from '../../../stores/useAuthStore';
+import { useBranchScope } from '../../../hooks/useBranchScope';
 import type {
   SupplierReturnListItem,
   SupplierReturnFilterState,
@@ -28,19 +28,21 @@ const DEFAULT_FILTERS: SupplierReturnFilterState = {
 export const SupplierReturnListPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const role = useAuthStore((s) => s.user?.role);
-  const userBranchId = useAuthStore((s) => s.user?.branchId);
-  const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
-  const lockedBranch = !isStoreOwner && userBranchId ? userBranchId : '';
+  const { isBranchLocked, scopedBranchId } = useBranchScope();
 
-  const [draft, setDraft] = useState<SupplierReturnFilterState>({
+  const [draft, setDraft] = useState<SupplierReturnFilterState>(() => ({
     ...DEFAULT_FILTERS,
-    branchId: lockedBranch,
-  });
-  const [applied, setApplied] = useState<SupplierReturnFilterState>({
+    branchId: scopedBranchId,
+  }));
+  const [applied, setApplied] = useState<SupplierReturnFilterState>(() => ({
     ...DEFAULT_FILTERS,
-    branchId: lockedBranch,
-  });
+    branchId: scopedBranchId,
+  }));
+
+  useEffect(() => {
+    setDraft((prev) => (prev.branchId === scopedBranchId ? prev : { ...prev, branchId: scopedBranchId, pageIndex: 1 }));
+    setApplied((prev) => (prev.branchId === scopedBranchId ? prev : { ...prev, branchId: scopedBranchId, pageIndex: 1 }));
+  }, [scopedBranchId]);
 
   const [items, setItems] = useState<SupplierReturnListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -180,13 +182,13 @@ export const SupplierReturnListPage: FC = () => {
           draft={draft}
           totalFiltered={items.length}
           totalAll={totalCount}
-          lockBranch={Boolean(lockedBranch)}
+          lockBranch={isBranchLocked}
           suppliers={suppliers}
           branches={branches}
           onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
           onSearch={() => setApplied({ ...draft, pageIndex: 1 })}
           onReset={() => {
-            const reset = { ...DEFAULT_FILTERS, branchId: lockedBranch };
+            const reset = { ...DEFAULT_FILTERS, branchId: scopedBranchId };
             setDraft(reset);
             setApplied(reset);
           }}

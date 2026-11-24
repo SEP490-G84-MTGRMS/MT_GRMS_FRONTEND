@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Boxes, Hourglass, Download, Printer, Loader2 } from 'lucide-react';
-import { useAuthStore } from '../../../stores/useAuthStore';
+import { useBranchScope } from '../../../hooks/useBranchScope';
 import type { InventoryFilterState, InventoryItem } from '../types/inventory.types';
 import { DEFAULT_INVENTORY_FILTERS } from '../types/inventory.types';
 import { inventoryApi } from '../api/inventoryApi';
@@ -32,15 +32,29 @@ function resolveUniqueBranchId(
 
 export const InventoryListPage: FC = () => {
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
-  const userBranchId = useAuthStore((s) => s.user?.branchId);
-  const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
-  const lockedBranch = !isStoreOwner && userBranchId ? userBranchId : '';
+  const { isBranchLocked, lockedBranchId, scopedBranchId } = useBranchScope();
+  const lockedBranch = lockedBranchId;
 
-  const [applied, setApplied] = useState<InventoryFilterState>({
+  const [applied, setApplied] = useState<InventoryFilterState>(() => ({
     ...DEFAULT_INVENTORY_FILTERS,
-    branchId: lockedBranch,
-  });
+    branchId: scopedBranchId,
+  }));
+
+  useEffect(() => {
+    setApplied((prev) =>
+      prev.branchId === scopedBranchId &&
+      prev.branchCodes.length === 0 &&
+      prev.branchNames.length === 0
+        ? prev
+        : {
+            ...prev,
+            branchId: scopedBranchId,
+            branchCodes: [],
+            branchNames: [],
+            pageIndex: 1,
+          }
+    );
+  }, [scopedBranchId]);
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -139,12 +153,12 @@ export const InventoryListPage: FC = () => {
     const resolvedBranchId =
       lockedBranch ||
       resolveUniqueBranchId(branchOptions, values.branchCodes, values.branchNames) ||
-      '';
+      scopedBranchId;
     setApplied({ ...values, branchId: resolvedBranchId, pageIndex: 1 });
   };
 
   const handleReset = () => {
-    setApplied({ ...DEFAULT_INVENTORY_FILTERS, branchId: lockedBranch, pageSize: applied.pageSize });
+    setApplied({ ...DEFAULT_INVENTORY_FILTERS, branchId: scopedBranchId, pageSize: applied.pageSize });
   };
 
   const handleExportExcel = () => {
@@ -289,7 +303,7 @@ export const InventoryListPage: FC = () => {
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <InventoryFilterBar
           initialValues={applied}
-          lockBranch={Boolean(lockedBranch)}
+          lockBranch={isBranchLocked}
           branches={branchOptions}
           products={items.map((i) => ({ sku: i.sku, productName: i.productName }))}
           onSearch={handleSearch}

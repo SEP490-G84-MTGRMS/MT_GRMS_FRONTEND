@@ -29,11 +29,16 @@ export interface SupplierSummary {
   createdAt: string;
 }
 
+export type APDocType = 'PurchaseInvoice' | 'ServiceInvoice' | 'PaymentVoucher' | 'ReturnAdjustment';
+
+export type APPaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'OTHER';
+
 export interface APLedgerEntry {
   id: string;
   supplierId: string;
   transactionDate: string;
-  docType: 'PurchaseInvoice' | 'ServiceInvoice' | 'PaymentVoucher' | 'ReturnAdjustment';
+  docType: APDocType;
+  docTypeName?: string;
   docNo: string;
   description: string;
   amount: number;
@@ -41,6 +46,51 @@ export interface APLedgerEntry {
   balanceAfter: number;
   createdByName: string;
   idempotencyKey?: string;
+  paymentMethod?: string | null;
+  referenceNo?: string | null;
+  createdAt?: string;
+}
+
+export interface SupplierApAging {
+  current: number;
+  days1To30: number;
+  days31To60: number;
+  days61To90: number;
+  over90Days: number;
+  totalOverdue: number;
+  totalDebt: number;
+}
+
+export interface SupplierApSummary {
+  supplierId: string;
+  currentDebt: number;
+  overdueDebt: number;
+  creditLimit: number;
+  paymentTermDays: number;
+  openPurchaseOrderCount: number;
+  aging: SupplierApAging;
+}
+
+export interface APLedgerQueryParams {
+  fromDate?: string;
+  toDate?: string;
+  docType?: APDocType | '';
+  pageIndex?: number;
+  pageSize?: number;
+}
+
+export interface RecordAPTransactionCommand {
+  supplierId: string;
+  transactionDate?: string;
+  docType: APDocType;
+  docNo?: string;
+  description: string;
+  amount: number;
+  direction: 1 | -1;
+  createdByName?: string;
+  idempotencyKey: string;
+  paymentMethod?: APPaymentMethod;
+  referenceNo?: string;
 }
 
 export interface SupplierStats {

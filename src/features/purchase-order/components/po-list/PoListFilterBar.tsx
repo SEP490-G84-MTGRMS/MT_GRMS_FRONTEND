@@ -46,6 +46,7 @@ const EMPTY_QUERIES: QueryMap = {
 
 interface PoListFilterBarProps {
   initialValues?: PoListFilterState;
+  lockBranch?: boolean;
   branches: { id: string; code: string; name: string }[];
   suppliers: { id: string; code: string; name: string }[];
   /** Pool gợi ý mã PO (từ danh sách đã tải). */
@@ -104,6 +105,7 @@ function highlightMatch(text: string, query: string) {
 
 export const PoListFilterBar: FC<PoListFilterBarProps> = ({
   initialValues,
+  lockBranch = false,
   branches = [],
   suppliers = [],
   poCodeSuggestions = [],
@@ -346,6 +348,7 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
   };
 
   const handleKeyDown = (field: FieldKey, e: KeyboardEvent<HTMLInputElement>) => {
+    if (lockBranch && (field === 'branchCode' || field === 'branchName')) return;
     const isDropdownOpen = openField === field && suggestions.length > 0;
 
     if (e.key === 'ArrowDown') {
@@ -403,6 +406,7 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
   };
 
   const handleClearField = (field: FieldKey) => {
+    if (lockBranch && (field === 'branchCode' || field === 'branchName')) return;
     setTokens((prev) => ({ ...prev, [field]: [] }));
     setQueries((prev) => ({ ...prev, [field]: '' }));
     setSuggestions([]);
@@ -443,6 +447,8 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
     const query = queries[field.key];
     const isOpen = openField === field.key && suggestions.length > 0;
     const hasValues = fieldTokens.length > 0;
+    const locked =
+      lockBranch && (field.key === 'branchCode' || field.key === 'branchName');
 
     return (
       <div
@@ -454,6 +460,7 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
           position: 'relative',
           minWidth: 0,
           flex: 1,
+          opacity: locked ? 0.75 : 1,
         }}
       >
         <label
@@ -471,7 +478,9 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
         <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
           <div
             className="supplier-chip-input so-list-chip-box"
-            onClick={() => inputRefs.current[field.key]?.focus()}
+            onClick={() => {
+              if (!locked) inputRefs.current[field.key]?.focus();
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -484,10 +493,10 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
               padding: '0 28px 0 6px',
               borderRadius: 6,
               border: hasValues || isOpen ? '1px solid #0d9488' : '1px solid #cbd5e1',
-              backgroundColor: hasValues ? '#f0fdfa' : '#ffffff',
+              backgroundColor: locked ? '#f1f5f9' : hasValues ? '#f0fdfa' : '#ffffff',
               boxSizing: 'border-box',
               boxShadow: isOpen ? '0 0 0 3px rgba(13, 148, 136, 0.12)' : 'none',
-              cursor: 'text',
+              cursor: locked ? 'not-allowed' : 'text',
             }}
           >
             {fieldTokens.map((token) => (
@@ -548,12 +557,21 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
                 inputRefs.current[field.key] = el;
               }}
               type="text"
+              disabled={locked}
               value={query}
-              placeholder={fieldTokens.length ? 'Thêm giá trị...' : field.placeholder}
-              onChange={(e) => handleFieldChange(field.key, e.target.value)}
+              placeholder={
+                locked
+                  ? 'Cố định theo chi nhánh'
+                  : fieldTokens.length
+                    ? 'Thêm giá trị...'
+                    : field.placeholder
+              }
+              onChange={(e) => {
+                if (!locked) handleFieldChange(field.key, e.target.value);
+              }}
               onKeyDown={(e) => handleKeyDown(field.key, e)}
               onFocus={() => {
-                if (query.trim()) loadSuggestions(field.key, query, fieldTokens);
+                if (!locked && query.trim()) loadSuggestions(field.key, query, fieldTokens);
               }}
               style={{
                 flex: '1 0 70px',

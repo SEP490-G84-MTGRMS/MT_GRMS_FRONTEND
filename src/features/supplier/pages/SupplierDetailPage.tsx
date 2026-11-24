@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
-  APLedgerEntry,
+  SupplierApSummary,
   SupplierDeliveryConfig,
   SupplierReturnPolicy,
   PurchaseOrderItem,
@@ -112,7 +112,9 @@ export const SupplierDetailPage: FC<Props> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role;
+  const actorName = user?.fullName || user?.email || 'Chủ cửa hàng';
   const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
   const tabs = isStoreOwner ? ALL_TABS : ALL_TABS.filter((t) => t.key !== 'payables');
 
@@ -156,7 +158,6 @@ export const SupplierDetailPage: FC<Props> = ({
     holidays: [],
   });
 
-  const [apLedgers] = useState<APLedgerEntry[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
   const [returnPolicy, setReturnPolicy] = useState<SupplierReturnPolicy | null>(null);
 
@@ -335,6 +336,30 @@ export const SupplierDetailPage: FC<Props> = ({
     showToast('Đã lưu chính sách trả/đổi hàng thành công!', 'success');
   };
 
+  const handleApDebtChanged = async (summary: SupplierApSummary) => {
+    setCurrentSupplier((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        currentDebt: summary.currentDebt,
+        overdueDebt: summary.overdueDebt,
+      };
+      onSupplierUpdated?.(next);
+      return next;
+    });
+    if (currentSupplier?.id) {
+      try {
+        const refreshed = await supplierApi.getSupplierById(currentSupplier.id);
+        if (refreshed) {
+          setCurrentSupplier(refreshed);
+          onSupplierUpdated?.(refreshed);
+        }
+      } catch {
+        // Keep optimistic summary values already synced above
+      }
+    }
+  };
+
   const handleLinkCustomer = (_supplierId: string, customerId: string) => {
     if (currentSupplier) {
       showToast(`Đã liên kết thành công Hồ sơ Khách hàng ${customerId} cho NCC ${currentSupplier.name}!`, 'success');
@@ -476,7 +501,9 @@ export const SupplierDetailPage: FC<Props> = ({
           {activeTab === 'payables' && isStoreOwner && (
             <SupplierPayablesTab
               supplier={currentSupplier}
-              apLedgers={apLedgers}
+              actorName={actorName}
+              onDebtChanged={handleApDebtChanged}
+              onNotify={showToast}
             />
           )}
 
