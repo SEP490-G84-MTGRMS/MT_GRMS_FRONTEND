@@ -36,6 +36,7 @@ export interface ScheduleResponse {
   approvedBy?: string | null;
   approvedAt?: string | null;
   createdAt: string;
+  workUnits?: number | null;
 }
 
 export interface ScheduleQueryFilter {
@@ -129,6 +130,47 @@ export interface ResetAttendanceResponse {
   schedule: ScheduleResponse;
   hasUnpaidPayslip: boolean;
   message: string;
+}
+
+export interface RecurringSeriesResponse {
+  employeeId: string;
+  branchId: string;
+  shiftConfigId?: string | null;
+  shiftName: string;
+  plannedStartTime: string;
+  plannedEndTime: string;
+  isRepeating: boolean;
+  repeatDays: string[];
+  startDate?: string | null;
+  endDate?: string | null;
+  schedules: ScheduleResponse[];
+}
+
+export interface SyncRecurringSchedulePayload {
+  employeeId: string;
+  branchId: string;
+  startDate: string; // "YYYY-MM-DD"
+  hasEndDate?: boolean;
+  endDate?: string | null; // "YYYY-MM-DD"
+  repeatDays?: string[];
+  sourceScheduleId?: string | null;
+  originalShiftConfigId?: string | null;
+  originalShiftName?: string | null;
+  shiftConfigId?: string | null;
+  shiftCode?: string;
+  shiftName?: string;
+  plannedStartTime?: string;
+  plannedEndTime?: string;
+  durationHours?: number;
+  isCheckInNextDay?: boolean;
+}
+
+export interface SyncRecurringScheduleResponse {
+  updatedCount: number;
+  createdCount: number;
+  deletedCount: number;
+  skippedCount: number;
+  schedules: ScheduleResponse[];
 }
 
 export const getShiftColor = (nameOrCode: string = ''): string => {
@@ -465,7 +507,7 @@ export const scheduleApi = {
    * Backend: POST /api/v1/schedules/face-id/check-in
    */
   async checkInFaceId(payload: {
-    scheduleId: string;
+    scheduleId?: string;
     employeeId: string;
     faceMatchScore: number;
     snapshotBase64?: string | null;
@@ -482,7 +524,7 @@ export const scheduleApi = {
    * Backend: POST /api/v1/schedules/face-id/check-out
    */
   async checkOutFaceId(payload: {
-    scheduleId: string;
+    scheduleId?: string;
     employeeId: string;
     faceMatchScore: number;
     snapshotBase64?: string | null;
@@ -492,6 +534,44 @@ export const scheduleApi = {
       return res.data.data;
     }
     throw new Error(res.data?.message || 'Điểm danh ra ca FaceID thất bại.');
+  },
+
+  /**
+   * Lấy thông tin chuỗi ca lặp lại hàng tuần của nhân viên
+   * Backend: GET /api/schedules/recurring-series
+   */
+  async getRecurringSeries(params: {
+    employeeId: string;
+    shiftConfigId?: string | null;
+    shiftName?: string | null;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<RecurringSeriesResponse | null> {
+    const res = await httpClient.get<ApiResponse<RecurringSeriesResponse>>('/schedules/recurring-series', {
+      params: {
+        employeeId: params.employeeId,
+        shiftConfigId: params.shiftConfigId || undefined,
+        shiftName: params.shiftName || undefined,
+        fromDate: params.fromDate || undefined,
+        toDate: params.toDate || undefined,
+      },
+    });
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    return null;
+  },
+
+  /**
+   * Đồng bộ cập nhật chuỗi ca lặp lại hàng tuần (cập nhật/thêm/bỏ các ca tương lai chưa chấm công)
+   * Backend: PUT /api/schedules/recurring-sync
+   */
+  async syncRecurringSchedule(payload: SyncRecurringSchedulePayload): Promise<SyncRecurringScheduleResponse> {
+    const res = await httpClient.put<ApiResponse<SyncRecurringScheduleResponse>>('/schedules/recurring-sync', payload);
+    if (res.data?.success && res.data.data) {
+      return res.data.data;
+    }
+    throw new Error(res.data?.message || 'Không thể đồng bộ lịch lặp lại.');
   },
 };
 

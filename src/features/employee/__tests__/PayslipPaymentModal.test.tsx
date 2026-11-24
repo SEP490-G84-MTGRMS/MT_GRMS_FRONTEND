@@ -161,4 +161,72 @@ describe('PayslipPaymentModal - VietQR Napas 247', () => {
     });
     expect(payslipApi.payPayslip).not.toHaveBeenCalled();
   });
+
+  it('hiển thị ConfirmModal cảnh báo khóa tháng lương trước khi thanh toán lẻ và chỉ gọi API khi xác nhận', async () => {
+    const { payslipApi } = await import('../api/payslipApi');
+    const onPaymentSuccess = vi.fn();
+
+    render(
+      <PayslipPaymentModal
+        isOpen
+        onClose={vi.fn()}
+        payslip={basePayslip}
+        onPaymentSuccess={onPaymentSuccess}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Tạo phiếu chi/i }));
+
+    expect(await screen.findByText('Xác nhận thanh toán lương')).toBeDefined();
+    expect(screen.getByText(/khóa toàn bộ/i)).toBeDefined();
+    expect(screen.getByText(/Chấm công \(FaceID, tự chấm công, chấm công thủ công\)/i)).toBeDefined();
+    expect(screen.getByText(/Gửi và duyệt phiếu yêu cầu/i)).toBeDefined();
+    expect(screen.getByText(/Tạo mới và chỉnh sửa lịch làm việc trong tháng/i)).toBeDefined();
+    expect(payslipApi.payPayslip).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận thanh toán' }));
+
+    await waitFor(() => {
+      expect(payslipApi.payPayslip).toHaveBeenCalledWith(
+        'ps-1',
+        expect.objectContaining({ paymentMethod: 'VIETQR' })
+      );
+    });
+    expect(onPaymentSuccess).toHaveBeenCalledWith('pay');
+  });
+
+  it('hiển thị ConfirmModal cảnh báo khóa tháng lương trước khi thanh toán hàng loạt', async () => {
+    const { payslipApi } = await import('../api/payslipApi');
+    const onPaymentSuccess = vi.fn();
+
+    render(
+      <PayslipPaymentModal
+        isOpen
+        onClose={vi.fn()}
+        batchPayslips={[
+          basePayslip,
+          { ...basePayslip, id: 'ps-2', employeeCode: 'NV002', employeeName: 'Trần Thị Bình', netSalary: 4200000 },
+        ]}
+        onPaymentSuccess={onPaymentSuccess}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Tạo phiếu chi/i }));
+
+    expect(await screen.findByText('Xác nhận thanh toán lương (2 nhân viên)')).toBeDefined();
+    expect(screen.getByText(/Tạo mới và chỉnh sửa lịch làm việc trong tháng/i)).toBeDefined();
+    expect(payslipApi.batchPayPayslips).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận thanh toán' }));
+
+    await waitFor(() => {
+      expect(payslipApi.batchPayPayslips).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payslipIds: ['ps-1', 'ps-2'],
+          paymentMethod: 'CASH',
+        })
+      );
+    });
+    expect(onPaymentSuccess).toHaveBeenCalledWith('pay');
+  });
 });

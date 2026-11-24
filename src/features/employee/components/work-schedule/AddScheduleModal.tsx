@@ -7,7 +7,7 @@ import type {
   ScheduleAssignment,
 } from '../../types';
 import { shiftConfigApi, type ShiftConfigDto } from '../../api/shiftConfigApi';
-import { scheduleApi, isLeaveSchedule, isScheduleDeletable, type CreateRecurringSchedulePayload } from '../../api/scheduleApi';
+import { scheduleApi, isLeaveSchedule, isScheduleDeletable, type CreateRecurringSchedulePayload, type RecurringSeriesResponse } from '../../api/scheduleApi';
 import { ScheduleScopeConfirmModal, type ScheduleScopeType, type ScheduleScopeDateRange } from './ScheduleScopeConfirmModal';
 import { getVietnamToday, getVietnamTodayIso } from '../../lib/vietnamTime';
 
@@ -224,6 +224,8 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   // Trạng thái gửi API & Báo lỗi
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [recurringSeriesInfo, setRecurringSeriesInfo] = useState<RecurringSeriesResponse | null>(null);
+  const [isLoadingRecurringSeries, setIsLoadingRecurringSeries] = useState(false);
 
   // Thông tin nhân viên chính
   const currentEmp = useMemo(() => {
@@ -400,7 +402,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   }, [isShiftDropdownOpen]);
 
   // Lặp lại hàng tuần
-  const [isRepeating, setIsRepeating] = useState(true);
+  const [isRepeating, setIsRepeating] = useState(false);
   const [selectedDays, setSelectedDays] = useState<Array<'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN'>>(
     editingAssignment ? [editingAssignment.dayOfWeek] : defaultDayOfWeek ? [defaultDayOfWeek] : ['T3']
   );
@@ -437,13 +439,18 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       return editingAssignment.workDate.slice(0, 10);
     }
     if (defaultStartDate) return defaultStartDate;
-    const activeKey = selectedDays[0] || defaultDayOfWeek || 'T2';
-    const dayObj = activeDaysList.find((d) => d.key === activeKey);
-    if (dayObj && dayObj.dateIso) {
-      return dayObj.dateIso;
+    const anchorKey = defaultDayOfWeek || selectedDays[0] || 'T2';
+    const anchorDayObj = activeDaysList.find((d) => d.key === anchorKey);
+    if (anchorDayObj && anchorDayObj.dateIso) {
+      return anchorDayObj.dateIso;
+    }
+    const fallbackKey = selectedDays[0];
+    const fallbackDayObj = fallbackKey ? activeDaysList.find((d) => d.key === fallbackKey) : undefined;
+    if (fallbackDayObj && fallbackDayObj.dateIso) {
+      return fallbackDayObj.dateIso;
     }
     return getVietnamTodayIso();
-  }, [editingAssignment, defaultStartDate, selectedDays, defaultDayOfWeek, activeDaysList]);
+  }, [editingAssignment, defaultStartDate, defaultDayOfWeek, selectedDays, activeDaysList]);
 
   // Ngày cuối cùng của tháng sau (hiển thị khi không chọn ngày kết thúc)
   const endOfNextMonthDisplay = useMemo(() => {
@@ -466,6 +473,8 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
     setIsSubmitting(false);
     setHasEndDate(false);
     setEndDate('');
+    setRecurringSeriesInfo(null);
+    setIsLoadingRecurringSeries(false);
 
     if (editingAssignment) {
       setEmployeeId(editingAssignment.employeeId);
@@ -480,34 +489,10 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         setSelectedShiftId(editingAssignment.shiftId || activeShifts[0]?.id || '');
       }
 
-      // Tìm tất cả các thứ trong tuần đã được giao ca này của nhân viên
-      const empId = editingAssignment.employeeId;
-      const targetShiftId = editingAssignment.shiftId;
-      const targetShiftName = editingAssignment.shiftName?.toLowerCase().trim();
-
-      const matchingAssignments = (weekAssignments || []).filter((a) => {
-        if (a.employeeId !== empId) return false;
-        const matchesShift =
-          (targetShiftId && a.shiftId === targetShiftId) ||
-          (targetShiftName && a.shiftName && a.shiftName.toLowerCase().trim() === targetShiftName);
-        return matchesShift;
-      });
-
-      const assignedDays = Array.from(
-        new Set(matchingAssignments.map((a) => a.dayOfWeek))
-      ).filter((d): d is 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN' =>
-        ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].includes(d as any)
-      );
-
-      // Đảm bảo luôn bao gồm thứ của ca hiện tại
-      if (editingAssignment.dayOfWeek && !assignedDays.includes(editingAssignment.dayOfWeek)) {
-        assignedDays.push(editingAssignment.dayOfWeek);
-      }
-
       const DAY_ORDER: Record<string, number> = {
         T2: 1, T3: 2, T4: 3, T5: 4, T6: 5, T7: 6, CN: 7,
       };
-      assignedDays.sort((a, b) => (DAY_ORDER[a] || 0) - (DAY_ORDER[b] || 0));
+      const VALID_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] as const;
 
       // Khởi tạo tạm thời là không lặp lại và chỉ chọn ngày của ca hiện tại
       setSelectedDays([editingAssignment.dayOfWeek]);
@@ -515,18 +500,57 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       setApplyToOthers(false);
       setSelectedOtherEmpIds([]);
 
-      // Kiểm tra xem ca làm việc này có phải là ca lặp lại tuần sau hay không
       let isSubscribed = true;
-      checkIsRepeatingSchedule(editingAssignment).then((isRepeat) => {
-        if (!isSubscribed) return;
-        if (isRepeat) {
-          setIsRepeating(true);
-          setSelectedDays(assignedDays.length > 0 ? assignedDays : [editingAssignment.dayOfWeek]);
-        } else {
-          setIsRepeating(false);
-          setSelectedDays([editingAssignment.dayOfWeek]);
-        }
-      });
+      const fromDateIso = editingAssignment.workDate
+        ? String(editingAssignment.workDate).slice(0, 10)
+        : undefined;
+      const targetShiftConfigId =
+        editingAssignment.shiftId && editingAssignment.shiftId !== 'custom'
+          ? editingAssignment.shiftId
+          : undefined;
+
+      setIsLoadingRecurringSeries(true);
+      scheduleApi
+        .getRecurringSeries({
+          employeeId: editingAssignment.employeeId,
+          shiftConfigId: targetShiftConfigId,
+          shiftName: editingAssignment.shiftName,
+          fromDate: fromDateIso,
+        })
+        .then(async (series) => {
+          if (!isSubscribed) return;
+          if (series) {
+            setRecurringSeriesInfo(series);
+          }
+
+          const seriesDays = (series?.repeatDays || []).filter((d): d is typeof VALID_DAYS[number] =>
+            (VALID_DAYS as readonly string[]).includes(d)
+          );
+
+          if (series && (series.isRepeating || series.schedules.length > 1) && seriesDays.length > 0) {
+            const mergedDays = Array.from(new Set([...seriesDays, editingAssignment.dayOfWeek]));
+            mergedDays.sort((a, b) => (DAY_ORDER[a] || 0) - (DAY_ORDER[b] || 0));
+            setIsRepeating(true);
+            setSelectedDays(mergedDays);
+            return;
+          }
+
+          const fallbackRepeat = await checkIsRepeatingSchedule(editingAssignment);
+          if (!isSubscribed) return;
+          if (fallbackRepeat) {
+            setIsRepeating(true);
+            setSelectedDays([editingAssignment.dayOfWeek]);
+          } else {
+            setIsRepeating(false);
+            setSelectedDays([editingAssignment.dayOfWeek]);
+          }
+        })
+        .catch(() => {
+          if (!isSubscribed) return;
+        })
+        .finally(() => {
+          if (isSubscribed) setIsLoadingRecurringSeries(false);
+        });
 
       return () => {
         isSubscribed = false;
@@ -542,7 +566,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       } else {
         setSelectedDays(['T2']);
       }
-      setIsRepeating(true);
+      setIsRepeating(false);
       setSelectedShiftId(activeShifts[0]?.id || '');
       setApplyToOthers(false);
       setSelectedOtherEmpIds([]);
@@ -584,7 +608,9 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
   // Tên ngày hiện tại hiển thị ở subtitle
   const currentDayInfo = useMemo(() => {
-    const activeKey = selectedDays[0] || defaultDayOfWeek || 'T2';
+    const activeKey = isEditMode
+      ? (selectedDays[0] || defaultDayOfWeek || 'T2')
+      : (defaultDayOfWeek || selectedDays[0] || 'T2');
     const dayItem = activeDaysList.find((d) => d.key === activeKey);
     if (dayItem) {
       const datePart = dayItem.date.includes('/') && dayItem.date.split('/').length === 3
@@ -595,7 +621,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       return `${dayItem.label}, ${datePart}`;
     }
     return 'Thứ 2';
-  }, [selectedDays, defaultDayOfWeek, activeDaysList]);
+  }, [isEditMode, selectedDays, defaultDayOfWeek, activeDaysList]);
 
   // Toggle ngày trong tuần
   const handleToggleDay = (day: 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7' | 'CN') => {
@@ -609,8 +635,8 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
   const handleToggleSelectAllDays = () => {
     if (selectedDays.length === DAYS.length) {
-      // Đang chọn hết -> quay về ngày đầu
-      setSelectedDays(['T2']);
+      // Đang chọn hết -> quay về ngày được chọn mặc định
+      setSelectedDays([defaultDayOfWeek || editingAssignment?.dayOfWeek || 'T2']);
     } else {
       // Chọn tất cả các ngày
       setSelectedDays(DAYS.map((d) => d.key));
@@ -619,10 +645,16 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
   // Text tóm tắt các ngày lặp
   const repeatSummaryText = useMemo(() => {
-    if (selectedDays.length === DAYS.length) return 'Lặp lại tất cả các ngày trong tuần';
+    const startVn = calculatedStartDate
+      ? calculatedStartDate.split('-').reverse().join('/')
+      : '';
+    const fromSuffix = startVn ? ` (từ ${startVn} trở đi)` : '';
+    if (selectedDays.length === DAYS.length) {
+      return `Lặp lại tất cả các ngày trong tuần${fromSuffix}`;
+    }
     const names = DAYS.filter((d) => selectedDays.includes(d.key)).map((d) => d.label);
-    return `Lặp lại ${names.join(', ')} hàng tuần`;
-  }, [selectedDays]);
+    return `Lặp lại ${names.join(', ')} hàng tuần${fromSuffix}`;
+  }, [selectedDays, calculatedStartDate]);
 
   // Danh sách nhân viên khác để tìm kiếm (chỉ lấy nhân viên cùng chi nhánh với nhân viên hiện tại)
   const candidateOtherEmployees = useMemo(() => {
@@ -794,74 +826,37 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
         setIsSubmitting(true);
         setSubmitError(null);
 
-        // 1. Cập nhật ca hiện tại
-        if (onUpdate) {
+        if (isRepeating) {
+          const daysToSync = selectedDays.length > 0 ? selectedDays : [updatedItem.dayOfWeek];
+          const formattedStart = rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined;
+          const formattedEnd = rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined;
+          const isNextDayShift = rawEndTime <= rawStartTime;
+
+          await scheduleApi.syncRecurringSchedule({
+            employeeId: currentEmp.id,
+            branchId: currentEmpBranchId || branches[0]?.id || '',
+            startDate: calculatedStartDate,
+            hasEndDate,
+            endDate: hasEndDate && endDate ? endDate : null,
+            repeatDays: daysToSync,
+            sourceScheduleId: editingAssignment.id,
+            originalShiftConfigId:
+              editingAssignment.shiftId && editingAssignment.shiftId !== 'custom'
+                ? editingAssignment.shiftId
+                : null,
+            originalShiftName: editingAssignment.shiftName,
+            shiftConfigId: shiftIdFinal ?? null,
+            shiftCode: currentSelectedShift?.code,
+            shiftName,
+            plannedStartTime: formattedStart,
+            plannedEndTime: formattedEnd,
+            durationHours: newShiftHours,
+            isCheckInNextDay: isNextDayShift,
+          });
+        } else if (onUpdate) {
           await onUpdate(updatedItem);
         } else if (onSave) {
           onSave([updatedItem]);
-        }
-
-        // 2. Nếu bật "Lặp lại hàng tuần", cập nhật tiếp các ca khác của nhân viên trong dải ngày
-        if (isRepeating) {
-          const daysToUpdate = selectedDays.length > 0 ? selectedDays : [updatedItem.dayOfWeek];
-
-          // Xác định ngày kết thúc dải ngày:
-          // Nếu có endDate cụ thể thì dùng endDate, ngược lại mặc định đến hết tháng sau
-          let toDateFinal = endDate;
-          if (!hasEndDate || !toDateFinal) {
-            const d = new Date(calculatedStartDate);
-            if (!isNaN(d.getTime())) {
-              const nextMonthLastDay = new Date(d.getFullYear(), d.getMonth() + 2, 0);
-              const dd = String(nextMonthLastDay.getDate()).padStart(2, '0');
-              const mm = String(nextMonthLastDay.getMonth() + 1).padStart(2, '0');
-              toDateFinal = `${nextMonthLastDay.getFullYear()}-${mm}-${dd}`;
-            } else {
-              toDateFinal = calculatedStartDate;
-            }
-          }
-
-          try {
-            const schedulesInRange = await scheduleApi.getSchedules({
-              employeeId: currentEmp.id,
-              branchId: currentEmpBranchId || undefined,
-              fromDate: calculatedStartDate,
-              toDate: toDateFinal,
-              pageSize: 1000,
-            });
-
-            const targetShiftId = editingAssignment.shiftId;
-            const targetShiftName = editingAssignment.shiftName?.toLowerCase().trim();
-
-            const matchingOtherSchedules = schedulesInRange.filter((s) => {
-              if (s.id === editingAssignment.id) return false;
-              const dow = getScheduleDayOfWeek(s);
-              const matchesDow = daysToUpdate.includes(dow);
-              const matchesShift =
-                !targetShiftId ||
-                s.shiftId === targetShiftId ||
-                (s.shiftName && s.shiftName.toLowerCase().trim() === targetShiftName);
-              return matchesDow && matchesShift;
-            });
-
-            if (matchingOtherSchedules.length > 0) {
-              const formattedStart = rawStartTime ? (rawStartTime.length === 5 ? `${rawStartTime}:00` : rawStartTime) : undefined;
-              const formattedEnd = rawEndTime ? (rawEndTime.length === 5 ? `${rawEndTime}:00` : rawEndTime) : undefined;
-
-              await Promise.allSettled(
-                matchingOtherSchedules.map((s) =>
-                  scheduleApi.updateSchedule(s.id, {
-                    shiftName,
-                    shiftConfigId: shiftIdFinal,
-                    shiftCode: currentSelectedShift?.code,
-                    plannedStartTime: formattedStart,
-                    plannedEndTime: formattedEnd,
-                  })
-                )
-              );
-            }
-          } catch (rangeErr) {
-            console.warn('Lỗi khi cập nhật các ca cùng dải ngày kết thúc:', rangeErr);
-          }
         }
 
         if (onSuccess) {
@@ -910,6 +905,12 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       for (const empIdToCheck of targetEmpIds) {
         const empObj = employees.find((e) => e.id === empIdToCheck) || currentEmp;
         for (const dow of targetRepeatDays) {
+          const dayInfoObj = activeDaysList.find((d) => d.key === dow);
+          // Khi lặp lại hàng tuần, chỉ kiểm tra xung đột với các ngày >= calculatedStartDate (không kiểm tra ngày trước ngày bắt đầu)
+          if (isRepeating && dayInfoObj?.dateIso && dayInfoObj.dateIso < calculatedStartDate) {
+            continue;
+          }
+
           const existingOnDay = (weekAssignments || []).filter(
             (a) =>
               a.employeeId === empIdToCheck &&
@@ -918,7 +919,6 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
           );
 
           let totalHoursOnDay = newShiftHours;
-          const dayInfoObj = activeDaysList.find((d) => d.key === dow);
           const dayLabel = dayInfoObj ? `${dayInfoObj.label} (${dayInfoObj.date})` : dow;
 
           for (const ex of existingOnDay) {
@@ -1336,6 +1336,44 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
                         setSelectedDays([selectedDays[0] || defaultDayOfWeek || 'T2']);
                         setHasEndDate(false);
                         setEndDate('');
+                        return;
+                      }
+                      const targetEmpId = currentEmp?.id || employeeId;
+                      if (targetEmpId) {
+                        const targetShiftCfgId =
+                          selectedShiftId && selectedShiftId !== 'custom' ? selectedShiftId : undefined;
+                        const targetShiftName =
+                          currentSelectedShift?.name || editingAssignment?.shiftName || undefined;
+                        setIsLoadingRecurringSeries(true);
+                        scheduleApi
+                          .getRecurringSeries({
+                            employeeId: targetEmpId,
+                            shiftConfigId: targetShiftCfgId,
+                            shiftName: targetShiftName,
+                            fromDate: calculatedStartDate,
+                          })
+                          .then((series) => {
+                            if (!series) return;
+                            setRecurringSeriesInfo(series);
+                            const VALID_DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'] as const;
+                            const DAY_ORDER: Record<string, number> = {
+                              T2: 1, T3: 2, T4: 3, T5: 4, T6: 5, T7: 6, CN: 7,
+                            };
+                            const seriesDays = (series.repeatDays || []).filter(
+                              (d): d is typeof VALID_DAYS[number] =>
+                                (VALID_DAYS as readonly string[]).includes(d)
+                            );
+                            if (seriesDays.length > 0) {
+                              const baseDay = editingAssignment?.dayOfWeek;
+                              const merged = baseDay
+                                ? Array.from(new Set([...seriesDays, baseDay]))
+                                : seriesDays;
+                              merged.sort((a, b) => (DAY_ORDER[a] || 0) - (DAY_ORDER[b] || 0));
+                              setSelectedDays(merged);
+                            }
+                          })
+                          .catch(() => {})
+                          .finally(() => setIsLoadingRecurringSeries(false));
                       }
                     }}
                     style={{ opacity: 0, width: 0, height: 0 }}
@@ -1378,6 +1416,52 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
 
               {isRepeating && (
                 <div style={{ marginTop: 14 }}>
+                  {(isLoadingRecurringSeries || recurringSeriesInfo) && (
+                    <div
+                      data-testid="recurring-series-summary"
+                      style={{
+                        marginBottom: 10,
+                        padding: '8px 12px',
+                        borderRadius: 6,
+                        background: '#F0FDFA',
+                        border: '1px solid #99F6E4',
+                        fontSize: 12,
+                        color: '#115E59',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {isLoadingRecurringSeries ? (
+                        <span>Đang tải danh sách ca lặp lại hàng tuần...</span>
+                      ) : recurringSeriesInfo && recurringSeriesInfo.schedules.length > 0 ? (
+                        <div>
+                          <span style={{ fontWeight: 700 }}>
+                            Đang lặp {recurringSeriesInfo.schedules.length} ca
+                          </span>
+                          {recurringSeriesInfo.repeatDays.length > 0 && (
+                            <span> ({recurringSeriesInfo.repeatDays.join(', ')})</span>
+                          )}
+                          {recurringSeriesInfo.plannedStartTime && recurringSeriesInfo.plannedEndTime && (
+                            <span>
+                              {' '}• {String(recurringSeriesInfo.plannedStartTime).slice(0, 5)} -{' '}
+                              {String(recurringSeriesInfo.plannedEndTime).slice(0, 5)}
+                            </span>
+                          )}
+                          {recurringSeriesInfo.startDate && recurringSeriesInfo.endDate && (
+                            <span>
+                              {' '}• Từ{' '}
+                              {String(recurringSeriesInfo.startDate).slice(0, 10).split('-').reverse().join('/')} đến{' '}
+                              {String(recurringSeriesInfo.endDate).slice(0, 10).split('-').reverse().join('/')}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span>
+                          Chưa có chuỗi ca lặp lại nào cho ca này — các thứ được chọn bên dưới sẽ được áp dụng khi lưu.
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Danh sách các nút ngày */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     {activeDaysList.map((d) => {

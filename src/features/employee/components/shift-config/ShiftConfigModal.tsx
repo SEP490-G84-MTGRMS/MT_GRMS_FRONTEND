@@ -240,8 +240,17 @@ export const ShiftConfigModal: React.FC<ShiftConfigModalProps> = ({
     if (hours > 24) {
       return 'Thời lượng ca làm việc phải lớn hơn 0 và không được vượt quá 24 giờ.';
     }
+    const duplicateTimeShift = existingShifts.find((s) => {
+      if (shiftToEdit && s.id === shiftToEdit.id) return false;
+      if (s.isActive === false) return false;
+      if (!isBranchOverlap(s)) return false;
+      return formatTimeHHmm(s.startTime) === startTime && formatTimeHHmm(s.endTime) === endTime;
+    });
+    if (duplicateTimeShift) {
+      return `Khung giờ ${startTime} - ${endTime} bị trùng hoàn toàn với ca "${duplicateTimeShift.shiftName}" đang hoạt động trong chi nhánh.`;
+    }
     return null;
-  }, [startTime, endTime, durationInfo.hours]);
+  }, [startTime, endTime, durationInfo.hours, existingShifts, shiftToEdit, selectedBranchIds]);
 
   const branchError = useMemo(() => {
     if (selectedBranchIds.length === 0) {
