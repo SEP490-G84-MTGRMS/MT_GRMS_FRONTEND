@@ -234,6 +234,8 @@ export const taxSnapshotApi = {
         tier2Method: filter.tier2Method,
         applyVatReduction: filter.applyVatReduction2026,
         vatReductionPercentage: filter.vatReductionPercentage,
+        customVatRate: filter.customVatRate,
+        customPitRate: filter.customPitRate,
       },
       responseType: 'blob',
     });
