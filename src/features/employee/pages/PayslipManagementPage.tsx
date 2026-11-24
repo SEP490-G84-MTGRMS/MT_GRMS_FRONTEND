@@ -719,28 +719,7 @@ export const PayslipManagementPage: React.FC = () => {
                   <Download size={14} />
                   <span>Xuất file Excel</span>
                 </button>
-                <button
-                  type="button"
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                  onClick={() => {
-                    window.print();
-                    setShowActionDropdown(false);
-                  }}
-                >
-                  <Printer size={14} />
-                  <span>In danh sách</span>
-                </button>
+
               </div>
             )}
           </div>

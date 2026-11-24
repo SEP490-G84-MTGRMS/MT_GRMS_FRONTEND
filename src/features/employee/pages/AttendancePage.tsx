@@ -38,6 +38,8 @@ interface ShiftRowItem {
   startTime: string;
   endTime: string;
   color: string;
+  ids?: string[];
+  codes?: string[];
 }
 
 const DAY_KEYS: Array<'CN' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7'> = [
@@ -476,31 +478,73 @@ export const AttendancePage: React.FC = () => {
         ? rawSchedulesData.filter((s) => s.branchId === branchParam)
         : rawSchedulesData;
 
-      // Map danh sách ca làm việc
-      const shiftRows: ShiftRowItem[] = (shiftRes.items || []).map((sc) => ({
-        id: sc.id,
-        code: sc.shiftCode,
-        name: sc.shiftName,
-        startTime: sc.startTime ? sc.startTime.substring(0, 5) : '00:00',
-        endTime: sc.endTime ? sc.endTime.substring(0, 5) : '00:00',
-        color: getShiftColor(sc.shiftName || sc.shiftCode),
-      }));
+      // Map & gộp danh sách ca làm việc (tránh duplicate ca cùng tên/khung giờ hoặc khác hoa/thường)
+      const shiftRows: ShiftRowItem[] = [];
+      const mergeOrPushShiftRow = (candidate: {
+        id: string;
+        code?: string;
+        name: string;
+        startTime: string;
+        endTime: string;
+      }) => {
+        const normName = (candidate.name || '').trim().toLowerCase();
+        const normCode = (candidate.code || '').trim().toLowerCase();
+        const existing = shiftRows.find(
+          (row) =>
+            row.id === candidate.id ||
+            row.ids?.includes(candidate.id) ||
+            (normName && row.name.trim().toLowerCase() === normName) ||
+            (normCode && row.codes?.includes(normCode))
+        );
+
+        if (existing) {
+          existing.ids = Array.from(new Set([...(existing.ids || [existing.id]), candidate.id]));
+          if (normCode) {
+            existing.codes = Array.from(new Set([...(existing.codes || []), normCode]));
+          }
+          return;
+        }
+
+        shiftRows.push({
+          id: candidate.id,
+          code: candidate.code,
+          name: candidate.name || 'Ca làm việc',
+          startTime: candidate.startTime,
+          endTime: candidate.endTime,
+          color: getShiftColor(candidate.name || candidate.code),
+          ids: [candidate.id],
+          codes: normCode ? [normCode] : [],
+        });
+      };
+
+      (shiftRes.items || []).forEach((sc) => {
+        if (branchParam) {
+          const belongsToBranch =
+            sc.branchId === branchParam ||
+            (Array.isArray(sc.branchIds) && sc.branchIds.includes(branchParam)) ||
+            (!sc.branchId && (!sc.branchIds || sc.branchIds.length === 0));
+          if (!belongsToBranch) return;
+        }
+        mergeOrPushShiftRow({
+          id: sc.id,
+          code: sc.shiftCode,
+          name: sc.shiftName,
+          startTime: sc.startTime ? sc.startTime.substring(0, 5) : '00:00',
+          endTime: sc.endTime ? sc.endTime.substring(0, 5) : '00:00',
+        });
+      });
 
       // Bổ sung các ca phát sinh từ schedules nếu chưa có trong danh sách cấu hình
-      const existingShiftKeys = new Set(shiftRows.map((s) => s.id));
       rawSchedules.forEach((s) => {
         const key = s.shiftConfigId || s.shiftCode || s.shiftName;
-        if (key && !existingShiftKeys.has(key) && !shiftRows.some((item) => item.name === s.shiftName)) {
-          shiftRows.push({
-            id: key,
-            code: s.shiftCode,
-            name: s.shiftName || 'Ca làm việc',
-            startTime: s.plannedStartTime ? s.plannedStartTime.substring(0, 5) : '00:00',
-            endTime: s.plannedEndTime ? s.plannedEndTime.substring(0, 5) : '00:00',
-            color: getShiftColor(s.shiftName || s.shiftCode),
-          });
-          existingShiftKeys.add(key);
-        }
+        if (!key) return;
+        mergeOrPushShiftRow({
+          id: key,
+          code: s.shiftCode,
+          name: s.shiftName || 'Ca làm việc',
+          startTime: s.plannedStartTime ? s.plannedStartTime.substring(0, 5) : '00:00',
+          endTime: s.plannedEndTime ? s.plannedEndTime.substring(0, 5) : '00:00',
+        });
       });
 
       setShifts(shiftRows);
@@ -1023,9 +1067,10 @@ export const AttendancePage: React.FC = () => {
                     const dayRecords = filteredRecords.filter((r) => {
                       const matchDay = r.workDateIso ? r.workDateIso === day.dateIso : r.dayOfWeek === day.key;
                       const matchShift =
-                        (r.shiftConfigId && r.shiftConfigId === sh.id) ||
-                        (r.shiftCode && sh.code && r.shiftCode.toLowerCase() === sh.code.toLowerCase()) ||
-                        (r.shiftName && sh.name && r.shiftName.toLowerCase() === sh.name.toLowerCase()) ||
+                        (r.shiftConfigId && (r.shiftConfigId === sh.id || sh.ids?.includes(r.shiftConfigId))) ||
+                        (r.shiftCode && sh.codes?.includes(r.shiftCode.trim().toLowerCase())) ||
+                        (r.shiftCode && sh.code && r.shiftCode.trim().toLowerCase() === sh.code.trim().toLowerCase()) ||
+                        (r.shiftName && sh.name && r.shiftName.trim().toLowerCase() === sh.name.trim().toLowerCase()) ||
                         r.shiftId === sh.id;
                       return matchDay && matchShift;
                     });
