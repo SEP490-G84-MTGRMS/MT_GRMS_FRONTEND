@@ -1,12 +1,12 @@
 import { useState, type FC } from 'react';
 import { X, PlusCircle } from 'lucide-react';
-import type { VoucherBatchItem, VoucherCodeItem } from '../../types/promotion.types';
+import type { VoucherBatchItem } from '../../types/promotion.types';
 
 interface GenerateCodesModalProps {
   isOpen: boolean;
   onClose: () => void;
   batch: VoucherBatchItem | null;
-  onGenerate: (batchId: string, additionalCodes: VoucherCodeItem[]) => void;
+  onGenerate: (batchId: string, quantity: number) => Promise<void> | void;
 }
 
 export const GenerateCodesModal: FC<GenerateCodesModalProps> = ({
@@ -16,25 +16,32 @@ export const GenerateCodesModal: FC<GenerateCodesModalProps> = ({
   onGenerate,
 }) => {
   const [qty, setQty] = useState(20);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !batch) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!Number.isInteger(qty) || qty < 1 || qty > 10000) {
-      alert('Số lượng mã phải là số nguyên từ 1 đến 10.000');
+      setErrorMsg('Số lượng mã phải là số nguyên từ 1 đến 10.000.');
       return;
     }
-
-    const newCodes: VoucherCodeItem[] = Array.from({ length: Math.min(qty, 5) }).map((_, i) => ({
-      id: `gen-code-${Date.now()}-${i}`,
-      code: `${batch.prefix}-${Math.random().toString(36).substring(2, 6).toUpperCase()}${Math.floor(10 + Math.random() * 89)}`,
-      status: 'UNUSED',
-      createdAt: new Date().toISOString().slice(0, 10),
-    }));
-
-    onGenerate(batch.id, newCodes);
-    onClose();
+    setErrorMsg(null);
+    try {
+      setIsSubmitting(true);
+      await onGenerate(batch.id, qty);
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(
+        err?.response?.data?.message ||
+          err?.response?.data?.detail ||
+          err?.message ||
+          'Không thể sinh thêm mã voucher.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -72,15 +79,20 @@ export const GenerateCodesModal: FC<GenerateCodesModalProps> = ({
               <span className="text-xs text-slate-500 mt-1 block">
                 Hệ thống sẽ tự động ghép tiền tố {batch.prefix} cùng chuỗi ngẫu nhiên bảo mật không trùng lặp.
               </span>
+              {errorMsg && (
+                <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 6, background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: 12.5, fontWeight: 600 }}>
+                  {errorMsg}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="promo-modal-footer">
-            <button type="button" onClick={onClose} className="btn-secondary-pill">
+            <button type="button" onClick={onClose} className="btn-secondary-pill" disabled={isSubmitting}>
               Hủy
             </button>
-            <button type="submit" className="btn-primary-pill">
-              Xác nhận tạo thêm
+            <button type="submit" className="btn-primary-pill" disabled={isSubmitting}>
+              {isSubmitting ? 'Đang tạo mã...' : 'Xác nhận tạo thêm'}
             </button>
           </div>
         </form>

@@ -314,8 +314,17 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                         <div className="promo-status-cell">
                           <div
                             className="switch-container"
-                            onClick={() => onToggleStatus(item.id)}
-                            title={item.status === 'ACTIVE' ? 'Tạm ngưng CTKM' : 'Kích hoạt CTKM'}
+                            onClick={() => {
+                              if (item.status !== 'EXPIRED') onToggleStatus(item.id);
+                            }}
+                            style={item.status === 'EXPIRED' ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                            title={
+                              item.status === 'EXPIRED'
+                                ? 'Chương trình đã hết hạn, không thể bật/tắt'
+                                : item.status === 'ACTIVE'
+                                  ? 'Tạm ngưng CTKM'
+                                  : 'Kích hoạt CTKM'
+                            }
                           >
                             <div className={`switch-track ${item.status === 'ACTIVE' ? 'switch-active' : ''}`}>
                               <div className="switch-thumb" />
@@ -353,7 +362,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                               <div className="accordion-title" style={{ margin: 0 }}>
                                 <Layers size={16} />
-                                <span>Quy tắc bậc thang & Thể lệ áp dụng ({item.tiers.length} mức cấu hình)</span>
+                                <span>{item.type === 'PRODUCT_DISCOUNT' ? 'Danh sách sản phẩm giảm giá' : 'Quy tắc bậc thang & Thể lệ áp dụng'} ({item.tiers.length} cấu hình)</span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Hình thức áp dụng:</span>
@@ -370,7 +379,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                                   <thead className="voucher-codes-sticky-header">
                                     <tr>
-                                      <th style={{ textAlign: 'left', width: 90 }}>Mức bậc</th>
+                                      <th style={{ textAlign: 'left', width: 90 }}>{item.type === 'PRODUCT_DISCOUNT' ? 'STT' : 'Mức bậc'}</th>
                                       <th style={{ textAlign: 'left' }}>Điều kiện áp dụng</th>
                                       <th style={{ textAlign: 'left' }}>Mức ưu đãi / Chiết khấu</th>
                                       <th style={{ textAlign: 'left' }}>Giảm tối đa</th>
@@ -381,10 +390,10 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                     {item.tiers.map((tier) => (
                                       <tr key={tier.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                                         <td style={{ padding: '10px 14px' }}>
-                                          <span className="tier-badge-number">Bậc {tier.tierLevel}</span>
+                                          <span className="tier-badge-number">{item.type === 'PRODUCT_DISCOUNT' ? tier.tierLevel : `Bậc ${tier.tierLevel}`}</span>
                                         </td>
                                         <td style={{ padding: '10px 14px' }}>
-                                          {item.type === 'BUY_X_GET_Y' ? (
+                                          {item.type === 'PRODUCT_DISCOUNT' ? <strong>{tier.buyProductName || 'Chưa chọn sản phẩm'}</strong> : item.type === 'BUY_X_GET_Y' ? (
                                             <div>
                                               <span style={{ color: '#64748b' }}>Mua từ </span>
                                               <strong style={{ color: '#0f172a' }}>

@@ -6,22 +6,9 @@ import type {
   PromotionTier,
 } from "../../types/promotion.types";
 import { MOCK_BRANCHES } from "../../mock/promotionMockData";
+import { ProductUnitPicker } from "./ProductUnitPicker";
+import { ProductPicker } from "./ProductPicker";
 import { productApi } from "../../../product/api/productApi";
-
-const COMMON_UNITS = [
-  "Hộp",
-  "Chai",
-  "Vỉ",
-  "Gói",
-  "Viên",
-  "Cái",
-  "Túi",
-  "Kg",
-  "Lọ",
-  "Thùng",
-  "Tuýp",
-  "Bịch",
-];
 
 interface PromotionModalProps {
   isOpen: boolean;
@@ -62,29 +49,21 @@ export const PromotionModal: FC<PromotionModalProps> = ({
   const [availableProducts, setAvailableProducts] = useState<
     Array<{ id: string; name: string; productCode: string; barcode: string; baseUnit: string }>
   >([]);
-  const [productSearch, setProductSearch] = useState<Record<string, string>>({});
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const matchingProducts = (key: string) => {
-    const keyword = (productSearch[key] || "").trim().toLowerCase();
-    if (!keyword) return availableProducts.slice(0, 20);
-    return availableProducts.filter((product) =>
-      product.name.toLowerCase().includes(keyword) ||
-      product.productCode.toLowerCase().includes(keyword) ||
-      product.barcode.toLowerCase().includes(keyword)
-    ).slice(0, 20);
-  };
 
   useEffect(() => {
+    let active = true;
     setValidationErrors([]);
     if (isOpen) {
+      setAvailableProducts([]);
       productApi
-        .getProductsPaged({ pageSize: 100, status: "Active" })
+        .getAllProducts({ status: "Active" })
         .then((res) => {
-          if (res?.items) {
+          if (active) {
             setAvailableProducts(
-              res.items.map((p) => ({
+              res.map((p) => ({
                 id: p.id,
                 name: p.name,
                 productCode: p.productCode,
@@ -95,9 +74,11 @@ export const PromotionModal: FC<PromotionModalProps> = ({
           }
         })
         .catch((err) => {
+          if (active) setValidationErrors(["Không thể tải danh mục sản phẩm. Vui lòng đóng và mở lại để thử lại."]);
           console.warn("Không thể tải danh mục sản phẩm quà tặng:", err);
         });
     }
+    return () => { active = false; };
   }, [isOpen]);
 
   useEffect(() => {
@@ -164,8 +145,8 @@ export const PromotionModal: FC<PromotionModalProps> = ({
       tierLevel: nextLevel,
       discountType: "PERCENT",
       discountValue: nextLevel * 5,
-      maxDiscount: type === "BUY_X_GET_Y" ? undefined : nextLevel * 30000,
-      minOrderValue: type === "BUY_X_GET_Y" ? undefined : nextLevel * 200000,
+      maxDiscount: type === "ORDER_DISCOUNT" ? nextLevel * 30000 : undefined,
+      minOrderValue: type === "ORDER_DISCOUNT" ? nextLevel * 200000 : undefined,
       buyProductId: undefined,
       buyProductName: undefined,
       requiredQty: type === "BUY_X_GET_Y" ? nextLevel * 2 : undefined,
@@ -205,6 +186,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
 
   const handleTypeChange = (newType: PromotionType) => {
     setType(newType);
+    setValidationErrors([]);
     if (newType === "BUY_X_GET_Y") {
       setTiers((prev) =>
         prev.map((t, idx) => ({
@@ -216,6 +198,24 @@ export const PromotionModal: FC<PromotionModalProps> = ({
           giftUnit: t.giftUnit || "Cái",
           discountType: "PERCENT",
           discountValue: 0,
+        }))
+      );
+    } else if (newType === "PRODUCT_DISCOUNT") {
+      setTiers((prev) =>
+        prev.map((t) => ({
+          ...t,
+          minOrderValue: undefined,
+          maxDiscount: undefined,
+          discountType: t.discountType || "PERCENT",
+          discountValue: t.discountValue > 0 ? t.discountValue : 10,
+        }))
+      );
+    } else if (newType === "ORDER_DISCOUNT") {
+      setTiers((prev) =>
+        prev.map((t, idx) => ({
+          ...t,
+          minOrderValue: t.minOrderValue && t.minOrderValue > 0 ? t.minOrderValue : (idx + 1) * 200000,
+          discountValue: t.discountValue > 0 ? t.discountValue : (idx + 1) * 5,
         }))
       );
     }
@@ -233,12 +233,14 @@ export const PromotionModal: FC<PromotionModalProps> = ({
     if (budgetLimit !== undefined && budgetLimit <= 0) errors.push("Ngân sách phải lớn hơn 0 hoặc để trống");
     if (description.trim().length > 1000) errors.push("Mô tả không quá 1.000 ký tự");
     tiers.forEach((tier, index) => {
+      if (type === "PRODUCT_DISCOUNT" && tier.buyProductId && tiers.some((other, otherIndex) => otherIndex < index && other.buyProductId === tier.buyProductId)) errors.push(`Sản phẩm ${index + 1}: sản phẩm đã được chọn ở dòng trước`);
+      if (type === "PRODUCT_DISCOUNT" && !tier.buyProductId) errors.push(`Bậc ${index + 1}: phải chọn sản phẩm giảm giá`);
       if (type === "BUY_X_GET_Y") {
         if (!tier.requiredQty || tier.requiredQty <= 0) errors.push(`Bậc ${index + 1}: số lượng mua phải lớn hơn 0`);
         if (!tier.giftProductId) errors.push(`Bậc ${index + 1}: phải chọn sản phẩm quà tặng từ kho`);
         if (!tier.giftQty || tier.giftQty <= 0) errors.push(`Bậc ${index + 1}: số lượng tặng phải lớn hơn 0`);
       } else {
-        if (!tier.minOrderValue || tier.minOrderValue <= 0) errors.push(`Bậc ${index + 1}: giá trị đơn phải lớn hơn 0`);
+        if (type === "ORDER_DISCOUNT" && (!tier.minOrderValue || tier.minOrderValue <= 0)) errors.push(`Bậc ${index + 1}: giá trị đơn phải lớn hơn 0`);
         if (!tier.discountValue || tier.discountValue <= 0) errors.push(`Bậc ${index + 1}: mức giảm phải lớn hơn 0`);
         if (tier.discountType === "PERCENT" && tier.discountValue > 100) errors.push(`Bậc ${index + 1}: phần trăm giảm không quá 100%`);
       }
@@ -272,8 +274,13 @@ export const PromotionModal: FC<PromotionModalProps> = ({
     try {
       setIsSubmitting(true);
       await onSave(payload);
-    } catch {
-      // Keep modal open so user doesn't lose form data
+    } catch (err: any) {
+      const apiMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Không thể lưu chương trình khuyến mãi. Vui lòng kiểm tra lại thông tin.';
+      setValidationErrors([apiMsg]);
     } finally {
       setIsSubmitting(false);
     }
@@ -476,7 +483,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
             <div style={{ marginTop: 12 }}>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-bold text-teal-800 m-0">
-                  Thiết lập bậc thang khuyến mãi & Quà tặng
+                  {type === "PRODUCT_DISCOUNT" ? "Danh sách sản phẩm giảm giá" : "Thiết lập bậc thang khuyến mãi & Quà tặng"}
                 </h4>
                 <button
                   type="button"
@@ -484,16 +491,16 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                   className="btn-secondary-pill text-xs py-1 px-3"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Thêm bậc</span>
+                  <span>{type === "PRODUCT_DISCOUNT" ? "Thêm sản phẩm" : "Thêm bậc"}</span>
                 </button>
               </div>
 
               <div className="modal-tiers-list">
                 {tiers.map((tier, idx) => (
                   <div key={tier.id} className="modal-tier-row">
-                    <span className="modal-tier-badge">
+                    {type !== "PRODUCT_DISCOUNT" && <span className="modal-tier-badge">
                       Bậc {tier.tierLevel}
-                    </span>
+                    </span>}
 
                     {type === "ORDER_DISCOUNT" && (
                       <>
@@ -605,7 +612,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                     )}
 
                     {type === "BUY_X_GET_Y" && (
-                      <>
+                      <div className="promotion-buy-gift-grid">
                         <div style={{ flex: 2, minWidth: 190 }}>
                           <label
                             style={{
@@ -617,42 +624,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                           >
                             Sản phẩm mua (X)
                           </label>
-                          <input
-                            type="search"
-                            value={productSearch[`buy-${tier.id}`] || ""}
-                            onChange={(e) => setProductSearch((current) => ({ ...current, [`buy-${tier.id}`]: e.target.value }))}
-                            placeholder="Tìm tên hoặc barcode..."
-                            className="form-input"
-                            style={{ padding: "5px 8px", fontSize: "0.75rem", marginBottom: 4 }}
-                          />
-                          <select
-                            value={tier.buyProductId || ""}
-                            onChange={(e) => {
-                              const selId = e.target.value;
-                              const prod = availableProducts.find((p) => p.id === selId);
-                              if (prod) {
-                                handleUpdateTier(idx, {
-                                  buyProductId: prod.id,
-                                  buyProductName: prod.name,
-                                  buyUnit: tier.buyUnit || prod.baseUnit || "Cái",
-                                });
-                              } else {
-                                handleUpdateTier(idx, {
-                                  buyProductId: undefined,
-                                  buyProductName: undefined,
-                                });
-                              }
-                            }}
-                            className="form-select-control"
-                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%" }}
-                          >
-                            <option value="">-- Bất kỳ sản phẩm trong giỏ --</option>
-                            {matchingProducts(`buy-${tier.id}`).map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
+                          <ProductPicker products={availableProducts} value={tier.buyProductId} selectedName={tier.buyProductName} optional onChange={(p) => handleUpdateTier(idx, { buyProductId: p?.id, buyProductName: p?.name, buyUnit: p?.baseUnit || "Cái" })} />
                         </div>
                         <div style={{ width: 75 }}>
                           <label
@@ -691,24 +663,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                           >
                             Đơn vị mua (X)
                           </label>
-                          <select
-                            value={tier.buyUnit || availableProducts.find((p) => p.id === tier.buyProductId)?.baseUnit || "Cái"}
-                            onChange={(e) =>
-                              handleUpdateTier(idx, "buyUnit", e.target.value)
-                            }
-                            className="form-select-control"
-                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%" }}
-                          >
-                            {Array.from(new Set([
-                              tier.buyUnit,
-                              availableProducts.find((p) => p.id === tier.buyProductId)?.baseUnit,
-                              ...COMMON_UNITS
-                            ].filter(Boolean))).map((u) => (
-                              <option key={u} value={u}>
-                                {u}
-                              </option>
-                            ))}
-                          </select>
+                          <ProductUnitPicker productId={tier.buyProductId} baseUnit={availableProducts.find(p => p.id === tier.buyProductId)?.baseUnit} value={tier.buyUnit} onChange={unit => handleUpdateTier(idx, "buyUnit", unit)} />
                         </div>
                         <div style={{ flex: 2, minWidth: 200 }}>
                           <label
@@ -721,44 +676,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                           >
                             Sản phẩm quà tặng (Y)
                           </label>
-                          <input
-                            type="search"
-                            value={productSearch[`gift-${tier.id}`] || ""}
-                            onChange={(e) => setProductSearch((current) => ({ ...current, [`gift-${tier.id}`]: e.target.value }))}
-                            placeholder="Tìm tên hoặc barcode..."
-                            className="form-input"
-                            style={{ padding: "5px 8px", fontSize: "0.75rem", marginBottom: 4 }}
-                          />
-                          <select
-                            value={tier.giftProductId || ""}
-                            onChange={(e) => {
-                              const selId = e.target.value;
-                              const prod = availableProducts.find((p) => p.id === selId);
-                              if (prod) {
-                                handleUpdateTier(idx, {
-                                  giftProductId: prod.id,
-                                  giftProductName: prod.name,
-                                  giftProductSku: prod.productCode,
-                                  giftUnit: prod.baseUnit || tier.giftUnit || "Cái",
-                                });
-                              } else {
-                                handleUpdateTier(idx, {
-                                  giftProductId: "",
-                                  giftProductName: "",
-                                  giftProductSku: undefined,
-                                });
-                              }
-                            }}
-                            className="form-select-control"
-                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%" }}
-                          >
-                            <option value="">-- Chọn sản phẩm từ kho --</option>
-                            {matchingProducts(`gift-${tier.id}`).map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
+                          <ProductPicker products={availableProducts} value={tier.giftProductId} selectedName={tier.giftProductName}  onChange={(p) => handleUpdateTier(idx, { giftProductId: p?.id, giftProductName: p?.name, giftUnit: p?.baseUnit || "Cái", giftProductSku: p?.productCode })} />
                           {(!tier.giftProductId || !availableProducts.some((p) => p.id === tier.giftProductId)) && (
                             <input
                               type="text"
@@ -787,24 +705,7 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                           >
                             Đơn vị tặng (Y)
                           </label>
-                          <select
-                            value={tier.giftUnit || availableProducts.find((p) => p.id === tier.giftProductId)?.baseUnit || "Cái"}
-                            onChange={(e) =>
-                              handleUpdateTier(idx, "giftUnit", e.target.value)
-                            }
-                            className="form-select-control"
-                            style={{ padding: "6px 8px", fontSize: "0.8rem", width: "100%" }}
-                          >
-                            {Array.from(new Set([
-                              tier.giftUnit,
-                              availableProducts.find((p) => p.id === tier.giftProductId)?.baseUnit,
-                              ...COMMON_UNITS
-                            ].filter(Boolean))).map((u) => (
-                              <option key={u} value={u}>
-                                {u}
-                              </option>
-                            ))}
-                          </select>
+                          <ProductUnitPicker productId={tier.giftProductId} baseUnit={availableProducts.find(p => p.id === tier.giftProductId)?.baseUnit} value={tier.giftUnit} onChange={unit => handleUpdateTier(idx, "giftUnit", unit)} />
                         </div>
                         <div style={{ width: 75 }}>
                           <label
@@ -832,11 +733,15 @@ export const PromotionModal: FC<PromotionModalProps> = ({
                             style={{ padding: "6px 8px", fontSize: "0.8rem" }}
                           />
                         </div>
-                      </>
+                      </div>
                     )}
 
                     {type === "PRODUCT_DISCOUNT" && (
                       <>
+                        <div style={{ flex: 2 }}>
+                          <label className="form-label">Sản phẩm áp dụng</label>
+                          <ProductPicker products={availableProducts} value={tier.buyProductId} selectedName={tier.buyProductName} onChange={(p) => handleUpdateTier(idx, { buyProductId: p?.id, buyProductName: p?.name })} />
+                        </div>
                         <div style={{ width: 100 }}>
                           <label
                             style={{

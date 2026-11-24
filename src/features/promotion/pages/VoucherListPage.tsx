@@ -14,9 +14,19 @@ import { promotionApi, type VoucherBatchDto } from '../api/promotionApi';
 import type {
   VoucherBatchItem,
   VoucherFilterState,
-  VoucherCodeItem,
 } from '../types/promotion.types';
 import '../promotion.css';
+
+const toLocalDateStr = (raw?: string) => {
+  if (!raw) return '';
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+    const d = new Date(raw);
+    if (!Number.isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+  }
+  return raw.slice(0, 10);
+};
 
 export const VoucherListPage: FC = () => {
   const [batches, setBatches] = useState<VoucherBatchItem[]>([]);
@@ -28,6 +38,7 @@ export const VoucherListPage: FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingBatch, setEditingBatch] = useState<VoucherBatchItem | null>(null);
   const [generateTargetBatch, setGenerateTargetBatch] = useState<VoucherBatchItem | null>(null);
+  const [codesRefreshSignal, setCodesRefreshSignal] = useState<{ batchId: string; version: number } | null>(null);
 
   const mapDtoToBatch = useCallback((dto: VoucherBatchDto): VoucherBatchItem => {
     const rawDesc = dto.description || '';
@@ -43,8 +54,8 @@ export const VoucherListPage: FC = () => {
       maxDiscount: dto.maxDiscountAmount,
       totalQuantity: dto.totalQuantity,
       usedQuantity: dto.usedQuantity,
-      startDate: dto.startDate?.slice(0, 10) || '',
-      endDate: dto.endDate?.slice(0, 10) || '',
+      startDate: toLocalDateStr(dto.startDate),
+      endDate: toLocalDateStr(dto.endDate),
       status: dto.status,
       prefix: dto.prefix,
       description: cleanDescription,
@@ -165,8 +176,8 @@ export const VoucherListPage: FC = () => {
 
   const handleSaveBatch = async (savedBatch: VoucherBatchItem) => {
     try {
-      const effectiveStartDate = savedBatch.startDate ? `${savedBatch.startDate}T00:00:00` : new Date().toISOString();
-      const effectiveEndDate = savedBatch.endDate ? `${savedBatch.endDate}T23:59:59` : new Date().toISOString();
+      const effectiveStartDate = savedBatch.startDate ? `${savedBatch.startDate}T00:00:00+07:00` : new Date().toISOString();
+      const effectiveEndDate = savedBatch.endDate ? `${savedBatch.endDate}T23:59:59+07:00` : new Date().toISOString();
 
       if (editingBatch) {
         await promotionApi.updateVoucherBatch(savedBatch.id, {
@@ -208,30 +219,27 @@ export const VoucherListPage: FC = () => {
     }
   };
 
-  const handleGenerateCodes = async (batchId: string, additionalCodes: VoucherCodeItem[]) => {
+  const handleGenerateCodes = async (batchId: string, quantity: number) => {
     try {
       const target = batches.find((b) => b.id === batchId);
-      await promotionApi.generateVoucherCodes(batchId, additionalCodes.length, target?.prefix);
+      const generatedCount = await promotionApi.generateVoucherCodes(batchId, quantity, target?.prefix);
       await loadBatches();
-    } catch {
-      // Ignored for optimistic UI
+      setCodesRefreshSignal((prev) => ({
+        batchId,
+        version: (prev?.version ?? 0) + 1,
+      }));
+      showToast(
+        `Đã sinh thành công ${generatedCount ?? quantity} mã voucher mới cho đợt!`
+      );
+    } catch (err: any) {
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Không thể sinh thêm mã voucher.';
+      showToast(errMsg, 'error');
+      throw err;
     }
-
-    setBatches((prev) =>
-      prev.map((b) => {
-        if (b.id === batchId) {
-          return {
-            ...b,
-            totalQuantity: b.totalQuantity + additionalCodes.length,
-            codes: [...b.codes, ...additionalCodes],
-          };
-        }
-        return b;
-      })
-    );
-    showToast(
-      `Đã sinh thành công ${additionalCodes.length} mã voucher mới cho đợt!`
-    );
   };
 
   return (
@@ -376,6 +384,7 @@ export const VoucherListPage: FC = () => {
       {/* Batch Table with Codes Accordion */}
       <VoucherBatchTable
         batches={filteredBatches}
+        codesRefreshSignal={codesRefreshSignal}
         onOpenGenerateCodes={(batch) => setGenerateTargetBatch(batch)}
         onToggleBatchStatus={handleToggleBatchStatus}
         onEdit={handleOpenEdit}

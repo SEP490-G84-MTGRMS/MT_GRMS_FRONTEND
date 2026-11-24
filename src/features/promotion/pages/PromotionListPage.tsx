@@ -152,10 +152,21 @@ export const PromotionListPage: FC = () => {
           },
         ];
 
+    const toLocalDateStr = (raw?: string) => {
+      if (!raw) return '';
+      if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+        const d = new Date(raw);
+        if (!Number.isNaN(d.getTime())) {
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+      }
+      return raw.slice(0, 10);
+    };
+
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const start = dto.startDate ? dto.startDate.slice(0, 10) : '';
-    const end = dto.endDate ? dto.endDate.slice(0, 10) : '';
+    const start = toLocalDateStr(dto.startDate);
+    const end = toLocalDateStr(dto.endDate);
 
     let computedStatus: PromotionStatus = 'ACTIVE';
     if (end && today > end) {
@@ -283,38 +294,49 @@ export const PromotionListPage: FC = () => {
   };
 
   const handleToggleStatus = async (id: string) => {
-    try {
-      await promotionApi.togglePromotionStatus(id);
-    } catch {
-      // Ignored for offline/optimistic updates
+    const target = promotions.find((p) => p.id === id);
+    if (!target) return;
+    if (target.status === 'EXPIRED') {
+      showToast('Chương trình đã hết hạn, không thể thay đổi trạng thái.', 'error');
+      return;
     }
-    setPromotions((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nextActive = !item.isActive;
-          const now = new Date();
-          const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-          let nextStatus: PromotionStatus = 'ACTIVE';
-          if (item.endDate && today > item.endDate) {
-            nextStatus = 'EXPIRED';
-          } else if (!nextActive) {
-            nextStatus = 'PAUSED';
-          } else if (item.startDate && today < item.startDate) {
-            nextStatus = 'UPCOMING';
-          } else {
-            nextStatus = 'ACTIVE';
+    try {
+      const serverActive = await promotionApi.togglePromotionStatus(id);
+      setPromotions((prev) =>
+        prev.map((item) => {
+          if (item.id === id) {
+            const nextActive = typeof serverActive === 'boolean' ? serverActive : !item.isActive;
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            let nextStatus: PromotionStatus = 'ACTIVE';
+            if (item.endDate && today > item.endDate) {
+              nextStatus = 'EXPIRED';
+            } else if (!nextActive) {
+              nextStatus = 'PAUSED';
+            } else if (item.startDate && today < item.startDate) {
+              nextStatus = 'UPCOMING';
+            } else {
+              nextStatus = 'ACTIVE';
+            }
+            showToast(
+              nextActive
+                ? `Đã kích hoạt chương trình "${item.name}"!`
+                : `Đã tạm dừng chương trình "${item.name}"!`,
+              'info'
+            );
+            return { ...item, isActive: nextActive, status: nextStatus };
           }
-          showToast(
-            nextActive
-              ? `Đã kích hoạt chương trình "${item.name}"!`
-              : `Đã tạm dừng chương trình "${item.name}"!`,
-            'info'
-          );
-          return { ...item, isActive: nextActive, status: nextStatus };
-        }
-        return item;
-      })
-    );
+          return item;
+        })
+      );
+    } catch (err: any) {
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Không thể cập nhật trạng thái chương trình khuyến mãi.';
+      showToast(errMsg, 'error');
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -375,6 +397,12 @@ export const PromotionListPage: FC = () => {
         }
       }
 
+      if (savedPromo.type === 'PRODUCT_DISCOUNT') {
+        for (const t of savedPromo.tiers) {
+          if (!t.buyProductId) throw new Error('Phải chọn sản phẩm giảm giá');
+          conditions.push({ productId: t.buyProductId, productName: t.buyProductName, productRole: 'DISCOUNT', minQty: 1, discountValue: t.discountValue, note: t.discountType });
+        }
+      }
       // Serialize tiers into description metadata so all tiers persist across DB reloads
       const tiersJson = JSON.stringify(savedPromo.tiers || []);
       const cleanDesc = (savedPromo.description || '').replace(/\[TIERS_JSON\][\s\S]*?\[\/TIERS_JSON\]/g, '').trim();
@@ -383,8 +411,8 @@ export const PromotionListPage: FC = () => {
       const isStillActive = editingPromo
         ? (savedPromo.isActive ?? (savedPromo.status !== 'PAUSED'))
         : (savedPromo.isActive ?? true);
-      const effectiveStartDate = savedPromo.startDate ? `${savedPromo.startDate}T00:00:00` : new Date().toISOString();
-      const effectiveEndDate = savedPromo.endDate ? `${savedPromo.endDate}T23:59:59` : new Date().toISOString();
+      const effectiveStartDate = savedPromo.startDate ? `${savedPromo.startDate}T00:00:00+07:00` : new Date().toISOString();
+      const effectiveEndDate = savedPromo.endDate ? `${savedPromo.endDate}T23:59:59+07:00` : new Date().toISOString();
 
       if (editingPromo) {
         await promotionApi.updatePromotion(savedPromo.id, {

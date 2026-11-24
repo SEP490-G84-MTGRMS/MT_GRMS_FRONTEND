@@ -1,4 +1,4 @@
-import { useState, type FC, Fragment } from 'react';
+import { useState, useEffect, type FC, Fragment } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -26,6 +26,7 @@ import { VoucherPrintModal } from './VoucherPrintModal';
 
 interface VoucherBatchTableProps {
   batches: VoucherBatchItem[];
+  codesRefreshSignal?: { batchId: string; version: number } | null;
   onOpenGenerateCodes: (batch: VoucherBatchItem) => void;
   onToggleBatchStatus: (batchId: string) => void;
   onEdit: (batch: VoucherBatchItem) => void;
@@ -34,6 +35,7 @@ interface VoucherBatchTableProps {
 
 export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   batches,
+  codesRefreshSignal,
   onOpenGenerateCodes,
   onToggleBatchStatus,
   onEdit,
@@ -113,6 +115,12 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
       return next;
     });
   };
+
+  useEffect(() => {
+    if (codesRefreshSignal?.batchId) {
+      fetchCodesForBatch(codesRefreshSignal.batchId);
+    }
+  }, [codesRefreshSignal]);
 
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -235,7 +243,10 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
             ) : (
               paginatedBatches.map((batch) => {
                 const isExpanded = expandedId === batch.id;
-                const usagePercent = Math.round((batch.usedQuantity / batch.totalQuantity) * 100);
+                const usagePercent =
+                  batch.totalQuantity > 0
+                    ? Math.min(100, Math.round((batch.usedQuantity / batch.totalQuantity) * 100))
+                    : 0;
                 const cleanDescription = batch.description
                   ? batch.description.replace(/\[CONFIG_JSON\][\s\S]*?\[\/CONFIG_JSON\]/g, '').trim()
                   : '';
