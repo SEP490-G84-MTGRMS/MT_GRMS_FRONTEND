@@ -729,6 +729,7 @@ export const InventoryFilterBar: FC<InventoryFilterBarProps> = ({
           >
             <option value="">Tất cả trạng thái</option>
             <option value="OK">Đủ hàng</option>
+            <option value="NearExpiry">Cận hạn</option>
             <option value="Low">Sắp hết</option>
             <option value="Out">Hết hàng</option>
           </select>

@@ -1,4 +1,4 @@
-export type InventoryStockStatus = 'OK' | 'Low' | 'Out';
+export type InventoryStockStatus = 'OK' | 'Low' | 'Out' | 'NearExpiry';
 
 export type InventoryCategory =
   | 'Dairy'

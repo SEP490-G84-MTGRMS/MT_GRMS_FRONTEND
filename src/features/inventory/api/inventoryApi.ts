@@ -8,6 +8,7 @@ import type {
 const mapStatus = (status: string | undefined): InventoryItem['status'] => {
   if (status === 'LOW_STOCK') return 'Low';
   if (status === 'OUT_OF_STOCK') return 'Out';
+  if (status === 'NEAR_EXPIRY') return 'NearExpiry';
   return 'OK';
 };
 
@@ -60,7 +61,9 @@ export const inventoryApi = {
           ? 'LOW_STOCK'
           : filters.stockStatus === 'Out'
             ? 'OUT_OF_STOCK'
-            : 'OK';
+            : filters.stockStatus === 'NearExpiry'
+              ? 'NEAR_EXPIRY'
+              : 'OK';
       params.append('status', apiStatus);
     }
     params.append('pageIndex', String(filters.pageIndex));

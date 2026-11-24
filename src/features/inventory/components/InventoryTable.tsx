@@ -23,6 +23,7 @@ const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 const statusBadge = (status: InventoryItem['status']) => {
   if (status === 'Out') return { label: 'Hết hàng', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' };
   if (status === 'Low') return { label: 'Sắp hết', bg: '#fffbeb', color: '#b45309', border: '#fde68a' };
+  if (status === 'NearExpiry') return { label: 'Cận hạn', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' };
   return { label: 'Đủ hàng', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
 };
 
