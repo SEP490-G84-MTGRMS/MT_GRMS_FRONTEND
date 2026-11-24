@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { X, Printer } from 'lucide-react';
 import type { LedgerTransaction } from '../types/cashbook.types';
 import { formatMoney } from '../../finance/utils/formatters';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface PrintReceiptModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
   onClose,
   transaction,
 }) => {
+  const tenantName = useAuthStore((state) => state.user?.tenantName);
   if (!isOpen || !transaction) return null;
 
   const isReceipt = transaction.transactionType === 'RECEIPT';
@@ -25,11 +27,24 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
     SUPPLIER: 'Nhà cung cấp',
     EMPLOYEE: 'Nhân viên',
     TAX_AUTHORITY: 'Cơ quan thuế',
+    INTERNAL: 'Nội bộ',
     OTHER: 'Khác',
+  };
+  const referenceDocLabels: Record<string, string> = {
+    POS_ORDER: 'Hóa đơn bán hàng',
+    SERVICE_EXPENSE: 'Phiếu chi vận hành',
+    DEBT_PAYMENT: 'Thu nợ khách hàng',
+    TAX_PAYMENT: 'Nộp thuế',
+    INTERNAL_TRANSFER: 'Chuyển quỹ nội bộ',
+    AUDIT: 'Kiểm kê quỹ',
+    MANUAL: 'Chứng từ thủ công',
   };
   const counterpartyTypeLabel = transaction.counterpartyType
     ? (counterpartyLabels[transaction.counterpartyType] || transaction.counterpartyType)
     : '';
+  const referenceDocTypeLabel = transaction.referenceDocType
+    ? (referenceDocLabels[transaction.referenceDocType] || transaction.referenceDocType)
+    : 'Hóa đơn';
 
   const handlePrint = () => {
     window.print();
@@ -111,7 +126,7 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', color: '#334155' }}>
-                HỆ THỐNG CỬA HÀNG BÁN LẺ MT-GRMS
+                {tenantName || 'Hộ kinh doanh'}
               </div>
               <div style={{ fontSize: '11px', color: '#64748B' }}>
                 {transaction.accountName}
@@ -154,7 +169,7 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
               <>
                 <span style={{ color: '#64748B', fontWeight: 600 }}>Chứng từ gốc kèm theo:</span>
                 <span style={{ fontWeight: 700, color: '#0284C7' }}>
-                  {transaction.referenceDocId} ({transaction.referenceDocType || 'Hóa đơn'})
+                  {transaction.referenceDocId} ({referenceDocTypeLabel})
                 </span>
               </>
             )}
