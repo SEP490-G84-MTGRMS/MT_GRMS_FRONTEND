@@ -28,6 +28,7 @@ import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalR
 import { ImportEmployeeModal } from '../components/employee-list/ImportEmployeeModal';
 import { TablePagination, NotificationModal, ConfirmModal } from '../../../components/common';
 import { matchesAnyVietnameseSearch } from '../lib/vietnamTime';
+import { exportEmployeesToExcel } from '../lib/employeeExcelExporter';
 import '../employee.css';
 
 const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
@@ -412,9 +413,73 @@ export const EmployeeListPage: React.FC = () => {
     alert(`Đã từ chối ${ids.length} yêu cầu!`);
   };
 
-  const handleExportExcel = () => {
-    alert(`Đang xuất danh sách ${totalItems} nhân viên ra file Excel...`);
+  const handleExportExcel = async () => {
     setShowActionDropdown(false);
+    try {
+      const currentBranchId =
+        activeBranch && activeBranch.id && activeBranch.id !== 'ALL'
+          ? activeBranch.id
+          : undefined;
+
+      const trimmedKeyword = (searchTerm || debouncedKeyword).trim();
+      const res = await employeeApi.getEmployeesPaged({
+        branchId: currentBranchId,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page: 1,
+        pageSize: 10000,
+      });
+
+      const filteredItems = trimmedKeyword
+        ? res.items.filter((emp) =>
+            matchesAnyVietnameseSearch(
+              [emp.fullName, emp.employeeCode, emp.phone, emp.citizenId, emp.email],
+              trimmedKeyword
+            )
+          )
+        : res.items;
+
+      const sortedItems = [...filteredItems].sort((a, b) => {
+        const aActive = a.status === 'active' ? 0 : 1;
+        const bActive = b.status === 'active' ? 0 : 1;
+        return aActive - bActive;
+      });
+
+      if (sortedItems.length === 0) {
+        setNotification({
+          isOpen: true,
+          type: 'warning',
+          title: 'Không có dữ liệu',
+          message: 'Không có nhân viên nào phù hợp với bộ lọc hiện tại để xuất file Excel.',
+        });
+        return;
+      }
+
+      const statusLabel =
+        statusFilter === 'active'
+          ? 'Đang làm việc'
+          : statusFilter === 'inactive'
+            ? 'Đã nghỉ việc'
+            : 'Tất cả trạng thái';
+
+      await exportEmployeesToExcel(sortedItems, {
+        branchName: activeBranch?.name,
+        statusLabel,
+      });
+
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Xuất Excel thành công',
+        message: `Đã xuất danh sách ${sortedItems.length} nhân viên ra file Excel (.xlsx).`,
+      });
+    } catch (err: any) {
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Xuất Excel thất bại',
+        message: err?.response?.data?.message || err?.message || 'Không thể xuất file Excel danh sách nhân viên.',
+      });
+    }
   };
 
   const formatVND = (num?: number) => {

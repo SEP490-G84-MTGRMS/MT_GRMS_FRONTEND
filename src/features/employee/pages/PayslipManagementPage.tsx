@@ -26,6 +26,7 @@ import { PayslipPaymentModal } from '../components/payslip-management/PayslipPay
 import { useLocation } from 'react-router-dom';
 import { ConfirmModal, NotificationModal } from '../../../components/common';
 import { getVietnamCurrentMonthIso, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
+import { exportPayslipsToExcel } from '../lib/employeeExcelExporter';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../employee.css';
 
@@ -706,13 +707,33 @@ export const PayslipManagementPage: React.FC = () => {
                     alignItems: 'center',
                     gap: 8,
                   }}
-                  onClick={() => {
+                  onClick={async () => {
                     setShowActionDropdown(false);
-                    showNotification(
-                      'info',
-                      'Xuất file Excel',
-                      `Đang xuất bảng lương ${filteredPayslips.length} nhân sự ra tệp Excel (.xlsx)...`
-                    );
+                    if (filteredPayslips.length === 0) {
+                      showNotification(
+                        'warning',
+                        'Không có dữ liệu',
+                        'Không có phiếu lương nào phù hợp với bộ lọc hiện tại để xuất file Excel.'
+                      );
+                      return;
+                    }
+                    try {
+                      await exportPayslipsToExcel(filteredPayslips, {
+                        periodMonth,
+                        branchName: activeBranch?.name,
+                      });
+                      showNotification(
+                        'success',
+                        'Xuất Excel thành công',
+                        `Đã xuất bảng lương ${filteredPayslips.length} nhân sự ra tệp Excel (.xlsx).`
+                      );
+                    } catch (err: any) {
+                      showNotification(
+                        'error',
+                        'Xuất Excel thất bại',
+                        extractErrorMessage(err, 'Không thể xuất file Excel bảng lương.')
+                      );
+                    }
                   }}
                 >
                   <Download size={14} />
