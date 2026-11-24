@@ -23,7 +23,7 @@ import { useAuthStore } from '../../../stores/useAuthStore';
 
 export const StorePosCashControlPage: FC = () => {
   const { user } = useAuthStore();
-  const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
+  const currentTenantId = user?.tenantId || '';
 
   // Chi nhánh đang chọn đồng bộ từ TopNav
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
@@ -34,6 +34,7 @@ export const StorePosCashControlPage: FC = () => {
   const [shiftTotalLimit, setShiftTotalLimit] = useState<number>(0);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Dữ liệu duyệt
   const [isLoading, setIsLoading] = useState(false);
@@ -125,21 +126,26 @@ export const StorePosCashControlPage: FC = () => {
       });
 
       // Cập nhật lưu local dự phòng offline
-      const storageKey = `pos_payment_config_${currentTenantId}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          parsed.cashOutApprovalThreshold = threshold;
-          parsed.cashOutShiftTotalLimit = shiftTotalLimit;
-          localStorage.setItem(storageKey, JSON.stringify(parsed));
-        } catch { }
+      if (currentTenantId) {
+        const storageKey = `pos_payment_config_${currentTenantId}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            parsed.cashOutApprovalThreshold = threshold;
+            parsed.cashOutShiftTotalLimit = shiftTotalLimit;
+            localStorage.setItem(storageKey, JSON.stringify(parsed));
+          } catch {
+            // ignore malformed local cache
+          }
+        }
       }
 
+      setActionError(null);
       setSaveMessage('Đã lưu cấu hình hạn mức duyệt chi két thành công!');
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể lưu cấu hình hạn mức');
+      setActionError(err.response?.data?.message || 'Không thể lưu cấu hình hạn mức');
     } finally {
       setIsSavingSettings(false);
     }
@@ -148,11 +154,12 @@ export const StorePosCashControlPage: FC = () => {
   // Duyệt phiếu chi
   const handleApprove = async (id: string) => {
     setActionLoadingId(id);
+    setActionError(null);
     try {
       await posShiftApi.approveCashMovement(id);
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể duyệt phiếu chi');
+      setActionError(err.response?.data?.message || 'Không thể duyệt phiếu chi');
     } finally {
       setActionLoadingId(null);
     }
@@ -162,17 +169,18 @@ export const StorePosCashControlPage: FC = () => {
   const handleRejectConfirm = async () => {
     if (!rejectingId) return;
     if (!rejectionReason.trim()) {
-      alert('Vui lòng nhập lý do từ chối phiếu chi!');
+      setActionError('Vui lòng nhập lý do từ chối phiếu chi!');
       return;
     }
     setActionLoadingId(rejectingId);
+    setActionError(null);
     try {
       await posShiftApi.rejectCashMovement(rejectingId, rejectionReason.trim());
       setRejectingId(null);
       setRejectionReason('');
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể từ chối phiếu chi');
+      setActionError(err.response?.data?.message || 'Không thể từ chối phiếu chi');
     } finally {
       setActionLoadingId(null);
     }
@@ -181,11 +189,12 @@ export const StorePosCashControlPage: FC = () => {
   // Xác nhận đã nhận tiền rút két
   const handleConfirmDrop = async (id: string) => {
     setActionLoadingId(id);
+    setActionError(null);
     try {
       await posShiftApi.confirmCashDrop(id);
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két');
+      setActionError(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két');
     } finally {
       setActionLoadingId(null);
     }
@@ -193,6 +202,32 @@ export const StorePosCashControlPage: FC = () => {
 
   return (
     <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20, padding: '4px 0 24px' }}>
+      {actionError && (
+        <div
+          role="alert"
+          style={{
+            padding: '10px 14px',
+            borderRadius: 10,
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#b91c1c',
+            fontSize: 13,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            style={{ background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontWeight: 700 }}
+          >
+            ×
+          </button>
+        </div>
+      )}
       {/* 1. Header Bar */}
       <div
         style={{

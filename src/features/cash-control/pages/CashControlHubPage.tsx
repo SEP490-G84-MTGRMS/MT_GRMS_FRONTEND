@@ -90,7 +90,7 @@ const dedupeParticipants = (participants?: any[]): any[] => {
 export const CashControlHubPage: FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
+  const currentTenantId = user?.tenantId || '';
   const isOwnerOrAdmin = user?.role === 'STORE_OWNER' || user?.role === 'ADMIN';
 
   // Navigation search parameters for tab selection
