@@ -137,7 +137,14 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
             <select
               className="cb-form-select"
               value={fromAccountId}
-              onChange={(e) => setFromAccountId(e.target.value)}
+              onChange={(e) => {
+                const nextFrom = e.target.value;
+                setFromAccountId(nextFrom);
+                if (nextFrom === toAccountId) {
+                  const fallbackDest = accounts.find((a) => a.id !== nextFrom && a.isActive) || accounts.find((a) => a.id !== nextFrom);
+                  setToAccountId(fallbackDest ? fallbackDest.id : '');
+                }
+              }}
               required
             >
               {accounts.map((acc) => (

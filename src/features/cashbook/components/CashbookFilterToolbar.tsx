@@ -228,7 +228,7 @@ export const CashbookFilterToolbar: FC<CashbookFilterToolbarProps> = ({
             className={`so-list-filter-select ${filters.branchId && filters.branchId !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
             style={{ width: '100%', minWidth: 0 }}
             value={filters.branchId || 'ALL'}
-            onChange={(e) => onChangeFilter({ branchId: e.target.value })}
+            onChange={(e) => onChangeFilter({ branchId: e.target.value, accountId: 'ALL' })}
             title="Lọc theo chi nhánh"
           >
             <option value="ALL">-- Toàn hệ thống (chỉ xem) --</option>

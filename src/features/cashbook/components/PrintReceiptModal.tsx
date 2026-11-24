@@ -19,6 +19,17 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
   const isReceipt = transaction.transactionType === 'RECEIPT';
   const isPayment = transaction.transactionType === 'PAYMENT';
   const title = isReceipt ? 'PHIẾU THU TIỀN' : isPayment ? 'PHIẾU CHI TIỀN' : 'PHIẾU ĐIỀU CHỈNH';
+  const formCode = isPayment ? '02-TT' : '01-TT';
+  const counterpartyLabels: Record<string, string> = {
+    CUSTOMER: 'Khách hàng',
+    SUPPLIER: 'Nhà cung cấp',
+    EMPLOYEE: 'Nhân viên',
+    TAX_AUTHORITY: 'Cơ quan thuế',
+    OTHER: 'Khác',
+  };
+  const counterpartyTypeLabel = transaction.counterpartyType
+    ? (counterpartyLabels[transaction.counterpartyType] || transaction.counterpartyType)
+    : '';
 
   const handlePrint = () => {
     window.print();
@@ -107,7 +118,7 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
               </div>
             </div>
             <div style={{ textAlign: 'right', fontSize: '11px', color: '#64748B' }}>
-              <div>Mẫu số: <strong>01-TT</strong></div>
+              <div>Mẫu số: <strong>{formCode}</strong></div>
               <div>Số: <strong style={{ color: '#0F766E' }}>{transaction.transactionCode}</strong></div>
             </div>
           </div>
@@ -126,7 +137,7 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '6px 12px', fontSize: '12.5px' }}>
             <span style={{ color: '#64748B', fontWeight: 600 }}>{isReceipt ? 'Người nộp tiền:' : 'Người nhận tiền:'}</span>
             <span style={{ fontWeight: 700, color: '#0F172A' }}>
-              {transaction.counterpartyName || 'Khách vãng lai'} {transaction.counterpartyType && `(${transaction.counterpartyType})`}
+              {transaction.counterpartyName || 'Khách vãng lai'} {counterpartyTypeLabel && `(${counterpartyTypeLabel})`}
             </span>
 
             <span style={{ color: '#64748B', fontWeight: 600 }}>Tài khoản quỹ:</span>
