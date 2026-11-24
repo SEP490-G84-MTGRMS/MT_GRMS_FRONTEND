@@ -294,25 +294,6 @@ export const payServiceExpense = async (
     .filter(Boolean)
     .join(' | ') || 'Xuất quỹ chi tiền qua hệ thống';
 
-  // Nếu phiếu chi đã được duyệt hoặc chi thất bại trước đó, bỏ qua bước gọi /approve và xuất quỹ trực tiếp
-  const isPreApproved = data.currentStatus === 'Approved' || data.currentStatus === 'PaymentFailed';
-
-  if (!isPreApproved) {
-    try {
-      const approveRes = await financeHttpClient.post<ApiResponse<any>>(`/expenses/${expenseId}/approve`, {
-        expenseId,
-        note: effectiveDisburseNote,
-      });
-
-      if (approveRes.data && approveRes.data.success === false) {
-        throw new Error(approveRes.data.message || 'Lỗi khi phê duyệt phiếu chi');
-      }
-    } catch (approveErr: any) {
-      const errMsg = approveErr?.response?.data?.message || approveErr?.message || 'Lỗi khi phê duyệt phiếu chi';
-      throw new Error(errMsg);
-    }
-  }
-
   // Xác định PaymentSourceType chuẩn enum Backend FinanceAccountType (Till = 1, Safe = 2, Bank = 3)
   let paymentSourceType = data.paymentMethod === 'Cash' ? 1 : 3;
   let paymentSourceAccountId = data.paidFromAccountId;
@@ -345,27 +326,32 @@ export const payServiceExpense = async (
     throw new Error('Không tìm thấy tài khoản quỹ (tiền mặt / ngân hàng) khả dụng để xuất quỹ.');
   }
 
-  // Disburse xuất quỹ chi tiền trên Backend (tự động cập nhật Cashbook)
-  const res = await financeHttpClient.post<ApiResponse<any>>(
-    `/expenses/${expenseId}/disburse`,
-    {
-      expenseId,
-      paymentSourceType,
-      paymentSourceAccountId,
-      note: effectiveDisburseNote,
-    },
-    {
-      headers: {
-        'Idempotency-Key': idempotencyKey,
+  // Disburse xuất quỹ chi tiền trên Backend (auto-approves + updates Cashbook atomically)
+  try {
+    const res = await financeHttpClient.post<ApiResponse<any>>(
+      `/expenses/${expenseId}/disburse`,
+      {
+        expenseId,
+        paymentSourceType,
+        paymentSourceAccountId,
+        note: effectiveDisburseNote,
       },
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
+
+    if (res.data?.data) {
+      return mapVoucherToExpenseDto(res.data.data);
     }
-  );
 
-  if (res.data?.data) {
-    return mapVoucherToExpenseDto(res.data.data);
+    throw new Error(res.data?.message || 'Lỗi khi xuất quỹ thanh toán chi phí');
+  } catch (err: any) {
+    const errMsg = err?.response?.data?.message || err?.message || 'Lỗi khi xuất quỹ thanh toán chi phí';
+    throw new Error(errMsg);
   }
-
-  throw new Error(res.data?.message || 'Lỗi khi xuất quỹ thanh toán chi phí');
 };
 
 /**

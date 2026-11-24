@@ -120,7 +120,6 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
 
     it('TC-EXP-04: should disburse payment and return updated paid voucher', async () => {
       vi.spyOn(financeHttpClient, 'post')
-        .mockResolvedValueOnce({ data: { success: true } } as any) // approve
         .mockResolvedValueOnce({
           data: {
             success: true,
@@ -133,7 +132,7 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
               category: 'Tiền điện',
             },
           },
-        } as any); // disburse
+        } as any); // atomic disburse (auto-approves on BE)
 
       const paid = await expenseApi.payServiceExpense('01a1a64c-4421-7751-9c42-e5a5f4a00295', {
         paymentMethod: 'Cash',
@@ -255,13 +254,12 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
 
     it('TC-EXP-06: should throw error when disburse fails due to insufficient balance', async () => {
       vi.spyOn(financeHttpClient, 'post')
-        .mockResolvedValueOnce({ data: { success: true } } as any) // approve
         .mockResolvedValueOnce({
           data: {
             success: false,
             message: 'Tài khoản không đủ số dư để chi tiền',
           },
-        } as any); // disburse
+        } as any); // atomic disburse
 
       await expect(
         expenseApi.payServiceExpense('01a1a64c-4421-7751-9c42-e5a5f4a00295', {
