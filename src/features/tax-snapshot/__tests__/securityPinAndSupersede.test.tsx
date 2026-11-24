@@ -39,7 +39,7 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
 
       expect(financeHttpClient.post).toHaveBeenCalledWith('/tax/household/pin/change', {
         currentPin: '1234',
-        password: null,
+        currentPassword: null,
         newPin: '5678',
         confirmNewPin: '5678',
       });
