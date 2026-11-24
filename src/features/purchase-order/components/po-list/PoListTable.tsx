@@ -629,7 +629,9 @@ export const PoListTable: FC<PoListTableProps> = ({
                           order.status === 'DISPATCHED' ||
                           order.status === 'APPROVED') &&
                           onEditOrder &&
-                          !isExchangePo(order) && (
+                          !isExchangePo(order) &&
+                          order.activeGoodsReceiptStatus !== 'DRAFT' &&
+                          order.activeGoodsReceiptStatus !== 'COMPLETED' && (
                           <button
                             type="button"
                             onClick={(e) => {
