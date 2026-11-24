@@ -35,7 +35,7 @@ interface EmployeeFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   employee?: Employee | null;
-  onSave: (employee: Employee, isAddNew?: boolean) => void;
+  onSave: (employee: Employee, isAddNew?: boolean, warning?: string) => void;
   branches: Branch[];
   existingEmployees?: Employee[];
 }
@@ -879,6 +879,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
     setIsSubmitting(true);
     try {
       let savedEmp: Employee;
+      let accountWarning: string | undefined;
       if (employee?.id) {
         savedEmp = await employeeApi.updateEmployee(employee.id, payload);
       } else {
@@ -897,13 +898,17 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
               userId: accRes.userId,
               userName: accRes.username || userName,
             };
-          } catch (accountErr) {
+          } catch (accountErr: any) {
             console.error('Lỗi khi tự động cấp tài khoản cho nhân viên mới:', accountErr);
+            accountWarning =
+              accountErr?.response?.data?.message ||
+              accountErr?.message ||
+              'Không thể tự động cấp tài khoản đăng nhập.';
           }
         }
       }
 
-      onSave(savedEmp, isAddNew);
+      onSave(savedEmp, isAddNew, accountWarning);
       if (!isAddNew) {
         onClose();
       } else {

@@ -152,19 +152,13 @@ export const EmployeeListPage: React.FC = () => {
           )
         : res.items;
 
-      // Ưu tiên nhân viên đang làm việc (active) hiển thị lên đầu
-      const sortedItems = [...filteredItems].sort((a, b) => {
-        const aActive = a.status === 'active' ? 0 : 1;
-        const bActive = b.status === 'active' ? 0 : 1;
-        return aActive - bActive;
-      });
-
+      // Thứ tự Active trước / CreatedAt giảm dần đã được sắp xếp từ SQL (EmployeeRepository.GetPagedListAsync)
       if (trimmedKeyword) {
         const startIdx = (page - 1) * pageSize;
-        setEmployees(sortedItems.slice(startIdx, startIdx + pageSize));
-        setTotalItems(sortedItems.length);
+        setEmployees(filteredItems.slice(startIdx, startIdx + pageSize));
+        setTotalItems(filteredItems.length);
       } else {
-        setEmployees(sortedItems);
+        setEmployees(filteredItems);
         setTotalItems(res.totalItems);
       }
     } catch (err: any) {
@@ -238,7 +232,7 @@ export const EmployeeListPage: React.FC = () => {
     }
   };
 
-  const handleSaveEmployee = (savedEmp: Employee, isAddNew: boolean = false) => {
+  const handleSaveEmployee = (savedEmp: Employee, isAddNew: boolean = false, warning?: string) => {
     fetchEmployees();
 
     if (selectedDetailEmployee?.id === savedEmp.id) {
@@ -248,6 +242,20 @@ export const EmployeeListPage: React.FC = () => {
     if (!isAddNew) {
       setShowFormModal(false);
       setEditingEmployee(null);
+    }
+
+    if (warning) {
+      setNotification({
+        isOpen: true,
+        type: 'warning',
+        title: 'Đã lưu nhân viên nhưng chưa cấp được tài khoản',
+        message: `Hồ sơ nhân viên "${savedEmp.fullName}" đã được lưu vào hệ thống, nhưng tự động cấp tài khoản đăng nhập thất bại: ${warning} Vui lòng mở chi tiết nhân viên để cấp lại tài khoản.`,
+        itemCode: savedEmp.employeeCode,
+      });
+      return;
+    }
+
+    if (!isAddNew) {
       setNotification({
         isOpen: true,
         type: 'success',
@@ -938,7 +946,15 @@ export const EmployeeListPage: React.FC = () => {
       <ImportEmployeeModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onImportSuccess={() => { }}
+        onImportSuccess={(count) => {
+          fetchEmployees();
+          setNotification({
+            isOpen: true,
+            type: 'success',
+            title: 'Nhập dữ liệu thành công',
+            message: `Đã nhập ${count} nhân viên và làm mới danh sách.`,
+          });
+        }}
       />
 
       {/* 5. Modal Xác nhận xóa nhân viên */}
