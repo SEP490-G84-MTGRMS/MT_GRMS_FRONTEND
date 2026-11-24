@@ -72,15 +72,17 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((state) => state.user);
   const [taxpayer, setTaxpayer] = useState<HouseholdTaxDeclarationPreviewDto['taxpayer'] | null>(null);
+  const [isLoadingTaxpayer, setIsLoadingTaxpayer] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
+    setIsLoadingTaxpayer(true);
     taxSnapshotApi
       .getDeclarationPreview({
         year: summary?.year ?? year,
         periodType: summary?.periodType ?? TaxPeriodType.Quarter,
-        periodNumber: summary?.periodNumber ?? 1,
+        periodNumber: summary?.periodNumber ?? Math.floor(new Date().getMonth() / 3) + 1,
         branchId: summary?.branchId,
         calculationMethod: summary?.calculationMethod ?? TaxCalculationMethod.RevenuePercentage,
       })
@@ -88,41 +90,41 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
         if (active && res?.taxpayer) setTaxpayer(res.taxpayer);
       })
       .catch(() => {
-        // fallback to summary/auth store fields
+        // fallback to auth store fields
+      })
+      .finally(() => {
+        if (active) setIsLoadingTaxpayer(false);
       });
     return () => {
       active = false;
     };
-  }, [isOpen, summary?.year, summary?.periodType, summary?.periodNumber, summary?.branchId, year]);
+  }, [isOpen, summary?.year, summary?.periodType, summary?.periodNumber, summary?.branchId, summary?.calculationMethod, year]);
 
   useDialogFocusTrap(isOpen, dialogRef, onClose);
   if (!isOpen) return null;
 
-  const displayHouseholdName = taxpayer?.taxpayerName || user?.tenantName || summary?.branchName || 'Hộ kinh doanh';
-  const displayTaxCode = taxpayer?.taxCode || 'Chưa cập nhật';
-  const displayAddress = taxpayer?.businessLocation || 'Chưa cập nhật';
+  const isGenericTenantLabel = (name?: string | null): boolean =>
+    !name || name.includes('(Tenant)') || name.trim().toLowerCase().startsWith('toàn bộ hộ kinh doanh');
+  const fallbackBranchName = !isGenericTenantLabel(summary?.branchName) ? summary?.branchName : undefined;
+  const displayHouseholdName =
+    taxpayer?.taxpayerName ||
+    user?.tenantName ||
+    fallbackBranchName ||
+    (isLoadingTaxpayer ? 'Đang tải thông tin hộ kinh doanh...' : 'Hộ kinh doanh');
+  const displayTaxCode = taxpayer?.taxCode || (isLoadingTaxpayer ? 'Đang tải...' : 'Chưa cập nhật');
+  const displayAddress = taxpayer?.businessLocation || (isLoadingTaxpayer ? 'Đang tải...' : 'Chưa cập nhật');
 
-  const cashEntries = entries.filter(
-    (e) =>
-      !e.isSummaryRow &&
-      (e.sectionGroup?.includes('Khối I') ||
-        e.sectionGroup?.includes('I.') ||
-        (!e.category?.toLowerCase().includes('ngân hàng') &&
-          !e.category?.toLowerCase().includes('bank') &&
-          !e.beneficiaryName?.toLowerCase().includes('bank') &&
-          !e.sectionGroup?.includes('Khối II')))
-  );
+  const isBankEntry = (e: AccountingBookEntryDto): boolean => {
+    const sg = e.sectionGroup || '';
+    if (sg.includes('Khối II') || sg.startsWith('II.')) return true;
+    if (sg.includes('Khối I') || sg.startsWith('I.')) return false;
+    const cat = e.category?.toLowerCase() || '';
+    const ben = e.beneficiaryName?.toLowerCase() || '';
+    return cat.includes('ngân hàng') || cat.includes('bank') || ben.includes('bank') || ben.includes('vietcombank');
+  };
 
-  const bankEntries = entries.filter(
-    (e) =>
-      !e.isSummaryRow &&
-      (e.sectionGroup?.includes('Khối II') ||
-        e.sectionGroup?.includes('II.') ||
-        e.category?.toLowerCase().includes('ngân hàng') ||
-        e.category?.toLowerCase().includes('bank') ||
-        e.beneficiaryName?.toLowerCase().includes('bank') ||
-        e.beneficiaryName?.toLowerCase().includes('vietcombank'))
-  );
+  const cashEntries = entries.filter((e) => !e.isSummaryRow && !isBankEntry(e));
+  const bankEntries = entries.filter((e) => !e.isSummaryRow && isBankEntry(e));
 
   return (
     <div className="tax-modal-backdrop no-print-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -724,7 +726,7 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
             style={{ background: '#0F766E' }}
           >
             <Printer size={15} />
-            <span>🖨️ In / Xuất PDF A4</span>
+            <span>In / Xuất PDF A4</span>
           </button>
         </div>
       </div>
