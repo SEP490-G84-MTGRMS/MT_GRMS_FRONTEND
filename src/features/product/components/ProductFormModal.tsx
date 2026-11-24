@@ -525,13 +525,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             });
         }
 
-        {
-          const desc = (productToEdit.description || '').trim();
-          const note = (productToEdit.internalNote || '').trim();
-          setDescription(
-            desc && note && desc !== note ? `${desc}\n${note}` : desc || note
-          );
-        }
+        setDescription((productToEdit.description || '').trim());
 
         setWarningMsg('');
         setValidationPopupMsg('');
@@ -1144,7 +1138,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         allowRepack: repackOn,
         eligibleForVatReduction,
         description: description.trim() || undefined,
-        internalNote: '',
+        internalNote: productToEdit?.internalNote ?? undefined,
         isBaseUnitPurchaseUnit: Boolean(base.isPurchaseUnit),
         purchaseUnit: purchase.unitName.trim() || base.unitName.trim(),
         uomConversions: unitsToSave,
