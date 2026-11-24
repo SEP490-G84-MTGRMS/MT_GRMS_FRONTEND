@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { FC } from 'react';
 import {
@@ -13,6 +13,7 @@ import {
   History,
 } from 'lucide-react';
 import type { CustomerDto } from '../types/customer.types';
+import { customerApi } from '../api/customerApi';
 import { sanitizeCustomerText } from '../utils/customerValidation';
 
 interface CustomerDrawerDetailProps {
@@ -41,12 +42,38 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'info' | 'invoices' | 'payments'>('info');
+  const [detailCustomer, setDetailCustomer] = useState<CustomerDto | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDetailCustomer(null);
+    if (!customer?.id) return () => { cancelled = true; };
+
+    const needsDetail = !Array.isArray(customer.invoices) || !Array.isArray(customer.payments);
+    if (!needsDetail) return () => { cancelled = true; };
+
+    customerApi.getCustomerById(customer.id).then((fetched) => {
+      if (!cancelled && fetched) {
+        setDetailCustomer(fetched);
+      }
+    }).catch(() => {
+      // Ignore detail fetch failure and keep summary fields
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customer?.id, customer?.invoices, customer?.payments]);
 
   if (!customer) return null;
 
-  const safeFullName = sanitizeCustomerText(customer.fullName, 'Khách hàng');
-  const safeAddress = sanitizeCustomerText(customer.address, 'Chưa cập nhật');
-  const safeDebt = Math.max(0, Number(customer.currentDebtAR) || 0);
+  const resolvedCustomer: CustomerDto = detailCustomer && detailCustomer.id === customer.id
+    ? { ...customer, ...detailCustomer }
+    : customer;
+
+  const safeFullName = sanitizeCustomerText(resolvedCustomer.fullName, 'Khách hàng');
+  const safeAddress = sanitizeCustomerText(resolvedCustomer.address, 'Chưa cập nhật');
+  const safeDebt = Math.max(0, Number(resolvedCustomer.currentDebtAR) || 0);
   const hasDebt = safeDebt > 0;
 
   return (
@@ -158,13 +185,13 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
               onClick={() => setActiveTab('invoices')}
               className={`customer-drawer-tab-btn ${activeTab === 'invoices' ? 'active' : ''}`}
             >
-              Lịch sử mua hàng ({customer.invoices?.length || 0})
+              Lịch sử mua hàng ({resolvedCustomer.invoices?.length || 0})
             </button>
             <button
               onClick={() => setActiveTab('payments')}
               className={`customer-drawer-tab-btn ${activeTab === 'payments' ? 'active' : ''}`}
             >
-              Lịch sử thu nợ ({customer.payments?.length || 0})
+              Lịch sử thu nợ ({resolvedCustomer.payments?.length || 0})
             </button>
           </div>
         </div>
@@ -207,8 +234,8 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
 
           {activeTab === 'invoices' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {customer.invoices && customer.invoices.length > 0 ? (
-                customer.invoices.map((inv) => (
+              {resolvedCustomer.invoices && resolvedCustomer.invoices.length > 0 ? (
+                resolvedCustomer.invoices.map((inv) => (
                   <div
                     key={inv.id}
                     style={{
@@ -279,8 +306,8 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
 
           {activeTab === 'payments' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {customer.payments && customer.payments.length > 0 ? (
-                customer.payments.map((p) => (
+              {resolvedCustomer.payments && resolvedCustomer.payments.length > 0 ? (
+                resolvedCustomer.payments.map((p) => (
                   <div
                     key={p.id}
                     style={{
