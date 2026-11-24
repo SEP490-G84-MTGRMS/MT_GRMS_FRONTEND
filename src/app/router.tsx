@@ -335,19 +335,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/create',
-        element: <CreateTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateTransferPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><ReceiveTransferPage /></ProtectedRoute>,
       },
       {
         path: 'subscriptions',
@@ -703,19 +703,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/create',
-        element: <CreateTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateTransferPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><ReceiveTransferPage /></ProtectedRoute>,
       },
       {
         path: 'tenants',
@@ -858,19 +858,19 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'create',
-        element: <CreateTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateTransferPage /></ProtectedRoute>,
       },
       {
         path: ':id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: ':id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><ReceiveTransferPage /></ProtectedRoute>,
       },
     ],
   },
@@ -922,35 +922,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/request',
-        element: <CreateUrgentTransferRequestPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><CreateUrgentTransferRequestPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
-      },
-      {
-        path: 'transfers',
-        element: <TransferListPage />,
-      },
-      {
-        path: 'transfers/request',
-        element: <CreateUrgentTransferRequestPage />,
-      },
-      {
-        path: 'transfers/:id',
-        element: <TransferDetailPage />,
-      },
-      {
-        path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><ReceiveTransferPage /></ProtectedRoute>,
       },
     ],
   },
@@ -994,19 +978,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STAFF', 'Staff', 'STORE_OWNER', 'StoreOwner']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/request',
-        element: <CreateUrgentTransferRequestPage />,
+        element: <ProtectedRoute allowedRoles={['STAFF', 'Staff', 'STORE_OWNER', 'StoreOwner']}><CreateUrgentTransferRequestPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STAFF', 'Staff', 'STORE_OWNER', 'StoreOwner']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STAFF', 'Staff', 'STORE_OWNER', 'StoreOwner']}><ReceiveTransferPage /></ProtectedRoute>,
       },
     ],
   },
