@@ -258,10 +258,9 @@ export const CashbookPage: FC = () => {
     setLoadError('');
     try {
       const branchParam = filters.branchId !== 'ALL' ? filters.branchId : undefined;
-      const [accs, txResult] = await Promise.all([
-        cashbookService.getCashAccounts(branchParam),
-        cashbookService.getTransactions(filters, currentPage, pageSize),
-      ]);
+      const accs = await cashbookService.getCashAccounts(branchParam);
+      if (version !== loadVersion.current) return;
+      const txResult = await cashbookService.getTransactions(filters, currentPage, pageSize, accs);
 
       if (version !== loadVersion.current) return;
       setAccounts(accs);

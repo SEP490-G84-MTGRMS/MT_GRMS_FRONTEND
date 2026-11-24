@@ -35,9 +35,9 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
   const [customTo, setCustomTo] = useState('');
   const [internalBranches, setInternalBranches] = useState<{ id: string; name: string }[]>([]);
 
-  // Tự động tải danh sách chi nhánh nếu component cha không truyền xuống
+  // Tự động tải danh sách chi nhánh nếu component cha không truyền prop branches
   useEffect(() => {
-    if (!branches || branches.length === 0) {
+    if (branches === undefined) {
       let isMounted = true;
       employeeApi.getBranches().then((list) => {
         if (isMounted && list && list.length > 0) {

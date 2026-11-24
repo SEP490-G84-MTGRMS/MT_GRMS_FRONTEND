@@ -54,6 +54,7 @@ export function useNotifications(enabled = true) {
 
     let disposed = false;
     let refreshTimer: number | undefined;
+    let startPromise: Promise<void> | null = null;
     const scheduleRefresh = () => {
       if (disposed || refreshTimer !== undefined) return;
       refreshTimer = window.setTimeout(() => {
@@ -63,17 +64,30 @@ export function useNotifications(enabled = true) {
     };
     connection.on('ReceiveNotification', scheduleRefresh);
     connection.onreconnected(scheduleRefresh);
-    connection.onclose(scheduleRefresh);
+    connection.onclose(() => {
+      if (!disposed) scheduleRefresh();
+    });
 
     const startConnection = () => {
-      if (connection.state === 'Disconnected') void connection.start().then(scheduleRefresh).catch(scheduleRefresh);
+      if (disposed || connection.state !== 'Disconnected' || startPromise) return;
+      startPromise = connection
+        .start()
+        .catch(() => {
+          // Ignore transient negotiation errors when unmounting or offline
+        })
+        .finally(() => {
+          startPromise = null;
+          if (disposed && connection.state !== 'Disconnected') {
+            void connection.stop().catch(() => undefined);
+          }
+        });
     };
     const refreshWhileVisible = () => {
       if (document.visibilityState !== 'visible') return;
       scheduleRefresh();
       startConnection();
     };
-    startConnection();
+    const connectTimer = window.setTimeout(startConnection, 50);
     const poll = window.setInterval(refreshWhileVisible, 30_000);
     window.addEventListener('focus', refreshWhileVisible);
     document.addEventListener('visibilitychange', refreshWhileVisible);
@@ -81,11 +95,18 @@ export function useNotifications(enabled = true) {
     return () => {
       disposed = true;
       requestVersion.current++;
+      window.clearTimeout(connectTimer);
       window.clearTimeout(refreshTimer);
       window.clearInterval(poll);
       window.removeEventListener('focus', refreshWhileVisible);
       document.removeEventListener('visibilitychange', refreshWhileVisible);
-      void connection.stop();
+      if (startPromise) {
+        void startPromise.finally(() => {
+          if (connection.state !== 'Disconnected') void connection.stop().catch(() => undefined);
+        });
+      } else if (connection.state !== 'Disconnected') {
+        void connection.stop().catch(() => undefined);
+      }
     };
   }, [enabled, session, fetchNotifications]);
 

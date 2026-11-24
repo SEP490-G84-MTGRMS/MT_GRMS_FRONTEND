@@ -227,7 +227,8 @@ export const cashbookService = {
   async getTransactions(
     params: CashbookFilterParams = {},
     page = 1,
-    pageSize = 10
+    pageSize = 10,
+    preloadedAccounts?: CashAccount[]
   ): Promise<{ items: LedgerTransaction[]; totalItems: number }> {
     const queryParams: Record<string, unknown> = { page, pageSize };
     if (params.accountId && params.accountId !== 'ALL') queryParams.accountId = params.accountId;
@@ -245,7 +246,9 @@ export const cashbookService = {
       '/cashbook/entries', { params: queryParams }
     );
     const entries = res.data.data;
-    const accounts = entries.length ? await this.getCashAccounts() : [];
+    const accounts = preloadedAccounts && preloadedAccounts.length > 0
+      ? preloadedAccounts
+      : (entries.length ? await this.getCashAccounts() : []);
     const accountMap = new Map(accounts.map((account) => [account.id, account.accountName]));
     return {
       items: entries.map((entry) => mapBackendEntryToLedgerTransaction(entry, accountMap.get(entry.accountId))),
