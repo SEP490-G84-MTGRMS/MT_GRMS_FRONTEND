@@ -140,7 +140,12 @@ export const TaxSnapshotPage: FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const pCode = filterParams.periodType === TaxPeriodType.Quarter ? `Q${filterParams.periodNumber}` : `T${filterParams.periodNumber}`;
+      const pCode =
+        filterParams.periodType === TaxPeriodType.Quarter
+          ? `Q${filterParams.periodNumber}`
+          : filterParams.periodType === TaxPeriodType.Year
+          ? 'NAM'
+          : `T${filterParams.periodNumber}`;
       a.download = `BaoCaoThue_${filterParams.year}_${pCode}.xlsx`;
       document.body.appendChild(a);
       a.click();
@@ -163,8 +168,7 @@ export const TaxSnapshotPage: FC = () => {
   };
 
   const handlePeriodTypeChange = (pType: TaxPeriodType) => {
-    const defaultNumber = pType === TaxPeriodType.Month ? 1 : pType === TaxPeriodType.Quarter ? 1 : filterParams.year;
-    setPeriod(pType, defaultNumber);
+    setPeriod(pType, 1);
   };
 
   const handlePeriodNumberChange = (num: number) => {
