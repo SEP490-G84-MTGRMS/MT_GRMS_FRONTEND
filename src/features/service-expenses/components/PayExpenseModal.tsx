@@ -42,35 +42,65 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
   const [note, setNote] = useState('');
   const [approvalReason, setApprovalReason] = useState('');
   const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setErrorMessage(null);
-      setApprovalReason('');
-      void cashbookService.getCashAccounts().then((accounts) => {
+    if (!isOpen) return;
+    let isMounted = true;
+    setErrorMessage(null);
+    setApprovalReason('');
+    setIsLoadingAccounts(true);
+    cashbookService
+      .getCashAccounts()
+      .then((accounts) => {
+        if (!isMounted) return;
         setCashAccounts(accounts);
-        const filtered = accounts.filter((a) =>
-          paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
-        );
-        if (filtered.length > 0) {
-          setSelectedAccountId(filtered[0].id);
-        } else if (accounts.length > 0) {
-          setSelectedAccountId(accounts[0].id);
-        }
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setCashAccounts([]);
+        setErrorMessage('Không thể tải danh sách tài khoản quỹ. Vui lòng thử lại.');
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingAccounts(false);
       });
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
+  const matchingAccounts = cashAccounts.filter((a) =>
+    paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
+  );
+
+  useEffect(() => {
+    if (!isOpen || isLoadingAccounts) return;
+    if (matchingAccounts.length === 0) {
+      setSelectedAccountId('');
+      return;
     }
-  }, [isOpen, paymentMethod]);
+    const currentStillValid = matchingAccounts.some((a) => a.id === selectedAccountId);
+    if (!currentStillValid) {
+      const sameBranch = item?.branchId
+        ? matchingAccounts.find((a) => a.branchId === item.branchId && a.currentBalance >= (item.amount || 0)) ||
+          matchingAccounts.find((a) => a.branchId === item.branchId)
+        : undefined;
+      const sufficient = matchingAccounts.find((a) => a.currentBalance >= (item?.amount || 0));
+      setSelectedAccountId((sameBranch || sufficient || matchingAccounts[0]).id);
+    }
+  }, [isOpen, isLoadingAccounts, paymentMethod, cashAccounts, item?.branchId, item?.amount, selectedAccountId]);
 
   if (!isOpen || !item) return null;
 
   const selectedAccount =
-    cashAccounts.find((a) => a.id === selectedAccountId) ||
-    (cashAccounts.length > 0 ? cashAccounts[0] : null);
+    matchingAccounts.find((a) => a.id === selectedAccountId) ||
+    (matchingAccounts.length > 0 ? matchingAccounts[0] : null);
 
-  // Business Rule GBR-CSH-03: Poka-yoke chống chi vượt số dư khả dụng
-  const isInsufficientBalance = (item?.amount || 0) > (selectedAccount?.currentBalance || 0);
+  // Business Rule GBR-CSH-03: Poka-yoke chống chi vượt số dư khả dụng (chỉ kiểm tra sau khi tải xong danh sách quỹ)
+  const isInsufficientBalance =
+    !isLoadingAccounts && (item?.amount || 0) > (selectedAccount?.currentBalance || 0);
   const isCashOverdraft = paymentMethod === 'Cash' && isInsufficientBalance;
   const isBankOverdraft = paymentMethod === 'BankTransfer' && isInsufficientBalance;
 
@@ -291,16 +321,21 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 <select
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
+                  disabled={isLoadingAccounts}
                   className="form-input"
                   style={{ fontWeight: 600, color: '#0F766E' }}
                 >
-                  {cashAccounts
-                    .filter((a) => (paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'))
-                    .map((acc) => (
+                  {isLoadingAccounts ? (
+                    <option value="">Đang tải danh sách tài khoản quỹ...</option>
+                  ) : matchingAccounts.length === 0 ? (
+                    <option value="">-- Không có tài khoản quỹ khả dụng --</option>
+                  ) : (
+                    matchingAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.accountName} (Khả dụng: {acc.currentBalance.toLocaleString('vi-VN')} đ)
+                        {acc.accountName}{acc.branchName ? ` — ${acc.branchName}` : ''} (Khả dụng: {acc.currentBalance.toLocaleString('vi-VN')} đ)
                       </option>
-                    ))}
+                    ))
+                  )}
                 </select>
                 <span style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 4, display: 'block' }}>
                   ✓ Số dư tài khoản này sẽ tự động giảm và đồng bộ vào Sổ quỹ
@@ -486,10 +521,10 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || isInsufficientBalance || isApprovalReasonMissing}
+              disabled={isSubmitting || isLoadingAccounts || !selectedAccount || isInsufficientBalance || isApprovalReasonMissing}
               className="btn-primary-pill"
               style={
-                isInsufficientBalance || isApprovalReasonMissing
+                isLoadingAccounts || !selectedAccount || isInsufficientBalance || isApprovalReasonMissing
                   ? {
                       opacity: 0.55,
                       cursor: 'not-allowed',
@@ -499,14 +534,18 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                   : undefined
               }
               title={
-                isInsufficientBalance
+                isLoadingAccounts
+                  ? 'Đang tải danh sách tài khoản quỹ'
+                  : !selectedAccount
+                  ? 'Chưa có tài khoản nguồn khả dụng'
+                  : isInsufficientBalance
                   ? 'Không thể thanh toán do tài khoản nguồn không đủ số dư'
                   : isApprovalReasonMissing
                   ? 'Bắt buộc nhập lý do phê duyệt giải trình cho phiếu chi nghi vấn'
                   : undefined
               }
             >
-              <span>{isSubmitting ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</span>
+              <span>{isSubmitting ? 'Đang xử lý...' : isLoadingAccounts ? 'Đang tải quỹ...' : 'Xác nhận thanh toán'}</span>
             </button>
           </div>
         </form>
