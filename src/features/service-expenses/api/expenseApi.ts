@@ -233,6 +233,7 @@ export const createServiceExpense = async (
     sellerTaxCode: data.sellerTaxCode || null,
     evidenceAttachmentUrl: data.attachedBillUrl || null,
     note: data.note || null,
+    expenseDate: data.expenseDate ? `${data.expenseDate}T00:00:00Z` : null,
     dueDate: data.dueDate || null,
   };
 

@@ -35,7 +35,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'BankTransfer'>(
     'Cash'
   );
-  const [createCashBookEntry, setCreateCashBookEntry] = useState(true);
+  const createCashBookEntry = true;
   const [paymentDate, setPaymentDate] = useState(() =>
     new Date().toISOString().split('T')[0]
   );
@@ -394,7 +394,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
               </div>
             )}
 
-            {/* Cashbook Integration Checkbox */}
+            {/* Cashbook Integration Notice (always synced atomically on backend disburse) */}
             <div
               style={{
                 padding: '12px 16px',
@@ -409,12 +409,13 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
               <input
                 type="checkbox"
                 id="cashbook-check"
-                checked={createCashBookEntry}
-                onChange={(e) => setCreateCashBookEntry(e.target.checked)}
-                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                checked={true}
+                disabled
+                readOnly
+                style={{ width: '16px', height: '16px', cursor: 'not-allowed' }}
               />
-              <label htmlFor="cashbook-check" style={{ fontSize: '0.8rem', color: '#166534', cursor: 'pointer', fontWeight: 500 }}>
-                Tự động tạo phiếu chi trong Sổ quỹ (FE-17 Cashbook)
+              <label htmlFor="cashbook-check" style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 500 }}>
+                Tự động tạo phiếu chi trong Sổ quỹ (FE-17 Cashbook) — bắt buộc hạch toán đồng bộ
               </label>
             </div>
 
