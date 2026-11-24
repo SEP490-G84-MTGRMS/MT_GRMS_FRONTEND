@@ -372,18 +372,18 @@ export const router = createBrowserRouter([
       {
         path: 'pos-cash-control',
         element: (
-          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <StorePosCashControlPage />
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}>
+            <CashControlHubPage />
           </ProtectedRoute>
         ),
       },
       {
         path: 'cash-control',
-        element: <ProtectedRoute allowedRoles={['STORE_OWNER']}><CashControlHubPage /></ProtectedRoute>,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CashControlHubPage /></ProtectedRoute>,
       },
       {
         path: 'cash-control/*',
-        element: <Navigate to="/store-owner/pos-cash-control" replace />,
+        element: <Navigate to="/store-owner/cash-control" replace />,
       },
       {
         path: 'account',
@@ -574,22 +574,6 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'pos-cash-control',
-        element: (
-          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <StorePosCashControlPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'cash-control',
-        element: <ProtectedRoute allowedRoles={['STORE_OWNER']}><CashControlHubPage /></ProtectedRoute>,
-      },
-      {
-        path: 'cash-control/*',
-        element: <Navigate to="/store-owner/pos-cash-control" replace />,
-      },
-      {
         path: 'tax-snapshots',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER']}>
@@ -672,10 +656,6 @@ export const router = createBrowserRouter([
           {
             path: 'payment-config',
             element: <Navigate to="/store-owner/subscriptions?tab=finance-accounts" replace />,
-          },
-          {
-            path: 'pos-cash-control',
-            element: <StorePosCashControlPage />,
           },
           {
             path: 'shifts',
