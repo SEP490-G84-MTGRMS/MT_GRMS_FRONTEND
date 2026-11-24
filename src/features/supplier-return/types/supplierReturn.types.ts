@@ -164,9 +164,10 @@ export interface CreateSupplierReturnPayload {
 export interface RecordSupplierResponsePayload {
   resultType: 'APPROVED_FULL' | 'APPROVED_PARTIAL' | 'REJECTED';
   supplierResponseNote?: string;
-  lines: {
+  lineResponses: {
     lineId: string;
     approvedQty: number;
+    rejectedQty: number;
     rejectionReason?: string;
   }[];
 }

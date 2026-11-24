@@ -285,7 +285,7 @@ export const supplierReturnApi = {
       ret.status = 'APPROVED';
       let totalApproved = 0;
       ret.lines.forEach((l) => {
-        const item = payload.lines.find((pl) => pl.lineId === l.id);
+        const item = payload.lineResponses.find((pl) => pl.lineId === l.id);
         if (item) {
           l.approvedQty = item.approvedQty;
           l.rejectedQty = Math.max(0, l.requestedQty - item.approvedQty);
