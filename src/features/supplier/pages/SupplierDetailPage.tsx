@@ -213,13 +213,23 @@ export const SupplierDetailPage: FC<Props> = ({
       });
 
     if (targetId) {
-      // Also load transactions
+      // Also load transactions (SUP-03: map BE SupplierTransactionDto -> SupplierHistoryTab shape)
       supplierApi
         .getSupplierTransactions(targetId)
         .then((res: any) => {
           if (!isMounted) return;
-          if (res?.items) {
-            setPurchaseOrders(res.items);
+          if (Array.isArray(res?.items)) {
+            setPurchaseOrders(
+              res.items.map((tx: any) => ({
+                id: tx.id,
+                code: tx.code || tx.transactionCode || '',
+                orderDate: tx.orderDate || (tx.transactionDate ? String(tx.transactionDate).slice(0, 10) : ''),
+                deliveryDate: tx.deliveryDate ? String(tx.deliveryDate).slice(0, 10) : '',
+                branchName: tx.branchName || '—',
+                totalAmount: Number(tx.totalAmount ?? tx.amount ?? 0),
+                status: tx.status || 'PENDING_APPROVAL',
+              }))
+            );
           }
         })
         .catch(() => {
