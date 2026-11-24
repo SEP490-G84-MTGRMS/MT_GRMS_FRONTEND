@@ -1,6 +1,6 @@
 import { type FC, useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Receipt, FileSpreadsheet, AlertTriangle, Loader2 } from 'lucide-react';
+import { Receipt, FileSpreadsheet, AlertTriangle, Loader2, Plus } from 'lucide-react';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { employeeApi } from '../../employee/api/employeeApi';
 import {
@@ -9,18 +9,21 @@ import {
 } from '../../admin/components';
 import { BillPreviewModal } from '../components/BillPreviewModal';
 import { ConfirmModal } from '../../../components/common';
+import { CreateExpenseModal } from '../components/CreateExpenseModal';
 import { ExpenseFilterBar } from '../components/ExpenseFilterBar';
 import { ExpenseTable } from '../components/ExpenseTable';
 import { PayExpenseModal } from '../components/PayExpenseModal';
 import {
   useApproveExpense,
   useCancelExpense,
+  useCreateExpense,
   useExpenseSummary,
   usePayExpense,
   useServiceExpenses,
 } from '../hooks/useServiceExpenses';
 import {
   EXPENSE_CATEGORY_LABELS,
+  type CreateExpenseRequest,
   type ExpenseFilterParams,
   type PayExpenseRequest,
   type ServiceExpenseDto,
@@ -122,6 +125,7 @@ export const ServiceExpensesPage: FC = () => {
   }, [urlSearch, urlBranchId]);
 
   // Modals state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [payingItem, setPayingItem] = useState<ServiceExpenseDto | null>(null);
   const [cancelingItem, setCancelingItem] = useState<ServiceExpenseDto | null>(null);
   const [previewBill, setPreviewBill] = useState<{
@@ -156,9 +160,23 @@ export const ServiceExpensesPage: FC = () => {
     filters.toDate
   );
 
+  const createExpenseMutation = useCreateExpense();
   const payExpenseMutation = usePayExpense();
   const cancelExpenseMutation = useCancelExpense();
   const approveExpenseMutation = useApproveExpense();
+
+  const handleCreateSubmit = async (data: CreateExpenseRequest) => {
+    try {
+      await createExpenseMutation.mutateAsync(data);
+      showToast('Đã tạo phiếu chi phí vận hành thành công!', 'success');
+      setIsCreateModalOpen(false);
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = errObj?.response?.data?.message || errObj?.message || 'Lỗi khi tạo phiếu chi phí';
+      showToast(msg, 'error');
+      throw err;
+    }
+  };
 
   const handleApproveClick = async (item: ServiceExpenseDto) => {
     try {
@@ -420,6 +438,17 @@ export const ServiceExpensesPage: FC = () => {
             <span>Xuất Excel</span>
           </button>
 
+          {canManageExpenses && (
+            <button
+              type="button"
+              className="po-btn po-btn-primary"
+              onClick={() => setIsCreateModalOpen(true)}
+              title="Tạo phiếu chi phí vận hành mới"
+            >
+              <Plus size={14} />
+              <span>Tạo phiếu chi</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -449,6 +478,16 @@ export const ServiceExpensesPage: FC = () => {
         onApprove={handleApproveClick}
         onCancel={handleCancelClick}
         canManageExpenses={canManageExpenses}
+      />
+
+      {/* ── 4. Create Expense Modal ── */}
+      <CreateExpenseModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateSubmit}
+        isSubmitting={createExpenseMutation.isPending}
+        branches={branches}
+        defaultBranchId={filters.branchId || undefined}
       />
 
       {/* ── 5. Pay Modal ── */}
