@@ -306,8 +306,12 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                   </td>
 
                   {/* Hạn thanh toán */}
-                  <td className="so-list-td" style={{ color: '#64748b', fontSize: '0.8rem' }}>
-                    {item.dueDate || '—'}
+                  <td className="so-list-td" style={{ color: '#64748b', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                    {item.dueDate
+                      ? (/^\d{4}-\d{2}-\d{2}/.test(item.dueDate)
+                          ? item.dueDate.slice(0, 10).split('-').reverse().join('/')
+                          : item.dueDate)
+                      : '—'}
                   </td>
 
                   {/* Số tiền */}
