@@ -21,7 +21,6 @@ import type {
   EmployeeStatus,
   WorkShiftDefinition,
   ScheduleAssignment,
-  DebtTransaction,
   Branch,
 } from '../types';
 import { AddScheduleModal } from '../components/work-schedule/AddScheduleModal';
@@ -768,23 +767,6 @@ export const WorkSchedulePage: React.FC = () => {
         if (e.id === employeeId) {
           const newStatus: EmployeeStatus = e.status === 'active' ? 'inactive' : 'active';
           const updated: Employee = { ...e, status: newStatus };
-          if (selectedDetailEmployee?.id === employeeId) {
-            setSelectedDetailEmployee(updated);
-          }
-          return updated;
-        }
-        return e;
-      })
-    );
-  };
-
-  const handleAddPayment = (employeeId: string, payment: DebtTransaction) => {
-    setEmployees((prev) =>
-      prev.map((e) => {
-        if (e.id === employeeId) {
-          const updatedDebt = payment.remainingDebtAfter;
-          const updatedHistory = [payment, ...(e.debtHistory || [])];
-          const updated = { ...e, debtAmount: updatedDebt, debtHistory: updatedHistory };
           if (selectedDetailEmployee?.id === employeeId) {
             setSelectedDetailEmployee(updated);
           }
@@ -2006,7 +1988,6 @@ export const WorkSchedulePage: React.FC = () => {
         initialTab="schedule"
         onEdit={() => { }}
         onToggleStatus={handleToggleEmployeeStatus}
-        onAddPayment={handleAddPayment}
       />
 
       {/* Modal Quản lý Cấu hình Ca Làm Việc Chuẩn */}

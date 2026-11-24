@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pencil, Loader2 } from 'lucide-react';
-import type { Employee, DebtTransaction } from '../../types';
+import type { Employee } from '../../types';
 import { employeeApi } from '../../api/employeeApi';
 import { CreateUserModal } from './CreateUserModal';
 
@@ -11,7 +11,6 @@ interface EmployeeDetailModalProps {
   onEdit: (employee: Employee) => void;
   onToggleStatus: (employeeId: string) => void;
   onDelete?: (employeeId: string) => void;
-  onAddPayment?: (employeeId: string, payment: DebtTransaction) => void;
   initialTab?: 'info' | 'schedule' | 'salary' | 'payslip' | 'debt';
 }
 

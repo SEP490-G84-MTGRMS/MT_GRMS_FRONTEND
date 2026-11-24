@@ -18,10 +18,9 @@ import type {
   Employee,
   Branch,
   EmployeeStatus,
-  ApprovalRequest,
-  DebtTransaction,
 } from '../types';
 import { employeeApi } from '../api/employeeApi';
+import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
 import { EmployeeFormModal } from '../components/employee-list/EmployeeFormModal';
 import { EmployeeDetailModal } from '../components/employee-list/EmployeeDetailModal';
 import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalRequestsModal';
@@ -38,7 +37,7 @@ export const EmployeeListPage: React.FC = () => {
   // State data
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
+  const [pendingRequestCount, setPendingRequestCount] = useState<number>(0);
   const [totalItems, setTotalItems] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -378,39 +377,20 @@ export const EmployeeListPage: React.FC = () => {
     }
   };
 
-  const handleAddPayment = (employeeId: string, payment: DebtTransaction) => {
-    setEmployees((prev) =>
-      prev.map((e) => {
-        if (e.id === employeeId) {
-          const updatedDebt = payment.remainingDebtAfter;
-          const updatedHistory = [payment, ...(e.debtHistory || [])];
-          const updated = { ...e, debtAmount: updatedDebt, debtHistory: updatedHistory };
-          if (selectedDetailEmployee?.id === employeeId) {
-            setSelectedDetailEmployee(updated);
-          }
-          return updated;
-        }
-        return e;
-      })
-    );
-  };
+  // Approval requests (đồng bộ từ Backend qua scheduleApprovalApi)
+  const fetchPendingApprovalCount = useCallback(async () => {
+    try {
+      const branchParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
+      const res = await scheduleApprovalApi.getPendingRequests(branchParam);
+      setPendingRequestCount(res.total ?? res.items.length);
+    } catch {
+      // Giữ nguyên số lượng hiện tại nếu lỗi mạng tạm thời
+    }
+  }, [activeBranch]);
 
-  // Approval requests
-  const pendingRequestCount = approvalRequests.filter((r) => r.status === 'pending').length;
-
-  const handleApproveRequests = (ids: string[]) => {
-    setApprovalRequests((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'approved' } : r))
-    );
-    alert(`Đã phê duyệt thành công ${ids.length} yêu cầu!`);
-  };
-
-  const handleRejectRequests = (ids: string[]) => {
-    setApprovalRequests((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'rejected' } : r))
-    );
-    alert(`Đã từ chối ${ids.length} yêu cầu!`);
-  };
+  useEffect(() => {
+    fetchPendingApprovalCount();
+  }, [fetchPendingApprovalCount]);
 
   const handleExportExcel = () => {
     alert(`Đang xuất danh sách ${totalItems} nhân viên ra file Excel...`);
@@ -936,16 +916,22 @@ export const EmployeeListPage: React.FC = () => {
             setEmployeeToDelete(target);
           }
         }}
-        onAddPayment={handleAddPayment}
       />
 
       {/* 3. Modal Duyệt yêu cầu */}
       <ApprovalRequestsModal
         isOpen={showApprovalModal}
         onClose={() => setShowApprovalModal(false)}
-        requests={approvalRequests}
-        onApprove={handleApproveRequests}
-        onReject={handleRejectRequests}
+        branchId={activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined}
+        onSuccess={() => {
+          fetchPendingApprovalCount();
+          setNotification({
+            isOpen: true,
+            type: 'success',
+            title: 'Đã xử lý yêu cầu',
+            message: 'Trạng thái phiếu yêu cầu đã được cập nhật vào hệ thống.',
+          });
+        }}
       />
 
       {/* 4. Modal Import Excel */}

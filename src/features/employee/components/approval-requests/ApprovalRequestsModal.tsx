@@ -13,6 +13,7 @@ import { scheduleApprovalApi } from '../../api/scheduleApprovalApi';
 export interface ApprovalRequestsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  branchId?: string;
   request?: ScheduleApprovalRequestDto | null;
   requests?: any[];
   onApprove?: (ids: string[]) => void;
@@ -23,6 +24,7 @@ export interface ApprovalRequestsModalProps {
 export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
   isOpen,
   onClose,
+  branchId,
   request = null,
   onSuccess,
 }) => {
@@ -39,19 +41,20 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
   const [approvedMinutes, setApprovedMinutes] = useState<number>(60);
   const [isPaidLeave, setIsPaidLeave] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
     try {
       setLoading(true);
       setActionError(null);
-      const res = await scheduleApprovalApi.getPendingRequests();
+      const res = await scheduleApprovalApi.getPendingRequests(branchId);
       setRequests(res.items || []);
     } catch {
       setActionError('Không thể tải danh sách phiếu yêu cầu chờ duyệt.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [branchId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -72,23 +75,25 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
     setReviewNote(approve ? 'Đã duyệt yêu cầu' : 'Từ chối yêu cầu do không đủ điều kiện');
     setApprovedMinutes(req.requestedOvertimeMinutes || 60);
     setIsPaidLeave(req.isPaidLeave);
+    setReviewError(null);
     setConfirmModalOpen(true);
   };
 
   const handleConfirmReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRequest) return;
+    setReviewError(null);
 
     if (!isApproveAction && !reviewNote.trim()) {
-      alert('Vui lòng nhập lý do từ chối yêu cầu.');
+      setReviewError('Vui lòng nhập lý do từ chối yêu cầu.');
       return;
     }
     if (reviewNote.trim().length > 500) {
-      alert('Ghi chú phản hồi không được vượt quá 500 ký tự.');
+      setReviewError('Ghi chú phản hồi không được vượt quá 500 ký tự.');
       return;
     }
     if (isApproveAction && selectedRequest.requestType === ScheduleRequestType.Overtime && (approvedMinutes < 0 || approvedMinutes > 480)) {
-      alert('Số phút OT phê duyệt phải từ 0 đến 480 phút.');
+      setReviewError('Số phút OT phê duyệt phải từ 0 đến 480 phút.');
       return;
     }
 
@@ -110,6 +115,7 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
       await scheduleApprovalApi.reviewRequest(selectedRequest.id, payload);
       setConfirmModalOpen(false);
       setSelectedRequest(null);
+      setReviewError(null);
       onSuccess?.();
       if (request) {
         onClose();
@@ -118,7 +124,7 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
       }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Xử lý yêu cầu thất bại.';
-      alert(msg);
+      setReviewError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -401,6 +407,21 @@ export const ApprovalRequestsModal: React.FC<ApprovalRequestsModalProps> = ({
 
             <form onSubmit={handleConfirmReview}>
               <div className="emp-modal-body" style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {reviewError && (
+                  <div
+                    role="alert"
+                    style={{
+                      padding: '8px 12px',
+                      background: '#FEF2F2',
+                      border: '1px solid #FCA5A5',
+                      borderRadius: 8,
+                      color: '#DC2626',
+                      fontSize: 12.5,
+                    }}
+                  >
+                    {reviewError}
+                  </div>
+                )}
                 <div style={{ fontSize: 13, color: '#334155' }}>
                   Nhân viên: <b>{selectedRequest.employeeName}</b> ({selectedRequest.employeeCode})
                 </div>
