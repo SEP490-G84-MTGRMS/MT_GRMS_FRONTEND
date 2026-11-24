@@ -29,6 +29,10 @@ export interface StoreProductItem {
   category: string;
   /** Đơn vị nhập (DeliveryUoM / IsPurchaseUnit / BaseUnit) — không phải ĐVT bán lẻ. */
   unit: string;
+  /** ĐVT tồn gốc (Product.BaseUnit) — currentStock được tính theo đơn vị này. */
+  stockUnit?: string;
+  /** 1 ĐVT nhập = bao nhiêu ĐVT tồn (base). */
+  purchaseToStockRate?: number;
   imageUrl?: string;
   retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
   costPrice: number; // Giá vốn từ SupplierProduct (NCC rẻ nhất khi nhiều NCC)

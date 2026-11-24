@@ -71,6 +71,8 @@ export const storeProductApi = {
         category: x.category || '',
         // Đơn vị nhập: BE resolve DeliveryUoM → IsPurchaseUnit → BaseUnit (cùng logic màn NCC)
         unit: x.unit || x.deliveryUoM || x.baseUoM || 'Cái',
+        stockUnit: x.stockUnit || x.baseUoM || x.unit || 'Cái',
+        purchaseToStockRate: Number(x.purchaseToStockRate ?? 1) || 1,
         imageUrl: x.imageUrl || undefined,
         retailPrice: x.retailPrice,
         costPrice: x.costPrice,

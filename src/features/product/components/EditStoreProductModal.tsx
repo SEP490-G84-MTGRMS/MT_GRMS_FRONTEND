@@ -502,7 +502,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputCurrentStock"
                     type="text"
                     readOnly
-                    value={`${product.currentStock} ${product.unit}`}
+                    value={`${product.currentStock} ${product.stockUnit || product.unit}`}
                     style={readOnlyInput}
                   />
                 </FieldPair>
