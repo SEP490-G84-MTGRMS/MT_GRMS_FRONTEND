@@ -401,7 +401,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                               alignItems: 'center',
                               color: '#64748b',
                             }}
-                            title="Tùy chọn khác"
+                            title={item.status === 'Paid' ? 'Thao tác phiếu đã chi' : 'Tùy chọn khác'}
                           >
                             <MoreHorizontal size={14} />
                           </button>
