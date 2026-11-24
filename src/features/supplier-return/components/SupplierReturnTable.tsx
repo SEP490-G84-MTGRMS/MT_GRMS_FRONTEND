@@ -69,7 +69,7 @@ export const returnStatusBadge = (status: SupplierReturnStatus) => {
     case 'APPROVED':
       return { label: 'Đã xác nhận', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
     case 'PARTIALLY_HANDED_OVER':
-      return { label: 'Giao 1 phần', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
+      return { label: 'Giao một phần', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
     case 'REJECTED':
       return { label: 'NCC từ chối', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' };
     case 'COMPLETED':
