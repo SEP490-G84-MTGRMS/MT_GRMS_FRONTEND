@@ -642,9 +642,8 @@ export const reportsPnlService = {
             });
           }
 
-          let topProducts: TopProductPerformance[] = [];
-          if (Array.isArray(s.topProducts) && s.topProducts.length > 0) {
-            topProducts = s.topProducts.map((tp: any) => ({
+          const topProducts: TopProductPerformance[] = Array.isArray(s.topProducts)
+            ? s.topProducts.map((tp: any) => ({
               productId: String(tp.productId),
               productCode: tp.productCode || 'SP',
               productName: tp.productName || 'Sản phẩm',
@@ -653,10 +652,8 @@ export const reportsPnlService = {
               cogs: Number(tp.cogs || 0),
               profit: Number(tp.profit || 0),
               marginPct: Number(tp.marginPct || 0),
-            }));
-          } else {
-            topProducts = await this.getLiveTopProducts(branchParam).catch(() => []);
-          }
+            }))
+            : [];
 
           return {
             filter: params,
