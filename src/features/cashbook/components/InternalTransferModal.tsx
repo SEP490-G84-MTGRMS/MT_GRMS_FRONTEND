@@ -24,7 +24,6 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
   const [fromAccountId, setFromAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
-  const [transferFee, setTransferFee] = useState<number | ''>(0);
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const getSubmissionKey = useCashbookSubmissionKey(isOpen);
@@ -41,7 +40,6 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
         setToAccountId('');
       }
       setAmount('');
-      setTransferFee(0);
       setNote('Chuyển tiền nội bộ giữa các tài khoản quỹ');
       setErrorMessage(null);
     }
@@ -88,7 +86,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
         fromAccountId,
         toAccountId,
         amount: numAmount,
-        transferFee: Number(transferFee) || 0,
+        transferFee: 0,
         note: note.trim() || 'Chuyển tiền nội bộ',
       };
       await onSubmit(dto, getSubmissionKey(dto));
@@ -197,20 +195,6 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
                 {Number(amount).toLocaleString('vi-VN')} đ
               </div>
             )}
-          </div>
-
-          {/* Phí chuyển khoản nếu có */}
-          <div className="cb-form-group">
-            <label className="cb-form-label">Phí ngân hàng</label>
-            <input
-              type="number"
-              className="cb-form-input"
-              placeholder="0"
-              value={transferFee}
-              onChange={(e) => setTransferFee(e.target.value === '' ? '' : Number(e.target.value))}
-              min="0"
-              step="1000"
-            />
           </div>
 
           {/* Ghi chú */}
