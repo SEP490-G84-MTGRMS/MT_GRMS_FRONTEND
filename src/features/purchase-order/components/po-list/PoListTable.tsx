@@ -59,7 +59,7 @@ const resolveDisplayStatus = (
 ): { label: string; bg: string; color: string; border: string } => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
   const byStatus: Record<string, { label: string; bg: string; color: string; border: string }> = {
-    PENDING_APPROVAL: { label: 'Chờ duyệt', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
+    PENDING_APPROVAL: { label: 'Chờ nhập', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
     APPROVED: { label: 'Đã duyệt', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
     DISPATCHED: { label: 'Đã gửi', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
     SENT: { label: 'Đã gửi', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },

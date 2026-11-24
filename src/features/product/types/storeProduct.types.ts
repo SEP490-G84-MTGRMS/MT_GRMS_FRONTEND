@@ -86,9 +86,15 @@ export interface StoreProductFilterValues {
   stockAlertFilter?: 'ALL' | 'LOW' | 'OUT_OF_STOCK' | 'NORMAL';
 }
 
+export interface AssignStoreProductItem {
+  productId: string;
+  supplierId?: string;
+}
+
 export interface AssignStoreProductInput {
   storeId: string;
   productIds: string[];
+  items?: AssignStoreProductItem[];
   defaultRetailPrice?: number;
   defaultMinStock?: number;
   defaultMinOrderQuantity?: number;

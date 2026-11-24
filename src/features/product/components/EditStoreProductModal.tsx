@@ -518,7 +518,11 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputSupplierCode"
                     type="text"
                     readOnly
-                    value={product.primarySupplierCode || ''}
+                    value={
+                      product.suppliers && product.suppliers.length > 1
+                        ? product.suppliers.map((s) => s.supplierCode).filter(Boolean).join(', ')
+                        : product.primarySupplierCode || ''
+                    }
                     style={readOnlyInput}
                   />
                 </FieldPair>
@@ -528,7 +532,11 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputSupplierName"
                     type="text"
                     readOnly
-                    value={product.primarySupplierName || ''}
+                    value={
+                      product.suppliers && product.suppliers.length > 1
+                        ? product.suppliers.map((s) => s.supplierName).filter(Boolean).join(', ')
+                        : product.primarySupplierName || ''
+                    }
                     style={readOnlyInput}
                   />
                 </FieldPair>

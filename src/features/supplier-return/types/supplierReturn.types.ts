@@ -128,6 +128,11 @@ export interface SupplierReturnKpiSummary {
 
 export interface SupplierReturnFilterState {
   keyword: string;
+  returnCodes?: string[];
+  grnCodes?: string[];
+  supplierCodes?: string[];
+  supplierNames?: string[];
+  branchNames?: string[];
   branchId: string;
   supplierId: string;
   status: '' | SupplierReturnStatus;

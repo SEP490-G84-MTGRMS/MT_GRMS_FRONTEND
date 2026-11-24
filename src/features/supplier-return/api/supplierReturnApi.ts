@@ -29,6 +29,11 @@ export const supplierReturnApi = {
   }> {
     const params = new URLSearchParams();
     if (filters.keyword) params.append('keyword', filters.keyword);
+    filters.returnCodes?.filter(Boolean).forEach((v) => params.append('returnCodes', v));
+    filters.grnCodes?.filter(Boolean).forEach((v) => params.append('grnCodes', v));
+    filters.supplierCodes?.filter(Boolean).forEach((v) => params.append('supplierCodes', v));
+    filters.supplierNames?.filter(Boolean).forEach((v) => params.append('supplierNames', v));
+    filters.branchNames?.filter(Boolean).forEach((v) => params.append('branchNames', v));
     if (filters.branchId) params.append('branchId', filters.branchId);
     if (filters.supplierId) params.append('supplierId', filters.supplierId);
     if (filters.status) params.append('status', filters.status);
@@ -64,7 +69,34 @@ export const supplierReturnApi = {
         (r) =>
           r.code.toLowerCase().includes(kw) ||
           r.goodsReceiptCode.toLowerCase().includes(kw) ||
+          r.supplierCode.toLowerCase().includes(kw) ||
           r.supplierName.toLowerCase().includes(kw)
+      );
+    }
+    if (filters.returnCodes?.length) {
+      const terms = filters.returnCodes.map((t) => t.toLowerCase());
+      filtered = filtered.filter((r) => terms.some((t) => r.code.toLowerCase().includes(t)));
+    }
+    if (filters.grnCodes?.length) {
+      const terms = filters.grnCodes.map((t) => t.toLowerCase());
+      filtered = filtered.filter((r) => terms.some((t) => r.goodsReceiptCode.toLowerCase().includes(t)));
+    }
+    if (filters.supplierCodes?.length) {
+      const terms = filters.supplierCodes.map((t) => t.toLowerCase());
+      filtered = filtered.filter((r) => terms.some((t) => r.supplierCode.toLowerCase().includes(t)));
+    }
+    if (filters.supplierNames?.length) {
+      const terms = filters.supplierNames.map((t) => t.toLowerCase());
+      filtered = filtered.filter((r) => terms.some((t) => r.supplierName.toLowerCase().includes(t)));
+    }
+    if (filters.branchNames?.length) {
+      const terms = filters.branchNames.map((t) => t.toLowerCase());
+      filtered = filtered.filter((r) =>
+        terms.some(
+          (t) =>
+            r.branchName.toLowerCase().includes(t) ||
+            r.branchCode.toLowerCase().includes(t)
+        )
       );
     }
     if (filters.branchId) {

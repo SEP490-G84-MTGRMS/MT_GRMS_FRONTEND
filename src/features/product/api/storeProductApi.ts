@@ -223,6 +223,7 @@ export const storeProductApi = {
   assignProducts: async (input: AssignStoreProductInput): Promise<void> => {
     await httpClient.post(`/branches/${input.storeId}/products`, {
       productIds: input.productIds,
+      items: input.items,
     });
   },
 

@@ -723,7 +723,7 @@ export const PoListFilterBar: FC<PoListFilterBarProps> = ({
             }}
           >
             <option value="all">-- Tất cả trạng thái --</option>
-            <option value="PENDING_APPROVAL">Chờ duyệt</option>
+            <option value="PENDING_APPROVAL">Chờ nhập</option>
             <option value="APPROVED">Đã duyệt</option>
             <option value="DISPATCHED">Đã gửi NCC (DISPATCHED)</option>
             <option value="SENT">Đã gửi NCC (SENT)</option>

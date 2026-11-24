@@ -147,7 +147,8 @@ export const StoreProductManagementPage: FC = () => {
   const handleAssignProducts = async (input: AssignStoreProductInput) => {
     try {
       await storeProductApi.assignProducts(input);
-      showToast(`Đã gán thành công ${input.productIds.length} sản phẩm vào cửa hàng.`);
+      const count = input.items?.length ?? input.productIds.length;
+      showToast(`Đã gán thành công ${count} sản phẩm vào cửa hàng.`);
       await fetchProducts();
       // Refresh summaries
       const summaries = await storeProductApi.getStoreSummaries();
