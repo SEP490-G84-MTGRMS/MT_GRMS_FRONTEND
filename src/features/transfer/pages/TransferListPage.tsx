@@ -119,7 +119,7 @@ export const TransferListPage: React.FC = () => {
     const today = new Date();
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
     const date =
-      timeRange === 'this_month' && dateField === 'transfer'
+      timeRange === 'this_month'
         ? monthStart
         : timeRange === 'custom' && customDate
         ? new Date(`${customDate}T00:00:00`).toISOString()
@@ -248,11 +248,11 @@ export const TransferListPage: React.FC = () => {
 
       // Recv status
       if (recvStatus === 'match') {
-        const isAllMatch = t.items.every((it) => it.receivedQty === it.sentQty);
+        const isAllMatch = t.items.every((it) => it.receivedQty === it.sentQty && (it.damagedQty ?? 0) === 0);
         if (!isAllMatch || t.status !== 'Completed') return false;
       } else if (recvStatus === 'mismatch') {
-        const hasMismatch = t.items.some((it) => (it.receivedQty ?? it.sentQty) < it.sentQty);
-        if (!hasMismatch) return false;
+        const hasMismatch = t.items.some((it) => (it.damagedQty ?? 0) > 0 || (it.receivedQty ?? it.sentQty) < it.sentQty);
+        if (!hasMismatch || t.status !== 'Completed') return false;
       }
 
       return true;
