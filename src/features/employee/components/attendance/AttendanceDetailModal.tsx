@@ -189,19 +189,38 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
   const badge = getBadgeInfo();
 
   return (
-    <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card" style={{ maxWidth: 580, borderRadius: 16, overflow: 'hidden' }}>
+    <div
+      className="emp-modal-overlay"
+      style={{ zIndex: 1100, padding: 16, boxSizing: 'border-box', overflow: 'hidden' }}
+    >
+      <div
+        className="emp-modal-card"
+        style={{
+          width: '100%',
+          maxWidth: 'min(620px, 100%)',
+          height: 'auto',
+          maxHeight: 'calc(100dvh - 32px)',
+          borderRadius: 16,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+        }}
+      >
         {/* Header Modal */}
         <div
           className="emp-modal-header"
           style={{
             background: 'linear-gradient(to right, #F8FAFC, #FFFFFF)',
-            padding: '18px 24px',
+            padding: '16px 20px',
             borderBottom: '1px solid #E2E8F0',
+            flexShrink: 0,
+            alignItems: 'flex-start',
+            gap: 12,
           }}
         >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0F172A' }}>
                 Chi tiết ca làm việc & Chấm công
               </h3>
@@ -214,27 +233,57 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                   backgroundColor: badge.bg,
                   color: badge.color,
                   border: `1px solid ${badge.border}`,
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {badge.label}
               </span>
             </div>
-            <div style={{ fontSize: 12.5, color: '#64748B', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div
+              style={{
+                fontSize: 12.5,
+                color: '#64748B',
+                marginTop: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                flexWrap: 'wrap',
+                overflowWrap: 'anywhere',
+              }}
+            >
               <span><b>{record.employeeName}</b> ({record.employeeCode})</span>
               <span style={{ color: '#CBD5E1' }}>•</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0F766E', fontWeight: 600 }}>
-                <Building2 size={13} />
+                <Building2 size={13} style={{ flexShrink: 0 }} />
                 {record.branchName || record.gpsLocation || 'Chi nhánh'}
               </span>
             </div>
           </div>
-          <button type="button" className="emp-modal-close-btn" onClick={onClose} title="Đóng">
+          <button
+            type="button"
+            className="emp-modal-close-btn"
+            onClick={onClose}
+            title="Đóng"
+            style={{ flexShrink: 0 }}
+          >
             <X size={20} />
           </button>
         </div>
 
         {/* Body Modal */}
-        <div className="emp-modal-body" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div
+          className="emp-modal-body"
+          style={{
+            padding: '18px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}
+        >
           {isLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: 10, color: '#64748B' }}>
               <Loader2 size={24} className="emp-spin" />
@@ -247,14 +296,16 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                 style={{
                   background: '#F8FAFC',
                   borderRadius: 12,
-                  padding: '14px 18px',
+                  padding: '14px 16px',
                   border: '1px solid #E2E8F0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: '1 1 200px' }}>
                   <div
                     style={{
                       width: 42,
@@ -265,12 +316,13 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      flexShrink: 0,
                     }}
                   >
                     <Calendar size={20} />
                   </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', overflowWrap: 'anywhere' }}>
                       {record.shiftName || 'Ca làm việc'} {record.shiftCode ? `(${record.shiftCode})` : ''}
                     </div>
                     <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
@@ -279,7 +331,7 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                   </div>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#0F766E' }}>
                     {planStart} - {planEnd}
                   </div>
@@ -290,7 +342,7 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
               </div>
 
               {/* Card 2: Lưới Đối Soát Thực Tế Vào Ca / Ra Ca */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
                 {/* Cột VÀO CA */}
                 <div
                   style={{
@@ -301,9 +353,11 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 10,
+                    minWidth: 0,
+                    boxSizing: 'border-box',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
                       <LogIn size={16} color="#059669" />
                       <span>Vào ca</span>
@@ -422,9 +476,11 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 10,
+                    minWidth: 0,
+                    boxSizing: 'border-box',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
                       <LogOut size={16} color="#0284C7" />
                       <span>Ra ca</span>
@@ -547,14 +603,16 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                 style={{
                   background: '#F0FDFA',
                   borderRadius: 12,
-                  padding: '14px 18px',
+                  padding: '14px 16px',
                   border: '1px solid #CCFBF1',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12,
                 }}
               >
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: '#0F766E', fontWeight: 600 }}>TỔNG GIỜ LÀM TÍNH LƯƠNG</div>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#0F766E', marginTop: 2 }}>
                     {actualHours.toFixed(2)} giờ
@@ -594,7 +652,7 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                   }}
                 >
                   <Info size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 2 }} />
-                  <div>
+                  <div style={{ minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>
                     <b>Quy tắc tính tăng ca:</b> Bạn tan ca lúc <b>{actualOut}</b> (sau giờ quy định <b>{planEnd}</b>). Giờ làm thêm ngoài ca chỉ được tính khi có <b>Đơn xin OT được Chủ cửa hàng duyệt</b>. Thời gian ở lại muộn không tự động xóa lỗi <b>Đi muộn ({lateMins}p)</b> hoặc <b>Về sớm ({earlyMins}p)</b>.
                   </div>
                 </div>
@@ -616,7 +674,7 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                   }}
                 >
                   <FileText size={16} color="#64748B" style={{ flexShrink: 0, marginTop: 2 }} />
-                  <div>
+                  <div style={{ minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>
                     <b>Ghi chú:</b> {scheduleDetail?.approvalReason || record.note}
                   </div>
                 </div>
@@ -632,9 +690,12 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
             display: 'flex',
             justifyContent: 'flex-end',
             alignItems: 'center',
-            padding: '14px 24px',
+            padding: '14px 20px',
             background: '#F8FAFC',
             borderTop: '1px solid #E2E8F0',
+            flexShrink: 0,
+            flexWrap: 'wrap',
+            gap: 10,
           }}
         >
           <button
@@ -1127,34 +1188,88 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
   };
 
   return (
-    <div className="emp-modal-overlay" style={{ zIndex: 1100 }}>
-      <div className="emp-modal-card">
+    <div
+      className="emp-modal-overlay"
+      style={{ zIndex: 1100, padding: 16, boxSizing: 'border-box', overflow: 'hidden' }}
+    >
+      <div
+        className="emp-modal-card"
+        style={{
+          width: '100%',
+          maxWidth: 'min(760px, 100%)',
+          height: 'auto',
+          maxHeight: 'calc(100dvh - 32px)',
+          borderRadius: 16,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+        }}
+      >
         {/* Header Modal */}
-        <div className="emp-modal-header" style={{ background: '#F8FAFC', padding: '16px 24px' }}>
-          <div>
+        <div
+          className="emp-modal-header"
+          style={{
+            background: '#F8FAFC',
+            padding: '16px 20px',
+            flexShrink: 0,
+            alignItems: 'flex-start',
+            gap: 12,
+          }}
+        >
+          <div style={{ minWidth: 0, flex: 1 }}>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0F172A' }}>
               Chấm công
             </h3>
-            <div style={{ fontSize: 13, color: '#64748B', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div
+              style={{
+                fontSize: 13,
+                color: '#64748B',
+                marginTop: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                flexWrap: 'wrap',
+                overflowWrap: 'anywhere',
+              }}
+            >
               <span><b>{record.employeeName}</b></span>
               <span style={{ color: '#CBD5E1' }}>|</span>
               <span>{record.employeeCode}</span>
               <span style={{ color: '#CBD5E1' }}>|</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0F766E', fontWeight: 600 }}>
-                <Building2 size={13} />
+                <Building2 size={13} style={{ flexShrink: 0 }} />
                 {record.branchName || record.gpsLocation || 'Chi nhánh'}
               </span>
               <span style={{ color: '#CBD5E1' }}>|</span>
               {getStatusDisplay()}
             </div>
           </div>
-          <button type="button" className="emp-modal-close-btn" onClick={onClose} title="Đóng">
+          <button
+            type="button"
+            className="emp-modal-close-btn"
+            onClick={onClose}
+            title="Đóng"
+            style={{ flexShrink: 0 }}
+          >
             <X size={20} />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="emp-modal-body" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div
+          className="emp-modal-body"
+          style={{
+            padding: '18px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}
+        >
           {/* Thông tin chung: Thời gian, Chi nhánh, Ca làm việc, Ghi chú */}
           <div
             style={{
@@ -1165,50 +1280,52 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
               borderBottom: '1px solid #E2E8F0',
             }}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Thời gian</span>
-              <span style={{ fontSize: 13, color: '#334155' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 12px' }}>
+              <span style={{ width: 112, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Thời gian</span>
+              <span style={{ flex: '1 1 220px', minWidth: 0, fontSize: 13, color: '#334155' }}>
                 Thứ {record.dayOfWeek ? record.dayOfWeek.replace('T', '') : '2'}, {record.dateStr}
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Chi nhánh</span>
-              <span style={{ fontSize: 13, color: '#0F766E', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Building2 size={15} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 12px' }}>
+              <span style={{ width: 112, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Chi nhánh</span>
+              <span style={{ flex: '1 1 220px', minWidth: 0, fontSize: 13, color: '#0F766E', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6, overflowWrap: 'anywhere' }}>
+                <Building2 size={15} style={{ flexShrink: 0 }} />
                 {record.branchName || record.gpsLocation || 'Chi nhánh mặc định'}
               </span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Ca làm việc</span>
-              <select
-                className="emp-form-select"
-                style={{ height: 36, maxWidth: 380, fontSize: 13 }}
-                value={selectedShiftId}
-                onChange={(e) => handleSelectShift(e.target.value)}
-                disabled={isLoadingShifts}
-              >
-                {isLoadingShifts ? (
-                  <option value="">Đang tải ca làm việc từ chi nhánh...</option>
-                ) : availableShifts.length === 0 ? (
-                  <option value="">{record.shiftName || 'Không có ca mẫu cấu hình'}</option>
-                ) : (
-                  availableShifts.map((sc) => {
-                    const timeStr = `${sc.startTime ? sc.startTime.substring(0, 5) : ''} - ${sc.endTime ? sc.endTime.substring(0, 5) : ''}`;
-                    return (
-                      <option key={sc.id} value={sc.id}>
-                        {sc.shiftName} ({timeStr}){sc.durationHours ? ` • ${sc.durationHours}h` : ''}
-                      </option>
-                    );
-                  })
-                )}
-              </select>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 12px' }}>
+              <span style={{ width: 112, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Ca làm việc</span>
+              <div style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 420 }}>
+                <select
+                  className="emp-form-select"
+                  style={{ width: '100%', minWidth: 0, height: 36, fontSize: 13, boxSizing: 'border-box' }}
+                  value={selectedShiftId}
+                  onChange={(e) => handleSelectShift(e.target.value)}
+                  disabled={isLoadingShifts}
+                >
+                  {isLoadingShifts ? (
+                    <option value="">Đang tải ca làm việc từ chi nhánh...</option>
+                  ) : availableShifts.length === 0 ? (
+                    <option value="">{record.shiftName || 'Không có ca mẫu cấu hình'}</option>
+                  ) : (
+                    availableShifts.map((sc) => {
+                      const timeStr = `${sc.startTime ? sc.startTime.substring(0, 5) : ''} - ${sc.endTime ? sc.endTime.substring(0, 5) : ''}`;
+                      return (
+                        <option key={sc.id} value={sc.id}>
+                          {sc.shiftName} ({timeStr}){sc.durationHours ? ` • ${sc.durationHours}h` : ''}
+                        </option>
+                      );
+                    })
+                  )}
+                </select>
+              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', alignItems: 'flex-start', gap: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', paddingTop: 8 }}>Ghi chú</span>
-              <div style={{ maxWidth: 380, width: '100%' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '6px 12px' }}>
+              <span style={{ width: 112, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#0F172A', paddingTop: 8 }}>Ghi chú</span>
+              <div style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 420 }}>
                 <textarea
                   className="emp-form-textarea"
                   rows={3}
@@ -1378,7 +1495,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
             {/* Thiết lập giờ Vào / Ra */}
             {attendanceType === 'working' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 80, fontSize: 13, fontWeight: 600, color: '#0F172A', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
@@ -1401,7 +1518,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, width: 80, fontSize: 13, fontWeight: 600, color: '#0F172A', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
@@ -1435,8 +1552,11 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '14px 24px',
+            padding: '14px 20px',
             background: '#F8FAFC',
+            flexShrink: 0,
+            flexWrap: 'wrap',
+            gap: 10,
           }}
         >
           {/* Nút bên trái: Hủy kết quả */}
