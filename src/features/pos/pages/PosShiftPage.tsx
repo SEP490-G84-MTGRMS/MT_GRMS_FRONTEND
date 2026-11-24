@@ -42,6 +42,13 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
   const { user } = useAuthStore();
   const isStoreOwner = user?.role === 'STORE_OWNER';
 
+  useEffect(() => {
+    if (dailyClosing || !isStoreOwner || !location.pathname.startsWith('/pos/')) return;
+    const params = new URLSearchParams(searchParams);
+    if (!params.get('branchId')) params.set('branchId', 'ALL');
+    navigate(`/store-owner/shifts?${params.toString()}`, { replace: true });
+  }, [dailyClosing, isStoreOwner, location.pathname, searchParams, navigate]);
+
   // Quay về trang gọi (Work schedule hoặc POS checkout)
   const branchFromUrl = searchParams.get('branchId');
   const linkedShiftId = dailyClosing ? null : searchParams.get('shiftId');
@@ -445,7 +452,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
       .find((fund) => {
         const raw = businessDayFundCounts[fund.fundId];
         const value = Number(raw);
-        return raw == null || raw.trim() === '' || !Number.isInteger(value) || value < 0 || value > 999_999_999_999;
+        return raw == null || raw.trim() === '' || !Number.isFinite(value) || value < 0 || value > 999_999_999_999;
       });
     if (pendingShiftsForBusinessDate.length === 0 && invalidFund) {
       alert(`Vui lòng nhập số tiền thực đếm hợp lệ cho quỹ ${invalidFund.fundName}.`);
@@ -651,7 +658,9 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
 
   const formatDate = (isoString?: string) => {
     if (!isoString) return '---';
-    const d = new Date(isoString);
+    const trimmed = isoString.trim();
+    const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+    const d = new Date(hasTz ? trimmed : `${trimmed}Z`);
     if (isNaN(d.getTime())) return isoString;
     return d.toLocaleString('vi-VN', {
       hour: '2-digit',
@@ -1255,9 +1264,14 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                       : 'Thu ngân'}
                   </span>
                 </div>
+                {handoverShift.discrepancyReason && (
+                  <div style={{ marginTop: 4, padding: '6px 8px', backgroundColor: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, fontSize: 12, color: '#991B1B' }}>
+                    <b>Lý do giải trình chênh lệch:</b> {handoverShift.discrepancyReason}
+                  </div>
+                )}
                 {handoverShift.notes && (
                   <div style={{ marginTop: 4, padding: '6px 8px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6, fontSize: 12, color: '#92400E' }}>
-                    <b>Ghi chú / Giải trình chốt ca:</b> {handoverShift.notes}
+                    <b>Ghi chú bàn giao / chốt ca:</b> {handoverShift.notes}
                   </div>
                 )}
               </div>
@@ -1448,6 +1462,22 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                     <div style={{ fontSize: 11.5, color: '#64748B' }}>Vốn đầu ca:</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>{formatVND(selectedDetailShift.openingFloat)}</div>
                   </div>
+                  <div style={{ background: '#F0FDF4', padding: '8px 12px', borderRadius: 6, border: '1px solid #BBF7D0' }}>
+                    <div style={{ fontSize: 11.5, color: '#166534' }}>Doanh thu tiền mặt (+):</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#15803D' }}>
+                      +{formatVND(
+                        selectedDetailShift.totalCashSales !== undefined && selectedDetailShift.totalCashSales !== null
+                          ? selectedDetailShift.totalCashSales
+                          : Math.max(
+                              0,
+                              selectedDetailShift.expectedCash -
+                                selectedDetailShift.openingFloat -
+                                selectedDetailShift.totalCashIn +
+                                selectedDetailShift.totalCashOut
+                            )
+                      )}
+                    </div>
+                  </div>
                   <div style={{ background: '#F8FAFC', padding: '8px 12px', borderRadius: 6, border: '1px solid #E2E8F0' }}>
                     <div style={{ fontSize: 11.5, color: '#64748B' }}>Doanh thu chuyển khoản:</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#0284C7' }}>{formatVND(selectedDetailShift.totalBankRevenue)}</div>
@@ -1496,8 +1526,16 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                         : `Thiếu ${formatVND(selectedDetailShift.discrepancy!)}`}
                   </span>
                 </div>
-                <div style={{ fontSize: 12.5, color: '#334155', marginTop: 4 }}>
-                  <b>Lý do giải trình chênh lệch / Ghi chú ca:</b>
+                {selectedDetailShift.discrepancyReason && (
+                  <div style={{ fontSize: 12.5, color: '#991B1B', marginTop: 6 }}>
+                    <b>Lý do giải trình chênh lệch:</b>
+                    <div style={{ marginTop: 2, padding: '6px 10px', background: '#FFFFFF', borderRadius: 4, border: '1px solid #FECACA', fontWeight: 600 }}>
+                      {selectedDetailShift.discrepancyReason}
+                    </div>
+                  </div>
+                )}
+                <div style={{ fontSize: 12.5, color: '#334155', marginTop: 6 }}>
+                  <b>Ghi chú bàn giao / Ghi chú ca:</b>
                   <div style={{ marginTop: 2, padding: '6px 10px', background: '#FFFFFF', borderRadius: 4, border: '1px solid #E2E8F0', fontStyle: selectedDetailShift.notes ? 'normal' : 'italic' }}>
                     {selectedDetailShift.notes || 'Không có ghi chú hoặc khiếu nại phát sinh trong ca.'}
                   </div>
@@ -1523,24 +1561,69 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                           <th style={{ padding: '6px 10px' }}>Thời gian</th>
                           <th style={{ padding: '6px 10px' }}>Loại</th>
                           <th style={{ padding: '6px 10px', textAlign: 'right' }}>Số tiền</th>
+                          <th style={{ padding: '6px 10px' }}>Trạng thái</th>
                           <th style={{ padding: '6px 10px' }}>Lý do</th>
                           <th style={{ padding: '6px 10px' }}>Người lập</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedDetailShift.cashMovements.map((m) => (
-                          <tr key={m.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                            <td style={{ padding: '6px 10px', color: '#64748B' }}>{formatDate(m.occurredAtUtc)}</td>
-                            <td style={{ padding: '6px 10px' }}>
-                              <span style={{ fontWeight: 600, color: m.movementType === 1 || m.movementType === 'IN' ? '#059669' : '#DC2626' }}>
-                                {m.movementType === 1 || m.movementType === 'IN' ? '[+] Thu' : '[-] Chi'}
-                              </span>
-                            </td>
-                            <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700 }}>{formatVND(m.amount)}</td>
-                            <td style={{ padding: '6px 10px' }}>{m.reason}</td>
-                            <td style={{ padding: '6px 10px', color: '#64748B' }}>{m.createdByName || 'Thu ngân'}</td>
-                          </tr>
-                        ))}
+                        {selectedDetailShift.cashMovements.map((m) => {
+                          const isRejected = m.status === 3 || m.status === 'Rejected';
+                          const isCancelled = m.status === 4 || m.status === 'Cancelled';
+                          const isPending = m.status === 2 || m.status === 'PendingApproval';
+                          const statusBadge = isRejected
+                            ? { text: 'Đã từ chối', bg: '#FEE2E2', color: '#B91C1C', border: '#FCA5A5' }
+                            : isCancelled
+                              ? { text: 'Đã hủy', bg: '#F1F5F9', color: '#475569', border: '#CBD5E1' }
+                              : isPending
+                                ? { text: 'Chờ duyệt', bg: '#FEF3C7', color: '#B45309', border: '#FCD34D' }
+                                : { text: 'Đã ghi nhận', bg: '#DCFCE7', color: '#15803D', border: '#86EFAC' };
+                          return (
+                            <tr
+                              key={m.id}
+                              style={{
+                                borderBottom: '1px solid #F1F5F9',
+                                opacity: isRejected || isCancelled ? 0.65 : 1,
+                                backgroundColor: isRejected ? '#FFF5F5' : undefined,
+                              }}
+                            >
+                              <td style={{ padding: '6px 10px', color: '#64748B', whiteSpace: 'nowrap' }}>{formatDate(m.occurredAtUtc)}</td>
+                              <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                                <span style={{ fontWeight: 600, color: m.movementType === 1 || m.movementType === 'IN' ? '#059669' : '#DC2626' }}>
+                                  {m.movementType === 1 || m.movementType === 'IN' ? '[+] Thu' : '[-] Chi'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '6px 10px', textAlign: 'right', fontWeight: 700, textDecoration: isRejected || isCancelled ? 'line-through' : 'none' }}>
+                                {formatVND(m.amount)}
+                              </td>
+                              <td style={{ padding: '6px 10px', whiteSpace: 'nowrap' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-block',
+                                    padding: '2px 7px',
+                                    borderRadius: 999,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    backgroundColor: statusBadge.bg,
+                                    color: statusBadge.color,
+                                    border: `1px solid ${statusBadge.border}`,
+                                  }}
+                                >
+                                  {statusBadge.text}
+                                </span>
+                              </td>
+                              <td style={{ padding: '6px 10px' }}>
+                                {m.reason}
+                                {isRejected && m.rejectionReason && (
+                                  <div style={{ fontSize: 11, color: '#B91C1C', marginTop: 2 }}>
+                                    Lý do từ chối: {m.rejectionReason}
+                                  </div>
+                                )}
+                              </td>
+                              <td style={{ padding: '6px 10px', color: '#64748B' }}>{m.createdByName || 'Thu ngân'}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1749,7 +1832,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                                 aria-label={`Tiền thực đếm quỹ ${fund.fundName}`}
                                 type="number"
                                 min="0"
-                                step="1"
+                                step="any"
                                 value={businessDayFundCounts[fund.fundId] ?? ''}
                                 onChange={(event) => setBusinessDayFundCounts((current) => ({ ...current, [fund.fundId]: event.target.value }))}
                                 style={{ padding: '7px 9px', border: '1px solid #94A3B8', borderRadius: 6 }}
@@ -1845,31 +1928,49 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                         ? 'Các ca đã đóng của ngày này đã duyệt xong; còn ca đang hoạt động ở trên.'
                         : 'Tất cả các ca đã đóng trong ngày nghiệp vụ này đều đã được duyệt.'}
                   </span>
-                  <button
-                    type="button"
-                    disabled={isSettlingOwnerEod || isLoadingBusinessDayPreview || !businessDayPreview}
-                    title={businessDayPreview?.blockers.length ? 'Bấm để xem lý do chưa thể khóa sổ' : 'Khóa sổ ngày nghiệp vụ'}
-                    onClick={handleApproveBusinessDateShifts}
-                    style={{
-                      padding: '6px 14px',
-                      borderRadius: 6,
-                      border: 'none',
-                      backgroundColor:
-                        '#D97706',
-                      color: '#FFFFFF',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor:
-                        isSettlingOwnerEod || isLoadingBusinessDayPreview || !businessDayPreview ? 'not-allowed' : 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {isSettlingOwnerEod
-                      ? 'Đang duyệt...'
-                      : pendingShiftsForBusinessDate.length > 0
-                        ? `Xác nhận bàn giao (${pendingShiftsForBusinessDate.length} ca)`
-                        : 'Khóa sổ ngày'}
-                  </button>
+                  {(() => {
+                    const isCurrentDayClosed = businessDayHistory.some(
+                      (h) => String(h.status || '').toUpperCase() === 'CLOSED'
+                    );
+                    const isButtonDisabled =
+                      isSettlingOwnerEod ||
+                      isLoadingBusinessDayPreview ||
+                      !businessDayPreview ||
+                      (isCurrentDayClosed && pendingShiftsForBusinessDate.length === 0);
+                    return (
+                      <button
+                        type="button"
+                        disabled={isButtonDisabled}
+                        title={
+                          isCurrentDayClosed && pendingShiftsForBusinessDate.length === 0
+                            ? 'Ngày nghiệp vụ này đã được khóa sổ'
+                            : businessDayPreview?.blockers.length
+                              ? 'Bấm để xem lý do chưa thể khóa sổ'
+                              : 'Khóa sổ ngày nghiệp vụ'
+                        }
+                        onClick={handleApproveBusinessDateShifts}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 6,
+                          border: 'none',
+                          backgroundColor: isButtonDisabled ? '#94A3B8' : '#D97706',
+                          color: '#FFFFFF',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {isSettlingOwnerEod
+                          ? 'Đang duyệt...'
+                          : isCurrentDayClosed && pendingShiftsForBusinessDate.length === 0
+                            ? 'Đã khóa sổ ngày'
+                            : pendingShiftsForBusinessDate.length > 0
+                              ? `Xác nhận bàn giao (${pendingShiftsForBusinessDate.length} ca)`
+                              : 'Khóa sổ ngày'}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
 

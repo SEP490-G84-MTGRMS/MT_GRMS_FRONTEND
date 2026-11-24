@@ -375,7 +375,12 @@ export const CashMovementModal: FC<Props> = ({
                           <span style={{ fontWeight: 600, fontSize: 13 }}>{m.reason}</span>
                         </div>
                         <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
-                          {new Date(m.occurredAtUtc).toLocaleTimeString('vi-VN')} • Tạo bởi: {m.createdByName || 'Thu ngân'}
+                          {(() => {
+                            const raw = (m.occurredAtUtc || '').trim();
+                            const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+                            const dt = new Date(hasTz ? raw : `${raw}Z`);
+                            return Number.isNaN(dt.getTime()) ? raw : dt.toLocaleTimeString('vi-VN');
+                          })()} • Tạo bởi: {m.createdByName || 'Thu ngân'}
                           {isCashDraw && (
                             <span style={{ marginLeft: 8, color: m.isConfirmedByOwner ? '#10b981' : '#f59e0b' }}>
                               [{m.isConfirmedByOwner ? 'Chủ đã nhận tiền' : 'Chờ chủ xác nhận nhận tiền'}]

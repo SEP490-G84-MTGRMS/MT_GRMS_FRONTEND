@@ -717,7 +717,9 @@ export const StorePosCashControlPage: FC = () => {
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <Clock size={13} />
-                            {item.occurredAtUtc ? new Date(item.occurredAtUtc).toLocaleString('vi-VN') : 'Vừa tạo'}
+                            {item.occurredAtUtc
+                              ? new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.occurredAtUtc) ? item.occurredAtUtc : `${item.occurredAtUtc}Z`).toLocaleString('vi-VN')
+                              : 'Vừa tạo'}
                           </span>
                         </div>
                       </div>
@@ -888,7 +890,9 @@ export const StorePosCashControlPage: FC = () => {
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <Clock size={13} />
-                            {item.occurredAtUtc ? new Date(item.occurredAtUtc).toLocaleString('vi-VN') : 'Vừa tạo'}
+                            {item.occurredAtUtc
+                              ? new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.occurredAtUtc) ? item.occurredAtUtc : `${item.occurredAtUtc}Z`).toLocaleString('vi-VN')
+                              : 'Vừa tạo'}
                           </span>
                         </div>
                       </div>
