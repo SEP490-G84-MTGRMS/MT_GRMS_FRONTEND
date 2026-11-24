@@ -54,6 +54,7 @@ export const CloseShiftModal: FC<Props> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [pendingCancelMovementId, setPendingCancelMovementId] = useState<string | null>(null);
 
   // Danh sách phiếu và trạng thái chờ duyệt
   const [movements, setMovements] = useState<ShiftCashMovementDto[]>(shift.cashMovements || []);
@@ -278,13 +279,21 @@ export const CloseShiftModal: FC<Props> = ({
     }));
   };
 
-  const handleCancelPendingMovement = async (id: string) => {
-    if (!window.confirm('Hủy yêu cầu chi này để mở khóa chốt ca?')) return;
+  const handleCancelPendingMovement = (id: string) => {
+    setPendingCancelMovementId(id);
+  };
+
+  const confirmCancelPendingMovement = async () => {
+    if (!pendingCancelMovementId) return;
+    const id = pendingCancelMovementId;
+    setPendingCancelMovementId(null);
+    setErrorMsg(null);
     try {
       await posShiftApi.cancelCashMovement(id);
       await refreshMovements();
+      setInfoMsg('Đã hủy yêu cầu chi đang chờ duyệt.');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể hủy yêu cầu chi');
+      setErrorMsg(err.response?.data?.message || 'Không thể hủy yêu cầu chi');
     }
   };
 
@@ -1113,6 +1122,16 @@ export const CloseShiftModal: FC<Props> = ({
         variant="warning"
         onConfirm={confirmCancelClosing}
         onCancel={() => setShowCancelConfirm(false)}
+      />
+      <ConfirmDialog
+        isOpen={Boolean(pendingCancelMovementId)}
+        title="Hủy yêu cầu chi chờ duyệt"
+        message="Hủy yêu cầu chi này để mở khóa chốt ca?"
+        confirmLabel="Hủy yêu cầu chi"
+        cancelLabel="Quay lại"
+        variant="danger"
+        onConfirm={confirmCancelPendingMovement}
+        onCancel={() => setPendingCancelMovementId(null)}
       />
     </div>
   );
