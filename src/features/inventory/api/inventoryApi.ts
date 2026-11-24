@@ -47,17 +47,10 @@ export const inventoryApi = {
     kpiSummary: InventoryKpiSummary;
   }> {
     const params = new URLSearchParams();
-    const keyword = [
-      ...(filters.skus ?? []),
-      ...(filters.names ?? []),
-      ...(filters.branchCodes ?? []),
-      ...(filters.branchNames ?? []),
-    ]
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-    if (keyword) params.append('keyword', keyword);
+    filters.skus?.filter(Boolean).forEach((v) => params.append('skus', v.trim()));
+    filters.names?.filter(Boolean).forEach((v) => params.append('names', v.trim()));
+    filters.branchCodes?.filter(Boolean).forEach((v) => params.append('branchCodes', v.trim()));
+    filters.branchNames?.filter(Boolean).forEach((v) => params.append('branchNames', v.trim()));
     if (filters.branchId) params.append('branchId', filters.branchId);
     if (filters.category) params.append('category', filters.category);
     if (filters.location) params.append('locationShelf', filters.location);

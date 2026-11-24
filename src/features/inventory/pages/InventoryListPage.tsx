@@ -98,38 +98,14 @@ export const InventoryListPage: FC = () => {
         resolveUniqueBranchId(branchOptions, applied.branchCodes, applied.branchNames) ||
         applied.branchId;
 
-      const hasChipFilters =
-        applied.skus.length > 0 ||
-        applied.names.length > 0 ||
-        applied.branchCodes.length > 0 ||
-        applied.branchNames.length > 0;
-
       const fetchFilters: InventoryFilterState = {
         ...applied,
         branchId: resolvedBranchId,
-        pageIndex: hasChipFilters ? 1 : applied.pageIndex,
-        pageSize: hasChipFilters ? Math.max(applied.pageSize, 100) : applied.pageSize,
       };
 
       const res = await inventoryApi.getStockSummary(fetchFilters);
-      let mapped = res.items;
-
-      if (hasChipFilters) {
-        mapped = mapped.filter(
-          (o) =>
-            tokenMatches(o.sku, applied.skus) &&
-            tokenMatches(o.productName, applied.names) &&
-            tokenMatches(o.branchCode || o.branchName, applied.branchCodes) &&
-            tokenMatches(o.branchName, applied.branchNames)
-        );
-        const total = mapped.length;
-        const start = (applied.pageIndex - 1) * applied.pageSize;
-        setItems(mapped.slice(start, start + applied.pageSize));
-        setTotalCount(total);
-      } else {
-        setItems(mapped);
-        setTotalCount(res.totalCount);
-      }
+      setItems(res.items);
+      setTotalCount(res.totalCount);
     } catch (err: any) {
       setItems([]);
       setTotalCount(0);
