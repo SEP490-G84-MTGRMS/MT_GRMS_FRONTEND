@@ -95,53 +95,60 @@ export const getServiceExpenses = async (
   if (params?.branchId && isGuid(params.branchId)) queryParams.branchId = params.branchId;
   if (params?.fromDate) queryParams.fromDate = `${params.fromDate}T00:00:00Z`;
   if (params?.toDate) queryParams.toDate = `${params.toDate}T23:59:59Z`;
+  if (params?.keyword?.trim()) queryParams.keyword = params.keyword.trim();
+  if (params?.category) queryParams.category = params.category;
+  if (params?.status) queryParams.status = params.status;
+  if (params?.quickStatus && params.quickStatus !== 'ALL') queryParams.quickStatus = params.quickStatus;
 
-  const res = await financeHttpClient.get<ApiResponse<any[]>>('/expenses', {
+  const res = await financeHttpClient.get<ApiResponse<any[]> & { totalItems?: number }>('/expenses', {
     params: queryParams,
   });
 
   if (res.data?.data && Array.isArray(res.data.data)) {
+    const hasServerTotal = typeof res.data.totalItems === 'number';
     let items = res.data.data.map(mapVoucherToExpenseDto);
-    if (params?.keyword) {
-      const q = params.keyword.trim().toLowerCase();
-      items = items.filter(
-        (i) =>
-          (i.voucherCode && i.voucherCode.toLowerCase().includes(q)) ||
-          (i.invoiceNumber && i.invoiceNumber.toLowerCase().includes(q)) ||
-          i.expenseId.toLowerCase().includes(q) ||
-          i.vendorName.toLowerCase().includes(q) ||
-          (i.note && i.note.toLowerCase().includes(q))
-      );
-    }
-    if (params?.category) {
-      const catLabel = EXPENSE_CATEGORY_LABELS[params.category] || params.category;
-      items = items.filter((i) => i.category === params.category || i.category === catLabel);
-    }
-    if (params?.status) {
-      items = items.filter((i) => i.status === params.status);
-    }
-    if (params?.quickStatus && params.quickStatus !== 'ALL') {
-      if (params.quickStatus === 'PENDING_APPROVAL') {
+    if (!hasServerTotal) {
+      if (params?.keyword) {
+        const q = params.keyword.trim().toLowerCase();
         items = items.filter(
           (i) =>
-            i.approvalStatus === 'PendingApproval' ||
-            i.approvalStatus === 'Draft' ||
-            i.approvalStatus === 'Unresolved' ||
-            (i.status === 'Pending' && Boolean(i.isFlaggedAsSuspiciousSplit))
+            (i.voucherCode && i.voucherCode.toLowerCase().includes(q)) ||
+            (i.invoiceNumber && i.invoiceNumber.toLowerCase().includes(q)) ||
+            i.expenseId.toLowerCase().includes(q) ||
+            i.vendorName.toLowerCase().includes(q) ||
+            (i.note && i.note.toLowerCase().includes(q))
         );
-      } else if (params.quickStatus === 'PENDING_PAYMENT') {
-        items = items.filter((i) => i.status === 'Pending');
-      } else if (params.quickStatus === 'PAID') {
-        items = items.filter((i) => i.status === 'Paid');
-      } else if (params.quickStatus === 'SUSPICIOUS') {
-        items = items.filter((i) => Boolean(i.isFlaggedAsSuspiciousSplit));
+      }
+      if (params?.category) {
+        const catLabel = EXPENSE_CATEGORY_LABELS[params.category] || params.category;
+        items = items.filter((i) => i.category === params.category || i.category === catLabel);
+      }
+      if (params?.status) {
+        items = items.filter((i) => i.status === params.status);
+      }
+      if (params?.quickStatus && params.quickStatus !== 'ALL') {
+        if (params.quickStatus === 'PENDING_APPROVAL') {
+          items = items.filter(
+            (i) =>
+              i.approvalStatus === 'PendingApproval' ||
+              i.approvalStatus === 'Draft' ||
+              i.approvalStatus === 'Unresolved' ||
+              (i.status === 'Pending' && Boolean(i.isFlaggedAsSuspiciousSplit))
+          );
+        } else if (params.quickStatus === 'PENDING_PAYMENT') {
+          items = items.filter((i) => i.status === 'Pending');
+        } else if (params.quickStatus === 'PAID') {
+          items = items.filter((i) => i.status === 'Paid');
+        } else if (params.quickStatus === 'SUSPICIOUS') {
+          items = items.filter((i) => Boolean(i.isFlaggedAsSuspiciousSplit));
+        }
       }
     }
     return {
       items,
       page: params?.page || 1,
       pageSize: params?.pageSize || 20,
-      totalItems: items.length,
+      totalItems: hasServerTotal ? (res.data.totalItems as number) : items.length,
     };
   }
 
