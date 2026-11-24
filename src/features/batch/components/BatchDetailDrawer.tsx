@@ -84,25 +84,25 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
       case 'Expired':
         return (
           <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, backgroundColor: '#ffe4e6', color: '#be123c', border: '1px solid #fecdd3' }}>
-            ☠️ Expired (Quá hạn)
+            Quá hạn
           </span>
         );
       case 'Critical':
         return (
           <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
-            🚨 Critical (Khẩn cấp)
+            Khẩn cấp
           </span>
         );
       case 'Warning':
         return (
           <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, backgroundColor: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-            ⚠️ Warning (Cận date)
+            Cận hạn
           </span>
         );
       case 'Normal':
         return (
           <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
-            ✅ Normal (An toàn)
+            An toàn
           </span>
         );
     }
