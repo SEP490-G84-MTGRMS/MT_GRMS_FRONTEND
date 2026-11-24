@@ -52,10 +52,16 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
 
   const activeBranches = branches && branches.length > 0 ? branches : internalBranches;
 
-  // Synchronize search input when external filters (such as URL search param) change
+  // Synchronize search input and period dropdown when external filters (such as URL search param) change
   useEffect(() => {
     setSearchInput(filters.keyword || '');
   }, [filters.keyword]);
+
+  useEffect(() => {
+    if (!filters.fromDate && !filters.toDate && selectedPeriod !== 'all') {
+      setSelectedPeriod('all');
+    }
+  }, [filters.fromDate, filters.toDate, selectedPeriod]);
 
   // Apply date range according to selected period
   const applyPeriod = (

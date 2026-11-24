@@ -21,6 +21,7 @@ import {
   usePayExpense,
   useServiceExpenses,
 } from '../hooks/useServiceExpenses';
+import { getServiceExpenses } from '../api/expenseApi';
 import {
   EXPENSE_CATEGORY_LABELS,
   type CreateExpenseRequest,
@@ -288,13 +289,28 @@ export const ServiceExpensesPage: FC = () => {
     : 0;
   const overdueCount = summaryData?.overdueCount ?? clientOverdueCount;
 
-  const handleExportExcel = () => {
+  const escapeCsvCell = (raw: string | number | null | undefined): string => {
+    const str = String(raw ?? '');
+    const neutralized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+    return `"${neutralized.replace(/"/g, '""')}"`;
+  };
+
+  const handleExportExcel = async () => {
     if (isExporting) return;
     setIsExporting(true);
     showToast('Đang kết xuất danh sách chi phí vận hành ra tệp Excel (.csv)...', 'info');
 
     try {
-      const exportItems = expenseRows;
+      const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]));
+      const allPaged = await getServiceExpenses({
+        ...filters,
+        page: 1,
+        pageSize: 200,
+      });
+      const exportItems = (allPaged.items.length > 0 ? allPaged.items : expenseRows).map((item) => ({
+        ...item,
+        branchName: item.branchName || branchNames.get(item.branchId) || 'Không xác định',
+      }));
       if (!exportItems.length) {
         showToast('Không có dữ liệu chi phí nào để xuất theo bộ lọc hiện tại.', 'warning');
         return;
@@ -327,16 +343,16 @@ export const ServiceExpensesPage: FC = () => {
             ? 'Đã hủy'
             : item.status;
         const row = [
-          `"${code.replace(/"/g, '""')}"`,
-          `"${catLabel.replace(/"/g, '""')}"`,
-          `"${(item.branchName || item.branchId || '').replace(/"/g, '""')}"`,
-          `"${(item.vendorName || '').replace(/"/g, '""')}"`,
-          `"${(item.note || '').replace(/"/g, '""')}"`,
-          `"${item.dueDate || ''}"`,
+          escapeCsvCell(code),
+          escapeCsvCell(catLabel),
+          escapeCsvCell(item.branchName || item.branchId || ''),
+          escapeCsvCell(item.vendorName || ''),
+          escapeCsvCell(item.note || ''),
+          escapeCsvCell(item.dueDate || ''),
           item.amount,
-          `"${statusLabel}"`,
-          `"${item.isTaxDeductible === false ? 'Loại trừ' : 'Hợp lệ'}"`,
-          `"${item.isRecurring ? 'Định kỳ' : 'Không'}"`,
+          escapeCsvCell(statusLabel),
+          escapeCsvCell(item.isTaxDeductible === false ? 'Loại trừ' : 'Hợp lệ'),
+          escapeCsvCell(item.isRecurring ? 'Định kỳ' : 'Không'),
         ];
         csvRows.push(row.join(','));
       }
