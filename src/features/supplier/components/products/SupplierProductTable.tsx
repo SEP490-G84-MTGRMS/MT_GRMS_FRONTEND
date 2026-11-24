@@ -82,8 +82,8 @@ export const SupplierProductTable: FC<SupplierProductTableProps> = ({
           valB = b.name.toLowerCase();
           break;
         case 'supplierCode': {
-          const suppA = supplierMap.get(a.supplierId)?.code || a.supplierId;
-          const suppB = supplierMap.get(b.supplierId)?.code || b.supplierId;
+          const suppA = a.supplierCode || supplierMap.get(a.supplierId)?.code || a.supplierId;
+          const suppB = b.supplierCode || supplierMap.get(b.supplierId)?.code || b.supplierId;
           valA = suppA.toLowerCase();
           valB = suppB.toLowerCase();
           break;
