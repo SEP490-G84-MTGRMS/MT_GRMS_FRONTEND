@@ -1211,9 +1211,15 @@ export const PosCheckoutPage: FC = () => {
     };
   };
 
-  const buildCreateOrderPayload = (debtNote?: string, managerBypass = false, isPendingPayment = false) => {
-    const isDebt = currentTab.paymentMethod === 'debt';
-    const isBank = currentTab.paymentMethod === 'vietqr';
+  const buildCreateOrderPayload = (
+    debtNote?: string,
+    managerBypass = false,
+    isPendingPayment = false,
+    paymentMethodOverride?: 'cash' | 'vietqr' | 'debt',
+  ) => {
+    const effectiveMethod = paymentMethodOverride ?? currentTab.paymentMethod;
+    const isDebt = effectiveMethod === 'debt';
+    const isBank = effectiveMethod === 'vietqr';
     const paymentMethod = isDebt ? 'CREDIT' : isBank ? 'BANK' : 'CASH';
 
     const branchId = activeBranch.id;
@@ -1265,7 +1271,7 @@ export const PosCheckoutPage: FC = () => {
       branchId,
       customerId: currentTab.customer?.id || null,
       paymentMethod,
-      cashTendered: currentTab.paymentMethod === 'cash' ? currentTab.cashTendered : undefined,
+      cashTendered: effectiveMethod === 'cash' ? currentTab.cashTendered : undefined,
       discountAmount: orderDiscountAmount + couponDiscountAmount + pointsDeduction,
       items,
       managerBypassCode: managerBypass ? 'MGR-BYPASS-2026' : undefined,
@@ -1304,6 +1310,24 @@ export const PosCheckoutPage: FC = () => {
       return;
     }
 
+    // Kiểm tra cấu hình VietQR của chi nhánh TRƯỚC khi tạo đơn PendingPayment (tránh sinh đơn rác & giữ tồn sai - DEF-SC19-002)
+    try {
+      const qrRes = await httpClient.get('/payments/public-qr-config', {
+        params: { tenantId: user?.tenantId, branchId: activeBranch.id },
+      });
+      const qrData = qrRes.data;
+      if (!qrData?.paymentAccountId || !qrData?.bankCode || !qrData?.bankAccountNumber || qrData?.isActive === false) {
+        showToast('Chi nhánh chưa có tài khoản VietQR đang hoạt động. Vui lòng liên hệ chủ cửa hàng.', 'error');
+        return;
+      }
+    } catch (cfgErr: any) {
+      const cfgMsg =
+        cfgErr?.response?.data?.message ||
+        'Chi nhánh chưa cấu hình tài khoản nhận VietQR hợp lệ. Không tạo đơn chờ để tránh giữ tồn sai.';
+      showToast(cfgMsg, 'error');
+      return;
+    }
+
     // Nếu đã có đơn chờ thanh toán trước đó cho giỏ hiện tại thì mở lại modal QR
     if (pendingPaymentOrder && pendingPaymentOrder.finalAmount === finalAmount) {
       setIsVietQrOpen(true);
@@ -1324,14 +1348,14 @@ export const PosCheckoutPage: FC = () => {
     }
 
     try {
-      const payload = buildCreateOrderPayload(undefined, false, true);
+      const payload = buildCreateOrderPayload(undefined, false, true, 'vietqr');
       const heldOrder = await posOrderApi.createOrder(payload);
       setPendingPaymentOrder(heldOrder);
       setIsVietQrOpen(true);
       showToast(`Đã giữ hàng cho đơn ${heldOrder.orderCode} chờ xác nhận thanh toán VietQR!`, 'info');
     } catch (apiErr: any) {
       const errMsg = apiErr?.response?.data?.message || apiErr?.message || String(apiErr);
-      alert('Không thể giữ kho chờ thanh toán: ' + errMsg);
+      showToast('Không thể giữ kho chờ thanh toán: ' + errMsg, 'error');
     }
   };
 

@@ -430,6 +430,11 @@ function AccountRow({ item, onConnect, onToggle, onDeposit }: { item: FinanceAcc
           <span className={`fa-type-badge ${isBank ? 'bank' : isSafe ? 'safe' : 'till'}`}>
             {isBank ? 'Tài khoản Ngân hàng' : isSafe ? 'Két Sắt Chi Nhánh' : 'Két Quầy POS'}
           </span>
+          {isBank && !item.isActive && (
+            <span className="fa-status-pill-inactive">
+              Đang tạm ngưng
+            </span>
+          )}
           {!isBank && (
             item.isActive ? (
               <span className="fa-status-pill-active">
@@ -476,9 +481,13 @@ function AccountRow({ item, onConnect, onToggle, onDeposit }: { item: FinanceAcc
         <button
           className={item.isActive ? 'subtle' : 'fa-btn-switch'}
           onClick={onToggle}
-          title={!item.isActive ? 'Bấm để đổi sang két này (két cùng loại đang hoạt động sẽ tự động tắt)' : 'Tạm ngưng két này'}
+          title={
+            isBank
+              ? (item.isActive ? 'Tạm ngưng tài khoản ngân hàng này' : 'Kích hoạt lại tài khoản ngân hàng này')
+              : (!item.isActive ? 'Bấm để đổi sang két này (két cùng loại đang hoạt động sẽ tự động tắt)' : 'Tạm ngưng két này')
+          }
         >
-          {item.isActive ? 'Tạm ngưng' : 'Đổi sang két này →'}
+          {item.isActive ? 'Tạm ngưng' : isBank ? 'Kích hoạt lại tài khoản' : 'Đổi sang két này →'}
         </button>
       </div>
     </article>

@@ -458,10 +458,7 @@ export const PosPaymentPanel: FC<Props> = ({
               type="radio"
               name="pay_method"
               checked={paymentMethod === 'vietqr'}
-              onChange={() => {
-                onPaymentMethodChange('vietqr');
-                onOpenVietQrModal();
-              }}
+              onChange={() => onPaymentMethodChange('vietqr')}
             />
             <b>Chuyển khoản VietQR</b>
           </label>

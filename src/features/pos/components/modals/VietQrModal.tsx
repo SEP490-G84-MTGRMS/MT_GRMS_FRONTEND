@@ -53,6 +53,7 @@ export const VietQrModal: FC<Props> = ({
     paidAmount: number;
     remainingAmount: number;
   } | null>(null);
+  const [qrTemplate, setQrTemplate] = useState<'qr_only' | 'compact2'>('qr_only');
 
   // Đọc cấu hình ngân hàng công khai của cửa hàng (Zero-Plaintext: Không chứa API Key)
   const [bankCode, setBankCode] = useState('');
@@ -194,13 +195,28 @@ export const VietQrModal: FC<Props> = ({
 
   if (!isOpen) return null;
 
-  if (configError) return <div className="pos-modal-overlay" role="dialog" aria-modal="true"><div className="pos-modal-dialog" style={{ maxWidth: 460, padding: 24, textAlign: 'center' }}><ShieldCheck size={38} color="#b86712"/><h3>Chưa thể nhận VietQR</h3><p style={{ color: '#64748b', fontSize: 13 }}>{configError}</p><button type="button" onClick={onClose} style={{ marginTop: 8, padding: '9px 18px', border: 0, borderRadius: 8, background: '#0f766e', color: '#fff', fontWeight: 700 }}>Đóng</button></div></div>;
+  if (configError) {
+    return (
+      <div className="pos-modal-overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div className="pos-modal-dialog" style={{ maxWidth: 460, padding: 24, textAlign: 'center' }}>
+          <ShieldCheck size={38} color="#b86712" style={{ margin: '0 auto 8px' }} />
+          <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: '#0f172a' }}>Chưa thể nhận VietQR</h3>
+          <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>{configError}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ marginTop: 4, padding: '9px 18px', border: 0, borderRadius: 8, background: '#0f766e', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const minutes = Math.floor(countdown / 60);
   const seconds = countdown % 60;
   const timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-  const [qrTemplate, setQrTemplate] = useState<'qr_only' | 'compact2'>('qr_only');
 
   // Tiền tố đơn hàng phân lập theo Tenant viết liền (VD: AN02HD1005) chống app ngân hàng tự động lọc bỏ dấu gạch dưới
   const cleanCode = orderCode.replace(/^HD/i, '');
