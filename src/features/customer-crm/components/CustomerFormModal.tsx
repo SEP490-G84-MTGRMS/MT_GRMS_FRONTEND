@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
-import { X, User, Phone, Mail, MapPin, Award, Building } from 'lucide-react';
+import { X, User, Phone, Mail, MapPin, Award } from 'lucide-react';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
 import {
   sanitizeCustomerText,
@@ -34,7 +34,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
-  const [taxCode, setTaxCode] = useState('');
   const [membershipTier, setMembershipTier] = useState<MembershipTier>('Standard');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -46,14 +45,12 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       setPhoneNumber(initialData.phoneNumber || '');
       setEmail(initialData.email || '');
       setAddress(sanitizeCustomerText(initialData.address));
-      setTaxCode(initialData.taxCode || '');
       setMembershipTier(initialData.membershipTier || 'Standard');
     } else {
       setFullName('');
       setPhoneNumber('');
       setEmail('');
       setAddress('');
-      setTaxCode('');
       setMembershipTier('Standard');
     }
     setErrorMsg('');
@@ -95,7 +92,6 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
         phoneNumber: cleanPhone,
         email: email.trim() || undefined,
         address: sanitizeCustomerText(address) || undefined,
-        taxCode: taxCode.trim() || undefined,
         membershipTier,
       });
     } catch (err: any) {
@@ -213,36 +209,19 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
               </div>
             </div>
 
-            {/* Email & MST */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <div style={{ position: 'relative' }}>
-                  <Mail className="w-4 h-4 customer-search-icon" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="customer@gmail.com"
-                    className="form-input"
-                    style={{ paddingLeft: '40px' }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Mã số thuế</label>
-                <div style={{ position: 'relative' }}>
-                  <Building className="w-4 h-4 customer-search-icon" />
-                  <input
-                    type="text"
-                    value={taxCode}
-                    onChange={(e) => setTaxCode(e.target.value)}
-                    placeholder="0312345678"
-                    className="form-input"
-                    style={{ paddingLeft: '40px', fontFamily: 'var(--font-mono, monospace)' }}
-                  />
-                </div>
+            {/* Email */}
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <div style={{ position: 'relative' }}>
+                <Mail className="w-4 h-4 customer-search-icon" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="customer@gmail.com"
+                  className="form-input"
+                  style={{ paddingLeft: '40px' }}
+                />
               </div>
             </div>
 
