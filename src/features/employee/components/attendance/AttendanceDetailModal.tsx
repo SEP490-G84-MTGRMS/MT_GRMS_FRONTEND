@@ -197,8 +197,9 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
         className="emp-modal-card"
         style={{
           width: '100%',
-          maxWidth: 'min(620px, 100%)',
+          maxWidth: 'min(760px, 100%)',
           height: 'auto',
+          minHeight: 'min(540px, calc(100dvh - 32px))',
           maxHeight: 'calc(100dvh - 32px)',
           borderRadius: 16,
           overflow: 'hidden',
@@ -634,29 +635,6 @@ const StaffAttendanceDetailView: React.FC<StaffAttendanceDetailViewProps> = ({
                   ) : null}
                 </div>
               </div>
-
-              {/* Box Cảnh báo / Nhắc nhở Quy tắc OT */}
-              {actualOut && planEnd && actualOut > planEnd && !hasApprovedOt && (
-                <div
-                  style={{
-                    backgroundColor: '#FFFBEB',
-                    borderRadius: 10,
-                    padding: '12px 14px',
-                    border: '1px solid #FDE68A',
-                    fontSize: 12,
-                    color: '#92400E',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 10,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <Info size={16} color="#D97706" style={{ flexShrink: 0, marginTop: 2 }} />
-                  <div style={{ minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>
-                    <b>Quy tắc tính tăng ca:</b> Bạn tan ca lúc <b>{actualOut}</b> (sau giờ quy định <b>{planEnd}</b>). Giờ làm thêm ngoài ca chỉ được tính khi có <b>Đơn xin OT được Chủ cửa hàng duyệt</b>. Thời gian ở lại muộn không tự động xóa lỗi <b>Đi muộn ({lateMins}p)</b> hoặc <b>Về sớm ({earlyMins}p)</b>.
-                  </div>
-                </div>
-              )}
 
               {/* Ghi chú hoặc Giải trình của Quản lý nếu có */}
               {(record.note || scheduleDetail?.approvalReason) && (
@@ -1196,8 +1174,9 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
         className="emp-modal-card"
         style={{
           width: '100%',
-          maxWidth: 'min(760px, 100%)',
+          maxWidth: 'min(920px, 100%)',
           height: 'auto',
+          minHeight: 'min(620px, calc(100dvh - 32px))',
           maxHeight: 'calc(100dvh - 32px)',
           borderRadius: 16,
           overflow: 'hidden',
@@ -1297,7 +1276,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
 
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px 12px' }}>
               <span style={{ width: 112, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#0F172A' }}>Ca làm việc</span>
-              <div style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 420 }}>
+              <div style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 540 }}>
                 <select
                   className="emp-form-select"
                   style={{ width: '100%', minWidth: 0, height: 36, fontSize: 13, boxSizing: 'border-box' }}
@@ -1325,7 +1304,7 @@ const AttendanceDetailModalContent: React.FC<AttendanceDetailModalContentProps> 
 
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '6px 12px' }}>
               <span style={{ width: 112, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#0F172A', paddingTop: 8 }}>Ghi chú</span>
-              <div style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 420 }}>
+              <div style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 540 }}>
                 <textarea
                   className="emp-form-textarea"
                   rows={3}

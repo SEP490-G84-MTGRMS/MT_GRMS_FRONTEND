@@ -592,11 +592,6 @@ export const PayslipDetailModal: React.FC<PayslipDetailModalProps> = ({
                     <span style={{ color: 'var(--blue-primary, #0F766E)', fontWeight: 500 }}>{formatAmount(totalAllowanceAmount)}</span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ color: '#475569' }}>Thưởng :</span>
-                    <span style={{ color: 'var(--blue-primary, #0F766E)', fontWeight: 500 }}>{formatAmount(effectivePayslip.bonus)}</span>
-                  </div>
-
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 2 }}>
                     <strong style={{ color: '#0F172A' }}>Tổng thu nhập (I) :</strong>
                     <strong style={{ color: '#0F172A' }}>{formatAmount(effectivePayslip.totalEarnings)}</strong>

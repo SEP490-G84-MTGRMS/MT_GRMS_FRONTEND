@@ -130,4 +130,46 @@ describe('AttendanceConfigModal — Tiered Workday Conversion Rules', () => {
     expect(screen.getAllByText('trở lên')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: /Xóa Mức/i })).toBeNull();
   });
+
+  it('disable ô "Từ" từ Mức 2 trở đi và tự động đồng bộ khi sửa ô "đến dưới" của mức liền trước', async () => {
+    render(
+      <AttendanceConfigModal
+        isOpen
+        onClose={vi.fn()}
+        branches={[{ id: 'br-1', name: 'Chi nhánh 1' } as any]}
+        initialBranchId="br-1"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Mức 1:')).toBeTruthy();
+    });
+
+    const m1FromHour = screen.getByLabelText('Mức 1 từ giờ') as HTMLInputElement;
+    const m1FromMin = screen.getByLabelText('Mức 1 từ phút') as HTMLInputElement;
+    const m1ToHour = screen.getByLabelText('Mức 1 đến dưới giờ') as HTMLInputElement;
+    const m1ToMin = screen.getByLabelText('Mức 1 đến dưới phút') as HTMLInputElement;
+    const m2FromHour = screen.getByLabelText('Mức 2 từ giờ') as HTMLInputElement;
+    const m2FromMin = screen.getByLabelText('Mức 2 từ phút') as HTMLInputElement;
+
+    // Mức 1 "Từ" không bị disable; Mức 2 "Từ" bị disable
+    expect(m1FromHour.disabled).toBe(false);
+    expect(m1FromMin.disabled).toBe(false);
+    expect(m2FromHour.disabled).toBe(true);
+    expect(m2FromMin.disabled).toBe(true);
+
+    // Sửa "đến dưới" của Mức 1 thành 5 giờ 30 phút -> Mức 2 "Từ" tự động cập nhật thành 5 giờ 30 phút
+    fireEvent.change(m1ToHour, { target: { value: '5' } });
+    fireEvent.change(m1ToMin, { target: { value: '30' } });
+
+    expect(m2FromHour.value).toBe('5');
+    expect(m2FromMin.value).toBe('30');
+
+    // Thêm Mức 3 -> "Từ" của Mức 3 cũng bị disable
+    fireEvent.click(screen.getByRole('button', { name: /Thêm mức quy đổi/i }));
+    const m3FromHour = screen.getByLabelText('Mức 3 từ giờ') as HTMLInputElement;
+    const m3FromMin = screen.getByLabelText('Mức 3 từ phút') as HTMLInputElement;
+    expect(m3FromHour.disabled).toBe(true);
+    expect(m3FromMin.disabled).toBe(true);
+  });
 });

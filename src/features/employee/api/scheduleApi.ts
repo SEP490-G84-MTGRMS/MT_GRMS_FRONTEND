@@ -465,7 +465,7 @@ export const scheduleApi = {
    * Backend: POST /api/v1/schedules/face-id/check-in
    */
   async checkInFaceId(payload: {
-    scheduleId: string;
+    scheduleId?: string;
     employeeId: string;
     faceMatchScore: number;
     snapshotBase64?: string | null;
@@ -482,7 +482,7 @@ export const scheduleApi = {
    * Backend: POST /api/v1/schedules/face-id/check-out
    */
   async checkOutFaceId(payload: {
-    scheduleId: string;
+    scheduleId?: string;
     employeeId: string;
     faceMatchScore: number;
     snapshotBase64?: string | null;
