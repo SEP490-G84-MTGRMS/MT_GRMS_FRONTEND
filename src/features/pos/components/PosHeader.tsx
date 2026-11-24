@@ -46,6 +46,7 @@ interface Props {
   onOpenCloseShift?: () => void;
   ownerShiftMode?: 'attach' | 'shiftless' | null;
   onOpenOwnerShiftModeModal?: () => void;
+  onNotify?: (message: string, type?: 'success' | 'info' | 'warning' | 'error') => void;
 }
 
 export const PosHeader: FC<Props> = ({
@@ -74,6 +75,7 @@ export const PosHeader: FC<Props> = ({
   onOpenCloseShift,
   ownerShiftMode,
   onOpenOwnerShiftModeModal,
+  onNotify,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -758,7 +760,7 @@ export const PosHeader: FC<Props> = ({
                     onClick={() => {
                       setIsMenuOpen(false);
                       if (!currentShift) {
-                        alert('Quầy chưa mở ca làm việc. Vui lòng mở ca trước khi lập phiếu thu/chi két.');
+                        onNotify?.('Quầy chưa mở ca làm việc. Vui lòng mở ca trước khi lập phiếu thu/chi két.', 'warning');
                         onOpenShift?.();
                         return;
                       }

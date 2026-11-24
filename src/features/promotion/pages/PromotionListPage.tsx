@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback, type FC } from 'react';
-import { Gift, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { ConfirmDialog } from '../../../components/common';
 import { PromotionFilterBar } from '../components/promotions/PromotionFilterBar';
 import { PromotionTable } from '../components/promotions/PromotionTable';
 import { PromotionModal } from '../components/promotions/PromotionModal';
@@ -11,6 +12,7 @@ import '../promotion.css';
 
 export const PromotionListPage: FC = () => {
   const [promotions, setPromotions] = useState<PromotionItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [dbBranches, setDbBranches] = useState<Array<{ id: string; name: string }>>([]);
   const [filter, setFilter] = useState<PromotionFilterState>({
     searchTerm: '',
@@ -18,8 +20,10 @@ export const PromotionListPage: FC = () => {
     status: 'ALL',
     branch: 'ALL',
   });
+  const [codeFilter, setCodeFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromotionItem | null>(null);
+  const [deleteTargetPromo, setDeleteTargetPromo] = useState<PromotionItem | null>(null);
 
   useEffect(() => {
     employeeApi.getBranches().then((list) => {
@@ -203,6 +207,7 @@ export const PromotionListPage: FC = () => {
   }, []);
 
   const loadPromotions = useCallback(async () => {
+    setIsLoading(true);
     try {
       const res = await promotionApi.getPromotions({
         searchTerm: filter.searchTerm || undefined,
@@ -214,6 +219,8 @@ export const PromotionListPage: FC = () => {
       }
     } catch (err) {
       console.warn('Lỗi tải danh sách khuyến mãi:', err);
+    } finally {
+      setIsLoading(false);
     }
   }, [filter.searchTerm, filter.type, filter.status, mapDtoToItem]);
 
@@ -237,6 +244,10 @@ export const PromotionListPage: FC = () => {
   // Filtered promotions
   const filteredPromotions = useMemo(() => {
     return promotions.filter((item) => {
+      if (codeFilter.trim()) {
+        const qCode = codeFilter.trim().toLowerCase();
+        if (!item.code.toLowerCase().includes(qCode)) return false;
+      }
       // Search
       if (filter.searchTerm.trim()) {
         const query = filter.searchTerm.toLowerCase();
@@ -280,7 +291,7 @@ export const PromotionListPage: FC = () => {
       }
       return true;
     });
-  }, [promotions, filter, dbBranches, branchMap]);
+  }, [promotions, filter, codeFilter, dbBranches, branchMap]);
 
   // Handlers
   const handleOpenCreate = () => {
@@ -339,22 +350,28 @@ export const PromotionListPage: FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     const promo = promotions.find((p) => p.id === id);
-    if (promo?.status === 'ACTIVE') {
+    if (!promo) return;
+    if (promo.status === 'ACTIVE') {
       showToast('Không thể xóa chương trình đang chạy. Hãy tạm ngưng chương trình trước.', 'error');
       return;
     }
-    if (window.confirm('Bạn có chắc chắn muốn xóa chương trình khuyến mãi này không?')) {
-      try {
-        await promotionApi.deletePromotion(id);
-      } catch {
-        showToast('Không thể xóa chương trình. Vui lòng kiểm tra trạng thái và thử lại.', 'error');
-        return;
-      }
-      setPromotions((prev) => prev.filter((item) => item.id !== id));
-      showToast(`Đã xóa chương trình "${promo?.name || id}" thành công!`, 'warning');
+    setDeleteTargetPromo(promo);
+  };
+
+  const confirmDeletePromo = async () => {
+    if (!deleteTargetPromo) return;
+    const target = deleteTargetPromo;
+    setDeleteTargetPromo(null);
+    try {
+      await promotionApi.deletePromotion(target.id);
+    } catch {
+      showToast('Không thể xóa chương trình. Vui lòng kiểm tra trạng thái và thử lại.', 'error');
+      return;
     }
+    setPromotions((prev) => prev.filter((item) => item.id !== target.id));
+    showToast(`Đã xóa chương trình "${target.name}" thành công!`, 'warning');
   };
 
   const handleSavePromo = async (savedPromo: PromotionItem) => {
@@ -481,19 +498,10 @@ export const PromotionListPage: FC = () => {
           }}
         />
       )}
-      {/* Top Header */}
-      <div className="promotion-topbar">
-        <div className="promotion-topbar-title">
-          <div className="promotion-topbar-icon">
-            <Gift className="w-6 h-6" />
-          </div>
-          <div className="promotion-topbar-text">
-            <h1>Quản Lý Khuyến Mãi & Ưu Đãi</h1>
-            <p>Thiết lập chiết khấu đơn hàng, mua X tặng Y và ưu đãi theo chi nhánh</p>
-          </div>
-        </div>
-
-        <div className="promotion-topbar-actions">
+      {/* Compact Standard Header */}
+      <div className="so-list-header" style={{ flexShrink: 0, marginBottom: 12 }}>
+        <h1 className="so-list-title">Quản Lý Khuyến Mãi &amp; Ưu Đãi</h1>
+        <div className="so-list-header-actions">
           <button onClick={handleOpenCreate} className="btn-primary-pill">
             <Plus className="w-4 h-4" />
             <span>Tạo mới chương trình</span>
@@ -507,12 +515,15 @@ export const PromotionListPage: FC = () => {
           filter={filter}
           onFilterChange={setFilter}
           onRefresh={loadPromotions}
+          codeTerm={codeFilter}
+          onCodeTermChange={setCodeFilter}
         />
       </div>
 
       {/* Table */}
       <PromotionTable
         promotions={filteredPromotions}
+        isLoading={isLoading}
         onEdit={handleOpenEdit}
         onToggleStatus={handleToggleStatus}
         onDelete={handleDelete}
@@ -526,6 +537,17 @@ export const PromotionListPage: FC = () => {
         onSave={handleSavePromo}
         editingPromo={editingPromo}
         branches={branchNames}
+      />
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTargetPromo)}
+        title="Xóa chương trình khuyến mãi"
+        message={`Bạn có chắc chắn muốn xóa chương trình "${deleteTargetPromo?.name || ''}" (${deleteTargetPromo?.code || ''})? Hành động này không thể hoàn tác.`}
+        confirmLabel="Xóa chương trình"
+        variant="danger"
+        onConfirm={confirmDeletePromo}
+        onCancel={() => setDeleteTargetPromo(null)}
       />
     </div>
   );

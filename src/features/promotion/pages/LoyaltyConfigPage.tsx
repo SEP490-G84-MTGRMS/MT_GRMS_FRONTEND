@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FC } from 'react';
+import { useState, useRef, useEffect, useCallback, type FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Award, Settings, History, Save } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -46,7 +46,7 @@ export const LoyaltyConfigPage: FC = () => {
       });
   }, []);
 
-  useEffect(() => {
+  const loadLedger = useCallback(() => {
     promotionApi.getLoyaltyLedger()
       .then((items) => setLedger(items.map((item) => ({
         ...item,
@@ -57,6 +57,10 @@ export const LoyaltyConfigPage: FC = () => {
         showToast('Không thể tải sổ cái điểm từ máy chủ', 'error');
       });
   }, []);
+
+  useEffect(() => {
+    loadLedger();
+  }, [loadLedger]);
 
   // Active Tab from query param or default to 'config'
   const tabParam = searchParams.get('tab');
@@ -166,17 +170,12 @@ export const LoyaltyConfigPage: FC = () => {
         />
       )}
 
-      {/* Top Header */}
-      <div className="promotion-topbar">
-        <div className="promotion-topbar-title">
-          <div className="promotion-topbar-icon">
-            <Award className="w-6 h-6" />
-          </div>
-          <div className="promotion-topbar-text">
-            <h1>Thiết Lập Tích Điểm & Đổi Thưởng</h1>
-            <p>Cấu hình tỷ lệ tích / tiêu điểm và quản lý sổ cái điểm thưởng cho toàn hệ thống</p>
-          </div>
-        </div>
+      {/* Top Header chuẩn so-list-header (DEF-UI-SC24-001) */}
+      <div className="so-list-header" style={{ marginBottom: 12 }}>
+        <h1 className="so-list-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Award className="w-5 h-5" style={{ color: '#0f766e' }} />
+          <span>Thiết Lập Tích Điểm &amp; Đổi Thưởng</span>
+        </h1>
       </div>
 
       {/* Centered Page Wrapper */}
@@ -254,6 +253,7 @@ export const LoyaltyConfigPage: FC = () => {
           <LoyaltyLedgerTable
             ledger={ledger}
             onOpenAdjustModal={() => setIsAdjustModalOpen(true)}
+            onRefresh={loadLedger}
           />
         )}
       </div>

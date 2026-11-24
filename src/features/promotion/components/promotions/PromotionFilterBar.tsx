@@ -1,4 +1,4 @@
-import type { FC } from 'react';
+import { useState, type FC } from 'react';
 import { Search, RotateCw, RotateCcw, X } from 'lucide-react';
 import type { PromotionFilterState } from '../../types/promotion.types';
 
@@ -6,51 +6,98 @@ interface PromotionFilterBarProps {
   filter: PromotionFilterState;
   onFilterChange: (newFilter: PromotionFilterState) => void;
   onRefresh: () => void;
+  codeTerm?: string;
+  onCodeTermChange?: (val: string) => void;
 }
 
 export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
   filter,
   onFilterChange,
   onRefresh,
+  codeTerm = '',
+  onCodeTermChange,
 }) => {
-  const isFiltered = Boolean(filter.searchTerm || filter.type !== 'ALL' || filter.status !== 'ALL');
+  const [draftCode, setDraftCode] = useState(codeTerm);
+  const [draftName, setDraftName] = useState(filter.searchTerm);
+  const isFiltered = Boolean(
+    filter.searchTerm || codeTerm || draftCode || draftName || filter.type !== 'ALL' || filter.status !== 'ALL'
+  );
+
+  const applySearch = () => {
+    onCodeTermChange?.(draftCode);
+    onFilterChange({ ...filter, searchTerm: draftName });
+  };
+
+  const handleReset = () => {
+    setDraftCode('');
+    setDraftName('');
+    onCodeTermChange?.('');
+    onFilterChange({ ...filter, searchTerm: '', type: 'ALL', status: 'ALL' });
+  };
 
   return (
-    <div className="so-list-filter" style={{ marginBottom: 16 }}>
-      <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
-        {/* 1. Ô Tìm kiếm */}
-        <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
-          <label className="so-list-filter-label">Tìm kiếm:</label>
+    <div className="so-list-filter" style={{ marginBottom: 14 }}>
+      <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 14px', flexWrap: 'wrap' }}>
+        {/* 1. Ô lọc Mã CTKM */}
+        <div className="so-list-filter-field" style={{ flex: '0 1 190px', minWidth: 165 }}>
+          <label className="so-list-filter-label">Mã CTKM:</label>
           <div style={{ position: 'relative', width: '100%' }}>
             <input
               type="text"
-              value={filter.searchTerm}
-              onChange={(e) => onFilterChange({ ...filter, searchTerm: e.target.value })}
-              placeholder="Nhập tên CTKM, mã chương trình..."
+              value={draftCode}
+              onChange={(e) => {
+                setDraftCode(e.target.value);
+                onCodeTermChange?.(e.target.value);
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+              placeholder="Nhập mã CTKM..."
               className="so-list-filter-input"
-              style={{ width: '100%', paddingLeft: 30, paddingRight: filter.searchTerm ? 28 : 10 }}
+              style={{ width: '100%', paddingRight: draftCode ? 26 : 10 }}
+            />
+            {draftCode && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftCode('');
+                  onCodeTermChange?.('');
+                }}
+                style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                title="Xóa mã CTKM"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 2. Ô lọc Tên chương trình */}
+        <div className="so-list-filter-field" style={{ flex: '1 1 220px', minWidth: 200 }}>
+          <label className="so-list-filter-label">Tên CTKM:</label>
+          <div style={{ position: 'relative', width: '100%' }}>
+            <input
+              type="text"
+              value={draftName}
+              onChange={(e) => {
+                setDraftName(e.target.value);
+                onFilterChange({ ...filter, searchTerm: e.target.value });
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+              placeholder="Nhập tên chương trình..."
+              className="so-list-filter-input"
+              style={{ width: '100%', paddingLeft: 28, paddingRight: draftName ? 26 : 10 }}
             />
             <Search
               size={14}
               style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
             />
-            {filter.searchTerm && (
+            {draftName && (
               <button
                 type="button"
-                onClick={() => onFilterChange({ ...filter, searchTerm: '' })}
-                style={{
-                  position: 'absolute',
-                  right: 8,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  color: '#94a3b8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: 2,
+                onClick={() => {
+                  setDraftName('');
+                  onFilterChange({ ...filter, searchTerm: '' });
                 }}
+                style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
                 title="Xóa tìm kiếm"
               >
                 <X size={13} />
@@ -59,7 +106,7 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
           </div>
         </div>
 
-        {/* 2. Lọc Hình thức */}
+        {/* 3. Lọc Hình thức */}
         <div className="so-list-filter-field">
           <label className="so-list-filter-label">Hình thức:</label>
           <select
@@ -74,7 +121,7 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
           </select>
         </div>
 
-        {/* 3. Lọc Trạng thái */}
+        {/* 4. Lọc Trạng thái */}
         <div className="so-list-filter-field">
           <label className="so-list-filter-label">Trạng thái:</label>
           <select
@@ -92,21 +139,29 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
 
         {/* Nút Thao tác Filter */}
         <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          {isFiltered && (
-            <button
-              type="button"
-              onClick={() => onFilterChange({ ...filter, searchTerm: '', type: 'ALL', status: 'ALL' })}
-              className="so-list-filter-reset"
-              title="Đặt lại bộ lọc"
-            >
-              <RotateCcw size={13} />
-              <span>Đặt lại</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={applySearch}
+            className="so-list-filter-search"
+            title="Tìm kiếm"
+          >
+            <Search size={13} />
+            <span>Tìm kiếm</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={!isFiltered}
+            className="so-list-filter-reset"
+            title="Đặt lại bộ lọc"
+          >
+            <RotateCcw size={13} />
+            <span>Đặt lại</span>
+          </button>
           <button
             type="button"
             onClick={onRefresh}
-            className="so-list-filter-search"
+            className="so-list-filter-reset"
             title="Tải lại dữ liệu"
           >
             <RotateCw size={13} />

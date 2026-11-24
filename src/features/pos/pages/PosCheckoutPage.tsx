@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { FC } from 'react';
-import { CheckCircle2, AlertTriangle, ShieldAlert, AlertOctagon } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, AlertOctagon } from 'lucide-react';
+import { AdminToast, type ToastState } from '../../admin/components';
+import { ConfirmDialog } from '../../../components/common';
 import type { OrderTab, CartItem, Product, Customer, ReceiptData } from '../types/pos.types';
 import {
   mockCustomers,
@@ -131,7 +133,15 @@ export const PosCheckoutPage: FC = () => {
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
   const [activeTabId, setActiveTabId] = useState<number>(() => getInitialActiveTabId(currentTenantId, currentUserId, tabs));
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'primary';
+    onConfirm: () => void;
+  } | null>(null);
   const [isInventoryLookupOpen, setIsInventoryLookupOpen] = useState(false);
   const [dbBranches, setDbBranches] = useState<Array<{ id: string; name: string; address?: string; phone?: string }>>([]);
 
@@ -230,42 +240,56 @@ export const PosCheckoutPage: FC = () => {
     return () => window.removeEventListener('mtgrms:customer-debt-changed', refreshCustomerDebt);
   }, []);
 
+  const performBranchSwitch = (target: { id: string; name: string; address?: string; phone?: string }) => {
+    setTabs((current) => current.map((tab) => ({
+      ...tab,
+      cart: [],
+      customer: null,
+      orderDiscountPercent: 0,
+      couponCode: '',
+      couponDiscount: 0,
+      usePoints: false,
+      note: '',
+      paymentMethod: 'cash',
+      cashTendered: 0,
+    })));
+    setGiftItems([]);
+    setPendingPaymentOrder(null);
+    setAppliedPromotionId(undefined);
+    setAppliedPromotions([]);
+    setAutoPromoDiscount(0);
+    setVoucherDiscount(0);
+    setSearchQuery('');
+    setActiveBranch(target);
+    showToast(`Đã chuyển điểm bán sang ${target.name}; chỉ giỏ nháp của tài khoản bạn tại chi nhánh cũ đã được xóa.`, 'info');
+  };
+
   const handleSelectBranch = (branchId: string) => {
     const target = availableBranches.find((b: { id: string; name: string }) => b.id === branchId);
     if (target && target.id !== activeBranch.id) {
       const itemCount = tabsRef.current.reduce((sum, tab) => sum + tab.cart.length, 0);
-      if (itemCount > 0 && !window.confirm(
-        `Đang có ${itemCount} sản phẩm trong các đơn của ${activeBranch.name}. Chuyển chi nhánh sẽ xóa các giỏ hàng này để tránh trừ nhầm kho. Bạn có muốn tiếp tục?`
-      )) return;
-
-      setTabs((current) => current.map((tab) => ({
-        ...tab,
-        cart: [],
-        customer: null,
-        orderDiscountPercent: 0,
-        couponCode: '',
-        couponDiscount: 0,
-        usePoints: false,
-        note: '',
-        paymentMethod: 'cash',
-        cashTendered: 0,
-      })));
-      setGiftItems([]);
-      setPendingPaymentOrder(null);
-      setAppliedPromotionId(undefined);
-      setAppliedPromotions([]);
-      setAutoPromoDiscount(0);
-      setVoucherDiscount(0);
-      setSearchQuery('');
-      setActiveBranch(target);
-      showToast(`Đã chuyển điểm bán sang ${target.name}; chỉ giỏ nháp của tài khoản bạn tại chi nhánh cũ đã được xóa.`, 'info');
+      if (itemCount > 0) {
+        setConfirmDialog({
+          title: 'Xác nhận chuyển chi nhánh',
+          message: `Đang có ${itemCount} sản phẩm trong các đơn của ${activeBranch.name}. Chuyển chi nhánh sẽ xóa các giỏ hàng này để tránh trừ nhầm kho. Bạn có muốn tiếp tục?`,
+          confirmLabel: 'Chuyển chi nhánh',
+          variant: 'warning',
+          onConfirm: () => {
+            setConfirmDialog(null);
+            performBranchSwitch(target);
+          },
+        });
+        return;
+      }
+      performBranchSwitch(target);
     }
   };
 
-  const showToast = (text: string, type: 'success' | 'info' | 'error' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => {
-      setToastMessage((prev) => (prev?.text === text ? null : prev));
+  const showToast = (text: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: String(Date.now()), message: text, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
     }, 4000);
   };
 
@@ -716,16 +740,23 @@ export const PosCheckoutPage: FC = () => {
   const handleCloseTab = (id: number) => {
     if (tabs.length <= 1) {
       if (currentTab.cart.length > 0) {
-        if (confirm('Bạn có muốn làm mới và xóa toàn bộ mặt hàng trong đơn này không?')) {
-          updateCurrentTab({
-            cart: [],
-            customer: null,
-            orderDiscountPercent: 0,
-            couponCode: '',
-            note: '',
-            cashTendered: 0,
-          });
-        }
+        setConfirmDialog({
+          title: 'Làm mới đơn hàng',
+          message: 'Bạn có muốn làm mới và xóa toàn bộ mặt hàng trong đơn này không?',
+          confirmLabel: 'Xóa giỏ hàng',
+          variant: 'danger',
+          onConfirm: () => {
+            setConfirmDialog(null);
+            updateCurrentTab({
+              cart: [],
+              customer: null,
+              orderDiscountPercent: 0,
+              couponCode: '',
+              note: '',
+              cashTendered: 0,
+            });
+          },
+        });
       }
       return;
     }
@@ -739,15 +770,15 @@ export const PosCheckoutPage: FC = () => {
   // Cart operations
   const handleAddToCart = (product: Product, batchId?: string, batchCode?: string, expiryDate?: string, discountPercent = 0, packageItem?: { id: string; netWeight: number; sellingPrice: number }, availableQty?: number) => {
     if (packageItem && currentTab.cart.some((item) => item.packageId === packageItem.id)) {
-      alert(`Khay của sản phẩm "${product.name}" đã có trong đơn.`);
+      showToast(`Khay của sản phẩm "${product.name}" đã có trong đơn.`, 'warning');
       return;
     }
     if ((batchId && availableQty !== undefined && availableQty <= 0) || (!batchId && !packageItem && product.quantityOnHand <= 0)) {
-      alert(`Sản phẩm "${product.name}" đã hết tồn khả dụng tại chi nhánh, không thể thêm vào đơn.`);
+      showToast(`Sản phẩm "${product.name}" đã hết tồn khả dụng tại chi nhánh, không thể thêm vào đơn.`, 'warning');
       return;
     }
     if (!isStoreOwner && !currentShift) {
-      alert('Quầy bán hàng hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc và kiểm đếm tiền đầu ca trước khi bán hàng!');
+      showToast('Quầy bán hàng hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc và kiểm đếm tiền đầu ca trước khi bán hàng!', 'warning');
       setIsOpenShiftModalOpen(true);
       return;
     }
@@ -924,7 +955,7 @@ export const PosCheckoutPage: FC = () => {
       }
     }
 
-    alert(`Không tìm thấy sản phẩm nào khớp với từ khóa "${searchQuery}". Vui lòng thử lại với tên hoặc mã vạch khác!`);
+    showToast(`Không tìm thấy sản phẩm nào khớp với từ khóa "${searchQuery}". Vui lòng thử lại với tên hoặc mã vạch khác!`, 'warning');
   };
 
   // Tải cấu hình tích điểm thành viên từ Backend
@@ -1309,20 +1340,20 @@ export const PosCheckoutPage: FC = () => {
   // Tạo đơn giữ hàng chờ thanh toán (PendingPayment) trước khi mở mã QR chuyển khoản
   const handleStartVietQrPayment = async () => {
     if (!isStoreOwner && !currentShift) {
-      alert('Quầy hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc trước khi thanh toán!');
+      showToast('Quầy hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc trước khi thanh toán!', 'warning');
       setIsOpenShiftModalOpen(true);
       return;
     }
     if (!isStoreOwner && cashierEligibility && !cashierEligibility.isAllowed) {
-      alert(cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.');
+      showToast(cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.', 'error');
       return;
     }
     if (!isStoreOwner && isShiftClosing) {
-      alert('Ca bán hàng đang kiểm đếm chốt ca (Closing). Tạm thời khóa thanh toán.');
+      showToast('Ca bán hàng đang kiểm đếm chốt ca (Closing). Tạm thời khóa thanh toán.', 'warning');
       return;
     }
     if (currentTab.cart.length === 0) {
-      alert('Giỏ hàng đang trống! Vui lòng thêm sản phẩm trước khi tạo mã VietQR.');
+      showToast('Giỏ hàng đang trống! Vui lòng thêm sản phẩm trước khi tạo mã VietQR.', 'warning');
       return;
     }
 
@@ -1502,35 +1533,35 @@ export const PosCheckoutPage: FC = () => {
           }
           showToast('Ca bán hàng vừa kết thúc hoặc đang kiểm đếm. Đã tự động chuyển sang chế độ bán riêng két sắt.', 'info');
         } else {
-          alert('Ca bán hàng đã đóng hoặc đang kiểm đếm: ' + errMsg);
+          showToast('Ca bán hàng đã đóng hoặc đang kiểm đếm: ' + errMsg, 'error');
         }
       } else if (errMsg && errMsg.includes('tồn kho')) {
-        alert(`Cảnh báo kho: ${errMsg}`);
+        showToast(`Cảnh báo kho: ${errMsg}`, 'warning');
       } else {
-        alert('Lỗi tạo đơn hàng: ' + errMsg);
+        showToast('Lỗi tạo đơn hàng: ' + errMsg, 'error');
       }
     }
   };
 
   const handleCheckoutSubmit = () => {
     if (!isStoreOwner && !currentShift) {
-      alert('Quầy hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc và kiểm đếm tiền đầu ca trước khi thanh toán đơn hàng!');
+      showToast('Quầy hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc và kiểm đếm tiền đầu ca trước khi thanh toán đơn hàng!', 'warning');
       setIsOpenShiftModalOpen(true);
       return;
     }
 
     if (!isStoreOwner && cashierEligibility && !cashierEligibility.isAllowed) {
-      alert(cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.');
+      showToast(cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.', 'error');
       return;
     }
 
     if (!isStoreOwner && isShiftClosing) {
-      alert('Ca bán hàng của chi nhánh đang trong trạng thái kiểm đếm chốt ca (Closing). Hệ thống tạm thời khóa thanh toán đơn hàng trên mọi máy quầy.');
+      showToast('Ca bán hàng của chi nhánh đang trong trạng thái kiểm đếm chốt ca (Closing). Hệ thống tạm thời khóa thanh toán đơn hàng trên mọi máy quầy.', 'warning');
       return;
     }
 
     if (currentTab.cart.length === 0) {
-      alert('Giỏ hàng đang trống! Vui lòng thêm sản phẩm trước khi thanh toán.');
+      showToast('Giỏ hàng đang trống! Vui lòng thêm sản phẩm trước khi thanh toán.', 'warning');
       return;
     }
 
@@ -1545,11 +1576,11 @@ export const PosCheckoutPage: FC = () => {
         item.actualPrice < 0
     );
     if (hasInvalidCartLine || !Number.isFinite(finalAmount) || finalAmount < 0) {
-      alert('Giỏ hàng có số lượng, đơn giá hoặc tổng tiền không hợp lệ. Vui lòng kiểm tra lại các mặt hàng.');
+      showToast('Giỏ hàng có số lượng, đơn giá hoặc tổng tiền không hợp lệ. Vui lòng kiểm tra lại các mặt hàng.', 'error');
       return;
     }
     if (currentTab.note.trim().length > 500) {
-      alert('Ghi chú đơn hàng tối đa 500 ký tự.');
+      showToast('Ghi chú đơn hàng tối đa 500 ký tự.', 'warning');
       return;
     }
 
@@ -1557,21 +1588,22 @@ export const PosCheckoutPage: FC = () => {
       currentTab.paymentMethod === 'cash' &&
       (!Number.isSafeInteger(currentTab.cashTendered) || currentTab.cashTendered < finalAmount)
     ) {
-      alert(
+      showToast(
         `Tiền khách đưa (${currentTab.cashTendered.toLocaleString(
           'vi-VN'
-        )} đ) không đủ để thanh toán số tiền cần trả (${finalAmount.toLocaleString('vi-VN')} đ)!`
+        )} đ) không đủ để thanh toán số tiền cần trả (${finalAmount.toLocaleString('vi-VN')} đ)!`,
+        'warning'
       );
       return;
     }
 
     if (currentTab.paymentMethod === 'debt') {
       if (!isStoreOwner) {
-        alert('Chỉ chủ cửa hàng mới được phép thực hiện bán nợ!');
+        showToast('Chỉ chủ cửa hàng mới được phép thực hiện bán nợ!', 'error');
         return;
       }
       if (!currentTab.customer?.id) {
-        alert('Vui lòng tìm và chọn khách hàng định danh trước khi thực hiện bán nợ!');
+        showToast('Vui lòng tìm và chọn khách hàng định danh trước khi thực hiện bán nợ!', 'warning');
         return;
       }
     }
@@ -1612,9 +1644,10 @@ export const PosCheckoutPage: FC = () => {
         onOpenCloseShift={() => setIsCloseShiftModalOpen(true)}
         ownerShiftMode={ownerShiftMode}
         onOpenOwnerShiftModeModal={() => setIsOwnerShiftModeModalOpen(true)}
+        onNotify={showToast}
         onOpenShift={() => {
           if (!isStoreOwner && cashierEligibility && !cashierEligibility.isAllowed) {
-            alert(cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.');
+            showToast(cashierEligibility.reason || 'Bạn không có lịch làm việc trong ca hiện tại của chi nhánh.', 'error');
             return;
           }
           setIsOpenShiftModalOpen(true);
@@ -1867,7 +1900,7 @@ export const PosCheckoutPage: FC = () => {
             item.id === itemId ? { ...item, isBelowCostApproved: true } : item
           );
           updateCurrentTab({ cart: updated });
-          alert('Quản lý đã phê duyệt thành công xuất đơn dưới giá vốn!');
+          showToast('Quản lý đã phê duyệt thành công xuất đơn dưới giá vốn!', 'success');
         }}
       />
 
@@ -1972,35 +2005,25 @@ export const PosCheckoutPage: FC = () => {
         />
       )}
 
-      {toastMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 24,
-            right: 24,
-            zIndex: 9999,
-            padding: '12px 20px',
-            borderRadius: 10,
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            fontSize: 13,
-            fontWeight: 500,
-            background:
-              toastMessage.type === 'success'
-                ? '#0f766e'
-                : toastMessage.type === 'error'
-                ? '#b91c1c'
-                : '#1e293b',
-            color: '#fff',
-            animation: 'fadeIn 0.2s ease-out',
+      {toast && (
+        <AdminToast
+          toast={toast}
+          onClose={() => {
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+            setToast(null);
           }}
-        >
-          <CheckCircle2 size={18} />
-          <span>{toastMessage.text}</span>
-        </div>
+        />
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(confirmDialog)}
+        title={confirmDialog?.title}
+        message={confirmDialog?.message || ''}
+        confirmLabel={confirmDialog?.confirmLabel}
+        variant={confirmDialog?.variant}
+        onConfirm={() => confirmDialog?.onConfirm()}
+        onCancel={() => setConfirmDialog(null)}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
@@ -22,7 +22,8 @@ import { posShiftApi } from '../api/posShiftApi';
 import { posOrderApi, type OwnerUnsettledSummaryResponse } from '../api/posOrderApi';
 import type { ShiftDetailResponse, ConfirmHandoverRequest, BusinessDayClosingPreview, BusinessDayClosingVersion } from '../types/posShift.types';
 import { employeeApi } from '../../employee/api/employeeApi';
-import { TablePagination } from '../../../components/common';
+import { TablePagination, SortableHeader, useTableSort } from '../../../components/common';
+import { AdminToast, type ToastState } from '../../admin/components';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../pos.css';
 
@@ -66,10 +67,19 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
   );
   const [selectedBranchName, setSelectedBranchName] = useState('');
 
-  // Bộ lọc dải thời gian & tìm kiếm
+  // Bộ lọc dải thời gian & tìm kiếm (tách Mã ca & Thu ngân)
   const [timePreset, setTimePreset] = useState<'today' | '7days' | '30days' | 'all'>('7days');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [cashierSearch, setCashierSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((message: string, type: ToastState['type'] = 'info') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: String(Date.now()), message, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+  }, []);
 
   // Trạng thái dữ liệu
   const [shifts, setShifts] = useState<ShiftDetailResponse[]>([]);
@@ -431,17 +441,18 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
       (blocker) => blocker.code !== 'UNCONFIRMED_HANDOVER'
     ) ?? [];
     if (blockersOtherThanPendingHandover.length) {
-      alert(`Chưa thể khóa sổ: còn ${blockersOtherThanPendingHandover.length} việc cần xử lý.`);
+      showToast(`Chưa thể khóa sổ: còn ${blockersOtherThanPendingHandover.length} việc cần xử lý.`, 'warning');
       return;
     }
     if (openShiftsForBusinessDate.length > 0) {
-      alert(`Chưa thể khóa sổ ngày ${eodBusinessDate}: còn ${openShiftsForBusinessDate.length} ca đang mở.`);
+      showToast(`Chưa thể khóa sổ ngày ${eodBusinessDate}: còn ${openShiftsForBusinessDate.length} ca đang mở.`, 'warning');
       return;
     }
     if (pendingShiftsForBusinessDate.length === 0) {
       if (openShiftsForBusinessDate.length > 0) {
-        alert(
-          `Ngày ${eodBusinessDate} hiện không có ca đã đóng nào chờ duyệt (còn ${openShiftsForBusinessDate.length} ca đang mở). Nếu nhân viên quên chốt ca, vui lòng bấm "Buộc đóng ca này"!`
+        showToast(
+          `Ngày ${eodBusinessDate} hiện không có ca đã đóng nào chờ duyệt (còn ${openShiftsForBusinessDate.length} ca đang mở). Nếu nhân viên quên chốt ca, vui lòng bấm "Buộc đóng ca này"!`,
+          'warning'
         );
       }
       if (!businessDayPreview) return;
@@ -455,7 +466,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
         return raw == null || raw.trim() === '' || !Number.isFinite(value) || value < 0 || value > 999_999_999_999;
       });
     if (pendingShiftsForBusinessDate.length === 0 && invalidFund) {
-      alert(`Vui lòng nhập số tiền thực đếm hợp lệ cho quỹ ${invalidFund.fundName}.`);
+      showToast(`Vui lòng nhập số tiền thực đếm hợp lệ cho quỹ ${invalidFund.fundName}.`, 'warning');
       return;
     }
 
@@ -482,7 +493,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
             .map((fund) => [fund.fundId, ''])
         ));
         await fetchShiftHistory();
-        alert(`Đã xác nhận bàn giao ${approvedShiftsCount} ca. Vui lòng kiểm tra số liệu tạm tính rồi bấm Khóa sổ ngày.`);
+        showToast(`Đã xác nhận bàn giao ${approvedShiftsCount} ca. Vui lòng kiểm tra số liệu tạm tính rồi bấm Khóa sổ ngày.`, 'success');
         return;
       }
       const closing = await posShiftApi.closeBusinessDay({
@@ -495,8 +506,9 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
         note: ownerEodNote.trim() || undefined,
       });
       dailyClosing?.onChange();
-      alert(
-        `Đã duyệt ${approvedShiftsCount} ca và khóa sổ ngày ${eodBusinessDate}. Mã chốt ngày: ${closing.referenceCode}.`
+      showToast(
+        `Đã duyệt ${approvedShiftsCount} ca và khóa sổ ngày ${eodBusinessDate}. Mã chốt ngày: ${closing.referenceCode}.`,
+        'success'
       );
       setBusinessDayHistory(await posShiftApi.getBusinessDayHistory(selectedBranchId, eodBusinessDate));
       await fetchShiftHistory();
@@ -511,13 +523,13 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
               .filter((fund) => fund.requiresPhysicalCount)
               .map((fund) => [fund.fundId, current[fund.fundId] ?? ''])
           ));
-          alert('Số liệu hệ thống đã thay đổi. Bản nháp kiểm đếm được giữ lại; vui lòng kiểm tra và xác nhận lại.');
+          showToast('Số liệu hệ thống đã thay đổi. Bản nháp kiểm đếm được giữ lại; vui lòng kiểm tra và xác nhận lại.', 'warning');
           return;
         } catch {
           // Fall through to the original server error when refresh also fails.
         }
       }
-      alert(err?.response?.data?.message || err?.message || 'Lỗi khi duyệt khóa sổ ca trong ngày.');
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi duyệt khóa sổ ca trong ngày.', 'error');
     } finally {
       setIsSettlingOwnerEod(false);
     }
@@ -537,12 +549,13 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
         });
         approvedShiftsCount++;
       }
-      alert(
-        `Đã xác nhận bàn giao ${approvedShiftsCount} ca. Các khoản chưa ghi sổ sẽ được ghi nhận khi khóa sổ ngày.`
+      showToast(
+        `Đã xác nhận bàn giao ${approvedShiftsCount} ca. Các khoản chưa ghi sổ sẽ được ghi nhận khi khóa sổ ngày.`,
+        'success'
       );
       await fetchShiftHistory();
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Lỗi khi duyệt tất cả các ca chờ bàn giao.');
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi duyệt tất cả các ca chờ bàn giao.', 'error');
     } finally {
       setIsSettlingOwnerEod(false);
     }
@@ -563,7 +576,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
     if (!forceCloseTargetShift) return;
     if (forceCloseTargetShift.cashierUserId === user?.id) return;
     if (!forceReason.trim()) {
-      alert('Vui lòng nhập lý do buộc đóng ca (VD: Nhân viên quên bấm chốt ca khi hết giờ).');
+      showToast('Vui lòng nhập lý do buộc đóng ca (VD: Nhân viên quên bấm chốt ca khi hết giờ).', 'warning');
       return;
     }
     const dropped = Math.max(0, forceActualCash - forceRetainedFloat);
@@ -581,28 +594,32 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
         setPreviewRevision((revision) => revision + 1);
         dailyClosing.onChange();
       }
-      alert(`Đã buộc đóng ca #${forceCloseTargetShift.shiftCode}. Các khoản chưa ghi sổ sẽ được ghi nhận khi khóa sổ ngày.`);
+      showToast(`Đã buộc đóng ca #${forceCloseTargetShift.shiftCode}. Các khoản chưa ghi sổ sẽ được ghi nhận khi khóa sổ ngày.`, 'success');
       setForceCloseTargetShift(null);
       setForceReason('');
       await fetchShiftHistory();
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Lỗi khi buộc đóng ca.');
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi buộc đóng ca.', 'error');
     } finally {
       setIsSubmittingForceClose(false);
     }
   };
 
-  // Lọc danh sách ca theo ô tìm kiếm và trạng thái
+  // Lọc danh sách ca theo ô tìm kiếm (Mã ca & Thu ngân tách riêng) và trạng thái
   const filteredShifts = useMemo(() => {
     return shifts.filter((s) => {
       if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase();
+        const q = searchTerm.trim().toLowerCase();
         const matchCode = (s.shiftCode || '').toLowerCase().includes(q);
-        const matchCashier = s.participants?.some(
-          (p) => (p.fullName || p.userName || '').toLowerCase().includes(q)
-        );
         const matchNote = (s.notes || '').toLowerCase().includes(q);
-        if (!matchCode && !matchCashier && !matchNote) return false;
+        if (!matchCode && !matchNote) return false;
+      }
+      if (cashierSearch.trim()) {
+        const cq = cashierSearch.trim().toLowerCase();
+        const matchCashier = s.participants?.some(
+          (p) => (p.fullName || p.userName || '').toLowerCase().includes(cq)
+        );
+        if (!matchCashier) return false;
       }
       if (statusFilter !== 'ALL') {
         const statusStr = String(s.status || '').toUpperCase();
@@ -615,19 +632,31 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
       }
       return true;
     });
-  }, [shifts, searchTerm, statusFilter]);
+  }, [shifts, searchTerm, cashierSearch, statusFilter]);
+
+  const { sort, handleSort, sortedItems: sortedShifts } = useTableSort(filteredShifts, {
+    shiftCode: (s) => s.shiftCode || '',
+    openedAtUtc: (s) => s.openedAtUtc || '',
+    closedAtUtc: (s) => s.closedAtUtc || '',
+    cashier: (s) => s.participants?.[0]?.fullName || s.participants?.[0]?.userName || '',
+    openingFloat: (s) => s.openingFloat ?? 0,
+    expectedCash: (s) => s.expectedCash ?? 0,
+    actualCashCounted: (s) => s.actualCashCounted ?? -1,
+    discrepancy: (s) => s.discrepancy ?? 0,
+    handoverStatus: (s) => String(s.handoverStatus || ''),
+  });
 
   // Dữ liệu phân trang
   const paginatedShifts = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filteredShifts.slice(start, start + pageSize);
-  }, [filteredShifts, currentPage, pageSize]);
+    return sortedShifts.slice(start, start + pageSize);
+  }, [sortedShifts, currentPage, pageSize]);
 
   // Xử lý gửi xác nhận bàn giao
   const handleConfirmHandoverSubmit = async () => {
     if (!handoverShift) return;
     if (handoverDecision === 'DISPUTED' && !disputeReason.trim()) {
-      alert('Vui lòng nhập lý do khiếu nại bàn giao lệch tiền.');
+      showToast('Vui lòng nhập lý do khiếu nại bàn giao lệch tiền.', 'warning');
       return;
     }
 
@@ -639,16 +668,17 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
       };
 
       await posShiftApi.confirmHandover(handoverShift.id, request);
-      alert(
+      showToast(
         handoverDecision === 'CONFIRMED'
           ? 'Đã xác nhận nhận bàn giao ca thành công!'
-          : 'Đã gửi khiếu nại bàn giao ca thành công!'
+          : 'Đã gửi khiếu nại bàn giao ca thành công!',
+        'success'
       );
       setHandoverShift(null);
       setDisputeReason('');
       await fetchShiftHistory();
     } catch (err: any) {
-      alert(err?.response?.data?.message || err?.message || 'Lỗi khi gửi xác nhận bàn giao ca.');
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi gửi xác nhận bàn giao ca.', 'error');
     } finally {
       setIsSubmittingHandover(false);
     }
@@ -795,12 +825,12 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
         </div>
       </div>
 
-      {/* ─── 2. THANH BỘ LỌC CHUẨN SO-LIST-FILTER (GIỐNG STORE PRODUCT) ─── */}
+      {/* ─── 2. THANH BỘ LỌC CHUẨN SO-LIST-FILTER (TÁCH MÃ CA & THU NGÂN) ─── */}
       <div className="so-list-filter" style={{ flexShrink: 0, marginBottom: 12 }}>
-        <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
-          {/* 1. Ô Tìm kiếm Mã ca / Thu ngân */}
-          <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
-            <label className="so-list-filter-label">Tìm kiếm:</label>
+        <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 14px', flexWrap: 'wrap' }}>
+          {/* 1a. Ô Tìm kiếm Mã ca */}
+          <div className="so-list-filter-field" style={{ flex: '0 1 185px', minWidth: 165 }}>
+            <label className="so-list-filter-label">Mã ca:</label>
             <div style={{ position: 'relative', width: '100%' }}>
               <input
                 type="text"
@@ -809,13 +839,9 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Nhập mã ca, tên thu ngân..."
+                placeholder="Nhập mã ca..."
                 className="so-list-filter-input"
-                style={{ width: '100%', paddingLeft: 30, paddingRight: searchTerm ? 28 : 10 }}
-              />
-              <Search
-                size={14}
-                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+                style={{ width: '100%', paddingRight: searchTerm ? 26 : 10 }}
               />
               {searchTerm && (
                 <button
@@ -824,20 +850,43 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                     setSearchTerm('');
                     setCurrentPage(1);
                   }}
-                  style={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: 2,
+                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                  title="Xóa mã ca"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 1b. Ô Tìm kiếm Thu ngân */}
+          <div className="so-list-filter-field" style={{ flex: '1 1 200px', minWidth: 185 }}>
+            <label className="so-list-filter-label">Thu ngân:</label>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type="text"
+                value={cashierSearch}
+                onChange={(e) => {
+                  setCashierSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Nhập tên thu ngân..."
+                className="so-list-filter-input"
+                style={{ width: '100%', paddingLeft: 28, paddingRight: cashierSearch ? 26 : 10 }}
+              />
+              <Search
+                size={14}
+                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+              />
+              {cashierSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCashierSearch('');
+                    setCurrentPage(1);
                   }}
-                  title="Xóa tìm kiếm"
+                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                  title="Xóa tìm thu ngân"
                 >
                   <X size={13} />
                 </button>
@@ -884,26 +933,35 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
 
           {/* Nút Thao tác Filter */}
           <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            {(searchTerm || timePreset !== '7days' || statusFilter !== 'ALL') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('');
-                  setTimePreset('7days');
-                  setStatusFilter('ALL');
-                  setCurrentPage(1);
-                }}
-                className="so-list-filter-reset"
-                title="Đặt lại bộ lọc"
-              >
-                <RotateCcw size={13} />
-                <span>Đặt lại</span>
-              </button>
-            )}
             <button
               type="button"
               onClick={fetchShiftHistory}
               className="so-list-filter-search"
+              title="Tìm kiếm"
+            >
+              <Search size={13} />
+              <span>Tìm kiếm</span>
+            </button>
+            <button
+              type="button"
+              disabled={!searchTerm && !cashierSearch && timePreset === '7days' && statusFilter === 'ALL'}
+              onClick={() => {
+                setSearchTerm('');
+                setCashierSearch('');
+                setTimePreset('7days');
+                setStatusFilter('ALL');
+                setCurrentPage(1);
+              }}
+              className="so-list-filter-reset"
+              title="Đặt lại bộ lọc"
+            >
+              <RotateCcw size={13} />
+              <span>Đặt lại</span>
+            </button>
+            <button
+              type="button"
+              onClick={fetchShiftHistory}
+              className="so-list-filter-reset"
               title="Tải lại dữ liệu"
             >
               <RefreshCw size={13} className={isLoading ? 'spin' : ''} />
@@ -944,11 +1002,12 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
         </div>
 
         <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-          <table className="so-list-table" style={{ minWidth: 1205, width: '100%', tableLayout: 'fixed' }}>
+          <table className="so-list-table" style={{ minWidth: 1320, width: '100%', tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: 110 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 185 }} />
+              <col style={{ width: 130 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 175 }} />
               <col style={{ width: 110 }} />
               <col style={{ width: 115 }} />
               <col style={{ width: 115 }} />
@@ -958,28 +1017,47 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
             </colgroup>
             <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
               <tr>
-                <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Mã ca</th>
-                <th style={{ width: 160, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thời gian mở - đóng</th>
-                <th style={{ width: 185, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>Thu ngân</th>
-                <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền đầu ca</th>
-                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Tiền lý thuyết</th>
-                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Thực đếm</th>
-                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>Chênh lệch</th>
-                <th style={{ width: 135, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Xác nhận kết ca</th>
+                <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>
+                  <SortableHeader label="Mã ca" active={sort.key === 'shiftCode'} direction={sort.direction} onClick={() => handleSort('shiftCode')} />
+                </th>
+                <th style={{ width: 130, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>
+                  <SortableHeader label="Giờ mở ca" active={sort.key === 'openedAtUtc'} direction={sort.direction} onClick={() => handleSort('openedAtUtc')} />
+                </th>
+                <th style={{ width: 140, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>
+                  <SortableHeader label="Giờ đóng ca" active={sort.key === 'closedAtUtc'} direction={sort.direction} onClick={() => handleSort('closedAtUtc')} />
+                </th>
+                <th style={{ width: 175, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box' }}>
+                  <SortableHeader label="Thu ngân" active={sort.key === 'cashier'} direction={sort.direction} onClick={() => handleSort('cashier')} />
+                </th>
+                <th style={{ width: 110, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>
+                  <SortableHeader label="Tiền đầu ca" align="right" active={sort.key === 'openingFloat'} direction={sort.direction} onClick={() => handleSort('openingFloat')} />
+                </th>
+                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>
+                  <SortableHeader label="Tiền lý thuyết" align="right" active={sort.key === 'expectedCash'} direction={sort.direction} onClick={() => handleSort('expectedCash')} />
+                </th>
+                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>
+                  <SortableHeader label="Thực đếm" align="right" active={sort.key === 'actualCashCounted'} direction={sort.direction} onClick={() => handleSort('actualCashCounted')} />
+                </th>
+                <th style={{ width: 115, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'right' }}>
+                  <SortableHeader label="Chênh lệch" align="right" active={sort.key === 'discrepancy'} direction={sort.direction} onClick={() => handleSort('discrepancy')} />
+                </th>
+                <th style={{ width: 135, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>
+                  <SortableHeader label="Xác nhận kết ca" align="center" active={sort.key === 'handoverStatus'} direction={sort.direction} onClick={() => handleSort('handoverStatus')} />
+                </th>
                 <th style={{ width: 160, position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc', padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #cbd5e1', userSelect: 'none', boxSizing: 'border-box', textAlign: 'center' }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan={10} style={{ padding: '36px', textAlign: 'center', color: '#64748b' }}>
                     <RefreshCw size={20} className="spin text-teal-700" style={{ margin: '0 auto 8px' }} />
                     <div>Đang tải lịch sử ca làm việc từ hệ thống...</div>
                   </td>
                 </tr>
               ) : paginatedShifts.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
+                  <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
                     <AlertCircle size={24} color="#94A3B8" style={{ margin: '0 auto 8px' }} />
                     <div style={{ fontWeight: 600, color: '#334155' }}>Không có ca làm việc nào trong khoảng thời gian này</div>
                     <div style={{ fontSize: 12, marginTop: 4 }}>Hãy chọn khoảng thời gian khác hoặc kiểm tra lại chi nhánh đã chọn.</div>
@@ -1018,9 +1096,13 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                       <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         <span className="so-list-code font-mono font-bold">{s.shiftCode}</span>
                       </td>
+                      <td className="so-list-td" style={{ color: '#334155', fontSize: 12, overflow: 'hidden', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono, monospace)' }}>
+                        {formatDate(s.openedAtUtc)}
+                      </td>
                       <td className="so-list-td" style={{ color: '#334155', fontSize: 12, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                        <div><b>Mở:</b> {formatDate(s.openedAtUtc)}</div>
-                        <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981', fontWeight: 600 }}>Đang mở</span>}</div>
+                        <div style={{ fontFamily: 'var(--font-mono, monospace)' }}>
+                          {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981', fontWeight: 600, fontFamily: 'inherit' }}>Đang mở</span>}
+                        </div>
                         {earlyLateText && (
                           <div
                             style={{
@@ -1035,7 +1117,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
                               backgroundColor: isEarlyClose ? '#FEF3C7' : isLateClose ? '#FEE2E2' : '#E0F2FE',
                               color: isEarlyClose ? '#B45309' : isLateClose ? '#B91C1C' : '#0369A1',
                               border: isEarlyClose ? '1px solid #FCD34D' : isLateClose ? '1px solid #FCA5A5' : '1px solid #BAE6FD',
-                              maxWidth: 135,
+                              maxWidth: 130,
                             }}
                             title={`Giải trình giờ chốt ca: ${earlyLateText}`}
                           >
@@ -2166,6 +2248,16 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {toast && (
+        <AdminToast
+          toast={toast}
+          onClose={() => {
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+            setToast(null);
+          }}
+        />
       )}
     </div>
   );

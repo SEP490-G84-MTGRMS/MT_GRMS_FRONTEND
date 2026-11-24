@@ -1,12 +1,13 @@
 import { useState, useMemo, useRef, useEffect, useCallback, type FC } from 'react';
 import {
-  Ticket,
   Plus,
   Search,
   RotateCw,
+  RotateCcw,
   X,
 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { ConfirmDialog } from '../../../components/common';
 import { VoucherBatchTable } from '../components/vouchers/VoucherBatchTable';
 import { VoucherBatchModal } from '../components/vouchers/VoucherBatchModal';
 import { GenerateCodesModal } from '../components/vouchers/GenerateCodesModal';
@@ -39,6 +40,8 @@ export const VoucherListPage: FC = () => {
   const [editingBatch, setEditingBatch] = useState<VoucherBatchItem | null>(null);
   const [generateTargetBatch, setGenerateTargetBatch] = useState<VoucherBatchItem | null>(null);
   const [codesRefreshSignal, setCodesRefreshSignal] = useState<{ batchId: string; version: number } | null>(null);
+  const [codeFilter, setCodeFilter] = useState('');
+  const [deleteTargetBatch, setDeleteTargetBatch] = useState<VoucherBatchItem | null>(null);
 
   const mapDtoToBatch = useCallback((dto: VoucherBatchDto): VoucherBatchItem => {
     const rawDesc = dto.description || '';
@@ -103,6 +106,10 @@ export const VoucherListPage: FC = () => {
   // Filtered
   const filteredBatches = useMemo(() => {
     return batches.filter((b) => {
+      if (codeFilter.trim()) {
+        const cq = codeFilter.trim().toLowerCase();
+        if (!b.batchCode.toLowerCase().includes(cq) && !b.prefix.toLowerCase().includes(cq)) return false;
+      }
       if (filter.searchTerm.trim()) {
         const query = filter.searchTerm.toLowerCase();
         const matchCode = b.batchCode.toLowerCase().includes(query);
@@ -118,7 +125,7 @@ export const VoucherListPage: FC = () => {
       }
       return true;
     });
-  }, [batches, filter]);
+  }, [batches, filter, codeFilter]);
 
   const handleToggleBatchStatus = async (batchId: string) => {
     try {
@@ -156,21 +163,26 @@ export const VoucherListPage: FC = () => {
     setIsCreateModalOpen(true);
   };
 
-  const handleDeleteBatch = async (batchId: string) => {
+  const handleDeleteBatch = (batchId: string) => {
     const target = batches.find((b) => b.id === batchId);
     if (!target) return;
     if (target.status === 'ACTIVE') {
       showToast('Không thể xóa đợt voucher đang lưu hành. Hãy tạm dừng trước khi xóa.', 'error');
       return;
     }
-    if (window.confirm(`Bạn có chắc chắn muốn xóa đợt voucher "${target.name}"?`)) {
-      try {
-        await promotionApi.deleteVoucherBatch(batchId);
-        setBatches((prev) => prev.filter((b) => b.id !== batchId));
-        showToast(`Đã xóa đợt voucher "${target.name}" thành công!`);
-      } catch {
-        showToast('Không thể xóa đợt voucher. Nếu đang chạy, hãy tạm dừng trước.', 'error');
-      }
+    setDeleteTargetBatch(target);
+  };
+
+  const confirmDeleteBatch = async () => {
+    if (!deleteTargetBatch) return;
+    const target = deleteTargetBatch;
+    setDeleteTargetBatch(null);
+    try {
+      await promotionApi.deleteVoucherBatch(target.id);
+      setBatches((prev) => prev.filter((b) => b.id !== target.id));
+      showToast(`Đã xóa đợt voucher "${target.name}" thành công!`);
+    } catch {
+      showToast('Không thể xóa đợt voucher. Nếu đang chạy, hãy tạm dừng trước.', 'error');
     }
   };
 
@@ -265,19 +277,10 @@ export const VoucherListPage: FC = () => {
         />
       )}
 
-      {/* Top Header */}
-      <div className="promotion-topbar">
-        <div className="promotion-topbar-title">
-          <div className="promotion-topbar-icon">
-            <Ticket className="w-6 h-6" />
-          </div>
-          <div className="promotion-topbar-text">
-            <h1>Quản Lý Voucher & Coupon</h1>
-            <p>Phát hành theo đợt, tạo mã hàng loạt và theo dõi tỷ lệ sử dụng mã ưu đãi</p>
-          </div>
-        </div>
-
-        <div className="promotion-topbar-actions">
+      {/* Compact Standard Header */}
+      <div className="so-list-header" style={{ flexShrink: 0, marginBottom: 12 }}>
+        <h1 className="so-list-title">Quản Lý Voucher &amp; Coupon</h1>
+        <div className="so-list-header-actions">
           <button onClick={handleOpenCreate} className="btn-primary-pill">
             <Plus className="w-4 h-4" />
             <span>Tạo mới đợt phát hành</span>
@@ -285,97 +288,121 @@ export const VoucherListPage: FC = () => {
         </div>
       </div>
 
-      {/* Filter Bar chuẩn StoreProductFilter */}
+      {/* Filter Bar chuẩn StoreProductFilter (tách Mã đợt & Tên đợt) */}
       <div style={{ flexShrink: 0, marginBottom: 12 }}>
         <div className="so-list-filter">
-        <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 16px' }}>
-          <div className="so-list-filter-field" style={{ flex: '1 1 280px', minWidth: 240 }}>
-            <label className="so-list-filter-label">Tìm kiếm:</label>
-            <div style={{ position: 'relative', width: '100%' }}>
-              <input
-                type="text"
-                value={filter.searchTerm}
-                onChange={(e) => setFilter({ ...filter, searchTerm: e.target.value })}
-                placeholder="Tìm theo tên đợt, mã đợt, tiền tố..."
-                className="so-list-filter-input"
-                style={{ width: '100%', paddingLeft: 30, paddingRight: filter.searchTerm ? 28 : 10 }}
-              />
-              <Search
-                size={14}
-                style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
-              />
-              {filter.searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setFilter({ ...filter, searchTerm: '' })}
-                  style={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    color: '#94a3b8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: 2,
-                  }}
-                  title="Xóa tìm kiếm"
-                >
-                  <X size={13} />
-                </button>
-              )}
+          <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 14px', flexWrap: 'wrap' }}>
+            <div className="so-list-filter-field" style={{ flex: '0 1 190px', minWidth: 165 }}>
+              <label className="so-list-filter-label">Mã đợt:</label>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type="text"
+                  value={codeFilter}
+                  onChange={(e) => setCodeFilter(e.target.value)}
+                  placeholder="Nhập mã đợt, tiền tố..."
+                  className="so-list-filter-input"
+                  style={{ width: '100%', paddingRight: codeFilter ? 26 : 10 }}
+                />
+                {codeFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setCodeFilter('')}
+                    style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                    title="Xóa mã đợt"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="so-list-filter-field">
-            <label className="so-list-filter-label">Loại ưu đãi:</label>
-            <select
-              value={filter.discountType}
-              onChange={(e) => setFilter({ ...filter, discountType: e.target.value })}
-              className={`so-list-filter-select ${filter.discountType !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
-            >
-              <option value="ALL">Tất cả hình thức</option>
-              <option value="FIXED_AMOUNT">Giảm tiền mặt (VNĐ)</option>
-              <option value="PERCENT">Giảm phần trăm (%)</option>
-            </select>
-          </div>
+            <div className="so-list-filter-field" style={{ flex: '1 1 220px', minWidth: 200 }}>
+              <label className="so-list-filter-label">Tên đợt:</label>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type="text"
+                  value={filter.searchTerm}
+                  onChange={(e) => setFilter({ ...filter, searchTerm: e.target.value })}
+                  placeholder="Nhập tên đợt phát hành..."
+                  className="so-list-filter-input"
+                  style={{ width: '100%', paddingLeft: 28, paddingRight: filter.searchTerm ? 26 : 10 }}
+                />
+                <Search
+                  size={14}
+                  style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
+                />
+                {filter.searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setFilter({ ...filter, searchTerm: '' })}
+                    style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                    title="Xóa tìm kiếm"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
 
-          <div className="so-list-filter-field">
-            <label className="so-list-filter-label">Trạng thái:</label>
-            <select
-              value={filter.status}
-              onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-              className={`so-list-filter-select ${filter.status !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTIVE">Đang lưu hành</option>
-              <option value="PAUSED">Tạm dừng</option>
-              <option value="EXPIRED">Đã hết hạn</option>
-            </select>
-          </div>
+            <div className="so-list-filter-field">
+              <label className="so-list-filter-label">Loại ưu đãi:</label>
+              <select
+                value={filter.discountType}
+                onChange={(e) => setFilter({ ...filter, discountType: e.target.value })}
+                className={`so-list-filter-select ${filter.discountType !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+              >
+                <option value="ALL">Tất cả hình thức</option>
+                <option value="FIXED_AMOUNT">Giảm tiền mặt (VNĐ)</option>
+                <option value="PERCENT">Giảm phần trăm (%)</option>
+              </select>
+            </div>
 
-          <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            {(filter.searchTerm || filter.discountType !== 'ALL' || filter.status !== 'ALL') && (
+            <div className="so-list-filter-field">
+              <label className="so-list-filter-label">Trạng thái:</label>
+              <select
+                value={filter.status}
+                onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+                className={`so-list-filter-select ${filter.status !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">Đang lưu hành</option>
+                <option value="PAUSED">Tạm dừng</option>
+                <option value="EXPIRED">Đã hết hạn</option>
+              </select>
+            </div>
+
+            <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
               <button
                 type="button"
-                onClick={() => setFilter({ searchTerm: '', discountType: 'ALL', status: 'ALL' })}
+                onClick={loadBatches}
+                className="so-list-filter-search"
+                title="Tìm kiếm"
+              >
+                <Search size={13} />
+                <span>Tìm kiếm</span>
+              </button>
+              <button
+                type="button"
+                disabled={!codeFilter && !filter.searchTerm && filter.discountType === 'ALL' && filter.status === 'ALL'}
+                onClick={() => {
+                  setCodeFilter('');
+                  setFilter({ searchTerm: '', discountType: 'ALL', status: 'ALL' });
+                }}
                 className="so-list-filter-reset"
                 title="Đặt lại bộ lọc"
               >
+                <RotateCcw size={13} />
                 <span>Đặt lại</span>
               </button>
-            )}
-            <button
-              type="button"
-              onClick={loadBatches}
-              className="so-list-filter-search"
-              title="Tải lại dữ liệu"
-            >
-              <RotateCw size={13} />
-              <span>Làm mới</span>
-            </button>
+              <button
+                type="button"
+                onClick={loadBatches}
+                className="so-list-filter-reset"
+                title="Tải lại dữ liệu"
+              >
+                <RotateCw size={13} />
+                <span>Làm mới</span>
+              </button>
           </div>
         </div>
       </div>
@@ -408,6 +435,15 @@ export const VoucherListPage: FC = () => {
         onClose={() => setGenerateTargetBatch(null)}
         batch={generateTargetBatch}
         onGenerate={handleGenerateCodes}
+      />
+
+      <ConfirmDialog
+        isOpen={!!deleteTargetBatch}
+        title="Xác nhận xóa đợt voucher"
+        message={deleteTargetBatch ? `Bạn có chắc chắn muốn xóa đợt voucher "${deleteTargetBatch.name}"?` : ''}
+        confirmLabel="Xóa đợt voucher"
+        onConfirm={confirmDeleteBatch}
+        onCancel={() => setDeleteTargetBatch(null)}
       />
     </div>
   );

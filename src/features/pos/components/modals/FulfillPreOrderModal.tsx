@@ -41,6 +41,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
   } | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (preOrder) {
@@ -49,6 +50,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
       setPaymentMethod('CASH');
       setQrConfig(null);
       setQrError(null);
+      setSubmitError(null);
     }
   }, [preOrder]);
 
@@ -104,16 +106,17 @@ export const FulfillPreOrderModal: FC<Props> = ({
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    setSubmitError(null);
     if (!Number.isSafeInteger(remaining) || remaining < 0 || (paymentMethod === 'CASH' && (!Number.isSafeInteger(cashTendered) || cashTendered < 0))) {
-      alert('Số tiền thanh toán phải là số nguyên không âm.');
+      setSubmitError('Số tiền thanh toán phải là số nguyên không âm.');
       return;
     }
     if (note.trim().length > 500) {
-      alert('Ghi chú tối đa 500 ký tự.');
+      setSubmitError('Ghi chú tối đa 500 ký tự.');
       return;
     }
     if (!isCashSufficient) {
-      alert(`Tiền khách đưa (${cashTendered.toLocaleString('vi-VN')} đ) chưa đủ để thanh toán phần còn lại (${remaining.toLocaleString('vi-VN')} đ)!`);
+      setSubmitError(`Tiền khách đưa (${cashTendered.toLocaleString('vi-VN')} đ) chưa đủ để thanh toán phần còn lại (${remaining.toLocaleString('vi-VN')} đ)!`);
       return;
     }
 
@@ -128,7 +131,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
       });
       onClose();
     } catch (e: any) {
-      alert(`Lỗi khi bàn giao hàng: ${e?.message || 'Không thể kết nối máy chủ'}`);
+      setSubmitError(`Lỗi khi bàn giao hàng: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -148,6 +151,12 @@ export const FulfillPreOrderModal: FC<Props> = ({
 
         {/* Body Modal */}
         <div className="pos-modal-body" style={{ maxHeight: '75vh', overflowY: 'auto', padding: '16px' }}>
+          {submitError && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', marginBottom: 12, borderRadius: 6, backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 12.5, fontWeight: 500 }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{submitError}</span>
+            </div>
+          )}
           {/* Thông tin khách hàng */}
           <div style={{ padding: '10px 14px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>

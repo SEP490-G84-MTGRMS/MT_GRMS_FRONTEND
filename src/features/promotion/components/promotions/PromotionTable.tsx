@@ -4,18 +4,19 @@ import {
   ChevronRight,
   Edit2,
   Trash2,
-  Calendar,
   Layers,
   MapPin,
   Gift,
   Percent,
   Tag,
+  Loader2,
 } from 'lucide-react';
 import type { PromotionItem, PromotionType, PromotionStatus } from '../../types/promotion.types';
-import { TablePagination } from '../../../../components/common';
+import { TablePagination, SortableHeader, useTableSort } from '../../../../components/common';
 
 interface PromotionTableProps {
   promotions: PromotionItem[];
+  isLoading?: boolean;
   onEdit: (item: PromotionItem) => void;
   onToggleStatus: (id: string) => void;
   onDelete: (id: string) => void;
@@ -24,6 +25,7 @@ interface PromotionTableProps {
 
 export const PromotionTable: FC<PromotionTableProps> = ({
   promotions,
+  isLoading = false,
   onEdit,
   onToggleStatus,
   onDelete,
@@ -33,7 +35,18 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
 
-  const paginatedPromotions = promotions.slice(
+  const { sort, handleSort, sortedItems } = useTableSort(promotions, {
+    code: (item) => item.code,
+    name: (item) => item.name,
+    type: (item) => item.type,
+    startDate: (item) => item.startDate,
+    endDate: (item) => item.endDate,
+    usageCount: (item) => item.usageCount,
+    totalDiscountGiven: (item) => item.totalDiscountGiven,
+    status: (item) => item.status,
+  });
+
+  const paginatedPromotions = sortedItems.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -100,35 +113,64 @@ export const PromotionTable: FC<PromotionTableProps> = ({
   return (
     <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
       <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1390, width: '100%', tableLayout: 'fixed' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1520, width: '100%', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 44 }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 220 }} />
+            <col style={{ width: 115 }} />
+            <col style={{ width: 215 }} />
             <col style={{ width: 135 }} />
-            <col style={{ width: 185 }} />
-            <col style={{ width: 195 }} />
+            <col style={{ width: 118 }} />
+            <col style={{ width: 118 }} />
             <col style={{ width: 180 }} />
-            <col style={{ width: 160 }} />
             <col style={{ width: 100 }} />
+            <col style={{ width: 185 }} />
+            <col style={{ width: 155 }} />
+            <col style={{ width: 95 }} />
           </colgroup>
           <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
               <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
-              <th style={{ ...thStyle, width: 110 }}>Mã CTKM</th>
-              <th style={{ ...thStyle, width: 220 }}>Tên chương trình</th>
-              <th style={{ ...thStyle, width: 135 }}>Hình thức</th>
-              <th style={{ ...thStyle, width: 185 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 195 }}>Chi nhánh áp dụng</th>
-              <th style={{ ...thStyle, width: 180 }}>Lượt &amp; Ngân sách</th>
-              <th style={{ ...thStyle, width: 160 }}>Trạng thái</th>
-              <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 115 }}>
+                <SortableHeader label="Mã CTKM" active={sort.key === 'code'} direction={sort.direction} onClick={() => handleSort('code')} />
+              </th>
+              <th style={{ ...thStyle, width: 215 }}>
+                <SortableHeader label="Tên chương trình" active={sort.key === 'name'} direction={sort.direction} onClick={() => handleSort('name')} />
+              </th>
+              <th style={{ ...thStyle, width: 135 }}>
+                <SortableHeader label="Hình thức" active={sort.key === 'type'} direction={sort.direction} onClick={() => handleSort('type')} />
+              </th>
+              <th style={{ ...thStyle, width: 118 }}>
+                <SortableHeader label="Ngày bắt đầu" active={sort.key === 'startDate'} direction={sort.direction} onClick={() => handleSort('startDate')} />
+              </th>
+              <th style={{ ...thStyle, width: 118 }}>
+                <SortableHeader label="Ngày kết thúc" active={sort.key === 'endDate'} direction={sort.direction} onClick={() => handleSort('endDate')} />
+              </th>
+              <th style={{ ...thStyle, width: 180 }}>Chi nhánh áp dụng</th>
+              <th style={{ ...thStyle, width: 100, textAlign: 'right' }}>
+                <SortableHeader label="Lượt dùng" align="right" active={sort.key === 'usageCount'} direction={sort.direction} onClick={() => handleSort('usageCount')} />
+              </th>
+              <th style={{ ...thStyle, width: 185, textAlign: 'right' }}>
+                <SortableHeader label="Ngân sách" align="right" active={sort.key === 'totalDiscountGiven'} direction={sort.direction} onClick={() => handleSort('totalDiscountGiven')} />
+              </th>
+              <th style={{ ...thStyle, width: 155 }}>
+                <SortableHeader label="Trạng thái" active={sort.key === 'status'} direction={sort.direction} onClick={() => handleSort('status')} />
+              </th>
+              <th style={{ ...thStyle, width: 95, textAlign: 'right' }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
-            {promotions.length === 0 ? (
+            {isLoading ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <Loader2 size={18} className="animate-spin" color="#0f766e" />
+                    <span>Đang tải danh sách khuyến mãi...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : promotions.length === 0 ? (
+              <tr>
+                <td colSpan={11} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
                   Không tìm thấy chương trình khuyến mãi nào phù hợp với bộ lọc.
                 </td>
               </tr>
@@ -175,19 +217,11 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                         </div>
                       </td>
                       <td className="so-list-td">{renderTypeBadge(item.type)}</td>
-                      <td className="so-list-td" style={{ overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
-                            <Calendar size={12} style={{ color: '#0f766e', flexShrink: 0 }} />
-                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Từ:</span>
-                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{item.startDate}</span>
-                          </div>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
-                            <span style={{ width: 12, display: 'inline-block', flexShrink: 0 }} />
-                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Đến:</span>
-                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{item.endDate}</span>
-                          </div>
-                        </div>
+                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#334155', whiteSpace: 'nowrap' }}>
+                        {item.startDate || '—'}
+                      </td>
+                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#334155', whiteSpace: 'nowrap' }}>
+                        {item.endDate || '—'}
                       </td>
                       <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         {(() => {
@@ -229,42 +263,14 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                           );
                         })()}
                       </td>
-                      <td className="so-list-td">
-                        <div className="promo-usage-cell" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                            <span className="promo-usage-count" style={{ fontWeight: 700, color: '#0f172a' }}>
-                              {item.usageCount} lượt
-                            </span>
-                            {item.budgetLimit && item.budgetLimit > 0 ? (
-                              <span
-                                style={{
-                                  fontSize: 10.5,
-                                  fontWeight: 700,
-                                  padding: '1px 6px',
-                                  borderRadius: 4,
-                                  backgroundColor:
-                                    (item.totalDiscountGiven / item.budgetLimit) >= 1
-                                      ? '#fef2f2'
-                                      : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
-                                        ? '#fffbeb'
-                                        : '#f0fdf4',
-                                  color:
-                                    (item.totalDiscountGiven / item.budgetLimit) >= 1
-                                      ? '#b91c1c'
-                                      : (item.totalDiscountGiven / item.budgetLimit) >= 0.8
-                                        ? '#b45309'
-                                        : '#15803d',
-                                }}
-                              >
-                                {Math.min(100, Math.round((item.totalDiscountGiven / item.budgetLimit) * 100))}%
-                              </span>
-                            ) : null}
-                          </div>
-
-                          {/* Chi tiết ngân sách */}
+                      <td className="so-list-td" style={{ textAlign: 'right', fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                        {item.usageCount.toLocaleString('vi-VN')}
+                      </td>
+                      <td className="so-list-td" style={{ textAlign: 'right' }}>
+                        <div className="promo-usage-cell" style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
                           {item.budgetLimit && item.budgetLimit > 0 ? (
-                            <div>
-                              <div style={{ fontSize: 11, color: '#475569', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                            <div style={{ width: '100%' }}>
+                              <div style={{ fontSize: 11.5, color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, flexWrap: 'wrap', fontFamily: 'var(--font-mono, monospace)' }}>
                                 <span style={{ fontWeight: 700, color: '#0f766e' }}>
                                   {item.totalDiscountGiven.toLocaleString('vi-VN')} đ
                                 </span>
@@ -273,7 +279,6 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                                   {item.budgetLimit.toLocaleString('vi-VN')} đ
                                 </span>
                               </div>
-                              {/* Thanh tiến độ */}
                               <div
                                 style={{
                                   width: '100%',
@@ -302,10 +307,9 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                               </div>
                             </div>
                           ) : (
-                            <div style={{ fontSize: 11, color: '#64748b' }}>
-                              <span>Đã giảm: </span>
+                            <div style={{ fontSize: 11.5, color: '#64748b', fontFamily: 'var(--font-mono, monospace)' }}>
                               <b style={{ color: '#0f766e' }}>{item.totalDiscountGiven.toLocaleString('vi-VN')} đ</b>
-                              <span style={{ fontSize: 10, color: '#94a3b8', display: 'block' }}>(Không giới hạn)</span>
+                              <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', fontFamily: 'inherit' }}>(Không giới hạn)</span>
                             </div>
                           )}
                         </div>
@@ -357,7 +361,7 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                     {/* Accordion Detail Row */}
                     {isExpanded && (
                       <tr>
-                        <td colSpan={9} style={{ padding: 0 }}>
+                        <td colSpan={11} style={{ padding: 0 }}>
                           <div className="accordion-wrapper">
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                               <div className="accordion-title" style={{ margin: 0 }}>

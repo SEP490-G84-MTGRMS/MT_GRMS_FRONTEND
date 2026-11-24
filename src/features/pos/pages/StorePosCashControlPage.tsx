@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import {
-  ShieldCheck,
   CheckCircle2,
   Save,
   RefreshCw,
@@ -16,9 +15,13 @@ import {
   AlertTriangle,
   Info,
   Building2,
+  Search,
+  RotateCcw,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
 import type { ShiftCashMovementDto } from '../types/posShift.types';
+import { TablePagination } from '../../../components/common';
+import { AdminToast, type ToastState } from '../../admin/components';
 import { useAuthStore } from '../../../stores/useAuthStore';
 
 export const StorePosCashControlPage: FC = () => {
@@ -33,7 +36,23 @@ export const StorePosCashControlPage: FC = () => {
   const [threshold, setThreshold] = useState<number>(200000);
   const [shiftTotalLimit, setShiftTotalLimit] = useState<number>(0);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  // Toast chuẩn AdminToast
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: String(Date.now()), message, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  // Bộ lọc & phân trang
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'PENDING_EXPENSE' | 'UNCONFIRMED_DROP'>('ALL');
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingPageSize, setPendingPageSize] = useState(10);
+  const [dropPage, setDropPage] = useState(1);
+  const [dropPageSize, setDropPageSize] = useState(10);
 
   // Dữ liệu duyệt
   const [isLoading, setIsLoading] = useState(false);
@@ -117,7 +136,6 @@ export const StorePosCashControlPage: FC = () => {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingSettings(true);
-    setSaveMessage(null);
     try {
       await posShiftApi.updateCashMovementSettings({
         cashOutApprovalThreshold: Number(threshold) || 0,
@@ -136,10 +154,9 @@ export const StorePosCashControlPage: FC = () => {
         } catch { }
       }
 
-      setSaveMessage('Đã lưu cấu hình hạn mức duyệt chi két thành công!');
-      setTimeout(() => setSaveMessage(null), 3000);
+      showToast('Đã lưu cấu hình hạn mức duyệt chi két thành công!', 'success');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể lưu cấu hình hạn mức');
+      showToast(err.response?.data?.message || 'Không thể lưu cấu hình hạn mức', 'error');
     } finally {
       setIsSavingSettings(false);
     }
@@ -150,9 +167,10 @@ export const StorePosCashControlPage: FC = () => {
     setActionLoadingId(id);
     try {
       await posShiftApi.approveCashMovement(id);
+      showToast('Đã duyệt xuất tiền phiếu chi két thành công!', 'success');
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể duyệt phiếu chi');
+      showToast(err.response?.data?.message || 'Không thể duyệt phiếu chi', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -162,7 +180,7 @@ export const StorePosCashControlPage: FC = () => {
   const handleRejectConfirm = async () => {
     if (!rejectingId) return;
     if (!rejectionReason.trim()) {
-      alert('Vui lòng nhập lý do từ chối phiếu chi!');
+      showToast('Vui lòng nhập lý do từ chối phiếu chi!', 'warning');
       return;
     }
     setActionLoadingId(rejectingId);
@@ -170,9 +188,10 @@ export const StorePosCashControlPage: FC = () => {
       await posShiftApi.rejectCashMovement(rejectingId, rejectionReason.trim());
       setRejectingId(null);
       setRejectionReason('');
+      showToast('Đã từ chối phiếu chi két.', 'info');
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể từ chối phiếu chi');
+      showToast(err.response?.data?.message || 'Không thể từ chối phiếu chi', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -183,54 +202,53 @@ export const StorePosCashControlPage: FC = () => {
     setActionLoadingId(id);
     try {
       await posShiftApi.confirmCashDrop(id);
+      showToast('Đã xác nhận nhận đủ tiền rút két!', 'success');
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két');
+      showToast(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két', 'error');
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20, padding: '4px 0 24px' }}>
-      {/* 1. Header Bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: 16,
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                backgroundColor: '#ccfbf1',
-                color: '#0f766e',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Hạn Mức &amp; Duyệt Chi Két POS
-              </h1>
-              <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>
-                Cấu hình hạn mức, duyệt phiếu chi và xác nhận tiền rút két.
-              </p>
-            </div>
-          </div>
-        </div>
+  const filteredPendingMovements = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return pendingMovements;
+    return pendingMovements.filter(
+      (m) =>
+        m.id.toLowerCase().includes(q) ||
+        (m.createdByName || '').toLowerCase().includes(q) ||
+        (m.reason || '').toLowerCase().includes(q)
+    );
+  }, [pendingMovements, searchTerm]);
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+  const filteredUnconfirmedDrops = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return unconfirmedDrops;
+    return unconfirmedDrops.filter(
+      (m) =>
+        m.id.toLowerCase().includes(q) ||
+        (m.createdByName || '').toLowerCase().includes(q) ||
+        (m.reason || '').toLowerCase().includes(q)
+    );
+  }, [unconfirmedDrops, searchTerm]);
+
+  const paginatedPendingMovements = useMemo(() => {
+    const start = (pendingPage - 1) * pendingPageSize;
+    return filteredPendingMovements.slice(start, start + pendingPageSize);
+  }, [filteredPendingMovements, pendingPage, pendingPageSize]);
+
+  const paginatedUnconfirmedDrops = useMemo(() => {
+    const start = (dropPage - 1) * dropPageSize;
+    return filteredUnconfirmedDrops.slice(start, start + dropPageSize);
+  }, [filteredUnconfirmedDrops, dropPage, dropPageSize]);
+
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16, padding: '4px 0 24px' }}>
+      {/* 1. Compact Standard Header */}
+      <div className="so-list-header">
+        <h1 className="so-list-title">Hạn Mức &amp; Duyệt Chi Két POS</h1>
+        <div className="so-list-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div
             style={{
               display: 'inline-flex',
@@ -254,48 +272,70 @@ export const StorePosCashControlPage: FC = () => {
             type="button"
             onClick={loadData}
             disabled={isLoading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              height: 36,
-              padding: '0 14px',
-              borderRadius: 8,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            }}
+            className="so-list-filter-reset"
           >
-            <RefreshCw size={15} className={isLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             <span>Làm mới</span>
           </button>
         </div>
       </div>
 
-      {/* Thông báo thành công */}
-      {saveMessage && (
-        <div
-          style={{
-            padding: '12px 18px',
-            backgroundColor: '#ecfdf5',
-            border: '1px solid #a7f3d0',
-            borderRadius: 8,
-            color: '#065f46',
-            fontSize: 14,
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <CheckCircle2 size={18} className="text-emerald-600" />
-          <span>{saveMessage}</span>
+      {/* Bộ lọc chuẩn so-list-filter */}
+      <div className="so-list-filter">
+        <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 14px', flexWrap: 'wrap' }}>
+          <div className="so-list-filter-field" style={{ flex: '1 1 260px', minWidth: 220 }}>
+            <label className="so-list-filter-label">Tìm phiếu:</label>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPendingPage(1); setDropPage(1); }}
+                placeholder="Tìm mã phiếu, tên thu ngân, lý do chi..."
+                className="so-list-filter-input"
+                style={{ width: '100%', paddingLeft: 28, paddingRight: searchTerm ? 26 : 10 }}
+              />
+              <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchTerm(''); setPendingPage(1); setDropPage(1); }}
+                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                  title="Xóa tìm kiếm"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label">Loại phiếu:</label>
+            <select
+              value={typeFilter}
+              onChange={(e) => { setTypeFilter(e.target.value as any); setPendingPage(1); setDropPage(1); }}
+              className={`so-list-filter-select ${typeFilter !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            >
+              <option value="ALL">Tất cả loại phiếu</option>
+              <option value="PENDING_EXPENSE">Phiếu chi chờ duyệt ({pendingMovements.length})</option>
+              <option value="UNCONFIRMED_DROP">Rút két chờ nhận ({unconfirmedDrops.length})</option>
+            </select>
+          </div>
+
+          <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button type="button" onClick={loadData} className="so-list-filter-search">
+              <Search size={13} /> Tìm kiếm
+            </button>
+            <button
+              type="button"
+              disabled={!searchTerm && typeFilter === 'ALL'}
+              onClick={() => { setSearchTerm(''); setTypeFilter('ALL'); setPendingPage(1); setDropPage(1); }}
+              className="so-list-filter-reset"
+            >
+              <RotateCcw size={13} /> Đặt lại
+            </button>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* 2. Quick KPI Stats */}
       <div
@@ -629,6 +669,7 @@ export const StorePosCashControlPage: FC = () => {
         {/* CỘT PHẢI: Danh sách chờ xử lý */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* PHẦN 1: Danh sách phiếu chi két chờ phê duyệt */}
+          {(typeFilter === 'ALL' || typeFilter === 'PENDING_EXPENSE') && (
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -651,7 +692,7 @@ export const StorePosCashControlPage: FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ArrowUpCircle size={20} className="text-rose-600" />
                 <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Phiếu Chi Két Chờ Phê Duyệt ({pendingMovements.length})
+                  Phiếu Chi Két Chờ Phê Duyệt ({filteredPendingMovements.length})
                 </h3>
               </div>
               <span
@@ -660,15 +701,15 @@ export const StorePosCashControlPage: FC = () => {
                   fontWeight: 700,
                   padding: '3px 8px',
                   borderRadius: 20,
-                  backgroundColor: pendingMovements.length > 0 ? '#ffe4e6' : '#f1f5f9',
-                  color: pendingMovements.length > 0 ? '#b91c1c' : '#64748b',
+                  backgroundColor: filteredPendingMovements.length > 0 ? '#ffe4e6' : '#f1f5f9',
+                  color: filteredPendingMovements.length > 0 ? '#b91c1c' : '#64748b',
                 }}
               >
-                {pendingMovements.length > 0 ? 'Có yêu cầu chi vặt cần duyệt' : 'Đã duyệt hết'}
+                {filteredPendingMovements.length > 0 ? 'Có yêu cầu chi vặt cần duyệt' : 'Đã duyệt hết'}
               </span>
             </div>
 
-            {pendingMovements.length === 0 ? (
+            {filteredPendingMovements.length === 0 ? (
               <div style={{ padding: '36px 20px', textAlign: 'center' }}>
                 <CheckCircle2 size={40} className="text-emerald-500" style={{ margin: '0 auto 10px' }} />
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
@@ -679,8 +720,9 @@ export const StorePosCashControlPage: FC = () => {
                 </div>
               </div>
             ) : (
+              <>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {pendingMovements.map((item) => (
+                {paginatedPendingMovements.map((item) => (
                   <div
                     key={item.id}
                     style={{
@@ -798,10 +840,22 @@ export const StorePosCashControlPage: FC = () => {
                   </div>
                 ))}
               </div>
+              <TablePagination
+                currentPage={pendingPage}
+                pageSize={pendingPageSize}
+                totalItems={filteredPendingMovements.length}
+                pageSizeOptions={[10, 20, 30]}
+                itemLabel="phiếu chi"
+                onPageChange={setPendingPage}
+                onPageSizeChange={(s) => { setPendingPageSize(s); setPendingPage(1); }}
+              />
+              </>
             )}
           </div>
+          )}
 
           {/* PHẦN 2: Danh sách tiền rút két chờ xác nhận (Cash Drops) */}
+          {(typeFilter === 'ALL' || typeFilter === 'UNCONFIRMED_DROP') && (
           <div
             style={{
               backgroundColor: '#ffffff',
@@ -824,7 +878,7 @@ export const StorePosCashControlPage: FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ArrowDownCircle size={20} className="text-sky-600" />
                 <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Khoản Rút Két Nộp Quỹ Chờ Xác Nhận ({unconfirmedDrops.length})
+                  Khoản Rút Két Nộp Quỹ Chờ Xác Nhận ({filteredUnconfirmedDrops.length})
                 </h3>
               </div>
               <span
@@ -833,15 +887,15 @@ export const StorePosCashControlPage: FC = () => {
                   fontWeight: 700,
                   padding: '3px 8px',
                   borderRadius: 20,
-                  backgroundColor: unconfirmedDrops.length > 0 ? '#e0f2fe' : '#f1f5f9',
-                  color: unconfirmedDrops.length > 0 ? '#0284c7' : '#64748b',
+                  backgroundColor: filteredUnconfirmedDrops.length > 0 ? '#e0f2fe' : '#f1f5f9',
+                  color: filteredUnconfirmedDrops.length > 0 ? '#0284c7' : '#64748b',
                 }}
               >
-                {unconfirmedDrops.length > 0 ? 'Chờ Chủ xác nhận đã nhận tiền' : 'Đã nhận đủ'}
+                {filteredUnconfirmedDrops.length > 0 ? 'Chờ Chủ xác nhận đã nhận tiền' : 'Đã nhận đủ'}
               </span>
             </div>
 
-            {unconfirmedDrops.length === 0 ? (
+            {filteredUnconfirmedDrops.length === 0 ? (
               <div style={{ padding: '36px 20px', textAlign: 'center' }}>
                 <CheckCircle2 size={40} className="text-sky-500" style={{ margin: '0 auto 10px' }} />
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
@@ -852,8 +906,9 @@ export const StorePosCashControlPage: FC = () => {
                 </div>
               </div>
             ) : (
+              <>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {unconfirmedDrops.map((item) => (
+                {paginatedUnconfirmedDrops.map((item) => (
                   <div
                     key={item.id}
                     style={{
@@ -946,8 +1001,19 @@ export const StorePosCashControlPage: FC = () => {
                   </div>
                 ))}
               </div>
+              <TablePagination
+                currentPage={dropPage}
+                pageSize={dropPageSize}
+                totalItems={filteredUnconfirmedDrops.length}
+                pageSizeOptions={[10, 20, 30]}
+                itemLabel="khoản rút két"
+                onPageChange={setDropPage}
+                onPageSizeChange={(s) => { setDropPageSize(s); setDropPage(1); }}
+              />
+              </>
             )}
           </div>
+          )}
 
 
         </div>
@@ -1044,6 +1110,15 @@ export const StorePosCashControlPage: FC = () => {
       )}
 
 
+      {toast && (
+        <AdminToast
+          toast={toast}
+          onClose={() => {
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+            setToast(null);
+          }}
+        />
+      )}
     </div>
   );
 };

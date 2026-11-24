@@ -284,6 +284,7 @@ export interface ProductPriceHistoryQuery {
   priceScope?: 'MASTER' | 'BRANCH';
   fromDate?: string;
   toDate?: string;
+  searchTerm?: string;
   page?: number;
   pageSize?: number;
 }

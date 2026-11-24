@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowDownToLine, Banknote, BookOpen, Building2, CheckCircle2, Landmark, Loader2, Plus, RotateCcw, ShieldCheck, WalletCards, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, Banknote, BookOpen, Building2, CheckCircle2, Landmark, Loader2, Plus, RotateCcw, Search, ShieldCheck, WalletCards, X } from 'lucide-react';
 import { branchManagementApi, type BranchItemResponse } from '../../../pages/store/api/branchManagementApi';
 import { financeAccountsApi, type FinanceAccountItem, type FinanceAccountType, type SaveFinanceAccountPayload, type SepayTransactionPage } from '../api/financeAccountsApi';
 import { SepayVisualGuide } from '../components/SepayVisualGuide';
-import { TablePagination } from '../../../components/common';
+import { TablePagination, SortableHeader, useTableSort } from '../../../components/common';
+import { AdminToast, type ToastState } from '../../admin/components';
 import './finance-accounts-settings.css';
 
 type TabKey = 'accounts' | 'drawers' | 'rules' | 'guide' | 'history';
@@ -53,6 +54,7 @@ export function FinanceAccountsSettingsPage() {
   });
 
   const [historyAccountId, setHistoryAccountId] = useState('');
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(9);
   const [transactionPage, setTransactionPage] = useState<SepayTransactionPage | null>(null);
@@ -63,7 +65,8 @@ export function FinanceAccountsSettingsPage() {
   const [branches, setBranches] = useState<BranchItemResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<SaveFinanceAccountPayload>(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -103,7 +106,11 @@ export function FinanceAccountsSettingsPage() {
     };
   }, []);
 
-  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(''), 2800); };
+  const notify = (message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: String(Date.now()), message, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3200);
+  };
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
@@ -167,6 +174,29 @@ export function FinanceAccountsSettingsPage() {
   useEffect(() => {
     void fetchHistory();
   }, [fetchHistory]);
+
+  const filteredHistoryItems = useMemo(() => {
+    const items = transactionPage?.items ?? [];
+    const q = historySearchTerm.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((tx) =>
+      (tx.bankTransactionId || '').toLowerCase().includes(q) ||
+      (tx.orderCode || '').toLowerCase().includes(q) ||
+      (tx.transactionContent || '').toLowerCase().includes(q) ||
+      (tx.branchName || '').toLowerCase().includes(q) ||
+      (tx.accountName || '').toLowerCase().includes(q)
+    );
+  }, [transactionPage, historySearchTerm]);
+
+  const { sort: txSort, handleSort: handleTxSort, sortedItems: sortedHistoryItems } = useTableSort(filteredHistoryItems, {
+    transactionDate: (tx) => tx.transactionDate || '',
+    bankTransactionId: (tx) => tx.bankTransactionId || '',
+    orderCode: (tx) => tx.orderCode || '',
+    branchName: (tx) => tx.branchName || '',
+    bankName: (tx) => tx.bankName || tx.gateway || '',
+    accountBranchName: (tx) => tx.accountBranchName || '',
+    amountIn: (tx) => tx.amountIn ?? 0,
+  });
 
   const drawers = accounts.filter((x) => x.accountType !== 'Bank');
   const connected = banks.filter((x) => x.sepayConnectionStatus === 'Connected');
@@ -233,95 +263,149 @@ export function FinanceAccountsSettingsPage() {
   };
 
   return <div className="fa-settings">
-    <header className="fa-heading"><div><span>Cài đặt & thiết lập</span><h1>Tài khoản & Két quỹ</h1><p>Quản lý tài khoản ngân hàng, kết nối SePay và két quầy theo từng chi nhánh.</p></div><button className="fa-primary" onClick={() => openCreate(tab === 'drawers' ? 'Till' : 'Bank')}><Plus size={17} /> Thêm tài khoản / két</button></header>
+    <div className="so-list-header" style={{ marginBottom: 12 }}>
+      <h1 className="so-list-title">Tài khoản &amp; Két quỹ</h1>
+      <div className="so-list-header-actions">
+        <button className="fa-primary" onClick={() => openCreate(tab === 'drawers' ? 'Till' : 'Bank')}><Plus size={17} /> Thêm tài khoản / két</button>
+      </div>
+    </div>
     <nav className="fa-tabs" aria-label="Cấu hình tài chính">{([['accounts', 'Tài khoản & kết nối'], ['drawers', 'Két theo chi nhánh'], ['history', 'Lịch sử chuyển khoản'], ['guide', 'Hướng dẫn SePay']] as [TabKey, string][]).map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</nav>
     {tab === 'history' && (
       <section className="fa-card fa-transaction-history">
         <header className="fa-history-header">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <h2>Lịch sử chuyển khoản SePay & VietQR</h2>
-              <span className="fa-branch-chip">
-                <Building2 size={13} /> {activeBranch.name}
-              </span>
-            </div>
-            <p>Giao dịch ghi nhận tự động ngay khi ngân hàng xác nhận tiền vào. Chốt doanh thu ngày chỉ tổng hợp báo cáo, không cộng trùng số dư.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <h2>Lịch sử chuyển khoản SePay &amp; VietQR</h2>
+            <span className="fa-branch-chip">
+              <Building2 size={13} /> {activeBranch.name}
+            </span>
           </div>
           <button type="button" className="fa-refresh-btn" onClick={() => void fetchHistory()} title="Tải lại giao dịch">
             <RotateCcw size={15} /> Làm mới
           </button>
         </header>
 
-        <div className="fa-history-filter-bar">
-          <div className="fa-filter-item">
-            <label><Landmark size={15} /> Tài khoản ngân hàng</label>
-            <select
-              value={historyAccountId}
-              onChange={(e) => {
-                setHistoryAccountId(e.target.value);
-                setHistoryPage(1);
-              }}
-            >
-              <option value="">
-                {activeBranchId
-                  ? `-- Toàn bộ tài khoản của ${activeBranch.name} (${filteredBanks.length} TK) --`
-                  : `-- Toàn bộ tài khoản ngân hàng (${banks.length} TK) --`}
-              </option>
-              {groupedBankAccounts.map(({ groupName, items }) => (
-                <optgroup key={groupName} label={`Chi nhánh: ${groupName}`}>
-                  {items.map((bank) => (
-                    <option key={bank.id} value={bank.id}>
-                      {bank.accountName} · {bank.maskedAccountNumber || bank.bankName} (TK: {bank.branchName || 'Toàn hệ thống'})
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
+        <div className="so-list-filter" style={{ margin: '0 0 12px 0' }}>
+          <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 14px', flexWrap: 'wrap' }}>
+            <div className="so-list-filter-field" style={{ flex: '1 1 240px', minWidth: 210 }}>
+              <label className="so-list-filter-label">Mã GD / Đơn hàng:</label>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <input
+                  type="text"
+                  value={historySearchTerm}
+                  onChange={(e) => setHistorySearchTerm(e.target.value)}
+                  placeholder="Tìm mã GD ngân hàng, mã đơn, nội dung CK..."
+                  className="so-list-filter-input"
+                  style={{ width: '100%', paddingLeft: 28, paddingRight: historySearchTerm ? 26 : 10 }}
+                />
+                <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                {historySearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setHistorySearchTerm('')}
+                    style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                    title="Xóa tìm kiếm"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
 
-          {historyAccountId && (
-            <button
-              type="button"
-              className="fa-clear-filters-btn"
-              onClick={() => {
-                setHistoryAccountId('');
-                setHistoryPage(1);
-              }}
-              title="Xem toàn bộ tài khoản"
-            >
-              <X size={14} /> Xem toàn bộ tài khoản
-            </button>
-          )}
+            <div className="so-list-filter-field" style={{ flex: '1 1 250px', minWidth: 220 }}>
+              <label className="so-list-filter-label">Tài khoản:</label>
+              <select
+                className={`so-list-filter-select ${historyAccountId ? 'so-list-filter-select--active' : ''}`}
+                value={historyAccountId}
+                onChange={(e) => {
+                  setHistoryAccountId(e.target.value);
+                  setHistoryPage(1);
+                }}
+              >
+                <option value="">
+                  {activeBranchId
+                    ? `-- Toàn bộ tài khoản của ${activeBranch.name} (${filteredBanks.length} TK) --`
+                    : `-- Toàn bộ tài khoản ngân hàng (${banks.length} TK) --`}
+                </option>
+                {groupedBankAccounts.map(({ groupName, items }) => (
+                  <optgroup key={groupName} label={`Chi nhánh: ${groupName}`}>
+                    {items.map((bank) => (
+                      <option key={bank.id} value={bank.id}>
+                        {bank.accountName} · {bank.maskedAccountNumber || bank.bankName} (TK: {bank.branchName || 'Toàn hệ thống'})
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+
+            <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                className="so-list-filter-search"
+                onClick={() => void fetchHistory()}
+              >
+                <Search size={13} /> Tìm kiếm
+              </button>
+              <button
+                type="button"
+                className="so-list-filter-reset"
+                disabled={!historyAccountId && !historySearchTerm}
+                onClick={() => {
+                  setHistoryAccountId('');
+                  setHistorySearchTerm('');
+                  setHistoryPage(1);
+                }}
+              >
+                <RotateCcw size={13} /> Đặt lại
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="fa-table-container">
           <table className="fa-table">
             <thead>
               <tr>
-                <th style={{ width: 145 }}>Thời gian</th>
-                <th style={{ width: 155 }}>Mã GD Ngân hàng</th>
-                <th style={{ width: 180 }}>Đơn hàng & Điểm bán</th>
-                <th style={{ width: 230 }}>Tài khoản nhận & Chi nhánh</th>
+                <th style={{ width: 140 }}>
+                  <SortableHeader label="Thời gian" active={txSort.key === 'transactionDate'} direction={txSort.direction} onClick={() => handleTxSort('transactionDate')} />
+                </th>
+                <th style={{ width: 145 }}>
+                  <SortableHeader label="Mã GD Ngân hàng" active={txSort.key === 'bankTransactionId'} direction={txSort.direction} onClick={() => handleTxSort('bankTransactionId')} />
+                </th>
+                <th style={{ width: 125 }}>
+                  <SortableHeader label="Đơn hàng" active={txSort.key === 'orderCode'} direction={txSort.direction} onClick={() => handleTxSort('orderCode')} />
+                </th>
+                <th style={{ width: 135 }}>
+                  <SortableHeader label="Điểm bán" active={txSort.key === 'branchName'} direction={txSort.direction} onClick={() => handleTxSort('branchName')} />
+                </th>
+                <th style={{ width: 185 }}>
+                  <SortableHeader label="Tài khoản nhận" active={txSort.key === 'bankName'} direction={txSort.direction} onClick={() => handleTxSort('bankName')} />
+                </th>
+                <th style={{ width: 135 }}>
+                  <SortableHeader label="Chi nhánh TK" active={txSort.key === 'accountBranchName'} direction={txSort.direction} onClick={() => handleTxSort('accountBranchName')} />
+                </th>
                 <th>Nội dung chuyển khoản</th>
-                <th style={{ width: 125, textAlign: 'right' }}>Số tiền vào</th>
-                <th style={{ width: 105, textAlign: 'center' }}>Đối soát</th>
+                <th style={{ width: 125, textAlign: 'right' }}>
+                  <SortableHeader label="Số tiền vào" align="right" active={txSort.key === 'amountIn'} direction={txSort.direction} onClick={() => handleTxSort('amountIn')} />
+                </th>
+                <th style={{ width: 100, textAlign: 'center' }}>Đối soát</th>
               </tr>
             </thead>
             <tbody>
               {historyLoading ? (
                 <tr>
-                  <td colSpan={7} className="fa-table-state">
+                  <td colSpan={9} className="fa-table-state">
                     <Loader2 className="spin" size={20} /> Đang tải danh sách giao dịch...
                   </td>
                 </tr>
               ) : historyError ? (
                 <tr>
-                  <td colSpan={7} className="fa-table-state error">
+                  <td colSpan={9} className="fa-table-state error">
                     <AlertTriangle size={18} /> {historyError}
                   </td>
                 </tr>
-              ) : transactionPage?.items && transactionPage.items.length > 0 ? (
-                transactionPage.items.map((tx) => (
+              ) : sortedHistoryItems.length > 0 ? (
+                sortedHistoryItems.map((tx) => (
                   <tr key={tx.id}>
                     <td>
                       <span className="fa-tx-date">
@@ -334,18 +418,16 @@ export function FinanceAccountsSettingsPage() {
                       </span>
                     </td>
                     <td>
-                      <div className="fa-order-cell">
-                        {tx.orderCode ? (
-                          <span className="fa-order-badge" title={`Đơn hàng: ${tx.orderCode}`}>
-                            {tx.orderCode}
-                          </span>
-                        ) : (
-                          <span className="fa-muted-dash">-</span>
-                        )}
-                        <div className="fa-point-sale" title={`Bán tại chi nhánh: ${tx.branchName || 'Toàn hệ thống'}`}>
-                          <span>Điểm bán: <b>{tx.branchName || 'Toàn hệ thống'}</b></span>
-                        </div>
-                      </div>
+                      {tx.orderCode ? (
+                        <span className="fa-order-badge" title={`Đơn hàng: ${tx.orderCode}`}>
+                          {tx.orderCode}
+                        </span>
+                      ) : (
+                        <span className="fa-muted-dash">—</span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: 12.5, color: '#334155', fontWeight: 500 }}>
+                      {tx.branchName || 'Toàn hệ thống'}
                     </td>
                     <td>
                       <div className="fa-acc-cell">
@@ -356,18 +438,17 @@ export function FinanceAccountsSettingsPage() {
                         {tx.accountHolderName && (
                           <span className="fa-acc-holder">{tx.accountHolderName}</span>
                         )}
-                        <div className="fa-acc-branch-badge" title={`Tài khoản ngân hàng của: ${tx.accountBranchName || 'Toàn hệ thống'}`}>
-                          <Building2 size={11} />
-                          <span>TK của: <b>{tx.accountBranchName || 'Toàn hệ thống'}</b></span>
-                        </div>
                       </div>
+                    </td>
+                    <td style={{ fontSize: 12.5, color: '#475569' }}>
+                      {tx.accountBranchName || 'Toàn hệ thống'}
                     </td>
                     <td>
                       <div className="fa-content-cell" title={tx.transactionContent}>
                         {tx.transactionContent}
                       </div>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono, monospace)' }}>
                       <span className="fa-amount-cell">+{money.format(tx.amountIn)}</span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
@@ -379,7 +460,7 @@ export function FinanceAccountsSettingsPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="fa-table-state">
+                  <td colSpan={9} className="fa-table-state">
                     <WalletCards size={24} />
                     <span>Chưa có giao dịch SePay nào cho bộ lọc này.</span>
                   </td>
@@ -409,7 +490,15 @@ export function FinanceAccountsSettingsPage() {
     {formOpen && <Modal title={form.accountType === 'Bank' ? 'Thêm tài khoản ngân hàng' : 'Thêm két quỹ'} onClose={() => setFormOpen(false)}><form onSubmit={submit} className="fa-form"><label>Tên nhận diện<input required value={form.accountName} onChange={e => setForm({ ...form, accountName: e.target.value })} /></label><label>Loại<select value={form.accountType} onChange={e => setForm({ ...form, accountType: e.target.value as FinanceAccountType, branchId: form.branchId ?? branches[0]?.id ?? null })}><option value="Bank">Tài khoản ngân hàng</option><option value="Till">Két quầy (Bán hàng POS)</option><option value="Safe">Két sắt (Bảo mật chi nhánh)</option></select></label>{form.accountType === 'Bank' ? <><label>Ngân hàng<select value={form.bankCode} onChange={e => { const b = BANKS.find(x => x.code === e.target.value); setForm({ ...form, bankCode: b?.code, bankName: b?.name }) }}>{BANKS.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}</select></label><label>Số tài khoản<input required value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} /></label><label className="wide">Chủ tài khoản<input required value={form.accountHolderName} onChange={e => setForm({ ...form, accountHolderName: e.target.value.toUpperCase() })} /></label><label className="wide">Chi nhánh áp dụng<select required value={form.branchId ?? ''} onChange={e => setForm({ ...form, branchId: e.target.value || null })}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label></> : <label>Chi nhánh<select required value={form.branchId ?? ''} onChange={e => setForm({ ...form, branchId: e.target.value })}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}{form.accountType === 'Bank' ? <div className="fa-form-note wide"><ShieldCheck size={17} /> Tài khoản ngân hàng chỉ được kích hoạt sau khi xác minh SePay.</div> : form.accountType === 'Safe' ? <div className="fa-form-note wide"><ShieldCheck size={17} /> <b>Mục đích Két sắt:</b> Cất giữ tiền nộp kết ca của thu ngân, chốt doanh thu bán của Chủ & chi tiền đổi trả/nhập hàng. Khuyên dùng: 01 Két sắt / chi nhánh.</div> : <div className="fa-form-note wide"><Banknote size={17} /> <b>Mục đích Két quầy:</b> Dùng cho nhân viên mở ca, thu tiền bán hàng và thối tiền lẻ cho khách tại quầy POS. Khuyên dùng: 01 Két quầy / chi nhánh.</div>}<footer className="wide"><button type="button" onClick={() => setFormOpen(false)}>Hủy</button><button className="fa-primary" disabled={saving}>{saving ? <Loader2 className="spin" size={16} /> : null} Lưu {form.accountType === 'Bank' ? '& kết nối SePay →' : ''}</button></footer></form></Modal>}
     {connecting && <Modal title="Kết nối SePay" onClose={() => { setConnecting(null); setWebhookKey(''); setWebhookUrl('') }}>{webhookKey ? <div className="fa-success"><CheckCircle2 /><h3>Kết nối thành công</h3><p>Tạo Webhook kiểu “Có tiền vào”, xác thực API Key bằng thông tin dưới đây. Khóa chỉ hiển thị trong lần kết nối này.</p><small>Webhook URL</small><code>{webhookUrl}</code><small>Authentication API Key</small><code>{webhookKey}</code><button className="fa-primary" onClick={() => { void navigator.clipboard.writeText(`${webhookUrl}\n${webhookKey}`); notify('Đã sao chép cấu hình webhook.') }}>Sao chép cấu hình</button></div> : <form className="fa-connect" onSubmit={connect}><p>Tài khoản: <b>{connecting.accountName}</b> · {connecting.maskedAccountNumber}</p><div><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}><label style={{ margin: 0 }}>API Token SePay</label><button type="button" onClick={() => setGuideModalOpen(true)} style={{ border: 0, background: 'none', color: '#087e78', fontSize: 10, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Xem ảnh hướng dẫn lấy token →</button></div><input type="password" required autoFocus value={apiToken} onChange={e => setApiToken(e.target.value)} placeholder="Nhập API Token từ SePay" /></div><div className="fa-form-note"><ShieldCheck size={17} /> Token được gửi tới backend để kiểm tra. Webhook nhận tiền: <b>https://thviet.store/api/payments/sepay-webhook</b></div><footer><button type="button" onClick={() => setConnecting(null)}>Hủy</button><button className="fa-primary" disabled={saving}>{saving ? <Loader2 className="spin" size={16} /> : null} Kiểm tra & kết nối</button></footer></form>}</Modal>}
     {guideModalOpen && <Modal title="Cẩm nang hướng dẫn kết nối SePay" wide onClose={() => setGuideModalOpen(false)}><div style={{ padding: '16px 20px', maxHeight: '75vh', overflowY: 'auto' }}><SepayVisualGuide compact /></div></Modal>}
-    {toast && <div className="fa-toast">{toast}</div>}
+    {toast && (
+      <AdminToast
+        toast={toast}
+        onClose={() => {
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          setToast(null);
+        }}
+      />
+    )}
   </div>;
 }
 

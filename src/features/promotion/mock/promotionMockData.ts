@@ -354,6 +354,7 @@ export const INITIAL_LOYALTY_CONFIG: LoyaltySystemConfig = {
   redemptionRateAmount: 1000, // 1 điểm = 1,000 đ
   minRedemptionPoints: 20, // Tối thiểu 20 điểm mới được trừ tiền
   pointsExpiryMonths: 12, // 12 tháng
+  maxRedemptionPercent: 50, // Tối đa 50% tổng hóa đơn
   allowPointsWithPromotions: false,
   tiers: [
     {
