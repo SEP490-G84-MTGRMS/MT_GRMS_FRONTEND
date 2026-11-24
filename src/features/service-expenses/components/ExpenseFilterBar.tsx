@@ -227,13 +227,15 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
           >
             <option value="">-- Tất cả danh mục chi --</option>
             {Array.from(
-              new Set([
-                ...(categories || []),
-                ...DEFAULT_CATEGORY_OPTIONS,
-              ])
-            ).map((cat) => (
-              <option key={cat} value={cat}>
-                {EXPENSE_CATEGORY_LABELS[cat as ExpenseCategory] || cat}
+              new Map(
+                [...(categories || []), ...DEFAULT_CATEGORY_OPTIONS].map((cat) => {
+                  const label = EXPENSE_CATEGORY_LABELS[cat as ExpenseCategory] || cat;
+                  return [label.toLowerCase(), { value: cat, label }];
+                })
+              ).values()
+            ).map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>
