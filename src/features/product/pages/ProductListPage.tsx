@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { productApi } from '../api/productApi';
 import {
@@ -182,10 +182,38 @@ export const ProductListPage: React.FC = () => {
       if (res && res.items) {
         const mapped: ProductItem[] = await Promise.all(
           res.items.map(async (p) => {
+            const rawUnitPrices = (p as any).unitPrices as Array<{
+              id?: string;
+              unitName: string;
+              conversionRate: number;
+              price: number;
+              barcode?: string | null;
+              isBaseUnit?: boolean;
+              isPurchaseUnit?: boolean;
+            }> | undefined;
             let uomConversions: UomConversion[] = (p as any).uomConversions || [];
             let isBaseUnitPurchaseUnit: boolean | undefined = p.isBaseUnitPurchaseUnit;
             let purchaseUnit: string | undefined = p.purchaseUnit ?? undefined;
-            if (uomConversions.length === 0 && p.id) {
+            if (uomConversions.length === 0 && Array.isArray(rawUnitPrices)) {
+              const baseRow = rawUnitPrices.find((u) => u.isBaseUnit);
+              const purchaseRow = rawUnitPrices.find((u) => Boolean(u.isPurchaseUnit));
+              if (purchaseRow) {
+                isBaseUnitPurchaseUnit = Boolean(purchaseRow.isBaseUnit);
+                purchaseUnit = purchaseRow.unitName;
+              } else if (baseRow) {
+                isBaseUnitPurchaseUnit = baseRow.isPurchaseUnit ?? true;
+              }
+              uomConversions = rawUnitPrices
+                .filter((u) => !u.isBaseUnit)
+                .map((u) => ({
+                  id: u.id,
+                  unitName: u.unitName,
+                  conversionRate: u.conversionRate,
+                  price: u.price,
+                  barcode: u.barcode ?? undefined,
+                  isPurchaseUnit: Boolean(u.isPurchaseUnit),
+                }));
+            } else if (uomConversions.length === 0 && !Array.isArray(rawUnitPrices) && p.id) {
               const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
               if (isGuid) {
                 try {
