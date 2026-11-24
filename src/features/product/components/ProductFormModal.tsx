@@ -639,7 +639,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const trimmedBarcode = barcode.trim();
   const isMainBarcodeDuplicateWithUom =
     trimmedBarcode !== '' &&
-    unitRows.some((u) => (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
+    unitRows.some((u) => !u.isBaseUnit && (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
   const barcodeError =
     barcode !== ''
       ? trimmedBarcode.length > 50 || /\s/.test(barcode)
