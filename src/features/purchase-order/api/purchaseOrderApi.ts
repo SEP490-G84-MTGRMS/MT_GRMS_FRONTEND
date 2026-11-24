@@ -552,7 +552,13 @@ export const purchaseOrderApi = {
     });
 
     if (res.data?.success && res.data.data) {
-      return res.data.data.map((po: any) => ({
+      const payload: any = res.data.data;
+      const list: any[] = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload.createdPurchaseOrders)
+          ? payload.createdPurchaseOrders
+          : [];
+      return list.map((po: any) => ({
         id: po.id,
         orderCode: po.code,
         supplierId: po.supplierId,
