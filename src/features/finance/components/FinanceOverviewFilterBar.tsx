@@ -13,7 +13,10 @@ interface Props {
 }
 
 export const FinanceOverviewFilterBar: React.FC<Props> = ({ value, branches, onChange }) => {
+  const [rangeError, setRangeError] = React.useState<string | null>(null);
+
   const selectPreset = (preset: FinancePeriodPreset) => {
+    setRangeError(null);
     if (preset === 'CUSTOM') {
       onChange({ ...value, preset });
       return;
@@ -23,7 +26,17 @@ export const FinanceOverviewFilterBar: React.FC<Props> = ({ value, branches, onC
 
   const updateCustomDate = (field: 'startDate' | 'endDate', date: string) => {
     const next = { ...value, preset: 'CUSTOM' as const, [field]: date };
-    if (next.startDate <= next.endDate) onChange(next);
+    if (next.startDate > next.endDate) {
+      setRangeError('Ngày bắt đầu không được sau ngày kết thúc.');
+      return;
+    }
+    const diffDays = (new Date(`${next.endDate}T00:00:00Z`).getTime() - new Date(`${next.startDate}T00:00:00Z`).getTime()) / 86400000;
+    if (diffDays > 366) {
+      setRangeError('Khoảng thời gian tổng quan không được vượt quá 366 ngày.');
+      return;
+    }
+    setRangeError(null);
+    onChange(next);
   };
 
   return (
@@ -56,6 +69,7 @@ export const FinanceOverviewFilterBar: React.FC<Props> = ({ value, branches, onC
         <div className="finance-custom-range">
           <label><span>Từ ngày</span><input type="date" value={value.startDate} max={value.endDate} onChange={(event) => updateCustomDate('startDate', event.target.value)} /></label>
           <label><span>Đến ngày</span><input type="date" value={value.endDate} min={value.startDate} onChange={(event) => updateCustomDate('endDate', event.target.value)} /></label>
+          {rangeError && <span role="alert" style={{ color: '#DC2626', fontSize: '0.78rem', fontWeight: 600 }}>{rangeError}</span>}
         </div>
       )}
     </section>
