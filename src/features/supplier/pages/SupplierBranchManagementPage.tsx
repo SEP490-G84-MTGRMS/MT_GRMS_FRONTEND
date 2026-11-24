@@ -160,7 +160,10 @@ export const SupplierBranchManagementPage: FC = () => {
     setIsUpdatingEdit(true);
     try {
       const statusChanged = payload.status !== editItem.status;
-      if (statusChanged) {
+      const reasonChanged =
+        payload.status === 'Inactive' &&
+        (payload.inactiveReason || '').trim() !== (editItem.inactiveReason || '').trim();
+      if (statusChanged || reasonChanged) {
         await supplierBranchApi.updateAssignmentStatus(
           editItem.supplierId,
           editItem.branchId,
