@@ -25,6 +25,7 @@ interface BackendCustomerDebtLedgerItem {
   referenceCode: string;
   description: string;
   occurredAtUtc: string;
+  paymentMethod?: string | null;
 }
 
 /**
@@ -180,24 +181,23 @@ export const customerApi = {
       }
 
       return res.data.data.map((entry) => {
-        const isDecrease =
-          entry.entryType === 'DebtRepayment' || entry.entryType === 'GoodsReturnOffset';
-        const isBankMethod =
-          Boolean(entry.description?.includes('Bank')) ||
-          Boolean(entry.description?.includes('VietQR'));
+        const isRepayment = entry.entryType === 'DebtRepayment';
+        const isDecrease = isRepayment || entry.entryType === 'GoodsReturnOffset';
+        const pmUpper = (entry.paymentMethod || '').toUpperCase();
+        const isBankMethod = pmUpper
+          ? pmUpper === 'BANK' || pmUpper === 'VIETQR'
+          : Boolean(entry.description?.includes('Bank')) || Boolean(entry.description?.includes('VietQR'));
 
         return {
           id: entry.id,
           customerId: entry.customerId,
           transactionType: isDecrease ? 'DEBT_DECREASE' : 'DEBT_INCREASE',
           amount: entry.amount,
-          referenceDocId: entry.referenceCode,
-          paymentMethod:
-            entry.entryType === 'DebtRepayment' ? (isBankMethod ? 'VietQR' : 'Cash') : undefined,
-          cashTransactionCode:
-            entry.entryType === 'DebtRepayment'
-              ? entry.referenceCode || entry.entryCode
-              : entry.entryCode,
+          balanceBefore: entry.balanceBefore ?? undefined,
+          balanceAfter: entry.balanceAfter ?? undefined,
+          referenceDocId: isRepayment ? undefined : entry.referenceCode,
+          paymentMethod: isRepayment ? (isBankMethod ? 'VietQR' : 'Cash') : undefined,
+          cashTransactionCode: isRepayment ? entry.referenceCode || entry.entryCode : undefined,
           note: entry.description,
           createdAt: entry.occurredAtUtc,
         };
