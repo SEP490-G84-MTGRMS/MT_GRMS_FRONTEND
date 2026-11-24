@@ -92,14 +92,17 @@ export const StoreProductManagementPage: FC = () => {
     loadInitialData();
   }, []);
 
-  // Fetch products based on applied filters & pagination
+  // Fetch products based on applied filters & pagination (avoid double fetch on stores load — BP-07)
+  const storesRef = useRef(stores);
+  storesRef.current = stores;
+
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await storeProductApi.getStoreProducts(appliedFilters);
       const enriched = res.items.map((item) => ({
         ...item,
-        storeCode: item.storeCode || stores.find((s) => s.id === item.storeId)?.code || '---',
+        storeCode: item.storeCode || storesRef.current.find((s) => s.id === item.storeId)?.code || '---',
       }));
       setProducts(enriched);
       setTotalCount(res.total);
@@ -108,7 +111,7 @@ export const StoreProductManagementPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters, stores]);
+  }, [appliedFilters]);
 
   useEffect(() => {
     fetchProducts();
@@ -155,6 +158,7 @@ export const StoreProductManagementPage: FC = () => {
       setStores(summaries);
     } catch (err: any) {
       showToast(err.message || 'Không thể gán sản phẩm.', 'error');
+      throw err;
     }
   };
 
