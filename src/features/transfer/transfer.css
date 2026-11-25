@@ -73,6 +73,56 @@
   }
 }
 
+/* Create Transfer Page Responsive Layout (FE-15) */
+.transfer-create-container {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.transfer-create-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  max-width: 750px;
+  flex-wrap: wrap;
+}
+
+.transfer-create-search-box {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 380px;
+}
+
+.transfer-create-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .transfer-create-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .transfer-create-header-left {
+    width: 100%;
+    max-width: 100%;
+  }
+  .transfer-create-search-box {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+}
+
 /* Sidebar filter */
 .transfer-sidebar {
   background: #ffffff;
@@ -354,3 +404,26 @@
 }
 
 
+
+.transfer-receive-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  align-items: start;
+  gap: 24px;
+}
+
+.transfer-receive-layout > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 950px) {
+  .transfer-receive-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.transfer-receive-actions {
+  display: flex;
+  justify-content: flex-end;
+}

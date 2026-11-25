@@ -1,73 +1,35 @@
 import { financeHttpClient, type EnhancedAxiosError } from '../../../api/financeHttpClient';
 import { generateUuidV7 } from '../../../utils/uuid';
+import { TaxPeriodType, TaxCalculationMethod, HouseholdTaxGroup, AccountingBookType } from '../types/taxSnapshot';
 import type {
   HouseholdTaxFilterDto,
   HouseholdTaxSummaryDto,
   AccountingBookEntryDto,
   CreateTaxSnapshotRequest,
   HouseholdTaxSnapshotDto,
-  AccountingBookType,
   ChangeSecurityPinRequest,
   ResetSecurityPinRequest,
   HouseholdTaxDeclarationPreviewDto,
 } from '../types/taxSnapshot';
-import { generateMockSummary, mockBookEntries, mockSnapshotsList } from './mockTaxData';
 
-let localSnapshots = [...mockSnapshotsList];
-
-/**
- * Cấu hình chế độ Mock dữ liệu:
- * - Runtime (Dev & Production): TUYỆT ĐỐI KHÔNG DÙNG MOCK, 100% dữ liệu thực từ Backend.
- * - Vitest Unit Test: Chỉ bật khi MODE === 'test' để CI test độc lập.
- */
-export const isMockEnabled = (): boolean => {
-  return import.meta.env.MODE === 'test';
-};
-
-// Theo dõi nguồn dữ liệu hiện tại (thật từ Backend hay Mock)
-let isCurrentlyUsingMock = false;
-
-export const isUsingMockData = (): boolean => isCurrentlyUsingMock;
-
-// Mock Security State cho Unit Test Runner
-let failedPinAttempts = 0;
-let lockedUntilTimestamp = 0;
-const MAX_PIN_ATTEMPTS = 5;
-const LOCK_DURATION_MS = 15 * 60 * 1000; // 15 phút
-
-// Expected hashed PIN cho Unit Test Runner (SHA-256 của '1234')
-const OWNER_PIN_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4';
-
-export interface TaxAuditLogEntry {
-  id: string;
-  timestamp: string;
-  action: string;
-  operator: string;
-  year: number;
-  periodType: number;
-  periodNumber: number;
-  calculationMethod: number;
-  applyVatReduction2026: boolean;
-  vatReductionPercentage?: number | null;
-  customVatRate?: number | null;
-  customPitRate?: number | null;
-  totalTaxAmount: number;
-  status: 'SUCCESS' | 'FAILED_PIN' | 'LOCKED';
-  notes?: string;
+// ASP.NET serializes enums as names; components use the numeric domain constants.
+function normalizeTaxDto<T extends object>(dto: T): T {
+  if (dto == null || typeof dto !== 'object' || Array.isArray(dto))
+    throw new Error('Máy chủ trả về dữ liệu thuế không hợp lệ.');
+  const normalized = { ...dto } as Record<string, unknown>;
+  const fields = { periodType: TaxPeriodType, calculationMethod: TaxCalculationMethod,
+    appliedPitMethod: TaxCalculationMethod, householdGroup: HouseholdTaxGroup, bookType: AccountingBookType };
+  for (const [field, values] of Object.entries(fields)) {
+    const value = normalized[field];
+    if (value == null) continue;
+    const options: Record<string, number> = values;
+    if (typeof value === 'number' && Object.values(options).includes(value)) continue;
+    if (typeof value !== 'string' || !Object.prototype.hasOwnProperty.call(options, value))
+      throw new Error(`Máy chủ trả về giá trị ${field} không hợp lệ.`);
+    normalized[field] = options[value];
+  }
+  return normalized as T;
 }
-
-export const taxAuditLogs: TaxAuditLogEntry[] = [];
-
-/**
- * SHA-256 helper cho Unit Test Runner
- */
-async function sha256(message: string): Promise<string> {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 interface BackendResponsePayload {
   success?: boolean;
   message?: string;
@@ -105,12 +67,7 @@ export const taxSnapshotApi = {
       `/tax/household/snapshots/${encodeURIComponent(id)}`, { signal },
     );
     if (!response.data?.data) throw new Error('Không tìm thấy hồ sơ chốt kỳ.');
-    return response.data.data;
-  },
-
-  resetSecurityLock(): void {
-    failedPinAttempts = 0;
-    lockedUntilTimestamp = 0;
+    return normalizeTaxDto(response.data.data);
   },
 
   /**
@@ -134,43 +91,13 @@ export const taxSnapshotApi = {
         },
       });
 
-      if (res.data?.data) {
-        isCurrentlyUsingMock = false;
-        return res.data.data;
+      if (res.data?.success !== false && res.data?.data && typeof res.data.data.year === 'number' && typeof res.data.data.totalTaxAmount === 'number') {
+        return normalizeTaxDto(res.data.data);
       }
+      throw new Error('Máy chủ trả về dữ liệu tổng hợp thuế không hợp lệ.');
     } catch (err: unknown) {
-      if (!isMockEnabled()) {
-        throw new Error(
-          extractErrorMessage(
-            err,
-            'Không thể kết nối đến máy chủ quản lý thuế. Vui lòng kiểm tra đường truyền hoặc thử lại sau.'
-          )
-        );
-      }
+      throw new Error(extractErrorMessage(err, 'Không thể tải dữ liệu tổng hợp thuế.'));
     }
-
-    // Mock Fallback cho Unit Test Runner
-    isCurrentlyUsingMock = true;
-    return generateMockSummary(filter);
-  },
-
-  /**
-   * Wrapper hỗ trợ xem trước bảng tính thuế
-   */
-  async previewTaxSnapshot(arg1: any, arg2?: any): Promise<HouseholdTaxSummaryDto> {
-    const year = typeof arg1 === 'number' ? arg1 : arg1?.year || 2026;
-    const periodNumber = typeof arg2 === 'number' ? arg2 : arg1?.periodNumber || arg1?.quarter || 3;
-    const calcMethod = typeof arg1 === 'object' ? arg1?.calculationMethod ?? 1 : 1;
-    const applyReduction = typeof arg1 === 'object' ? arg1?.applyVatReduction2026 : false;
-
-    return this.getTaxSummary({
-      year,
-      periodType: 2,
-      periodNumber,
-      branchId: typeof arg1 === 'object' ? arg1?.branchId : undefined,
-      calculationMethod: calcMethod,
-      applyVatReduction2026: applyReduction,
-    });
   },
 
   async getDeclarationPreview(filter: HouseholdTaxFilterDto): Promise<HouseholdTaxDeclarationPreviewDto> {
@@ -191,7 +118,7 @@ export const taxSnapshotApi = {
         },
       }
     );
-    return res.data.data;
+    return normalizeTaxDto(res.data.data);
   },
 
   async exportDeclarationXml(snapshotId: string): Promise<Blob> {
@@ -217,22 +144,13 @@ export const taxSnapshotApi = {
         params,
       });
 
-      if (res.data?.data && Array.isArray(res.data.data)) {
-        return res.data.data;
+      if (res.data?.success !== false && Array.isArray(res.data?.data)) {
+        return res.data.data.map(normalizeTaxDto);
       }
-      if (!isMockEnabled()) {
-        return [];
-      }
+      throw new Error('Máy chủ trả về sổ kế toán không hợp lệ.');
     } catch (err: unknown) {
-      if (!isMockEnabled()) {
-        throw new Error(extractErrorMessage(err, 'Không thể tải sổ kế toán từ máy chủ.'));
-      }
+      throw new Error(extractErrorMessage(err, 'Không thể tải sổ kế toán từ máy chủ.'));
     }
-
-    if (params.bookType) {
-      return mockBookEntries.filter((b) => b.bookType === params.bookType);
-    }
-    return mockBookEntries;
   },
 
   /**
@@ -244,29 +162,18 @@ export const taxSnapshotApi = {
         params: { year, branchId },
       });
 
-      if (res.data?.data && Array.isArray(res.data.data)) {
-        return res.data.data;
+      if (res.data?.success !== false && Array.isArray(res.data?.data)) {
+        return res.data.data.map(normalizeTaxDto);
       }
-      if (!isMockEnabled()) {
-        return [];
-      }
+      throw new Error('Máy chủ trả về lịch sử chốt kỳ không hợp lệ.');
     } catch (err: unknown) {
-      if (!isMockEnabled()) {
-        throw new Error(extractErrorMessage(err, 'Không thể tải lịch sử kỳ tính thuế từ máy chủ.'));
-      }
+      throw new Error(extractErrorMessage(err, 'Không thể tải lịch sử kỳ tính thuế từ máy chủ.'));
     }
-
-    let result = [...localSnapshots];
-    if (year) {
-      result = result.filter((s) => s.year === year);
-    }
-    return result;
   },
 
   /**
    * Thực hiện chốt sổ ký số kỳ tính thuế (Finalize Snapshot)
-   * Trong runtime: Gọi Backend thật POST /api/tax/household/snapshots (xác thực PBKDF2 và khóa 15 phút).
-   * Trong Vitest Runner: Chạy mock security guard để kiểm thử logic rate limiting độc lập.
+   * Xác thực PIN và khóa kỳ được thực hiện tại backend.
    */
   async createSnapshot(req: CreateTaxSnapshotRequest): Promise<HouseholdTaxSnapshotDto> {
     const backendPayload = {
@@ -301,154 +208,12 @@ export const taxSnapshotApi = {
       );
 
       if (res.data?.data) {
-        return res.data.data;
+        return normalizeTaxDto(res.data.data);
       }
       throw new Error(res.data?.message || 'Không thể tạo bản chốt kỳ tính thuế.');
     } catch (err: unknown) {
-      // 2. Nếu không bật chế độ mock (runtime thông thường), ném lỗi thật từ Backend
-      if (!isMockEnabled()) {
-        const errorMsg = extractErrorMessage(
-          err,
-          'Không thể kết nối đến máy chủ chốt kỳ thuế. Vui lòng kiểm tra mã PIN hoặc thử lại sau.'
-        );
-        throw new Error(errorMsg);
-      }
+      throw new Error(extractErrorMessage(err, 'Không thể chốt kỳ thuế.'));
     }
-
-    // 3. Mock Security Guard cho Vitest Test Runner
-    const now = Date.now();
-    if (lockedUntilTimestamp > now) {
-      const minutesRemaining = Math.ceil((lockedUntilTimestamp - now) / 60000);
-      throw new Error(
-        `Tài khoản đã bị tạm khóa chức năng chốt kỳ do nhập sai mã PIN quá 5 lần. Vui lòng thử lại sau ${minutesRemaining} phút.`
-      );
-    }
-
-    const inputPin = req.pin?.trim() || '';
-    const inputHash = await sha256(inputPin);
-
-    if (inputHash !== OWNER_PIN_HASH) {
-      failedPinAttempts += 1;
-      const attemptsLeft = MAX_PIN_ATTEMPTS - failedPinAttempts;
-
-      taxAuditLogs.push({
-        id: `audit-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        action: 'FINALIZE_SNAPSHOT_FAILED',
-        operator: 'STORE_OWNER',
-        year: req.year,
-        periodType: req.periodType,
-        periodNumber: req.periodNumber,
-        calculationMethod: req.calculationMethod,
-        applyVatReduction2026: Boolean(req.applyVatReduction2026),
-        vatReductionPercentage: req.vatReductionPercentage ?? null,
-        customVatRate: req.customVatRate ?? null,
-        customPitRate: req.customPitRate ?? null,
-        totalTaxAmount: 0,
-        status: failedPinAttempts >= MAX_PIN_ATTEMPTS ? 'LOCKED' : 'FAILED_PIN',
-        notes: `Mã PIN không chính xác. Số lần còn lại: ${Math.max(0, attemptsLeft)}`,
-      });
-
-      if (failedPinAttempts >= MAX_PIN_ATTEMPTS) {
-        lockedUntilTimestamp = now + LOCK_DURATION_MS;
-        throw new Error(
-          'Nhập sai mã PIN quá 5 lần liên tiếp. Hệ thống đã tạm khóa chức năng chốt kỳ trong 15 phút để bảo vệ dữ liệu.'
-        );
-      }
-
-      throw new Error(`Mã PIN xác thực không chính xác. Bạn còn ${attemptsLeft} lần thử.`);
-    }
-
-    // PIN hợp lệ trong Test Runner
-    failedPinAttempts = 0;
-    lockedUntilTimestamp = 0;
-
-    const existingIndex = localSnapshots.findIndex(
-      (s) =>
-        s.year === req.year &&
-        s.periodType === req.periodType &&
-        s.periodNumber === req.periodNumber &&
-        (s.status === 1 || s.status === 'Finalized' || s.status === 'finalized') &&
-        s.revisionNumber !== undefined
-    );
-
-    let revisionNumber = 0;
-    let supersededSnapshotId: string | null = null;
-
-    if (existingIndex !== -1) {
-      if (!req.allowSupersedeExisting) {
-        throw new Error(
-          `Kỳ tính thuế ${req.periodType === 2 ? 'Quarter' : 'Month'} ${req.periodNumber}/${req.year} đã được chốt và khóa sổ.`
-        );
-      }
-      if (!req.rectificationReason?.trim()) {
-        throw new Error('Bắt buộc phải nhập lý do thay thế / số biên bản điều chỉnh khi chốt lại kỳ tính thuế đã khóa.');
-      }
-      const existing = localSnapshots[existingIndex];
-      existing.status = 'Superseded';
-      revisionNumber = (existing.revisionNumber ?? 0) + 1;
-      supersededSnapshotId = existing.id;
-    }
-
-    const summary = generateMockSummary({
-      year: req.year,
-      periodType: req.periodType,
-      periodNumber: req.periodNumber,
-      branchId: req.branchId,
-      calculationMethod: req.calculationMethod,
-      applyVatReduction2026: req.applyVatReduction2026,
-    });
-
-    const newSnapshot: HouseholdTaxSnapshotDto = {
-      id: `snap-${req.year}-p${req.periodNumber}-${Date.now().toString(36)}`,
-      branchId: req.branchId,
-      periodType: req.periodType,
-      year: req.year,
-      periodNumber: req.periodNumber,
-      annualAccumulatedRevenue: summary.annualAccumulatedRevenue,
-      householdGroup: summary.householdGroup,
-      calculationMethod: req.calculationMethod,
-      applyVatReduction2026: Boolean(req.applyVatReduction2026),
-      vatReductionPercentage: req.vatReductionPercentage ?? null,
-      customVatRate: req.customVatRate ?? null,
-      customPitRate: req.customPitRate ?? null,
-      isTaxExempt: summary.isTaxExempt,
-      taxableRevenueInPeriod: summary.taxableRevenueInPeriod,
-      vatRate: summary.vatRate,
-      vatAmount: summary.vatAmount,
-      pitRate: summary.pitRate,
-      pitAmount: summary.pitAmount,
-      totalTaxAmount: summary.totalTaxAmount,
-      status: 'Finalized',
-      revisionNumber,
-      supersededSnapshotId,
-      rectificationReason: req.rectificationReason || null,
-      finalizedBy: 'Chủ tiệm (STORE_OWNER)',
-      finalizedAtUtc: new Date().toISOString(),
-      notes: req.notes || `Chốt kỳ tự động - Phương pháp ${req.calculationMethod === 2 ? 'Kê khai' : 'Tỷ lệ %'}`,
-    };
-
-    localSnapshots = [newSnapshot, ...localSnapshots];
-
-    taxAuditLogs.push({
-      id: `audit-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      action: 'FINALIZE_SNAPSHOT_SUCCESS',
-      operator: 'STORE_OWNER',
-      year: req.year,
-      periodType: req.periodType,
-      periodNumber: req.periodNumber,
-      calculationMethod: req.calculationMethod,
-      applyVatReduction2026: Boolean(req.applyVatReduction2026),
-      vatReductionPercentage: req.vatReductionPercentage ?? null,
-      customVatRate: req.customVatRate ?? null,
-      customPitRate: req.customPitRate ?? null,
-      totalTaxAmount: summary.totalTaxAmount,
-      status: 'SUCCESS',
-      notes: `Chốt kỳ thành công. Mã snapshot: ${newSnapshot.id}`,
-    });
-
-    return newSnapshot;
   },
 
   /**
@@ -469,6 +234,8 @@ export const taxSnapshotApi = {
         tier2Method: filter.tier2Method,
         applyVatReduction: filter.applyVatReduction2026,
         vatReductionPercentage: filter.vatReductionPercentage,
+        customVatRate: filter.customVatRate,
+        customPitRate: filter.customPitRate,
       },
       responseType: 'blob',
     });
@@ -482,14 +249,11 @@ export const taxSnapshotApi = {
     try {
       await financeHttpClient.post('/tax/household/pin/change', {
         currentPin: req.currentPin || null,
-        password: req.password || null,
+        currentPassword: req.password || null,
         newPin: req.newPin,
         confirmNewPin: req.confirmNewPin,
       });
     } catch (err: unknown) {
-      if (isMockEnabled()) {
-        return;
-      }
       throw new Error(extractErrorMessage(err, 'Không thể đổi mã PIN bảo mật.'));
     }
   },
@@ -505,9 +269,6 @@ export const taxSnapshotApi = {
         confirmNewPin: req.confirmNewPin,
       });
     } catch (err: unknown) {
-      if (isMockEnabled()) {
-        return;
-      }
       throw new Error(extractErrorMessage(err, 'Không thể đặt lại mã PIN bảo mật.'));
     }
   },
@@ -527,17 +288,6 @@ export const taxSnapshotApi = {
         message: res.data?.message || 'Kiểm tra chữ ký số HMAC-SHA256 hoàn tất.',
       };
     } catch (err: unknown) {
-      if (isMockEnabled()) {
-        const snap = localSnapshots.find((s) => s.id === snapshotId);
-        const valid = snap?.isIntegrityValid !== false;
-        return {
-          snapshotId,
-          isIntegrityValid: valid,
-          message: valid
-            ? 'Chữ ký số toàn vẹn. Bản chốt thuế không bị can thiệp sau khi ký số.'
-            : 'CẢNH BÁO: Phát hiện sai lệch chữ ký số của bản chốt thuế!',
-        };
-      }
       throw new Error(extractErrorMessage(err, 'Không thể kiểm tra tính toàn vẹn của snapshot.'));
     }
   },

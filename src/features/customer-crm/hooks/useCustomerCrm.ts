@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customerApi } from '../api/customerApi';
 import { useIdempotentAction } from '../../../hooks/useIdempotentAction';
@@ -29,20 +29,20 @@ export function useCustomerCrm(defaultPageSize = 15) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
-  const handleSearchChange = (term: string) => {
+  const handleSearchChange = useCallback((term: string) => {
     setSearchTerm(term);
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleTierChange = (tier: string) => {
+  const handleTierChange = useCallback((tier: string) => {
     setSelectedTier(tier);
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleDebtStatusChange = (status: DebtFilterStatus) => {
+  const handleDebtStatusChange = useCallback((status: DebtFilterStatus) => {
     setSelectedDebtStatus(status);
     setCurrentPage(1);
-  };
+  }, []);
 
   // Drawer and Modal states
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDto | null>(null);
@@ -114,27 +114,27 @@ export function useCustomerCrm(defaultPageSize = 15) {
   });
 
   // Handlers
-  const handleOpenCreateModal = () => {
+  const handleOpenCreateModal = useCallback(() => {
     setEditingCustomer(null);
     setIsFormModalOpen(true);
-  };
+  }, []);
 
-  const handleOpenEditModal = (customer: CustomerDto) => {
+  const handleOpenEditModal = useCallback((customer: CustomerDto) => {
     setEditingCustomer(customer);
     setIsFormModalOpen(true);
-  };
+  }, []);
 
-  const handleOpenCollectModal = (customer: CustomerDto) => {
+  const handleOpenCollectModal = useCallback((customer: CustomerDto) => {
     setCollectingCustomer(customer);
-  };
+  }, []);
 
-  const handleSelectCustomer = (customer: CustomerDto) => {
+  const handleSelectCustomer = useCallback((customer: CustomerDto) => {
     setSelectedCustomer(customer);
-  };
+  }, []);
 
-  const handleCloseDrawer = () => {
+  const handleCloseDrawer = useCallback(() => {
     setSelectedCustomer(null);
-  };
+  }, []);
 
   return {
     // Data

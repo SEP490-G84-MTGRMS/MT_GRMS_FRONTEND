@@ -116,7 +116,6 @@ import { StaffManagementGate } from '../pages/store/components/StaffManagementGa
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { CashControlHubPage } from '../features/cash-control';
-import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 /**
  * Application client-side router configuration across public, store-owner, POS, and admin portals.
@@ -335,19 +334,23 @@ export const router = createBrowserRouter([
       },
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/create',
-        element: <CreateTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateTransferPage /></ProtectedRoute>,
+      },
+      {
+        path: 'transfers/request',
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateUrgentTransferRequestPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><ReceiveTransferPage /></ProtectedRoute>,
       },
       {
         path: 'subscriptions',
@@ -372,18 +375,18 @@ export const router = createBrowserRouter([
       {
         path: 'pos-cash-control',
         element: (
-          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <StorePosCashControlPage />
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}>
+            <CashControlHubPage />
           </ProtectedRoute>
         ),
       },
       {
         path: 'cash-control',
-        element: <ProtectedRoute allowedRoles={['STORE_OWNER']}><CashControlHubPage /></ProtectedRoute>,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CashControlHubPage /></ProtectedRoute>,
       },
       {
         path: 'cash-control/*',
-        element: <Navigate to="/store-owner/pos-cash-control" replace />,
+        element: <Navigate to="/store-owner/cash-control" replace />,
       },
       {
         path: 'account',
@@ -574,22 +577,6 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: 'pos-cash-control',
-        element: (
-          <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <StorePosCashControlPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: 'cash-control',
-        element: <ProtectedRoute allowedRoles={['STORE_OWNER']}><CashControlHubPage /></ProtectedRoute>,
-      },
-      {
-        path: 'cash-control/*',
-        element: <Navigate to="/store-owner/pos-cash-control" replace />,
-      },
-      {
         path: 'tax-snapshots',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER']}>
@@ -674,10 +661,6 @@ export const router = createBrowserRouter([
             element: <Navigate to="/store-owner/subscriptions?tab=finance-accounts" replace />,
           },
           {
-            path: 'pos-cash-control',
-            element: <StorePosCashControlPage />,
-          },
-          {
             path: 'shifts',
             element: <PosShiftPage />,
           },
@@ -703,19 +686,23 @@ export const router = createBrowserRouter([
       },
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/create',
-        element: <CreateTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateTransferPage /></ProtectedRoute>,
+      },
+      {
+        path: 'transfers/request',
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateUrgentTransferRequestPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><ReceiveTransferPage /></ProtectedRoute>,
       },
       {
         path: 'tenants',
@@ -858,19 +845,19 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'create',
-        element: <CreateTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateTransferPage /></ProtectedRoute>,
       },
       {
         path: ':id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: ':id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><ReceiveTransferPage /></ProtectedRoute>,
       },
     ],
   },
@@ -922,35 +909,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/request',
-        element: <CreateUrgentTransferRequestPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><CreateUrgentTransferRequestPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
-      },
-      {
-        path: 'transfers',
-        element: <TransferListPage />,
-      },
-      {
-        path: 'transfers/request',
-        element: <CreateUrgentTransferRequestPage />,
-      },
-      {
-        path: 'transfers/:id',
-        element: <TransferDetailPage />,
-      },
-      {
-        path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'STAFF', 'Staff']}><ReceiveTransferPage /></ProtectedRoute>,
       },
     ],
   },
@@ -994,19 +965,19 @@ export const router = createBrowserRouter([
       },
       {
         path: 'transfers',
-        element: <TransferListPage />,
+        element: <ProtectedRoute allowedRoles={['STAFF', 'Staff', 'STORE_OWNER', 'StoreOwner']}><TransferListPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/request',
-        element: <CreateUrgentTransferRequestPage />,
+        element: <ProtectedRoute allowedRoles={['STAFF', 'Staff', 'STORE_OWNER', 'StoreOwner']}><CreateUrgentTransferRequestPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
-        element: <TransferDetailPage />,
+        element: <ProtectedRoute allowedRoles={['STAFF', 'Staff', 'STORE_OWNER', 'StoreOwner']}><TransferDetailPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id/receive',
-        element: <ReceiveTransferPage />,
+        element: <ProtectedRoute allowedRoles={['STAFF', 'Staff', 'STORE_OWNER', 'StoreOwner']}><ReceiveTransferPage /></ProtectedRoute>,
       },
     ],
   },

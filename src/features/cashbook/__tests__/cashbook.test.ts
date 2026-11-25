@@ -1,240 +1,79 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { financeHttpClient } from '../../../api/financeHttpClient';
 import { cashbookService } from '../services/cashbookService';
 
-describe('FE-17 Cashbook & Cash Flow Service Tests', () => {
-  beforeEach(() => {
-    // Reset localStorage before each test
-    localStorage.clear();
+afterEach(() => {
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
+
+describe('Sổ quỹ dùng dữ liệu từ API', () => {
+  it('giữ kết quả rỗng từ API dù trình duyệt còn dữ liệu cũ', async () => {
+    localStorage.setItem('mtgrms_cashbook_transactions', JSON.stringify([{ id: 'old' }]));
+    const get = vi.spyOn(financeHttpClient, 'get').mockResolvedValue({ data: { data: [], totalItems: 0 } });
+
+    await expect(cashbookService.getTransactions()).resolves.toEqual({ items: [], totalItems: 0 });
+    expect(get).toHaveBeenCalledTimes(1);
   });
 
-  it('REQ-17.1: should get initial cash and bank accounts properly', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    expect(accounts.length).toBeGreaterThanOrEqual(4);
+  it('gửi ngày và trạng thái để backend lọc trước khi phân trang', async () => {
+    const get = vi.spyOn(financeHttpClient, 'get').mockResolvedValue({ data: { data: [], totalItems: 28 } });
 
-    const cashAccount = accounts.find((a) => a.accountType === 'CASH');
-    expect(cashAccount).toBeDefined();
-    expect(cashAccount?.currentBalance).toBeGreaterThan(0);
+    const result = await cashbookService.getTransactions({
+      startDate: '2026-11-20', endDate: '2026-11-24', status: 'VOIDED',
+    }, 2, 10);
 
-    const bankAccount = accounts.find((a) => a.accountType === 'BANK');
-    expect(bankAccount).toBeDefined();
-    expect(bankAccount?.bankName).toBeDefined();
+    expect(get).toHaveBeenCalledWith('/cashbook/entries', { params: {
+      page: 2, pageSize: 10, status: 'VOIDED',
+      fromDate: '2026-11-20T00:00:00+07:00', toDate: '2026-11-24T23:59:59.999999+07:00',
+    } });
+    expect(result.totalItems).toBe(28);
   });
 
-  it('REQ-17.2: should create a manual receipt and update account balance', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    const targetAccount = accounts[0];
-    const initialBal = targetAccount.currentBalance;
+  it('chuyển tiếp lỗi khi tải sổ hoặc tải tổng hợp', async () => {
+    const failure = new Error('API unavailable');
+    vi.spyOn(financeHttpClient, 'get').mockRejectedValue(failure);
 
-    const receiptAmount = 500000;
-    const newTx = await cashbookService.createReceipt({
-      accountId: targetAccount.id,
-      amount: receiptAmount,
-      category: 'Thu nợ khách hàng',
-      counterpartyType: 'CUSTOMER',
-      counterpartyName: 'Khách hàng VIP test',
-      description: 'Khách thanh toán đợt 1',
-      categoryCode: 'OTHER_INCOME',
-      taxTreatment: 'NonTaxableReceipt',
-      taxTreatmentReason: 'Thu nợ đã ghi nhận doanh thu trước đó',
+    await expect(cashbookService.getTransactions()).rejects.toBe(failure);
+    await expect(cashbookService.getSummaryKPI()).rejects.toBe(failure);
+  });
+
+  it('chuyển tiếp lỗi chuyển quỹ và gạch bỏ, không ghi dữ liệu cục bộ', async () => {
+    const failure = new Error('Backend rejected transaction');
+    vi.spyOn(financeHttpClient, 'post').mockRejectedValue(failure);
+
+    await expect(cashbookService.transferFunds({
+      fromAccountId: 'from', toAccountId: 'to', amount: 5000, note: 'Chuyển quỹ',
+    })).rejects.toBe(failure);
+    await expect(cashbookService.voidTransaction('entry', 'Sai chứng từ')).rejects.toBe(failure);
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('giữ dấu âm cho bút toán ADJUSTMENT Payment và dương cho ADJUSTMENT Receipt', async () => {
+    vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: 'adj-pay', entryCode: 'CB-ADJ-1', accountId: 'acc-1', accountType: 'Till',
+            entryType: 'Payment', amount: 150000, balanceAfter: 850000, sourceType: 'ADJUSTMENT',
+            referenceCode: 'ADJ-1', auditHash: 'H1', description: 'Thiếu quỹ kiểm kê', occurredAtUtc: '2026-11-24T10:00:00Z',
+          },
+          {
+            id: 'adj-rec', entryCode: 'CB-ADJ-2', accountId: 'acc-1', accountType: 'Till',
+            entryType: 'Receipt', amount: 50000, balanceAfter: 900000, sourceType: 'ADJUSTMENT',
+            referenceCode: 'ADJ-2', auditHash: 'H2', description: 'Thừa quỹ kiểm kê', occurredAtUtc: '2026-11-24T11:00:00Z',
+          },
+        ],
+        totalItems: 2,
+      },
     });
 
-    expect(newTx.transactionType).toBe('RECEIPT');
-    expect(newTx.amount).toBe(receiptAmount);
-    expect(newTx.balanceAfter).toBe(initialBal + receiptAmount);
-
-    const updatedAccount = await cashbookService.getCashAccountById(targetAccount.id);
-    expect(updatedAccount?.currentBalance).toBe(initialBal + receiptAmount);
-  });
-
-  it('REQ-17.2: should throw error when receipt amount is <= 0', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    await expect(
-      cashbookService.createReceipt({
-        accountId: accounts[0].id,
-        amount: 0,
-        category: 'Thu test',
-        counterpartyType: 'OTHER',
-        counterpartyName: 'Test',
-        description: 'Test',
-        categoryCode: 'OWNER_DEPOSIT',
-      })
-    ).rejects.toThrow('Số tiền thu phải lớn hơn 0');
-  });
-
-  it('REQ-17.3: should create a payment when sufficient cash balance exists', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    const cashAccount = accounts.find((a) => a.accountType === 'CASH')!;
-    const initialBal = cashAccount.currentBalance;
-
-    const paymentAmount = 200000;
-    const newTx = await cashbookService.createPayment({
-      accountId: cashAccount.id,
-      amount: paymentAmount,
-      category: 'Chi phí vận hành',
-      counterpartyType: 'SUPPLIER',
-      counterpartyName: 'EVN Điện Lực',
-      description: 'Thanh toán tiền điện',
-      categoryCode: 'OTHER_PAYMENT',
-      taxTreatment: 'NonDeductibleExpense',
-    });
-
-    expect(newTx.transactionType).toBe('PAYMENT');
-    expect(newTx.amount).toBe(paymentAmount);
-    expect(newTx.balanceAfter).toBe(initialBal - paymentAmount);
-
-    const updatedAccount = await cashbookService.getCashAccountById(cashAccount.id);
-    expect(updatedAccount?.currentBalance).toBe(initialBal - paymentAmount);
-  });
-
-  it('REQ-17.3 (Rule GBR-CSH-03): should strictly throw error preventing cash drawer overdraft', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    const cashAccount = accounts.find((a) => a.accountType === 'CASH')!;
-
-    const excessiveAmount = cashAccount.currentBalance + 5000000;
-
-    await expect(
-      cashbookService.createPayment({
-        accountId: cashAccount.id,
-        amount: excessiveAmount,
-        category: 'Chi quá số dư két',
-        counterpartyType: 'OTHER',
-        counterpartyName: 'Người nhận',
-        description: 'Thử nghiệm âm két',
-        categoryCode: 'OTHER_PAYMENT',
-        taxTreatment: 'NonDeductibleExpense',
-      })
-    ).rejects.toThrow(/vượt quá số dư két hiện có.*GBR-CSH-03/);
-  });
-
-  it('REQ-17.4 (Rule GBR-CSH-04): should reconcile cash without discrepancy', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    const cashAccount = accounts.find((a) => a.accountType === 'CASH')!;
-
-    const adj = await cashbookService.reconcileCashAccount({
-      accountId: cashAccount.id,
-      systemBalance: cashAccount.currentBalance,
-      actualCountedBalance: cashAccount.currentBalance,
-      differenceAmount: 0,
-      reason: '',
-      auditedBy: 'Kiểm toán viên',
-    });
-
-    expect(adj).toBeNull();
-  });
-
-  it('REQ-17.4 (Rule GBR-CSH-04): should throw error if discrepancy exists but reason is missing', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    const cashAccount = accounts.find((a) => a.accountType === 'CASH')!;
-
-    await expect(
-      cashbookService.reconcileCashAccount({
-        accountId: cashAccount.id,
-        systemBalance: cashAccount.currentBalance,
-        actualCountedBalance: cashAccount.currentBalance - 50000,
-        differenceAmount: -50000,
-        reason: '   ',
-        auditedBy: 'Kiểm toán viên',
-      })
-    ).rejects.toThrow(/bắt buộc phải có lý do giải trình cụ thể theo quy tắc GBR-CSH-04/);
-  });
-
-  it('REQ-17.4: should create ADJUSTMENT transaction when discrepancy is justified', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    const cashAccount = accounts.find((a) => a.accountType === 'CASH')!;
-
-    const diff = -20000;
-    const actual = cashAccount.currentBalance + diff;
-
-    const adj = await cashbookService.reconcileCashAccount({
-      accountId: cashAccount.id,
-      systemBalance: cashAccount.currentBalance,
-      actualCountedBalance: actual,
-      differenceAmount: diff,
-      reason: 'Bù tiền thối nhầm khách',
-      auditedBy: 'Nguyễn Trường An',
-    });
-
-    expect(adj).not.toBeNull();
-    expect(adj?.transactionType).toBe('ADJUSTMENT');
-    expect(adj?.amount).toBe(diff);
-    expect(adj?.balanceAfter).toBe(actual);
-
-    const updatedAccount = await cashbookService.getCashAccountById(cashAccount.id);
-    expect(updatedAccount?.currentBalance).toBe(actual);
-  });
-
-  it('REQ-17.5: should export CSV with UTF-8 BOM prefix', async () => {
-    const { items } = await cashbookService.getTransactions({}, 1, 5);
-    const csv = cashbookService.exportCashbookToCSV(items);
-
-    expect(csv.startsWith('\uFEFF')).toBe(true);
-    expect(csv).toContain('Mã giao dịch');
-    expect(csv).toContain('Số dư sau GD (VNĐ)');
-  });
-
-  it('REQ-17.6: should filter internal transfers by sourceType === "INTERNAL_TRANSFER" instead of entryType === "TRANSFER"', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    const fromAcc = accounts.find((a) => a.accountType === 'CASH')!;
-    const toAcc = accounts.find((a) => a.accountType === 'BANK')!;
-
-    // Perform internal transfer
-    const { payment, receipt } = await cashbookService.transferFunds({
-      fromAccountId: fromAcc.id,
-      toAccountId: toAcc.id,
-      amount: 1000000,
-      note: 'Chuyển tiền vào tài khoản ngân hàng VietQR',
-    });
-
-    expect(payment.sourceType).toBe('INTERNAL_TRANSFER');
-    expect(receipt.sourceType).toBe('INTERNAL_TRANSFER');
-    // Notice backend double entry preserves PAYMENT & RECEIPT, not TRANSFER
-    expect(payment.transactionType).toBe('PAYMENT');
-    expect(receipt.transactionType).toBe('RECEIPT');
-
-    // Filter by sourceType === 'INTERNAL_TRANSFER'
-    const { items: transferItems } = await cashbookService.getTransactions(
-      { sourceType: 'INTERNAL_TRANSFER' },
-      1,
-      10
-    );
-
-    expect(transferItems.length).toBeGreaterThanOrEqual(2);
-    expect(transferItems.some((tx) => tx.id === payment.id)).toBe(true);
-    expect(transferItems.some((tx) => tx.id === receipt.id)).toBe(true);
-  });
-
-  it('REQ-17.7 (Immutable Ledger): should void transaction by creating compensating entry with prefix GB-', async () => {
-    const accounts = await cashbookService.getCashAccounts();
-    const cashAccount = accounts.find((a) => a.accountType === 'CASH')!;
-
-    // Create a payment
-    const paymentTx = await cashbookService.createPayment({
-      accountId: cashAccount.id,
-      amount: 150000,
-      category: 'Chi mua văn phòng phẩm',
-      counterpartyType: 'SUPPLIER',
-      counterpartyName: 'Nhà sách Fahasa',
-      description: 'Chi tiền mua giấy in bill',
-      categoryCode: 'OTHER_PAYMENT',
-      taxTreatment: 'NonDeductibleExpense',
-    });
-
-    // Void the transaction
-    const compTx = await cashbookService.voidTransaction(
-      paymentTx.id,
-      'Nhập sai số tiền phiếu chi, cần lập lại'
-    );
-
-    expect(compTx.transactionCode.startsWith('GB-')).toBe(true);
-    expect(compTx.isCompensating).toBe(true);
-    expect(compTx.referenceDocType).toBe('COMPENSATING');
-    expect(compTx.description).toContain('[BÚT TOÁN GẠCH BỎ]');
-    expect(compTx.description).toContain('Bù trừ cho phiếu gốc');
-
-    // Original entry should be marked as voided
-    const { items } = await cashbookService.getTransactions({}, 1, 20);
-    const original = items.find((tx) => tx.id === paymentTx.id);
-    expect(original?.isVoided).toBe(true);
-    expect(original?.voidReason).toContain('Nhập sai số tiền');
+    const result = await cashbookService.getTransactions({}, 1, 10, [
+      { id: 'acc-1', branchId: 'b-1', branchName: 'CN1', accountName: 'Két 1', accountType: 'CASH', currentBalance: 900000, initialBalance: 0, isActive: true, currency: 'VND' },
+    ]);
+    expect(result.items[0].transactionType).toBe('ADJUSTMENT');
+    expect(result.items[0].amount).toBe(-150000);
+    expect(result.items[1].transactionType).toBe('ADJUSTMENT');
+    expect(result.items[1].amount).toBe(50000);
   });
 });

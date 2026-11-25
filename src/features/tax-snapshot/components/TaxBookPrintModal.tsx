@@ -1,12 +1,17 @@
-import { useRef, type FC } from 'react';
+import { useEffect, useRef, useState, type FC } from 'react';
 import { Printer, X } from 'lucide-react';
 import {
   AccountingBookType,
+  TaxCalculationMethod,
+  TaxPeriodType,
+  type HouseholdTaxDeclarationPreviewDto,
   type HouseholdTaxSummaryDto,
   type AccountingBookEntryDto,
 } from '../types/taxSnapshot';
 import { formatMoney } from '../../finance/utils/formatters';
 import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
+import { taxSnapshotApi } from '../api/taxSnapshotApi';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 export interface BookTabMetadata {
   type: AccountingBookType;
@@ -65,30 +70,61 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
   onPrint,
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const user = useAuthStore((state) => state.user);
+  const [taxpayer, setTaxpayer] = useState<HouseholdTaxDeclarationPreviewDto['taxpayer'] | null>(null);
+  const [isLoadingTaxpayer, setIsLoadingTaxpayer] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setIsLoadingTaxpayer(true);
+    taxSnapshotApi
+      .getDeclarationPreview({
+        year: summary?.year ?? year,
+        periodType: summary?.periodType ?? TaxPeriodType.Quarter,
+        periodNumber: summary?.periodNumber ?? Math.floor(new Date().getMonth() / 3) + 1,
+        branchId: summary?.branchId,
+        calculationMethod: summary?.calculationMethod ?? TaxCalculationMethod.RevenuePercentage,
+      })
+      .then((res) => {
+        if (active && res?.taxpayer) setTaxpayer(res.taxpayer);
+      })
+      .catch(() => {
+        // fallback to auth store fields
+      })
+      .finally(() => {
+        if (active) setIsLoadingTaxpayer(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, summary?.year, summary?.periodType, summary?.periodNumber, summary?.branchId, summary?.calculationMethod, year]);
+
   useDialogFocusTrap(isOpen, dialogRef, onClose);
   if (!isOpen) return null;
 
-  const cashEntries = entries.filter(
-    (e) =>
-      !e.isSummaryRow &&
-      (e.sectionGroup?.includes('Khối I') ||
-        e.sectionGroup?.includes('I.') ||
-        (!e.category?.toLowerCase().includes('ngân hàng') &&
-          !e.category?.toLowerCase().includes('bank') &&
-          !e.beneficiaryName?.toLowerCase().includes('bank') &&
-          !e.sectionGroup?.includes('Khối II')))
-  );
+  const isGenericTenantLabel = (name?: string | null): boolean =>
+    !name || name.includes('(Tenant)') || name.trim().toLowerCase().startsWith('toàn bộ hộ kinh doanh');
+  const fallbackBranchName = !isGenericTenantLabel(summary?.branchName) ? summary?.branchName : undefined;
+  const displayHouseholdName =
+    taxpayer?.taxpayerName ||
+    user?.tenantName ||
+    fallbackBranchName ||
+    (isLoadingTaxpayer ? 'Đang tải thông tin hộ kinh doanh...' : 'Hộ kinh doanh');
+  const displayTaxCode = taxpayer?.taxCode || (isLoadingTaxpayer ? 'Đang tải...' : 'Chưa cập nhật');
+  const displayAddress = taxpayer?.businessLocation || (isLoadingTaxpayer ? 'Đang tải...' : 'Chưa cập nhật');
 
-  const bankEntries = entries.filter(
-    (e) =>
-      !e.isSummaryRow &&
-      (e.sectionGroup?.includes('Khối II') ||
-        e.sectionGroup?.includes('II.') ||
-        e.category?.toLowerCase().includes('ngân hàng') ||
-        e.category?.toLowerCase().includes('bank') ||
-        e.beneficiaryName?.toLowerCase().includes('bank') ||
-        e.beneficiaryName?.toLowerCase().includes('vietcombank'))
-  );
+  const isBankEntry = (e: AccountingBookEntryDto): boolean => {
+    const sg = e.sectionGroup || '';
+    if (sg.includes('Khối II') || sg.startsWith('II.')) return true;
+    if (sg.includes('Khối I') || sg.startsWith('I.')) return false;
+    const cat = e.category?.toLowerCase() || '';
+    const ben = e.beneficiaryName?.toLowerCase() || '';
+    return cat.includes('ngân hàng') || cat.includes('bank') || ben.includes('bank') || ben.includes('vietcombank');
+  };
+
+  const cashEntries = entries.filter((e) => !e.isSummaryRow && !isBankEntry(e));
+  const bankEntries = entries.filter((e) => !e.isSummaryRow && isBankEntry(e));
 
   return (
     <div className="tax-modal-backdrop no-print-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -220,9 +256,9 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
             {/* A4 National Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
               <div style={{ width: '48%', fontSize: '8.5pt', lineHeight: 1.45 }}>
-                <div><strong>HỘ KINH DOANH:</strong> {summary?.branchName || 'Tạp Hóa Tuấn Minh'}</div>
-                <div><strong>Mã số thuế:</strong> 8301928374-001</div>
-                <div><strong>Địa chỉ:</strong> TP. Hồ Chí Minh</div>
+                <div><strong>HỘ KINH DOANH:</strong> {displayHouseholdName}</div>
+                <div><strong>Mã số thuế:</strong> {displayTaxCode}</div>
+                <div><strong>Địa chỉ:</strong> {displayAddress}</div>
                 <div><strong>Kỳ hạch toán:</strong> {periodDisplayName}</div>
               </div>
               <div style={{ width: '50%', textAlign: 'center', fontSize: '8.5pt', lineHeight: 1.4 }}>
@@ -645,21 +681,19 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
                   <div style={{ fontWeight: 800 }}>NGƯỜI LẬP BIỂU</div>
                   <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, ghi rõ họ tên)</div>
                   <div style={{ height: 60 }}></div>
-                  <div style={{ fontWeight: 600 }}>Nguyễn Thị Thu Ngân</div>
                 </div>
 
                 <div>
                   <div style={{ fontWeight: 800 }}>KẾ TOÁN TRƯỞNG</div>
                   <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, ghi rõ họ tên)</div>
                   <div style={{ height: 60 }}></div>
-                  <div style={{ fontWeight: 600 }}>Trần Văn Kế Toán</div>
                 </div>
 
                 <div>
                   <div style={{ fontWeight: 800 }}>NGƯỜI ĐẠI DIỆN HỘ KINH DOANH</div>
                   <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, đóng dấu nếu có)</div>
                   <div style={{ height: 60 }}></div>
-                  <div style={{ fontWeight: 700 }}>{summary?.branchName || 'Đại diện HKD'}</div>
+                  <div style={{ fontWeight: 700 }}>{displayHouseholdName}</div>
                 </div>
               </div>
             </div>
@@ -692,7 +726,7 @@ export const TaxBookPrintModal: FC<TaxBookPrintModalProps> = ({
             style={{ background: '#0F766E' }}
           >
             <Printer size={15} />
-            <span>🖨️ In / Xuất PDF A4</span>
+            <span>In / Xuất PDF A4</span>
           </button>
         </div>
       </div>

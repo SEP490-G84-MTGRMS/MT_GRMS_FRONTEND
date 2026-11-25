@@ -5,7 +5,6 @@ import {
   Plus,
   ClipboardCheck,
   MoreHorizontal,
-  Upload,
   Download,
   User,
   AlertTriangle,

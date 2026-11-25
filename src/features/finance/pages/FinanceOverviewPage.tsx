@@ -49,7 +49,7 @@ function createInitialPnlFilter(): PnlFilterParams {
   };
 }
 
-function getLinkedPnlFilter(startDate: string | null, endDate: string | null): PnlFilterParams | undefined {
+function getLinkedPnlFilter(startDate: string | null, endDate: string | null, branchId?: string | null): PnlFilterParams | undefined {
   const isCalendarDate = (value: string) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const parsed = new Date(`${value}T00:00:00Z`);
@@ -57,7 +57,7 @@ function getLinkedPnlFilter(startDate: string | null, endDate: string | null): P
   };
   if (!startDate || !endDate || !isCalendarDate(startDate) || !isCalendarDate(endDate) || startDate > endDate)
     return undefined;
-  return { branchId: 'ALL', startDate, endDate, presetPeriod: 'CUSTOM' };
+  return { branchId: branchId || getStoredBranchId(), startDate, endDate, presetPeriod: 'CUSTOM' };
 }
 
 function useOverviewToast() {
@@ -82,11 +82,11 @@ function useOverviewToast() {
   return { toast, showToast, dismissToast };
 }
 
-const OverviewErrorBanner: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
+const OverviewErrorBanner: React.FC<{ message?: string; onRetry: () => void }> = ({ message, onRetry }) => (
   <div className="finance-error-banner" role="alert">
     <div className="finance-error-banner-content">
       <AlertCircle size={18} />
-      <span>Không thể tải dữ liệu tổng quan tài chính theo phạm vi đã chọn.</span>
+      <span>{message || 'Không thể tải dữ liệu tổng quan tài chính theo phạm vi đã chọn.'}</span>
     </div>
     <button type="button" onClick={onRetry} className="finance-error-retry-btn">Thử lại</button>
   </div>
@@ -97,16 +97,27 @@ export const FinanceOverviewPage: React.FC = () => {
   const activeTab: FinanceTabKey = searchParams.get('tab') === 'pnl' ? 'pnl' : 'overview';
   const linkedStartDate = searchParams.get('startDate');
   const linkedEndDate = searchParams.get('endDate');
-  const [overviewFilter, setOverviewFilter] = useState<FinanceOverviewFilter>(createInitialOverviewFilter);
-  const [pnlFilter, setPnlFilter] = useState<PnlFilterParams>(() =>
-    getLinkedPnlFilter(linkedStartDate, linkedEndDate) ?? createInitialPnlFilter(),
-  );
+  const linkedBranchId = searchParams.get('branchId');
+  const [overviewFilter, setOverviewFilter] = useState<FinanceOverviewFilter>(() => {
+    const base = createInitialOverviewFilter();
+    return linkedBranchId ? { ...base, branchId: linkedBranchId } : base;
+  });
+  const [pnlFilter, setPnlFilter] = useState<PnlFilterParams>(() => {
+    const linked = getLinkedPnlFilter(linkedStartDate, linkedEndDate, linkedBranchId);
+    if (linked) return linked;
+    const base = createInitialPnlFilter();
+    return linkedBranchId ? { ...base, branchId: linkedBranchId } : base;
+  });
   const { toast, showToast, dismissToast } = useOverviewToast();
 
   useEffect(() => {
-    const linkedFilter = getLinkedPnlFilter(linkedStartDate, linkedEndDate);
+    const linkedFilter = getLinkedPnlFilter(linkedStartDate, linkedEndDate, linkedBranchId);
     if (linkedFilter) setPnlFilter(linkedFilter);
-  }, [linkedStartDate, linkedEndDate]);
+    else if (linkedBranchId) {
+      setOverviewFilter((prev) => ({ ...prev, branchId: linkedBranchId }));
+      setPnlFilter((prev) => ({ ...prev, branchId: linkedBranchId }));
+    }
+  }, [linkedStartDate, linkedEndDate, linkedBranchId]);
 
   useEffect(() => {
     if (!searchParams.has('tab')) {
@@ -184,13 +195,28 @@ export const FinanceOverviewPage: React.FC = () => {
 
         {activeTab === 'overview' && (
           <div role="tabpanel" aria-label="Sức khỏe tiền mặt" className="finance-overview-panel">
-            <FinanceOverviewFilterBar value={overviewFilter} branches={branchesQuery.data || []} onChange={setOverviewFilter} />
-            {overviewQuery.isError && <OverviewErrorBanner onRetry={handleRefresh} />}
+            <FinanceOverviewFilterBar
+              value={overviewFilter}
+              branches={branchesQuery.data || []}
+              onChange={(next) => {
+                setOverviewFilter(next);
+                setPnlFilter((prev) => ({ ...prev, branchId: next.branchId, startDate: next.startDate, endDate: next.endDate, presetPeriod: next.preset }));
+              }}
+            />
+            {overviewQuery.isError && (
+              <OverviewErrorBanner
+                message={(overviewQuery.error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message || (overviewQuery.error as Error)?.message}
+                onRetry={handleRefresh}
+              />
+            )}
             <BranchCashHealthPanel
               data={overviewQuery.data}
               isLoading={overviewQuery.isLoading}
               isFetching={overviewQuery.isFetching}
-              onSelectBranch={(branchId) => setOverviewFilter((previous) => ({ ...previous, branchId }))}
+              onSelectBranch={(branchId) => {
+                setOverviewFilter((previous) => ({ ...previous, branchId }));
+                setPnlFilter((previous) => ({ ...previous, branchId }));
+              }}
             />
           </div>
         )}
@@ -199,12 +225,20 @@ export const FinanceOverviewPage: React.FC = () => {
           <div className="finance-pnl-zone" role="tabpanel" aria-label="Lãi lỗ">
             <FinancePnlOverviewPanel
               filter={pnlFilter}
-              onFilterChange={setPnlFilter}
+              onFilterChange={(next) => {
+                setPnlFilter(next);
+                setOverviewFilter((prev) => ({ ...prev, branchId: next.branchId || 'ALL', startDate: next.startDate, endDate: next.endDate, preset: next.presetPeriod }));
+              }}
               branches={branchesQuery.data || []}
               reportData={pnlReportQuery.data}
               isLoading={pnlReportQuery.isLoading}
               isFetching={pnlReportQuery.isFetching}
-              errorMessage={pnlReportQuery.isError ? 'Không thể tải dữ liệu báo cáo Lãi lỗ.' : null}
+              errorMessage={
+                pnlReportQuery.isError
+                  ? ((pnlReportQuery.error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message || 'Không thể tải dữ liệu báo cáo Lãi lỗ.')
+                  : null
+              }
+              onShowToast={showToast}
             />
           </div>
         )}

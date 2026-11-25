@@ -520,12 +520,14 @@ export const reportsPnlService = {
           const grossProfit = Number(s.grossProfit || 0);
           const grossMarginPct = Number(s.grossMarginPercentage || 0);
           const operatingExpenses = Number(s.operatingExpenses?.totalAmount || 0);
-          const shrinkageLoss = Number(s.badDebtExpense || 0);
+          const shrinkageLoss = Number(s.shrinkageLoss || 0);
           const netProfit = Number(s.netProfit || 0);
           const netMarginPct = Number(s.netMarginPercentage || 0);
 
-          const taxConfig = getTaxRateConfig();
-          const estimatedTaxAmount = Math.round(netRevenue * (taxConfig.effectiveTotalRatePct / 100));
+          const estimatedTaxAmount =
+            typeof s.estimatedTaxAmount === 'number'
+              ? Number(s.estimatedTaxAmount)
+              : 0;
           const netProfitAfterTax = netProfit - estimatedTaxAmount;
           const netProfitAfterTaxMarginPct = calculateMarginPct(netProfitAfterTax, netRevenue);
 
@@ -624,7 +626,7 @@ export const reportsPnlService = {
           };
 
           const rawCategories = s.operatingExpenses?.categories || [];
-          const pnlTree = buildPnlStatementTree(liveKpiSummary, rawCategories, taxConfig);
+          const pnlTree = buildPnlStatementTree(liveKpiSummary, rawCategories, getTaxRateConfig());
           const expenseBreakdown = buildLiveExpenseBreakdown(rawCategories, operatingExpenses, shrinkageLoss);
 
           let trendData: PnlTrendPoint[] = [];
@@ -642,9 +644,8 @@ export const reportsPnlService = {
             });
           }
 
-          let topProducts: TopProductPerformance[] = [];
-          if (Array.isArray(s.topProducts) && s.topProducts.length > 0) {
-            topProducts = s.topProducts.map((tp: any) => ({
+          const topProducts: TopProductPerformance[] = Array.isArray(s.topProducts)
+            ? s.topProducts.map((tp: any) => ({
               productId: String(tp.productId),
               productCode: tp.productCode || 'SP',
               productName: tp.productName || 'Sản phẩm',
@@ -653,10 +654,8 @@ export const reportsPnlService = {
               cogs: Number(tp.cogs || 0),
               profit: Number(tp.profit || 0),
               marginPct: Number(tp.marginPct || 0),
-            }));
-          } else {
-            topProducts = await this.getLiveTopProducts(branchParam).catch(() => []);
-          }
+            }))
+            : [];
 
           return {
             filter: params,

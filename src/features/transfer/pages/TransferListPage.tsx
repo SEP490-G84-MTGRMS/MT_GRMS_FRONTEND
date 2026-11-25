@@ -12,14 +12,34 @@ import {
   RotateCcw,
   Loader2,
 } from 'lucide-react';
-import type { Branch, TransferOrder, TransferStatus } from '../types';
-import { transferService } from '../services/transferService';
+import type { Branch, TransferCompletionResult, TransferOrder, TransferStatus } from '../types';
+import { getTransferErrorMessage, transferService } from '../services/transferService';
 import { TransferDetailModal } from '../components/TransferDetailModal';
 import { TablePagination } from '../../../components/common';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../../styles/so-list-page.css';
 import '../../purchase-order/purchase-order.css';
 import '../transfer.css';
+
+const getStatusDisplayLabel = (t: TransferOrder): string => {
+  if (t.status === 'Completed') {
+    if (t.completionResult === 'Returned') return 'Đã hoàn trả kho nguồn';
+    if (t.completionResult === 'ReceivedWithDiscrepancy' || t.hasDiscrepancy) {
+      return 'Hoàn tất có chênh lệch';
+    }
+    return 'Hoàn tất';
+  }
+  switch (t.status) {
+    case 'Draft':
+      return 'Phiếu tạm';
+    case 'Pending':
+      return 'Chờ xử lý';
+    case 'InTransit':
+      return 'Đang chuyển';
+    case 'Cancelled':
+      return 'Đã hủy';
+  }
+};
 
 export const TransferListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -38,7 +58,7 @@ export const TransferListPage: React.FC = () => {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
-  // User role & current branch context (BR-SEC-02 simulation)
+  // User role & current branch context
   const user = useAuthStore((state) => state.user);
   const isStoreOwner = user?.role === 'STORE_OWNER';
   const transferBasePath = isStoreOwner ? '/store-owner/transfers' : '/employee/transfers';
@@ -55,10 +75,15 @@ export const TransferListPage: React.FC = () => {
     if (queryStatus === 'InTransit') {
       return ['InTransit'];
     }
-    if (queryStatus === 'Completed') {
+    if (queryStatus === 'Completed' || queryStatus === 'Completed_Discrepancy' || queryStatus === 'Completed_Returned') {
       return ['Completed'];
     }
     return ['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled'];
+  });
+  const [completionResultFilter, setCompletionResultFilter] = useState<TransferCompletionResult | undefined>(() => {
+    if (queryStatus === 'Completed_Discrepancy') return 'ReceivedWithDiscrepancy';
+    if (queryStatus === 'Completed_Returned') return 'Returned';
+    return undefined;
   });
   const [statusDropdown, setStatusDropdown] = useState<string>(() => queryStatus);
   const [timeRange, setTimeRange] = useState<'all' | 'this_month' | 'custom'>('this_month');
@@ -66,12 +91,14 @@ export const TransferListPage: React.FC = () => {
   const [recvStatus, setRecvStatus] = useState<'all' | 'match' | 'mismatch'>('all');
   const [dateField, setDateField] = useState<'transfer' | 'receive'>('transfer');
 
-  // Modals & Selection
+  // Modals & Pagination
   const [selectedTransfer, setSelectedTransfer] = useState<TransferOrder | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [pageIndex, setPageIndex] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(15);
+
+  // Race-condition guard
+  const requestSeqRef = useRef<number>(0);
 
   // Scroll synchronization between fixed header and scrollable body
   const headerRef = useRef<HTMLDivElement>(null);
@@ -108,6 +135,7 @@ export const TransferListPage: React.FC = () => {
   }, [queryDetailId]);
 
   const loadTransfers = useCallback(() => {
+    const seq = ++requestSeqRef.current;
     setIsLoading(true);
     if (selectedStatuses.length === 0) {
       setTransfers([]);
@@ -122,8 +150,8 @@ export const TransferListPage: React.FC = () => {
       timeRange === 'this_month'
         ? monthStart
         : timeRange === 'custom' && customDate
-        ? new Date(`${customDate}T00:00:00`).toISOString()
-        : undefined;
+          ? new Date(`${customDate}T00:00:00`).toISOString()
+          : undefined;
 
     transferService
       .list({
@@ -133,22 +161,26 @@ export const TransferListPage: React.FC = () => {
         fromBranchId: fromBranchId || undefined,
         toBranchId: toBranchId || undefined,
         statuses: activeStatuses.length ? activeStatuses : undefined,
+        completionResult: completionResultFilter,
         receiveStatus: recvStatus,
         fromDate: date,
         toDate: timeRange === 'custom' && customDate ? customDate : undefined,
         dateField,
       })
       .then((result) => {
+        if (seq !== requestSeqRef.current) return;
         setTransfers(result.items);
         setTotalItems(result.totalItems);
       })
       .catch((error: unknown) => {
-        showToast(
-          error instanceof Error ? error.message : 'Không tải được phiếu điều chuyển.',
-          'warning'
-        );
+        if (seq !== requestSeqRef.current) return;
+        showToast(getTransferErrorMessage(error), 'warning');
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        if (seq === requestSeqRef.current) {
+          setIsLoading(false);
+        }
+      });
   }, [
     pageIndex,
     pageSize,
@@ -156,6 +188,7 @@ export const TransferListPage: React.FC = () => {
     fromBranchId,
     toBranchId,
     selectedStatuses,
+    completionResultFilter,
     timeRange,
     customDate,
     dateField,
@@ -173,10 +206,7 @@ export const TransferListPage: React.FC = () => {
         setBranches(data);
       })
       .catch((error: unknown) => {
-        showToast(
-          error instanceof Error ? error.message : 'Không tải được danh sách chi nhánh.',
-          'warning'
-        );
+        showToast(getTransferErrorMessage(error), 'warning');
       });
   }, []);
 
@@ -187,6 +217,7 @@ export const TransferListPage: React.FC = () => {
     fromBranchId,
     toBranchId,
     selectedStatuses,
+    completionResultFilter,
     timeRange,
     customDate,
     recvStatus,
@@ -197,8 +228,16 @@ export const TransferListPage: React.FC = () => {
     setStatusDropdown(value);
     if (value === 'ALL') {
       setSelectedStatuses(['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled']);
+      setCompletionResultFilter(undefined);
+    } else if (value === 'Completed_Discrepancy') {
+      setSelectedStatuses(['Completed']);
+      setCompletionResultFilter('ReceivedWithDiscrepancy');
+    } else if (value === 'Completed_Returned') {
+      setSelectedStatuses(['Completed']);
+      setCompletionResultFilter('Returned');
     } else {
       setSelectedStatuses([value as TransferStatus]);
+      setCompletionResultFilter(undefined);
     }
   };
 
@@ -209,32 +248,20 @@ export const TransferListPage: React.FC = () => {
     setToBranchId('');
     setStatusDropdown('ALL');
     setSelectedStatuses(['Draft', 'Pending', 'InTransit', 'Completed', 'Cancelled']);
+    setCompletionResultFilter(undefined);
     setTimeRange('this_month');
     setCustomDate('');
     setRecvStatus('all');
     setDateField('transfer');
   };
 
-  const handleToggleFavorite = (_id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    showToast('Thao tác đánh dấu yêu thích chưa được API hỗ trợ.', 'warning');
-  };
-
-  // Filter logic including BR-SEC-02
+  // Filter logic including BR-SEC-02 (server-side search is authoritative for appliedSearch)
   const filteredTransfers = useMemo(() => {
     return transfers.filter((t) => {
       // BR-SEC-02: Branch Isolation for Employee
       if (!isStoreOwner && user?.branchId) {
         const isRelated = t.fromBranchId === user.branchId || t.toBranchId === user.branchId;
         if (!isRelated) return false;
-      }
-
-      // Search code & notes
-      if (appliedSearch.trim()) {
-        const kw = appliedSearch.trim().toLowerCase();
-        const codeMatch = t.transferCode.toLowerCase().includes(kw);
-        const noteMatch = (t.note || '').toLowerCase().includes(kw);
-        if (!codeMatch && !noteMatch) return false;
       }
 
       // From branch
@@ -246,13 +273,16 @@ export const TransferListPage: React.FC = () => {
       // Status
       if (!selectedStatuses.includes(t.status)) return false;
 
+      // Completion result
+      if (completionResultFilter && t.completionResult !== completionResultFilter) return false;
+
       // Recv status
       if (recvStatus === 'match') {
-        const isAllMatch = t.items.every((it) => it.receivedQty === it.sentQty);
-        if (!isAllMatch || t.status !== 'Completed') return false;
+        const isAllMatch = t.items.every((it) => it.receivedQty === it.sentQty && (it.damagedQty ?? 0) === 0);
+        if (!isAllMatch || t.status !== 'Completed' || t.completionResult === 'Returned') return false;
       } else if (recvStatus === 'mismatch') {
-        const hasMismatch = t.items.some((it) => (it.receivedQty ?? it.sentQty) < it.sentQty);
-        if (!hasMismatch) return false;
+        const hasMismatch = t.items.some((it) => (it.damagedQty ?? 0) > 0 || (it.receivedQty ?? it.sentQty) < it.sentQty);
+        if (!hasMismatch || t.status !== 'Completed' || t.completionResult === 'Returned') return false;
       }
 
       return true;
@@ -261,10 +291,10 @@ export const TransferListPage: React.FC = () => {
     transfers,
     isStoreOwner,
     user?.branchId,
-    appliedSearch,
     fromBranchId,
     toBranchId,
     selectedStatuses,
+    completionResultFilter,
     recvStatus,
   ]);
 
@@ -280,7 +310,10 @@ export const TransferListPage: React.FC = () => {
     return () => window.removeEventListener('resize', updateScrollState);
   }, [filteredTransfers]);
 
-  const totalTransferValue = filteredTransfers.reduce((sum, t) => sum + t.totalAmount, 0);
+  // BUG-044: Exclude both Cancelled and Returned transfers from totalTransferValue
+  const totalTransferValue = filteredTransfers
+    .filter((t) => t.status !== 'Cancelled' && t.completionResult !== 'Returned')
+    .reduce((sum, t) => sum + t.totalAmount, 0);
 
   const exportExcel = async () => {
     if (!filteredTransfers.length) {
@@ -294,6 +327,7 @@ export const TransferListPage: React.FC = () => {
       sheet.addRow([
         'Mã phiếu',
         'Ngày chuyển',
+        'Ngày nhận',
         'Chi nhánh gửi',
         'Chi nhánh nhận',
         'Trạng thái',
@@ -303,9 +337,12 @@ export const TransferListPage: React.FC = () => {
         sheet.addRow([
           transfer.transferCode,
           transfer.transferDate,
+          transfer.completionResult === 'Returned'
+            ? '(Hoàn trả kho nguồn)'
+            : transfer.receiveDate || '',
           transfer.fromBranchName,
           transfer.toBranchName,
-          transfer.status,
+          getStatusDisplayLabel(transfer),
           ...(isStoreOwner ? [transfer.totalAmount] : []),
         ])
       );
@@ -332,8 +369,72 @@ export const TransferListPage: React.FC = () => {
     }
   };
 
-  const renderStatus = (status: TransferStatus) => {
-    switch (status) {
+  const renderStatus = (transfer: TransferOrder) => {
+    if (transfer.status === 'Completed') {
+      if (transfer.completionResult === 'Returned') {
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '3px 10px',
+              borderRadius: 9999,
+              fontSize: 11.5,
+              fontWeight: 600,
+              backgroundColor: '#f5f3ff',
+              color: '#6d28d9',
+              border: '1px solid #ddd6fe',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Đã hoàn trả kho nguồn
+          </span>
+        );
+      }
+      if (transfer.completionResult === 'ReceivedWithDiscrepancy' || transfer.hasDiscrepancy) {
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '3px 10px',
+              borderRadius: 9999,
+              fontSize: 11.5,
+              fontWeight: 600,
+              backgroundColor: '#fff7ed',
+              color: '#c2410c',
+              border: '1px solid #fed7aa',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Hoàn tất có chênh lệch
+          </span>
+        );
+      }
+      return (
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '3px 10px',
+            borderRadius: 9999,
+            fontSize: 11.5,
+            fontWeight: 600,
+            backgroundColor: '#f0fdf4',
+            color: '#15803d',
+            border: '1px solid #bbf7d0',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Hoàn tất
+        </span>
+      );
+    }
+
+    switch (transfer.status) {
       case 'Draft':
         return (
           <span
@@ -378,26 +479,6 @@ export const TransferListPage: React.FC = () => {
             Đang chuyển
           </span>
         );
-      case 'Completed':
-        return (
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '3px 10px',
-              borderRadius: 9999,
-              fontSize: 11.5,
-              fontWeight: 600,
-              backgroundColor: '#f0fdf4',
-              color: '#15803d',
-              border: '1px solid #bbf7d0',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Hoàn tất
-          </span>
-        );
       case 'Cancelled':
         return (
           <span
@@ -423,17 +504,17 @@ export const TransferListPage: React.FC = () => {
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: 44 }} />
-      <col style={{ width: 40 }} />
-      <col style={{ width: 150 }} />
-      <col style={{ width: 140 }} />
-      <col style={{ width: 140 }} />
-      <col style={{ width: 190 }} />
-      <col style={{ width: 190 }} />
-      {isStoreOwner && <col style={{ width: 140 }} />}
-      <col style={{ width: 120 }} />
+      <col style={{ width: 160 }} />
+      <col style={{ width: 145 }} />
+      <col style={{ width: 155 }} />
+      <col style={{ width: 200 }} />
+      <col style={{ width: 200 }} />
+      {isStoreOwner && <col style={{ width: 145 }} />}
+      <col style={{ width: 170 }} />
     </colgroup>
   );
+
+  const tableColumnCount = isStoreOwner ? 7 : 6;
 
   return (
     <div
@@ -452,7 +533,7 @@ export const TransferListPage: React.FC = () => {
       {/* Toast Notification */}
       {toast && <AdminToast toast={toast} onClose={() => setToast(null)} />}
 
-      {/* ── 1. HEADER BAR CHUẨN DESIGN SYSTEM (~44px) ── */}
+      {/* ── 1. HEADER BAR ── */}
       <div className="so-list-header" style={{ minHeight: 44 }}>
         <div>
           <h1 className="so-list-title">
@@ -472,20 +553,22 @@ export const TransferListPage: React.FC = () => {
         </div>
 
         <div className="so-list-header-actions">
-          {isStoreOwner && <span
-            className="so-list-filter-badge"
-            style={{
-              backgroundColor: '#F0FDFA',
-              color: '#0F766E',
-              borderColor: '#CCFBF1',
-              height: 32,
-              fontSize: 12.5,
-            }}
-            title="Tổng giá trị các phiếu chuyển theo bộ lọc"
-          >
-            Tổng giá trị:{' '}
-            <strong style={{ marginLeft: 4 }}>{totalTransferValue.toLocaleString()} đ</strong>
-          </span>}
+          {isStoreOwner && (
+            <span
+              className="so-list-filter-badge"
+              style={{
+                backgroundColor: '#F0FDFA',
+                color: '#0F766E',
+                borderColor: '#CCFBF1',
+                height: 32,
+                fontSize: 12.5,
+              }}
+              title="Tổng giá trị các phiếu chuyển hiệu lực theo bộ lọc (loại trừ đã hủy và hoàn trả)"
+            >
+              Tổng giá trị:{' '}
+              <strong style={{ marginLeft: 4 }}>{totalTransferValue.toLocaleString('vi-VN')} đ</strong>
+            </span>
+          )}
           <button
             type="button"
             className="po-btn po-btn-secondary"
@@ -503,23 +586,16 @@ export const TransferListPage: React.FC = () => {
             title="Tạo phiếu chuyển kho mới"
           >
             <Plus size={15} />
-            <span>+ Tạo phiếu chuyển kho</span>
+            <span>Tạo phiếu chuyển kho</span>
           </button>
         </div>
       </div>
 
-      {/* ── 2. FILTER CARD CSS GRID 4 CỘT x 2 DÒNG (~86px) ── */}
+      {/* ── 2. FILTER CARD CSS GRID 4 CỘT x 2 DÒNG ── */}
       <div className="so-list-filter" style={{ marginBottom: 8 }}>
-        {/* ROW 1: Tìm kiếm mã/ghi chú, Kho gửi, Kho nhận, Trạng thái chuyển */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '10px 14px',
-            alignItems: 'center',
-          }}
-        >
-          {/* Cột 1: Tìm kiếm mã phiếu / ghi chú */}
+        {/* ROW 1 */}
+        <div className="so-filter-grid-4">
+          {/* Cột 1: Tìm kiếm */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 65 }}>
               Tìm kiếm:
@@ -534,7 +610,13 @@ export const TransferListPage: React.FC = () => {
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    setAppliedSearch(searchInput.trim());
+                    const nextSearch = searchInput.trim();
+                    if (nextSearch !== appliedSearch) {
+                      setPageIndex(1);
+                      setAppliedSearch(nextSearch);
+                    } else {
+                      loadTransfers();
+                    }
                   }
                 }}
               />
@@ -551,7 +633,7 @@ export const TransferListPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Cột 2: Kho gửi (Từ chi nhánh) */}
+          {/* Cột 2: Kho gửi */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 60 }}>
               Kho gửi:
@@ -571,7 +653,7 @@ export const TransferListPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Cột 3: Kho nhận (Tới chi nhánh) */}
+          {/* Cột 3: Kho nhận */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 65 }}>
               Kho nhận:
@@ -591,7 +673,7 @@ export const TransferListPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Cột 4: Trạng thái (All, Draft, InTransit, Completed, Cancelled) */}
+          {/* Cột 4: Trạng thái */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 68 }}>
               Trạng thái:
@@ -603,27 +685,20 @@ export const TransferListPage: React.FC = () => {
               onChange={(e) => handleStatusDropdownChange(e.target.value)}
             >
               <option value="ALL">Tất cả trạng thái</option>
-              <option value="Draft">Phiếu tạm (Draft)</option>
-              <option value="Pending">Chờ xử lý (Pending)</option>
-              <option value="InTransit">Đang chuyển (InTransit)</option>
-              <option value="Completed">Hoàn tất (Completed)</option>
-              <option value="Cancelled">Đã hủy (Cancelled)</option>
+              <option value="Draft">Phiếu tạm</option>
+              <option value="Pending">Chờ xử lý</option>
+              <option value="InTransit">Đang chuyển</option>
+              <option value="Completed">Hoàn tất</option>
+              <option value="Completed_Discrepancy">Hoàn tất có chênh lệch</option>
+              <option value="Completed_Returned">Đã hoàn trả kho nguồn</option>
+              <option value="Cancelled">Đã hủy</option>
             </select>
           </div>
         </div>
 
-        {/* ROW 2: Tình trạng nhận/hư hại, Thời gian/kỳ lọc, Lọc theo ngày, Nút Tìm kiếm & Đặt lại */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '10px 14px',
-            alignItems: 'center',
-            paddingTop: 8,
-            borderTop: '1px dashed #f1f5f9',
-          }}
-        >
-          {/* Cột 1: Tình trạng nhận hàng / lệch hàng */}
+        {/* ROW 2 */}
+        <div className="so-filter-grid-4 so-filter-grid-row2">
+          {/* Cột 1: Tình trạng nhận hàng */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 65 }}>
               Nhận hàng:
@@ -640,7 +715,7 @@ export const TransferListPage: React.FC = () => {
             </select>
           </div>
 
-          {/* Cột 2: Thời gian / Khoảng ngày */}
+          {/* Cột 2: Thời gian */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 60 }}>
               Thời gian:
@@ -666,7 +741,7 @@ export const TransferListPage: React.FC = () => {
             )}
           </div>
 
-          {/* Cột 3: Loại mốc ngày lọc */}
+          {/* Cột 3: Lọc theo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <label className="so-list-filter-label" style={{ minWidth: 60 }}>
               Lọc theo:
@@ -691,8 +766,13 @@ export const TransferListPage: React.FC = () => {
               type="button"
               className="so-list-filter-search"
               onClick={() => {
-                setAppliedSearch(searchInput.trim());
-                loadTransfers();
+                const nextSearch = searchInput.trim();
+                if (nextSearch !== appliedSearch) {
+                  setPageIndex(1);
+                  setAppliedSearch(nextSearch);
+                } else {
+                  loadTransfers();
+                }
               }}
               title="Tìm kiếm theo tiêu chí đã chọn"
             >
@@ -720,38 +800,20 @@ export const TransferListPage: React.FC = () => {
           className="so-list-table-head"
           style={{ paddingRight: hasScrollY ? 6 : 0 }}
         >
-          <table className="so-list-table" style={{ minWidth: 1100, tableLayout: 'fixed' }}>
+          <table className="so-list-table" style={{ minWidth: 1050, tableLayout: 'fixed' }}>
             {tableColGroup}
             <thead>
               <tr>
-                <th className="so-list-th" style={{ textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={
-                      filteredTransfers.length > 0 &&
-                      selectedIds.length === filteredTransfers.length
-                    }
-                    onChange={() => {
-                      if (selectedIds.length === filteredTransfers.length) {
-                        setSelectedIds([]);
-                      } else {
-                        setSelectedIds(filteredTransfers.map((t) => t.id));
-                      }
-                    }}
-                    style={{ accentColor: '#0F766E', cursor: 'pointer' }}
-                  />
-                </th>
-                <th className="so-list-th" style={{ textAlign: 'center' }}>
-                  ★
-                </th>
                 <th className="so-list-th">Mã Chuyển Hàng</th>
                 <th className="so-list-th">Ngày Chuyển</th>
                 <th className="so-list-th">Ngày Nhận</th>
                 <th className="so-list-th">Kho Gửi</th>
                 <th className="so-list-th">Kho Nhận</th>
-                {isStoreOwner && <th className="so-list-th" style={{ textAlign: 'right' }}>
-                  Giá Trị Chuyển
-                </th>}
+                {isStoreOwner && (
+                  <th className="so-list-th" style={{ textAlign: 'right' }}>
+                    Giá Trị Chuyển
+                  </th>
+                )}
                 <th className="so-list-th" style={{ textAlign: 'center' }}>
                   Trạng Thái
                 </th>
@@ -760,18 +822,18 @@ export const TransferListPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Scrollable Body (12-15 dòng trong viewport) */}
+        {/* Scrollable Body */}
         <div
           ref={bodyRef}
           className="so-list-table-body supplier-table-scroll-container"
           onScroll={handleBodyScroll}
         >
-          <table className="so-list-table" style={{ minWidth: 1100, tableLayout: 'fixed' }}>
+          <table className="so-list-table" style={{ minWidth: 1050, tableLayout: 'fixed' }}>
             {tableColGroup}
             <tbody>
               {filteredTransfers.map((t) => {
-                const isChecked = selectedIds.includes(t.id);
                 const isReceiving = t.status === 'InTransit';
+                const isReturned = t.status === 'Completed' && t.completionResult === 'Returned';
 
                 return (
                   <tr
@@ -783,48 +845,6 @@ export const TransferListPage: React.FC = () => {
                     }}
                     style={{ cursor: 'pointer' }}
                   >
-                    {/* Checkbox */}
-                    <td
-                      className="so-list-td"
-                      style={{ textAlign: 'center' }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          if (isChecked) {
-                            setSelectedIds(selectedIds.filter((id) => id !== t.id));
-                          } else {
-                            setSelectedIds([...selectedIds, t.id]);
-                          }
-                        }}
-                        style={{ accentColor: '#0F766E', cursor: 'pointer' }}
-                      />
-                    </td>
-
-                    {/* Favorite ★ */}
-                    <td
-                      className="so-list-td"
-                      style={{ textAlign: 'center' }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => handleToggleFavorite(t.id, e)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: 15,
-                          color: t.isFavorite ? '#eab308' : '#94a3b8',
-                          padding: 0,
-                        }}
-                      >
-                        {t.isFavorite ? '★' : '☆'}
-                      </button>
-                    </td>
-
                     {/* Mã phiếu */}
                     <td className="so-list-td">
                       <span className="so-list-code">{t.transferCode}</span>
@@ -837,60 +857,77 @@ export const TransferListPage: React.FC = () => {
 
                     {/* Ngày nhận / Nhận hàng button */}
                     <td className="so-list-td" style={{ fontSize: 12.5, color: '#475569' }}>
-                      {t.receiveDate ? (
+                      {isReturned ? (
+                        <span style={{ fontStyle: 'italic', color: '#6d28d9' }}>(Hoàn trả kho nguồn)</span>
+                      ) : t.receiveDate ? (
                         t.receiveDate
                       ) : isReceiving ? (
-                        <button
-                          type="button"
-                          className="so-list-action-btn so-list-action-btn--success"
-                          style={{
-                            height: 26,
-                            padding: '0 8px',
-                            fontSize: 11.5,
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`${transferBasePath}/${t.id}/receive`);
-                          }}
-                        >
-                          <CheckCircle size={12} />
-                          <span>Nhận hàng</span>
-                        </button>
-                      ) : t.status === 'Draft' ? (
-                        <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa nhận)</span>
+                        isStoreOwner || user?.branchId === t.toBranchId ? (
+                          <button
+                            type="button"
+                            className="so-list-action-btn so-list-action-btn--success"
+                            style={{
+                              height: 26,
+                              padding: '0 8px',
+                              fontSize: 11.5,
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`${transferBasePath}/${t.id}/receive`);
+                            }}
+                          >
+                            <CheckCircle size={12} />
+                            <span>Nhận hàng</span>
+                          </button>
+                        ) : (
+                          <span style={{ fontStyle: 'italic', color: '#0284c7' }}>(Đang vận chuyển)</span>
+                        )
                       ) : t.status === 'Pending' ? (
-                        <span style={{ fontStyle: 'italic', color: '#d97706' }}>(Chờ xuất)</span>
+                        <span style={{ fontStyle: 'italic', color: '#d97706' }}>(Chờ xuất kho)</span>
+                      ) : t.status === 'Draft' ? (
+                        <span style={{ fontStyle: 'italic', color: '#64748b' }}>(Chưa gửi)</span>
                       ) : (
                         <span style={{ fontStyle: 'italic', color: '#dc2626' }}>(Đã hủy)</span>
                       )}
                     </td>
 
                     {/* Kho gửi */}
-                    <td className="so-list-td" style={{ fontWeight: 600, color: '#1e293b' }}>
+                    <td
+                      className="so-list-td"
+                      style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'normal', lineHeight: 1.35 }}
+                      title={t.fromBranchName}
+                    >
                       {t.fromBranchName}
                     </td>
 
                     {/* Kho nhận */}
-                    <td className="so-list-td" style={{ fontWeight: 600, color: '#1e293b' }}>
+                    <td
+                      className="so-list-td"
+                      style={{ fontWeight: 600, color: '#1e293b', whiteSpace: 'normal', lineHeight: 1.35 }}
+                      title={t.toBranchName}
+                    >
                       {t.toBranchName}
                     </td>
 
                     {/* Giá trị chuyển */}
-                    {isStoreOwner && <td
-                      className="so-list-td"
-                      style={{
-                        textAlign: 'right',
-                        fontWeight: 700,
-                        color: '#0f172a',
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    >
-                      {t.totalAmount.toLocaleString()} đ
-                    </td>}
+                    {isStoreOwner && (
+                      <td
+                        className="so-list-td"
+                        style={{
+                          textAlign: 'right',
+                          fontWeight: 700,
+                          color: isReturned ? '#94a3b8' : '#0f172a',
+                          textDecoration: isReturned ? 'line-through' : 'none',
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        {t.totalAmount.toLocaleString('vi-VN')} đ
+                      </td>
+                    )}
 
                     {/* Trạng thái */}
                     <td className="so-list-td" style={{ textAlign: 'center' }}>
-                      {renderStatus(t.status)}
+                      {renderStatus(t)}
                     </td>
                   </tr>
                 );
@@ -898,7 +935,7 @@ export const TransferListPage: React.FC = () => {
 
               {isLoading && (
                 <tr>
-                  <td colSpan={isStoreOwner ? 9 : 8} style={{ padding: 28, textAlign: 'center' }}>
+                  <td colSpan={tableColumnCount} style={{ padding: 28, textAlign: 'center' }}>
                     <Loader2
                       size={24}
                       className="animate-spin"
@@ -914,7 +951,7 @@ export const TransferListPage: React.FC = () => {
               {!isLoading && filteredTransfers.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isStoreOwner ? 9 : 8}
+                    colSpan={tableColumnCount}
                     style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8' }}
                   >
                     <FileText size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
@@ -931,7 +968,7 @@ export const TransferListPage: React.FC = () => {
           </table>
         </div>
 
-        {/* ── 4. FOOTER PHÂN TRANG GẮN LIỀN VỚI BẢNG ── */}
+        {/* ── 4. FOOTER PHÂN TRANG ── */}
         <TablePagination
           currentPage={pageIndex}
           pageSize={pageSize}
@@ -952,7 +989,7 @@ export const TransferListPage: React.FC = () => {
         transfer={selectedTransfer}
         onClose={() => setIsDetailModalOpen(false)}
         onUpdateTransfer={(updated) => {
-          setTransfers(transfers.map((t) => (t.id === updated.id ? updated : t)));
+          setTransfers((current) => current.map((t) => (t.id === updated.id ? updated : t)));
           setSelectedTransfer(updated);
         }}
       />

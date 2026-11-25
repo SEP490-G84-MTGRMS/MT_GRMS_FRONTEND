@@ -37,6 +37,18 @@ export const SupplierVietQrCard: FC<Props> = ({
     template: 'compact2',
   });
 
+  if (!qrUrl) {
+    return (
+      <div
+        role="alert"
+        className={`supplier-vietqr-card ${compact ? 'supplier-vietqr-card--compact' : ''}`}
+        style={{ padding: 12, fontSize: 12.5, color: '#9a3412', background: '#fff7ed', border: '1px solid #fdba74' }}
+      >
+        Không nhận diện được mã ngân hàng ({bankName || 'Chưa chọn'}) để tạo mã VietQR. Vui lòng cập nhật tên ngân hàng hợp lệ.
+      </div>
+    );
+  }
+
   const handleCopyAccount = () => {
     navigator.clipboard.writeText(accountNo);
     setCopied(true);

@@ -48,6 +48,8 @@ export interface CashAccount {
   accountName: string;
   accountType: CashAccountType;
   bankName?: string;
+  bankCode?: string;
+  accountHolderName?: string;
   accountNumber?: string;
   currentBalance: number;
   initialBalance: number;
@@ -89,20 +91,6 @@ export interface LedgerTransaction {
   isCompensating?: boolean;
   originalEntryId?: string;
   voidReason?: string;
-}
-
-export interface CashTransitItem {
-  id: string;
-  transferCode: string;
-  fromAccountId: string;
-  fromAccountName: string;
-  toAccountId: string;
-  toAccountName: string;
-  amount: number;
-  senderName: string;
-  sentAt: string;
-  status: 'PENDING' | 'RECEIVED' | 'DISCREPANCY';
-  note?: string;
 }
 
 export interface CashbookFilterParams {
@@ -158,16 +146,6 @@ export interface FundTransferDTO {
   transferFee?: number;
   note?: string;
   performedBy?: string;
-}
-
-export interface CashReconciliationDTO {
-  accountId: string;
-  systemBalance: number;
-  actualCountedBalance: number;
-  differenceAmount: number;
-  reason: string;
-  auditedBy: string;
-  breakdown?: Record<number, number>; // Denomination counts
 }
 
 export interface CashbookSummaryKPI {

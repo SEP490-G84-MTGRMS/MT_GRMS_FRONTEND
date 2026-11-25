@@ -318,15 +318,15 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '11%' }} />
+      <col style={{ width: '13%' }} />
       <col style={{ width: '10%' }} />
       <col style={{ width: '12%' }} />
       <col style={{ width: '8%' }} />
-      <col style={{ width: '16%' }} />
+      <col style={{ width: '12%' }} />
       <col style={{ width: '9%' }} />
       <col style={{ width: '9%' }} />
       <col style={{ width: '9.5%' }} />
-      <col style={{ width: '7.5%' }} />
+      <col style={{ width: '9.5%' }} />
       <col style={{ width: '8%' }} />
     </colgroup>
   );
@@ -339,7 +339,6 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
     color: '#334155',
     textTransform: 'uppercase',
     letterSpacing: '0.02em',
-    whiteSpace: 'nowrap',
     boxSizing: 'border-box',
     borderBottom: '1px solid #cbd5e1',
     userSelect: 'none',
@@ -353,7 +352,7 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
         className="so-list-table-head"
         style={{ paddingRight: hasScrollY ? 6 : 0 }}
       >
-        <table className="so-list-table" style={{ minWidth: 1160, tableLayout: 'fixed' }}>
+        <table className="so-list-table so-list-table--readable cb-ledger-table">
           {tableColGroup}
           <thead>
             <tr>
@@ -362,8 +361,8 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
               <th style={thStyle}>Tài khoản</th>
               <th style={thStyle}>Loại bút toán</th>
               <th style={thStyle}>Đối tượng / Diễn giải</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Phát sinh Thu (+)</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Phát sinh Chi (-)</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Thu (+)</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Chi (−)</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Số dư sau GD</th>
               <th style={{ ...thStyle, textAlign: 'center' }}>Nguồn / Trạng thái</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Thao tác</th>
@@ -395,7 +394,7 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
             </p>
           </div>
         ) : (
-          <table className="so-list-table" style={{ minWidth: 1160, tableLayout: 'fixed' }}>
+          <table className="so-list-table so-list-table--readable cb-ledger-table">
             {tableColGroup}
             <tbody>
               {transactions.map((tx) => {
@@ -529,7 +528,7 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                       )}
                     </td>
 
-                    {/* 6. Phát sinh Thu (+) */}
+                    {/* 6. Thu (+) */}
                     <td className="so-list-td" style={{ textAlign: 'right' }}>
                       {isReceipt || (isAdj && tx.amount > 0) ? (
                         <span
@@ -547,7 +546,7 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                       )}
                     </td>
 
-                    {/* 7. Phát sinh Chi (-) */}
+                    {/* 7. Chi (−) */}
                     <td className="so-list-td" style={{ textAlign: 'right' }}>
                       {isPayment || (isAdj && tx.amount < 0) ? (
                         <span
@@ -633,8 +632,8 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                           </button>
                         )}
 
-                        {/* Action: Void / Reverse Transaction */}
-                        {!isVoided && !isComp && onVoidTransaction && (
+                        {/* Action: Void / Reverse Transaction (manual entries only) */}
+                        {!isVoided && !isComp && !tx.isAutomated && (!tx.sourceType || tx.sourceType === 'MANUAL') && onVoidTransaction && (
                           <button
                             type="button"
                             className="so-list-action-btn so-list-action-btn--danger"

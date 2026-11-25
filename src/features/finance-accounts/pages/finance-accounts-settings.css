@@ -437,9 +437,16 @@
   white-space: nowrap;
 }
 
-.fa-btn-switch:hover {
+.fa-btn-switch:hover:not(:disabled) {
   background: #0369a1;
   border-color: #0369a1;
+}
+
+.fa-btn-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: #94a3b8;
+  border-color: #94a3b8;
 }
 
 .fa-row--inactive {
@@ -808,6 +815,12 @@
   font-size: 13px;
   font-weight: 600;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.fa-toast--error {
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid #b91c1c;
 }
 
 .fa-rules {

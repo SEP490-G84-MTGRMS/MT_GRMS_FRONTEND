@@ -48,6 +48,8 @@ const mockAccounts: CashAccount[] = [
     accountName: 'Vietcombank Doanh Nghiệp',
     accountNumber: '0071001234567',
     bankName: 'Vietcombank',
+    bankCode: 'VCB',
+    accountHolderName: 'NGUYEN VAN TEST',
     accountType: 'BANK',
     currentBalance: 80000000,
     initialBalance: 0,
@@ -62,6 +64,8 @@ const mockAccounts: CashAccount[] = [
     accountName: 'MBBank Số Đẹp',
     accountNumber: '999988887777',
     bankName: 'MBBank',
+    bankCode: 'MB',
+    accountHolderName: 'CONG TY TEST',
     accountType: 'BANK',
     currentBalance: 30000000,
     initialBalance: 0,
@@ -71,6 +75,38 @@ const mockAccounts: CashAccount[] = [
 ];
 
 describe('DebtCollectionModal - LG-07 Account Selection', () => {
+  const openModal = () => render(<DebtCollectionModal isOpen onClose={vi.fn()} customer={mockCustomer} onConfirm={vi.fn()} isSubmitting={false} />);
+
+  it('waits for a positive amount, then uses the selected real account and encoded payment details', async () => {
+    openModal();
+    await waitFor(() => expect(screen.getByLabelText(/Tài khoản ngân hàng nhận tiền/)).toHaveProperty('value', 'acc-bank-1'));
+    expect(screen.queryByRole('img')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Thu hết/ }));
+    let url = new URL((screen.getByRole('img') as HTMLImageElement).src);
+    expect(url.hostname).toBe('img.vietqr.io');
+    expect(url.pathname).toBe('/image/VCB-0071001234567-compact2.svg');
+    expect(url.searchParams.get('amount')).toBe('5000000');
+    expect(url.searchParams.get('accountName')).toBe('NGUYEN VAN TEST');
+    expect(url.searchParams.get('addInfo')).toBe('THU NO KH NGUYEN VAN TEST');
+    fireEvent.change(screen.getByLabelText(/Tài khoản ngân hàng nhận tiền/), { target: { value: 'acc-bank-2' } });
+    url = new URL((screen.getByRole('img') as HTMLImageElement).src);
+    expect(url.pathname).toBe('/image/MB-999988887777-compact2.svg');
+    expect(url.searchParams.get('accountName')).toBe('CONG TY TEST');
+    fireEvent.error(screen.getByRole('img'));
+    expect(screen.getByRole('alert').textContent).toContain('Không tải được ảnh QR');
+    expect(screen.getByText('999988887777')).toBeDefined();
+  });
+
+  it('never substitutes a demo account when bank configuration is missing', async () => {
+    vi.mocked(cashbookService.getCashAccounts).mockResolvedValue(mockAccounts.map(a => ({ ...a, bankCode: undefined })));
+    openModal();
+    await waitFor(() => expect(screen.getByLabelText(/Tài khoản ngân hàng nhận tiền/)).toHaveProperty('value', 'acc-bank-1'));
+    fireEvent.click(screen.getByRole('button', { name: /Thu hết/ }));
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.getByRole('status').textContent).toContain('chưa đủ thông tin');
+    expect((screen.getByRole('button', { name: /Thu 5.000.000/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(cashbookService, 'getCashAccounts').mockResolvedValue(mockAccounts);
@@ -171,5 +207,19 @@ describe('DebtCollectionModal - LG-07 Account Selection', () => {
         })
       );
     });
+  });
+
+  it('requires manual bank confirmation and clears it when the amount changes', async () => {
+    openModal();
+    await waitFor(() => expect((screen.getByLabelText(/Tài khoản ngân hàng nhận tiền/i) as HTMLSelectElement).value).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /Thu hết/i }));
+    const confirmation = screen.getByRole('checkbox', { name: /đã kiểm tra tiền vào tài khoản/i });
+    const submit = screen.getByRole('button', { name: /^Thu 5.000.000/ });
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(confirmation);
+    expect((submit as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: /Thu một nửa/i }));
+    expect((confirmation as HTMLInputElement).checked).toBe(false);
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
   });
 });

@@ -32,12 +32,24 @@ export const VIETNAM_BANKS: BankInfo[] = [
   { code: 'NAB', bin: '970428', name: 'Ngân hàng Nam Á', shortName: 'Nam A Bank' },
 ];
 
+const GENERIC_BANK_TOKENS = new Set([
+  'bank',
+  'ngan hang',
+  'ngân hàng',
+  'nh',
+  'tmcp',
+  'viet nam',
+  'việt nam',
+]);
+
 /**
- * Tìm mã ngân hàng (code hoặc bin) dựa trên tên ngân hàng người dùng nhập/chọn
+ * Tìm mã ngân hàng (code hoặc bin) dựa trên tên ngân hàng người dùng nhập/chọn.
+ * Trả về null nếu không nhận diện được ngân hàng để tránh sinh QR sai tài khoản.
  */
-export function resolveBankCodeOrBin(bankNameInput?: string): string {
-  if (!bankNameInput) return 'VCB'; // Default fallback Vietcombank
+export function resolveBankCodeOrBin(bankNameInput?: string): string | null {
+  if (!bankNameInput) return null;
   const input = bankNameInput.trim().toLowerCase();
+  if (!input) return null;
 
   // 1. Exact match
   const exact = VIETNAM_BANKS.find(
@@ -49,13 +61,14 @@ export function resolveBankCodeOrBin(bankNameInput?: string): string {
   );
   if (exact) return exact.code;
 
-  // 2. Substring on shortName or full name
+  // 2. Substring on shortName or full name (skip generic tokens to avoid false matches)
+  const allowReverseSubstring = input.length >= 3 && !GENERIC_BANK_TOKENS.has(input);
   const byName = VIETNAM_BANKS.find(
     (b) =>
       input.includes(b.shortName.toLowerCase()) ||
-      b.shortName.toLowerCase().includes(input) ||
       input.includes(b.name.toLowerCase()) ||
-      b.name.toLowerCase().includes(input)
+      (allowReverseSubstring &&
+        (b.shortName.toLowerCase().includes(input) || b.name.toLowerCase().includes(input)))
   );
   if (byName) return byName.code;
 
@@ -64,7 +77,7 @@ export function resolveBankCodeOrBin(bankNameInput?: string): string {
   const byCodeWord = VIETNAM_BANKS.find((b) => words.includes(b.code.toLowerCase()));
   if (byCodeWord) return byCodeWord.code;
 
-  return 'VCB';
+  return null;
 }
 
 export interface VietQrOptions {
@@ -77,7 +90,8 @@ export interface VietQrOptions {
 }
 
 /**
- * Tạo URL mã QR VietQR chuẩn từ thông tin tài khoản ngân hàng
+ * Tạo URL mã QR VietQR chuẩn từ thông tin tài khoản ngân hàng.
+ * Trả về chuỗi rỗng nếu không nhận diện được mã ngân hàng hoặc số tài khoản không hợp lệ.
  */
 export function getVietQrUrl({
   bankName,
@@ -89,6 +103,9 @@ export function getVietQrUrl({
 }: VietQrOptions): string {
   const bankIdentifier = resolveBankCodeOrBin(bankName);
   const cleanAccountNo = accountNo.replace(/[^0-9a-zA-Z]/g, '');
+  if (!bankIdentifier || !cleanAccountNo) {
+    return '';
+  }
 
   let url = `https://img.vietqr.io/image/${bankIdentifier}-${cleanAccountNo}-${template}.png`;
 

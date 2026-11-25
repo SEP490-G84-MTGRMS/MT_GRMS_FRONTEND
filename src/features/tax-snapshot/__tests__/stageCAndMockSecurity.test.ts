@@ -1,44 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { isMockEnabled } from '../api/taxSnapshotApi';
-import { mockBookEntries } from '../api/mockTaxData';
+import { mockBookEntries } from './mockTaxData';
 import { AccountingBookType } from '../types/taxSnapshot';
-import { MOCK_PNL_MONTH, MOCK_LEDGER_EQUATION } from '../../finance/data/mockFinanceData';
+import { MOCK_PNL_MONTH, MOCK_LEDGER_EQUATION } from '../../finance/__tests__/mockFinanceData';
 
-describe('Stage C & Mock Security Integration Tests', () => {
-  describe('1. Production Mock Security Guard', () => {
-    it('isMockEnabled() must strictly return false if production mode is set', () => {
-      const originalProd = import.meta.env.PROD;
-      const originalMode = import.meta.env.MODE;
-
-      try {
-        // Simulate production environment
-        (import.meta.env as any).PROD = true;
-        (import.meta.env as any).MODE = 'production';
-        expect(isMockEnabled()).toBe(false);
-      } finally {
-        (import.meta.env as any).PROD = originalProd;
-        (import.meta.env as any).MODE = originalMode;
-      }
-    });
-  });
-
+describe('Tax fixture integrity and terminology', () => {
   describe('2. Banner & Legal Citation Compliance Verification', () => {
     const taxModules = import.meta.glob(
       '../*/*.tsx',
       { query: '?raw', import: 'default', eager: true }
     );
-
-    it('TaxSnapshotPage banner must match exact convention and NOT have uppercase shouting or warning icons', () => {
-      let pageContent = '';
-      Object.entries(taxModules).forEach(([filePath, content]) => {
-        if (filePath.includes('TaxSnapshotPage.tsx')) {
-          pageContent = typeof content === 'string' ? content : '';
-        }
-      });
-
-      expect(pageContent).not.toContain('CHẾ ĐỘ MÔ PHỎNG / DỮ LIỆU MẪU');
-      expect(pageContent).toContain('Chế độ dữ liệu mẫu: máy chủ chưa kết nối, số liệu chỉ để xem thiết kế, không dùng để kê khai.');
-    });
 
     it('Components must NOT contain obsolete or repealed legal citations in user-facing JSX', () => {
       const bannedCitations = [
@@ -108,42 +78,4 @@ describe('Stage C & Mock Security Integration Tests', () => {
     });
   });
 
-  describe('5. Configurable Tax Rate Parameters Validation', () => {
-    it('generates summary with custom VAT and PIT rates correctly', async () => {
-      const { taxSnapshotApi } = await import('../api/taxSnapshotApi');
-      const customSummary = await taxSnapshotApi.getTaxSummary({
-        year: 2026,
-        periodType: 2,
-        periodNumber: 3,
-        calculationMethod: 1,
-        customVatRate: 1.5,
-        customPitRate: 0.8,
-        applyVatReduction2026: true,
-        vatReductionPercentage: 20,
-      });
-
-      // 1.5% base with 20% reduction = 1.2% effective
-      expect(customSummary.vatRate).toBe(1.2);
-      expect(customSummary.pitRate).toBe(0.8);
-    });
-
-    it('creates snapshot preserving custom tax rates in request payload', async () => {
-      const { taxSnapshotApi } = await import('../api/taxSnapshotApi');
-      const created = await taxSnapshotApi.createSnapshot({
-        year: 2026,
-        periodType: 2,
-        periodNumber: 1,
-        calculationMethod: 1,
-        applyVatReduction2026: true,
-        customVatRate: 2.0,
-        customPitRate: 1.0,
-        vatReductionPercentage: 30,
-        pin: '1234',
-        notes: 'Test snapshot with custom rates',
-      });
-
-      expect(created.year).toBe(2026);
-      expect(created.periodNumber).toBe(1);
-    });
-  });
 });

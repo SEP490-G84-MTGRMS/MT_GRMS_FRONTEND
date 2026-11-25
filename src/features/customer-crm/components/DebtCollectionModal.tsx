@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { FC, FormEvent } from 'react';
-import { X, QrCode, Banknote, AlertTriangle, Copy } from 'lucide-react';
+import { X, QrCode, Banknote, AlertTriangle } from 'lucide-react';
 import type { CollectDebtInput, CustomerDto } from '../types/customer.types';
 import type { CashAccount } from '../../cashbook/types/cashbook.types';
 import { VietQrDisplayCard } from './VietQrDisplayCard';
 import { cashbookService } from '../../cashbook/services/cashbookService';
 import { MoneyInput } from '../../../components/common/MoneyInput';
-import { formatMoney, numberToWordsVietnamese } from '../../finance/utils/formatters';
+import { formatMoney } from '../../finance/utils/formatters';
+import { buildVietQrUrl, normalizeVietQrContent } from '../../../utils/vietQrHelper';
 
 interface DebtCollectionModalProps {
   isOpen: boolean;
@@ -31,28 +32,36 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
 
   const [transactionRef, setTransactionRef] = useState('');
+  const [bankPaymentConfirmed, setBankPaymentConfirmed] = useState(false);
   const [accountLoadFailed, setAccountLoadFailed] = useState(false);
-  const [isCopiedContent, setIsCopiedContent] = useState(false);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     let isMounted = true;
-    setAccounts([]);
     setAccountLoadFailed(false);
+    setIsLoadingAccounts(true);
     cashbookService.getCashAccounts().then((accs) => {
       if (isMounted) {
         setAccounts(accs);
       }
     }).catch(() => {
       if (isMounted) setAccountLoadFailed(true);
+    }).finally(() => {
+      if (isMounted) setIsLoadingAccounts(false);
     });
     return () => {
       isMounted = false;
     };
   }, [isOpen]);
 
-  const filteredAccounts = accounts.filter((a) =>
-    method === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
+  const filteredAccounts = useMemo(
+    () =>
+      accounts.filter((a) => {
+        const type = String(a.accountType || '').toUpperCase();
+        return method === 'Cash' ? type === 'CASH' : type === 'BANK';
+      }),
+    [accounts, method]
   );
 
   useEffect(() => {
@@ -67,7 +76,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
     }
   }, [method, filteredAccounts, selectedAccountId]);
 
-  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
+  const selectedAccount = filteredAccounts.find((a) => a.id === selectedAccountId);
 
   useEffect(() => {
     if (customer) {
@@ -79,18 +88,26 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
     }
   }, [customer, isOpen]);
 
+  useEffect(() => {
+    setBankPaymentConfirmed(false);
+  }, [amount, method, selectedAccountId, customer?.id, isOpen]);
+
   if (!isOpen || !customer) return null;
 
   const currentDebt = customer.currentDebtAR || 0;
   const isOverpaying = amount > currentDebt;
 
-  const qrPaymentContent = `THU NO KH ${customer.fullName.toUpperCase().replace(/\s+/g, ' ')}`;
+  const qrPaymentContent = normalizeVietQrContent(`THU NO KH ${customer.fullName}`);
+  const qrUrl = !isOverpaying ? buildVietQrUrl({
+    bankCode: selectedAccount?.bankCode,
+    accountNumber: selectedAccount?.accountNumber,
+    accountHolderName: selectedAccount?.accountHolderName,
+    amount,
+    description: qrPaymentContent,
+  }) : null;
 
-  const handleCopyContent = () => {
-    navigator.clipboard.writeText(qrPaymentContent);
-    setIsCopiedContent(true);
-    setTimeout(() => setIsCopiedContent(false), 2000);
-  };
+  const canSubmit = !isSubmitting && amount > 0 && !isOverpaying && Boolean(selectedAccount) &&
+    (method === 'Cash' || (Boolean(qrUrl) && bankPaymentConfirmed));
 
   const handleSetQuickAmount = (pct: number) => {
     const calculated = Math.round(currentDebt * pct);
@@ -106,7 +123,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
       return;
     }
 
-    if (isSubmitting || !selectedAccountId || isOverpaying) return;
+    if (!canSubmit) return;
 
     setErrorMsg('');
     await onConfirm({
@@ -130,7 +147,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
         style={{ maxHeight: '92vh' }}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-emerald-50/70">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-emerald-50/70 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
               <QrCode size={22} />
@@ -148,14 +165,16 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            className="dcm-close-btn"
+            aria-label="Đóng"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Modal Body: 2 Columns (5/7) */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col" style={{ minHeight: 0, overflow: 'hidden' }}>
+          <div className="p-6 space-y-6" style={{ minHeight: 0, flex: '1 1 auto', overflowY: 'auto' }}>
           {errorMsg && (
             <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
               <AlertTriangle size={18} className="shrink-0" />
@@ -198,24 +217,19 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                   className="w-full text-2xl h-14 font-extrabold text-teal-800"
                 />
 
-                {/* Amount in Words */}
-                <div className="text-xs text-teal-900 font-medium italic min-h-[1.25rem]">
-                  {amount > 0 ? numberToWordsVietnamese(amount) : 'Chưa nhập số tiền'}
-                </div>
-
                 {/* Quick Selection Chips */}
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => handleSetQuickAmount(0.5)}
-                    className="py-2.5 px-3 rounded-xl border border-teal-300 bg-teal-50 text-teal-900 text-xs font-semibold hover:bg-teal-100 transition-colors"
+                    className="dcm-quick-btn dcm-quick-btn--half"
                   >
                     Thu một nửa ({formatMoney(Math.round(currentDebt * 0.5))})
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSetQuickAmount(1)}
-                    className="py-2.5 px-3 rounded-xl border border-emerald-400 bg-emerald-50 text-emerald-900 text-xs font-bold hover:bg-emerald-100 transition-colors"
+                    className="dcm-quick-btn dcm-quick-btn--full"
                   >
                     Thu hết ({formatMoney(currentDebt)})
                   </button>
@@ -246,15 +260,11 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
             {/* Right Column (7/12): Payment Method & VietQR Display */}
             <div className="md:col-span-7 bg-gray-50/70 p-5 rounded-2xl border border-gray-200 space-y-4">
               {/* Method Switcher */}
-              <div className="flex rounded-xl bg-gray-200 p-1">
+              <div className="dcm-method-group">
                 <button
                   type="button"
                   onClick={() => setMethod('VietQR')}
-                  className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${
-                    method === 'VietQR'
-                      ? 'bg-white text-emerald-800 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`dcm-method-btn ${method === 'VietQR' ? 'dcm-method-btn--active' : ''}`}
                 >
                   <QrCode size={18} />
                   <span>Chuyển khoản QR</span>
@@ -262,11 +272,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setMethod('Cash')}
-                  className={`flex-1 py-2 text-sm font-bold rounded-lg flex items-center justify-center gap-2 transition-all ${
-                    method === 'Cash'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`dcm-method-btn ${method === 'Cash' ? 'dcm-method-btn--active' : ''}`}
                 >
                   <Banknote size={18} />
                   <span>Tiền mặt tại quầy</span>
@@ -285,9 +291,12 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                   id="target-account-select"
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
+                  disabled={isLoadingAccounts}
                   className="w-full h-10 px-3 text-sm font-medium rounded-xl border border-gray-300 bg-white text-gray-800 focus:border-teal-600 focus:ring-1 focus:ring-teal-500 outline-none transition-colors"
                 >
-                  {filteredAccounts.length === 0 ? (
+                  {isLoadingAccounts ? (
+                    <option value="">Đang tải danh sách tài khoản...</option>
+                  ) : filteredAccounts.length === 0 ? (
                     <option value="" disabled>
                       {method === 'Cash'
                         ? '-- Không có két tiền mặt khả dụng --'
@@ -296,9 +305,7 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
                   ) : (
                     filteredAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.accountName}
-                        {acc.accountNumber ? ` - ${acc.accountNumber}` : ''}
-                        {acc.bankName ? ` (${acc.bankName})` : ''}
+                        {acc.accountName}{acc.branchName ? ` — ${acc.branchName}` : ''}
                       </option>
                     ))
                   )}
@@ -308,49 +315,40 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
               {/* VietQR View */}
               {method === 'VietQR' ? (
                 <div className="space-y-4 text-center">
-                  <div className="bg-white p-4 rounded-2xl border border-gray-200 inline-block shadow-sm">
+                  {qrUrl && selectedAccount ? (
                     <VietQrDisplayCard
+                      key={qrUrl}
                       config={{
-                        bankId: selectedAccount?.bankName || '970436',
-                        bankName: selectedAccount?.bankName || 'Vietcombank',
-                        accountNo: selectedAccount?.accountNumber || '0071001234567',
-                        accountName: selectedAccount?.accountName || 'NGUYEN VAN CHU TIEM',
-                        amount: Math.min(amount, currentDebt),
+                        bankId: selectedAccount.bankCode!,
+                        bankName: selectedAccount.bankName || selectedAccount.bankCode!,
+                        accountNo: selectedAccount.accountNumber!,
+                        accountName: selectedAccount.accountHolderName!,
+                        amount,
                         description: qrPaymentContent,
-                        qrDataUrl: selectedAccount?.accountNumber
-                          ? `https://api.vietqr.io/image/${selectedAccount.bankName || '970436'}-${selectedAccount.accountNumber}-compact2.png`
-                          : 'https://api.vietqr.io/image/970436-0071001234567-compact2.png',
+                        qrDataUrl: qrUrl,
                       }}
                     />
-                  </div>
-
-                  {/* Transfer details copy helper */}
-                  <div className="text-left bg-white p-3 rounded-xl border border-gray-200 text-xs space-y-1.5">
-                    <div className="flex items-center justify-between text-gray-600">
-                      <span>Nội dung chuyển khoản:</span>
-                      <button
-                        type="button"
-                        onClick={handleCopyContent}
-                        className="text-teal-700 font-semibold flex items-center gap-1 hover:underline"
-                      >
-                        <Copy size={13} />
-                        <span>{isCopiedContent ? 'Đã sao chép!' : 'Sao chép'}</span>
-                      </button>
+                  ) : (
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-6 text-sm text-gray-600" role="status">
+                      {amount <= 0 ? 'Nhập số tiền cần thu để tạo mã QR.' : isOverpaying
+                        ? 'Số tiền thu không được vượt quá dư nợ.'
+                        : 'Tài khoản chưa đủ thông tin VietQR. Vui lòng cấu hình mã ngân hàng, số tài khoản và tên chủ tài khoản.'}
                     </div>
-                    <div className="font-mono font-bold text-gray-900 text-sm bg-gray-50 p-1.5 rounded border border-gray-100">
-                      {qrPaymentContent}
-                    </div>
-                  </div>
+                  )}
 
-                  <label className="flex w-full flex-col gap-2 rounded-xl bg-teal-50 p-3 text-xs text-teal-900">
-                    Kiểm tra tiền đã vào tài khoản trước khi xác nhận thu nợ.
+                  <label className="flex items-center gap-2 rounded-xl bg-teal-50 p-3 text-left text-sm text-teal-900">
+                    <input type="checkbox" checked={bankPaymentConfirmed} disabled={!qrUrl || isSubmitting}
+                      onChange={(event) => setBankPaymentConfirmed(event.target.checked)} />
+                    Tôi đã kiểm tra tiền vào tài khoản
+                  </label>
+                  <label className="flex w-full flex-col gap-2 text-left text-xs text-teal-900">
                     <span className="font-semibold">Mã giao dịch ngân hàng (không bắt buộc)</span>
                     <input
                       type="text"
                       maxLength={100}
                       value={transactionRef}
                       onChange={(event) => setTransactionRef(event.target.value)}
-                      className="h-9 rounded-lg border border-gray-300 px-3 font-mono"
+                      className="dcm-text-input font-mono"
                     />
                   </label>
                 </div>
@@ -374,13 +372,14 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
           </div>
 
           {accountLoadFailed && <p role="alert" className="mt-3 text-sm text-red-700">Không thể tải tài khoản nhận tiền. Mở lại biểu mẫu để thử lại.</p>}
-          {/* Sheet Footer: Action Buttons */}
-          <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-6">
+          </div>
+          {/* Footer luôn nằm ngoài vùng cuộn của nội dung. */}
+          <div className="flex shrink-0 items-center justify-between gap-3 px-6 py-4 border-t border-gray-100">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="btn-text-cancel"
+              className="dcm-cancel-btn"
             >
               Hủy bỏ
             </button>
@@ -388,8 +387,8 @@ export const DebtCollectionModal: FC<DebtCollectionModalProps> = ({
             {/* Decision D5: Green button for collecting debt */}
             <button
               type="submit"
-              disabled={isSubmitting || amount <= 0 || isOverpaying || !selectedAccountId}
-              className="btn-collect-debt text-lg min-w-[200px] shadow-lg disabled:opacity-50"
+              disabled={!canSubmit}
+              className="btn-collect-debt text-lg min-w-[200px] shadow-lg"
               id="btn-confirm-collect-debt"
             >
               {isSubmitting ? (

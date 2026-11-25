@@ -6,7 +6,7 @@ import {
   MOCK_CUSTOMERS,
   MOCK_PNL_MONTH,
   MOCK_LEDGER_EQUATION,
-} from '../data/mockFinanceData';
+} from './mockFinanceData';
 import { calculateHouseholdTax, defaultTaxConfig } from '../config/taxConfig';
 import {
   setFinancialNow,

@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -5,11 +6,12 @@ import {
   Search,
   User,
   Check,
-  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import type { TransferOrder, TransferItem } from '../types';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { transferService } from '../services/transferService';
+import { getTransferErrorMessage, transferService } from '../services/transferService';
+import { formatDateTimeVN } from '../utils/transferDate';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../transfer.css';
 
@@ -17,9 +19,11 @@ export const ReceiveTransferPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const canViewFinancials = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
-  const currentUserName = useAuthStore((state) => state.user?.fullName || state.user?.email || 'Nhân viên');
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
+  const receiver = useAuthStore((state) => state.user?.fullName || state.user?.email);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [transfer, setTransfer] = useState<TransferOrder | null>(null);
   const [items, setItems] = useState<TransferItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -28,9 +32,7 @@ export const ReceiveTransferPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'match' | 'mismatch' | 'unreceived'>('all');
   const [searchKw, setSearchKw] = useState('');
   const [receiveNote, setReceiveNote] = useState('');
-  const [receiveTime] = useState(() =>
-    new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  );
+  const [receiveTime, setReceiveTime] = useState('');
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -41,14 +43,44 @@ export const ReceiveTransferPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setLoadState('missing');
+      return;
+    }
+
+    let disposed = false;
+    setLoadState('loading');
     transferService.get(id).then((result) => {
+      if (disposed) return;
       setTransfer(result);
       setItems(result.items.map((item) => ({ ...item, receivedQty: item.sentQty, damagedQty: 0, note: '' })));
-    }).catch(() => showToast('Không tải được phiếu nhận hàng.', 'warning'));
-  }, [id]);
+      setReceiveNote('');
+      setReceiveTime(formatDateTimeVN(new Date()));
+      setLoadState('ready');
+    }).catch((error: unknown) => {
+      if (!disposed) setLoadState(isAxiosError(error) && error.response?.status === 404 ? 'missing' : 'error');
+    });
+    return () => { disposed = true; };
+  }, [id, loadAttempt]);
 
-  if (!transfer) return <div className="transfer-container">Đang tải phiếu chuyển hoặc không tìm thấy phiếu.</div>;
+  if (loadState === 'loading' || (loadState === 'ready' && id !== transfer?.id)) {
+    return <div className="transfer-container" role="status"><Loader2 className="animate-spin" /> Đang tải phiếu chuyển…</div>;
+  }
+
+  if (loadState !== 'ready' || !transfer || transfer.status !== 'InTransit') {
+    const message = loadState === 'missing' ? 'Không tìm thấy phiếu chuyển.'
+      : loadState === 'error' ? 'Không tải được phiếu chuyển.'
+      : 'Phiếu này không ở trạng thái đang chuyển.';
+    return (
+      <div className="transfer-container">
+        <p role="alert">{message}</p>
+        <button type="button" className="btn-secondary-white" onClick={() => navigate(transferBasePath)}>Quay lại</button>
+        {loadState === 'error' && (
+          <button type="button" className="btn-primary-teal" onClick={() => setLoadAttempt((attempt) => attempt + 1)}>Thử lại</button>
+        )}
+      </div>
+    );
+  }
 
   const handleUpdateReceivedQty = (itemId: string, qty: number) => {
     setItems(
@@ -117,27 +149,22 @@ export const ReceiveTransferPage: React.FC = () => {
   const countUnreceived = items.filter((it) => (it.receivedQty ?? it.sentQty) + (it.damagedQty ?? 0) === 0).length;
 
   const handleConfirm = async () => {
-    if (!transfer || !id) return;
-    const hasDamaged = items.some((it) => (it.damagedQty ?? 0) > 0);
-    const hasMissingReason = items.some(
-      (it) => (it.damagedQty ?? 0) > 0 && !it.note?.trim() && !receiveNote.trim()
+    if (!id || isSaving) return;
+    const missingReason = items.some((item) =>
+      ((item.damagedQty ?? 0) > 0 || (item.receivedQty ?? item.sentQty) < item.sentQty)
+      && !item.note?.trim() && !receiveNote.trim()
     );
-    if (hasDamaged && hasMissingReason) {
-      showToast('Không thể xác nhận hàng hỏng nếu để trống lý do.', 'warning');
-      return;
-    }
-    if (totalDifference > 0 && !receiveNote.trim() && !items.some((it) => it.note?.trim())) {
-      showToast('Bắt buộc nhập lý do chênh lệch nhận hàng vào ô "Ghi chú nhận"!', 'warning');
+    if (missingReason) {
+      showToast('Nhập lý do cho từng mặt hàng bị thiếu hoặc hỏng, hoặc ghi chú nhận chung.', 'warning');
       return;
     }
 
     setIsSaving(true);
     try {
       await transferService.receive(id, items, receiveNote.trim());
-      showToast(`Đã nhận hàng cho phiếu ${transfer.transferCode}.`);
-      setTimeout(() => navigate(`${transferBasePath}/${transfer.id}`), 500);
+      navigate(`${transferBasePath}/${transfer.id}`, { replace: true });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Không thể xác nhận nhận hàng.', 'warning');
+      showToast(getTransferErrorMessage(error), 'warning');
     } finally { setIsSaving(false); }
   };
 
@@ -161,7 +188,7 @@ export const ReceiveTransferPage: React.FC = () => {
         }}
       >
         {/* Trái: Link quay lại + Ô tìm kiếm */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, maxWidth: 600 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, maxWidth: 600, minWidth: 0, flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => navigate(transferBasePath)}
@@ -187,7 +214,8 @@ export const ReceiveTransferPage: React.FC = () => {
               type="text"
               className="filter-input"
               style={{ paddingLeft: 36, borderRadius: 9999 }}
-              placeholder="🔍 Tìm hàng hóa theo mã hoặc tên (F3)..."
+              aria-label="Tìm hàng hóa"
+              placeholder="Tìm theo mã hoặc tên hàng"
               value={searchKw}
               onChange={(e) => setSearchKw(e.target.value)}
             />
@@ -199,7 +227,7 @@ export const ReceiveTransferPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#64748b' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1e293b' }}>
             <User size={16} color="#0F766E" />
-            <span>{currentUserName}</span>
+            <span>{receiver || 'Chưa xác định người nhận'}</span>
           </div>
           <span
             style={{
@@ -217,7 +245,7 @@ export const ReceiveTransferPage: React.FC = () => {
       </div>
 
       {/* Main 2-column Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+      <div className="transfer-receive-layout">
         {/* CỘT TRÁI: Bảng nhận hàng */}
         <div
           style={{
@@ -232,7 +260,7 @@ export const ReceiveTransferPage: React.FC = () => {
           }}
         >
           {/* Tabs phân loại tình trạng */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, borderBottom: '2px solid #e2e8f0', paddingBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', borderBottom: '2px solid #e2e8f0', paddingBottom: 8 }}>
             <button
               type="button"
               onClick={() => setActiveTab('all')}
@@ -315,7 +343,6 @@ export const ReceiveTransferPage: React.FC = () => {
                   <th style={{ width: 110 }}>Mã hàng</th>
                   <th>Tên hàng</th>
                   <th style={{ width: 60, textAlign: 'center' }}>ĐVT</th>
-                  <th style={{ width: 70, textAlign: 'right' }}>Tồn kho</th>
                   <th style={{ width: 80, textAlign: 'center' }}>SL chuyển</th>
                   <th style={{ width: 95, textAlign: 'center', backgroundColor: '#e0f2fe' }}>SL nhận tốt</th>
                   <th style={{ width: 95, textAlign: 'center', backgroundColor: '#fee2e2' }}>Hỏng</th>
@@ -344,12 +371,8 @@ export const ReceiveTransferPage: React.FC = () => {
                       </td>
                       <td>
                         <div style={{ fontWeight: 600, color: '#0f172a' }}>{it.productName}</div>
-                        <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-                          ✏ Ghi chú...
-                        </div>
                       </td>
                       <td style={{ textAlign: 'center' }}>{it.unitName}</td>
-                      <td style={{ textAlign: 'right', color: '#64748b' }}>{it.onHandReceiver}</td>
                       <td style={{ textAlign: 'center', fontWeight: 600 }}>{it.sentQty}</td>
 
                       {/* Ô nhập SL nhận tốt */}
@@ -439,7 +462,7 @@ export const ReceiveTransferPage: React.FC = () => {
 
                 {/* Dòng tổng cộng */}
                 <tr style={{ backgroundColor: '#f8fafc', fontWeight: 700 }}>
-                  <td colSpan={5} style={{ textAlign: 'right', padding: 12 }}>
+                  <td colSpan={4} style={{ textAlign: 'right', padding: 12 }}>
                     Tổng:
                   </td>
                   <td style={{ textAlign: 'center' }}>{totalSent}</td>
@@ -510,7 +533,7 @@ export const ReceiveTransferPage: React.FC = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
             <span style={{ color: '#64748b' }}>Ngày chuyển:</span>
-            <span>{transfer.transferDate}</span>
+            <span>{formatDateTimeVN(transfer.dispatchedAt, 'Chưa có thời điểm chuyển')}</span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
@@ -534,10 +557,11 @@ export const ReceiveTransferPage: React.FC = () => {
 
           {/* Ghi chú nhận * */}
           <div style={{ paddingTop: 4 }}>
-            <label style={{ display: 'block', fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
-              Ghi chú nhận *:
+            <label htmlFor="transfer-receive-note" style={{ display: 'block', fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>
+              Ghi chú nhận
             </label>
             <textarea
+              id="transfer-receive-note"
               className="filter-input"
               style={{
                 width: '100%',
@@ -552,28 +576,7 @@ export const ReceiveTransferPage: React.FC = () => {
             />
           </div>
 
-          {/* Cảnh báo thời gian nhận */}
-          <div
-            style={{
-              padding: '10px 14px',
-              backgroundColor: '#fef2f2',
-              borderRadius: 12,
-              border: '1px solid #fee2e2',
-              fontSize: 11.5,
-              color: '#b91c1c',
-              lineHeight: 1.5,
-              display: 'flex',
-              gap: 6,
-            }}
-          >
-            <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span>
-              <b>Lưu ý:</b> Thời gian nhận hàng không được sớm hơn thời gian chuyển hàng ({transfer.transferDate}).
-            </span>
-          </div>
-
-          {/* Nút bấm Nhận hàng */}
-          <div style={{ display: 'flex', marginTop: 4 }}>
+          <div className="transfer-receive-actions">
             <button
               type="button"
               className="btn-primary-teal"
@@ -581,7 +584,7 @@ export const ReceiveTransferPage: React.FC = () => {
               disabled={isSaving}
               style={{ flex: 1, justifyContent: 'center' }}
             >
-              <Check size={15} /> Nhận hàng
+              <Check size={15} /> {isSaving ? 'Đang xác nhận…' : 'Nhận hàng'}
             </button>
           </div>
         </div>

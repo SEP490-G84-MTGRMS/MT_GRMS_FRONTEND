@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import type { FC } from 'react';
-import { Banknote, QrCode, CheckCircle2, PackageCheck } from 'lucide-react';
+import { Banknote, QrCode, CheckCircle2, PackageCheck, AlertTriangle, RefreshCw } from 'lucide-react';
 import type { PreOrderDTO } from '../../types/inventory.types';
+import { useAuthStore } from '../../../../stores/useAuthStore';
+import { httpClient } from '../../../../api/httpClient';
+import { buildVietQrUrl } from '../../../../utils/vietQrHelper';
 
 interface Props {
   isOpen: boolean;
@@ -19,24 +22,103 @@ interface Props {
   ) => Promise<void>;
 }
 
+interface PublicQrConfig {
+  paymentAccountId?: string;
+  bankCode?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
+  tenantPrefix?: string;
+  isActive?: boolean;
+}
+
 export const FulfillPreOrderModal: FC<Props> = ({
   isOpen,
   preOrder,
   onClose,
   onConfirmFulfill,
 }) => {
+  const { user } = useAuthStore();
+  const currentTenantId = user?.tenantId;
+  const fallbackBranchId = user?.branchId;
+
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'VIETQR'>('CASH');
   const [cashTendered, setCashTendered] = useState<number>(0);
   const [note, setNote] = useState('Khách nhận hàng đầy đủ tại quầy');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [qrConfig, setQrConfig] = useState<PublicQrConfig | null>(null);
+  const [isQrConfigLoading, setIsQrConfigLoading] = useState(false);
+  const [qrConfigError, setQrConfigError] = useState<string | null>(null);
 
   useEffect(() => {
     if (preOrder) {
       setCashTendered(preOrder.remainingAmount);
       setNote('Khách nhận hàng đầy đủ tại quầy');
       setPaymentMethod('CASH');
+      setQrConfig(null);
+      setQrConfigError(null);
+      setIsQrConfigLoading(false);
     }
   }, [preOrder]);
+
+  useEffect(() => {
+    if (!isOpen || !preOrder || paymentMethod !== 'VIETQR' || preOrder.remainingAmount <= 0) {
+      setIsQrConfigLoading(false);
+      setQrConfigError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsQrConfigLoading(true);
+    setQrConfigError(null);
+    setQrConfig(null);
+
+    const resolvedBranchId = preOrder.branchId || fallbackBranchId;
+    if (!currentTenantId || !resolvedBranchId) {
+      setQrConfigError(
+        'Chi nhánh chưa cấu hình tài khoản ngân hàng hoạt động. Vui lòng thiết lập tại mục Tài khoản & Thanh toán (SC-49) trước khi thu VietQR.'
+      );
+      setIsQrConfigLoading(false);
+      return;
+    }
+
+    httpClient
+      .get<PublicQrConfig>('/payments/public-qr-config', {
+        params: { tenantId: currentTenantId, branchId: resolvedBranchId },
+      })
+      .then((res) => {
+        if (cancelled) return;
+        const data = res.data;
+        if (
+          !data?.paymentAccountId ||
+          !data.bankCode ||
+          !data.bankAccountNumber ||
+          !data.bankAccountName ||
+          data.isActive === false
+        ) {
+          setQrConfigError(
+            'Chi nhánh chưa cấu hình tài khoản ngân hàng hoạt động. Vui lòng cấu hình tài khoản nhận tiền tại SC-49.'
+          );
+          return;
+        }
+        setQrConfig(data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setQrConfigError(
+          error?.response?.data?.message ||
+            'Chi nhánh chưa cấu hình tài khoản ngân hàng hoạt động. Vui lòng cấu hình tại SC-49 trước khi thu VietQR.'
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setIsQrConfigLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, preOrder, paymentMethod, currentTenantId, fallbackBranchId]);
 
   if (!isOpen || !preOrder) return null;
 
@@ -44,13 +126,28 @@ export const FulfillPreOrderModal: FC<Props> = ({
   const changeAmount = paymentMethod === 'CASH' ? Math.max(0, cashTendered - remaining) : 0;
   const isCashSufficient = paymentMethod !== 'CASH' || cashTendered >= remaining;
 
-  // VietQR URL động cho số tiền còn lại
-  const qrUrl = `https://api.vietqr.io/image/970422-0974742130-compact2.png?amount=${remaining}&addInfo=${encodeURIComponent(
-    preOrder.preOrderId
-  )}&accountName=MT%20GROCERY%20STORE`;
+  const transferContent = `${qrConfig?.tenantPrefix || ''}${preOrder.preOrderId}`;
+  const qrUrl =
+    paymentMethod === 'VIETQR' && qrConfig && remaining > 0
+      ? buildVietQrUrl({
+          bankCode: qrConfig.bankCode,
+          accountNumber: qrConfig.bankAccountNumber,
+          accountHolderName: qrConfig.bankAccountName,
+          amount: remaining,
+          description: transferContent,
+        })
+      : null;
+
+  const isVietQrBlocked =
+    paymentMethod === 'VIETQR' &&
+    remaining > 0 &&
+    (isQrConfigLoading || Boolean(qrConfigError) || !qrUrl);
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    if (isVietQrBlocked) {
+      return;
+    }
     if (!Number.isSafeInteger(remaining) || remaining < 0 || (paymentMethod === 'CASH' && (!Number.isSafeInteger(cashTendered) || cashTendered < 0))) {
       alert('Số tiền thanh toán phải là số nguyên không âm.');
       return;
@@ -261,18 +358,59 @@ export const FulfillPreOrderModal: FC<Props> = ({
             </div>
           )}
 
-          {/* Nếu chọn VIETQR: Hiển thị mã QR động */}
+          {/* Nếu chọn VIETQR: Hiển thị mã QR động theo cấu hình thật của chi nhánh */}
           {paymentMethod === 'VIETQR' && (
             <div style={{ padding: 14, backgroundColor: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 6, textAlign: 'center', marginBottom: 14 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: '#334155', marginBottom: 8 }}>
-                Quét mã VietQR để thanh toán nốt <b>{remaining.toLocaleString('vi-VN')} VNĐ</b>
-              </div>
-              <div style={{ width: 170, height: 170, margin: '0 auto', padding: 6, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <img src={qrUrl} alt="VietQR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-              </div>
-              <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
-                Nội dung CK: <b>{preOrder.preOrderId}</b> &bull; Napas 247
-              </div>
+              {remaining <= 0 ? (
+                <div style={{ fontSize: 12.5, color: '#0f766e', fontWeight: 600 }}>
+                  Đơn hàng đã thanh toán đủ tiền cọc, không cần quét mã VietQR.
+                </div>
+              ) : isQrConfigLoading ? (
+                <div style={{ padding: '18px 10px', color: '#475569', fontSize: 12.5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <RefreshCw size={20} className="animate-spin text-teal-600" />
+                  <span>Đang tải tài khoản nhận tiền của chi nhánh...</span>
+                </div>
+              ) : qrConfigError || !qrUrl ? (
+                <div
+                  role="alert"
+                  style={{
+                    padding: '12px 14px',
+                    backgroundColor: '#fff7ed',
+                    border: '1px solid #fdba74',
+                    borderRadius: 6,
+                    color: '#9a3412',
+                    fontSize: 12.5,
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
+                  }}
+                >
+                  <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <div>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Chưa thể tạo mã VietQR</div>
+                    <div>
+                      {qrConfigError ||
+                        'Chi nhánh chưa cấu hình đầy đủ tài khoản ngân hàng hoạt động. Vui lòng thiết lập tại SC-49.'}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: '#334155', marginBottom: 8 }}>
+                    Quét mã VietQR để thanh toán nốt <b>{remaining.toLocaleString('vi-VN')} VNĐ</b>
+                  </div>
+                  <div style={{ width: 170, height: 170, margin: '0 auto', padding: 6, backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img src={qrUrl!} alt="VietQR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#334155', marginTop: 8 }}>
+                    <b>{qrConfig?.bankName || qrConfig?.bankCode}</b> &bull; STK: <b>{qrConfig?.bankAccountNumber}</b> &bull; {qrConfig?.bankAccountName}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    Nội dung CK: <b>{transferContent}</b> &bull; Napas 247
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -300,7 +438,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
               type="button"
               className="pos-btn-primary"
               onClick={handleSubmit}
-              disabled={isSubmitting || !isCashSufficient}
+              disabled={isSubmitting || !isCashSufficient || isVietQrBlocked}
               style={{ padding: '8px 18px', fontSize: 13.5, backgroundColor: '#0f766e' }}
             >
               <CheckCircle2 size={15} />

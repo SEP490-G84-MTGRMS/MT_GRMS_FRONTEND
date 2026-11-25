@@ -99,17 +99,6 @@
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
 }
 
-.cb-btn-receipt {
-  background-color: var(--green-money, #00c853);
-  color: #ffffff;
-}
-
-.cb-btn-receipt:hover:not(:disabled) {
-  background-color: #00b34a;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 200, 83, 0.25);
-}
-
 .cb-btn-payment {
   background-color: var(--red-accent, #ff3b30);
   color: #ffffff;
@@ -579,16 +568,6 @@
   gap: 8px;
 }
 
-.cb-reconciliation-diff-box {
-  background-color: var(--blue-light, #f0fdfa);
-  border: 1px solid var(--blue-border, #99f6e4);
-  border-radius: var(--radius-sm, 12px);
-  padding: 14px 18px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 .cb-modal-footer {
   padding: 18px 28px;
   border-top: 1px solid var(--border-light, #edf2f9);
@@ -599,8 +578,12 @@
 }
 
 /* Cashbook 2026: compact ledger + unified transaction dialogs */
+.cb-ledger-table {
+  min-width: 1260px;
+}
+
 .cb-voucher-link {
-  display: inline-flex;
+  display: inline-block;
   align-items: center;
   gap: 5px;
   max-width: 100%;
@@ -609,7 +592,8 @@
   background: transparent;
   color: #0f766e;
   font: 700 12px/1.35 var(--font-mono, monospace);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
@@ -654,6 +638,21 @@
 .cb-form-input,
 .cb-form-select,
 .cb-form-textarea { min-height: 42px; border-color: #cbd5e1; border-radius: 10px; background: #fff; }
+.cb-counterparty-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cb-counterparty-fields select {
+  flex: 0 1 168px;
+}
+
+.cb-counterparty-fields input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
 .cb-form-textarea { min-height: 72px; resize: vertical; }
 .cb-character-count {
   align-self: flex-end;
@@ -802,8 +801,6 @@
   }
 }
 
-
-
 /* ==========================================================================
    Cashbook Action Buttons, More Action Dropdown & Pro Filter Toolbar
    ========================================================================== */
@@ -848,20 +845,6 @@
 .cb-action-btn-payment:hover {
   background-color: #fef2f2;
   border-color: #fca5a5;
-}
-
-.cb-action-btn-reconcile {
-  background-color: #f0fdfa;
-  color: var(--blue-primary, #0f766e);
-  border-color: #99f6e4;
-  box-shadow: 0 1px 3px rgba(15, 118, 110, 0.1);
-}
-
-.cb-action-btn-reconcile:hover:not(:disabled) {
-  background-color: #ccfbf1;
-  border-color: var(--blue-primary, #0f766e);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(15, 118, 110, 0.18);
 }
 
 .cb-action-btn-transfer {
@@ -1305,4 +1288,30 @@
 
 .cb-custom-date-input:focus {
   border-color: var(--blue-primary, #0f766e);
+}
+
+.cb-more-actions {
+  position: relative;
+}
+
+.cb-more-actions-menu {
+  position: absolute;
+  z-index: 5;
+  right: 0;
+  top: calc(100% + 6px);
+  display: grid;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 6px 18px #0f172a20;
+}
+
+.cb-load-error {
+  padding: 8px 12px;
+  color: #991b1b;
+  background: #fef2f2;
 }

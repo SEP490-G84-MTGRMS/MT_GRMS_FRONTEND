@@ -35,42 +35,72 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'BankTransfer'>(
     'Cash'
   );
-  const [createCashBookEntry, setCreateCashBookEntry] = useState(true);
+  const createCashBookEntry = true;
   const [paymentDate, setPaymentDate] = useState(() =>
     new Date().toISOString().split('T')[0]
   );
   const [note, setNote] = useState('');
   const [approvalReason, setApprovalReason] = useState('');
   const [cashAccounts, setCashAccounts] = useState<CashAccount[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setErrorMessage(null);
-      setApprovalReason('');
-      void cashbookService.getCashAccounts().then((accounts) => {
+    if (!isOpen) return;
+    let isMounted = true;
+    setErrorMessage(null);
+    setApprovalReason('');
+    setIsLoadingAccounts(true);
+    cashbookService
+      .getCashAccounts()
+      .then((accounts) => {
+        if (!isMounted) return;
         setCashAccounts(accounts);
-        const filtered = accounts.filter((a) =>
-          paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
-        );
-        if (filtered.length > 0) {
-          setSelectedAccountId(filtered[0].id);
-        } else if (accounts.length > 0) {
-          setSelectedAccountId(accounts[0].id);
-        }
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setCashAccounts([]);
+        setErrorMessage('Không thể tải danh sách tài khoản quỹ. Vui lòng thử lại.');
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingAccounts(false);
       });
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen]);
+
+  const matchingAccounts = cashAccounts.filter((a) =>
+    paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'
+  );
+
+  useEffect(() => {
+    if (!isOpen || isLoadingAccounts) return;
+    if (matchingAccounts.length === 0) {
+      setSelectedAccountId('');
+      return;
     }
-  }, [isOpen, paymentMethod]);
+    const currentStillValid = matchingAccounts.some((a) => a.id === selectedAccountId);
+    if (!currentStillValid) {
+      const sameBranch = item?.branchId
+        ? matchingAccounts.find((a) => a.branchId === item.branchId && a.currentBalance >= (item.amount || 0)) ||
+          matchingAccounts.find((a) => a.branchId === item.branchId)
+        : undefined;
+      const sufficient = matchingAccounts.find((a) => a.currentBalance >= (item?.amount || 0));
+      setSelectedAccountId((sameBranch || sufficient || matchingAccounts[0]).id);
+    }
+  }, [isOpen, isLoadingAccounts, paymentMethod, cashAccounts, item?.branchId, item?.amount, selectedAccountId]);
 
   if (!isOpen || !item) return null;
 
   const selectedAccount =
-    cashAccounts.find((a) => a.id === selectedAccountId) ||
-    (cashAccounts.length > 0 ? cashAccounts[0] : null);
+    matchingAccounts.find((a) => a.id === selectedAccountId) ||
+    (matchingAccounts.length > 0 ? matchingAccounts[0] : null);
 
-  // Business Rule GBR-CSH-03: Poka-yoke chống chi vượt số dư khả dụng
-  const isInsufficientBalance = (item?.amount || 0) > (selectedAccount?.currentBalance || 0);
+  // Business Rule GBR-CSH-03: Poka-yoke chống chi vượt số dư khả dụng (chỉ kiểm tra sau khi tải xong danh sách quỹ)
+  const isInsufficientBalance =
+    !isLoadingAccounts && (item?.amount || 0) > (selectedAccount?.currentBalance || 0);
   const isCashOverdraft = paymentMethod === 'Cash' && isInsufficientBalance;
   const isBankOverdraft = paymentMethod === 'BankTransfer' && isInsufficientBalance;
 
@@ -93,7 +123,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
     if (isInsufficientBalance) {
       setErrorMessage(
         paymentMethod === 'Cash'
-          ? `Số tiền chi (${formatCurrency(item.amount)}) vượt quá số dư két hiện có (${formatCurrency(selectedAccount?.currentBalance || 0)}). Không thể xuất quỹ âm tiền theo Rule GBR-CSH-03.`
+          ? `Số tiền chi (${formatCurrency(item.amount)}) vượt quá số dư két hiện có (${formatCurrency(selectedAccount?.currentBalance || 0)}). Không thể xuất quỹ vượt số dư khả dụng.`
           : `Số dư tài khoản ngân hàng (${formatCurrency(selectedAccount?.currentBalance || 0)}) không đủ để thanh toán khoản chi (${formatCurrency(item.amount)}).`
       );
       return;
@@ -174,8 +204,10 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
-                <span>Mã chi phí:</span>
-                <span style={{ fontWeight: 700, color: 'var(--blue-primary, #0F766E)' }}>{item.expenseId}</span>
+                <span>Mã phiếu chi:</span>
+                <span style={{ fontWeight: 700, color: 'var(--blue-primary, #0F766E)', fontFamily: 'var(--font-mono, monospace)' }}>
+                  {item.voucherCode || item.expenseId}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
                 <span>Danh mục:</span>
@@ -291,16 +323,21 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 <select
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
+                  disabled={isLoadingAccounts}
                   className="form-input"
                   style={{ fontWeight: 600, color: '#0F766E' }}
                 >
-                  {cashAccounts
-                    .filter((a) => (paymentMethod === 'Cash' ? a.accountType === 'CASH' : a.accountType === 'BANK'))
-                    .map((acc) => (
+                  {isLoadingAccounts ? (
+                    <option value="">Đang tải danh sách tài khoản quỹ...</option>
+                  ) : matchingAccounts.length === 0 ? (
+                    <option value="">-- Không có tài khoản quỹ khả dụng --</option>
+                  ) : (
+                    matchingAccounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.accountName} (Khả dụng: {acc.currentBalance.toLocaleString('vi-VN')} đ)
+                        {acc.accountName}{acc.branchName ? ` — ${acc.branchName}` : ''} (Khả dụng: {acc.currentBalance.toLocaleString('vi-VN')} đ)
                       </option>
-                    ))}
+                    ))
+                  )}
                 </select>
                 <span style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 4, display: 'block' }}>
                   ✓ Số dư tài khoản này sẽ tự động giảm và đồng bộ vào Sổ quỹ
@@ -329,7 +366,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, color: '#B91C1C', marginBottom: '2px' }}>
-                    Vi phạm Rule GBR-CSH-03 (Chống âm két tiền mặt)
+                    Số dư két tiền mặt không đủ để chi trả
                   </div>
                   <div>
                     Số tiền chi (<strong>{formatCurrency(item.amount)}</strong>) vượt quá số dư két tiền mặt hiện có (<strong>{formatCurrency(selectedAccount?.currentBalance || 0)}</strong>).
@@ -394,7 +431,7 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
               </div>
             )}
 
-            {/* Cashbook Integration Checkbox */}
+            {/* Cashbook Integration Notice (always synced atomically on backend disburse) */}
             <div
               style={{
                 padding: '12px 16px',
@@ -409,12 +446,13 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
               <input
                 type="checkbox"
                 id="cashbook-check"
-                checked={createCashBookEntry}
-                onChange={(e) => setCreateCashBookEntry(e.target.checked)}
-                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                checked={true}
+                disabled
+                readOnly
+                style={{ width: '16px', height: '16px', cursor: 'not-allowed' }}
               />
-              <label htmlFor="cashbook-check" style={{ fontSize: '0.8rem', color: '#166534', cursor: 'pointer', fontWeight: 500 }}>
-                Tự động tạo phiếu chi trong Sổ quỹ (FE-17 Cashbook)
+              <label htmlFor="cashbook-check" style={{ fontSize: '0.8rem', color: '#166534', fontWeight: 500 }}>
+                Tự động tạo phiếu chi trong Sổ quỹ — bắt buộc hạch toán đồng bộ
               </label>
             </div>
 
@@ -485,10 +523,10 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || isInsufficientBalance || isApprovalReasonMissing}
+              disabled={isSubmitting || isLoadingAccounts || !selectedAccount || isInsufficientBalance || isApprovalReasonMissing}
               className="btn-primary-pill"
               style={
-                isInsufficientBalance || isApprovalReasonMissing
+                isLoadingAccounts || !selectedAccount || isInsufficientBalance || isApprovalReasonMissing
                   ? {
                       opacity: 0.55,
                       cursor: 'not-allowed',
@@ -498,14 +536,18 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                   : undefined
               }
               title={
-                isInsufficientBalance
+                isLoadingAccounts
+                  ? 'Đang tải danh sách tài khoản quỹ'
+                  : !selectedAccount
+                  ? 'Chưa có tài khoản nguồn khả dụng'
+                  : isInsufficientBalance
                   ? 'Không thể thanh toán do tài khoản nguồn không đủ số dư'
                   : isApprovalReasonMissing
                   ? 'Bắt buộc nhập lý do phê duyệt giải trình cho phiếu chi nghi vấn'
                   : undefined
               }
             >
-              <span>{isSubmitting ? 'Đang xử lý...' : 'Xác nhận thanh toán'}</span>
+              <span>{isSubmitting ? 'Đang xử lý...' : isLoadingAccounts ? 'Đang tải quỹ...' : 'Xác nhận thanh toán'}</span>
             </button>
           </div>
         </form>

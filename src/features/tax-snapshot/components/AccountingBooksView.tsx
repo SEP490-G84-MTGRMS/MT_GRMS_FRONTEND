@@ -258,6 +258,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
   const loadBookData = useCallback(async () => {
     setIsLoadingBooks(true);
     setBookError(null);
+    setBookEntries([]);
     try {
       const data = await taxSnapshotApi.getBookDetails({
         year,
@@ -365,15 +366,16 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
         return;
       }
 
+      const sg = entry.sectionGroup || '';
+      const isExplicitBankBlock = sg.includes('Khối II') || sg.startsWith('II.');
+      const isExplicitCashBlock = !isExplicitBankBlock && (sg.includes('Khối I') || sg.startsWith('I.'));
       const isBank =
-        !entry.sectionGroup?.includes('Khối I') &&
-        !entry.sectionGroup?.includes('I.') &&
-        (entry.category?.toLowerCase().includes('ngân hàng') ||
-          entry.category?.toLowerCase().includes('bank') ||
-          entry.sectionGroup?.includes('Khối II') ||
-          entry.sectionGroup?.includes('II.') ||
-          entry.beneficiaryName?.toLowerCase().includes('vietcombank') ||
-          entry.beneficiaryName?.toLowerCase().includes('bank'));
+        isExplicitBankBlock ||
+        (!isExplicitCashBlock &&
+          (entry.category?.toLowerCase().includes('ngân hàng') ||
+            entry.category?.toLowerCase().includes('bank') ||
+            entry.beneficiaryName?.toLowerCase().includes('vietcombank') ||
+            entry.beneficiaryName?.toLowerCase().includes('bank')));
 
       const { inAmt, outAmt } = getEntryFundAmounts(entry);
 
@@ -1202,21 +1204,25 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                 (e) => !s2cRevenueEntries.includes(e) && !s2cCogsEntries.includes(e)
               );
 
+              const s2cRevenueFromRows = s2cRevenueEntries.reduce((s, e) => s + (e.amount || 0), 0);
               const s2cTotalRevenue =
-                summary?.taxableRevenueInPeriod ??
-                s2cRevenueEntries.reduce((s, e) => s + (e.amount || 0), 0);
+                s2cRevenueEntries.length > 0
+                  ? s2cRevenueFromRows
+                  : (summary?.taxableRevenueInPeriod ?? 0);
+              const s2cCogsFromRows = s2cCogsEntries.reduce((s, e) => s + (e.amount || 0), 0);
               const s2cTotalCogs =
-                summary?.cogsAmount ??
-                s2cCogsEntries.reduce((s, e) => s + (e.amount || 0), 0);
+                s2cCogsEntries.length > 0 ? s2cCogsFromRows : (summary?.cogsAmount ?? 0);
               const s2cTotalOpex = s2cExpenseEntries.reduce((s, e) => s + (e.amount || 0), 0);
+              const s2cComputedExpense = s2cTotalCogs + s2cTotalOpex;
               const s2cTotalExpense =
-                summary?.deductibleExpensesInPeriod ?? s2cTotalCogs + s2cTotalOpex;
-              const s2cTaxableIncome =
-                summary?.taxableIncomeDeclaration ?? Math.max(0, s2cTotalRevenue - s2cTotalExpense);
+                s2cComputedExpense > 0
+                  ? s2cComputedExpense
+                  : (summary?.deductibleExpensesInPeriod ?? 0);
+              const s2cTaxableIncome = Math.max(0, s2cTotalRevenue - s2cTotalExpense);
               const s2cPitAmount =
-                summary?.declarationPitAmount ??
-                summary?.pitAmount ??
-                Math.round(s2cTaxableIncome * 0.15);
+                summary?.declarationPitAmount && summary.declarationPitAmount > 0
+                  ? summary.declarationPitAmount
+                  : Math.round(s2cTaxableIncome * 0.15);
 
               return (
                 <table className="tax-data-table">
@@ -1406,7 +1412,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                           {(entry.inQuantity ?? 0).toLocaleString('vi-VN')}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 700, background: '#FAFCFA', color: '#166534' }}>
-                          {formatMoney(entry.inAmount ?? entry.amount)}
+                          {formatMoney(entry.inAmount ?? 0)}
                         </td>
                         <td style={{ textAlign: 'right', fontWeight: 600, background: '#FCFAFA', color: '#991B1B' }}>
                           {(entry.outQuantity ?? 0).toLocaleString('vi-VN')}
@@ -1438,7 +1444,7 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
                       {filteredEntries.reduce((s, e) => s + (e.inQuantity ?? 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td style={{ textAlign: 'right', padding: '12px 6px', color: '#166534' }}>
-                      {formatMoney(filteredEntries.reduce((s, e) => s + (e.inAmount ?? e.amount ?? 0), 0))}
+                      {formatMoney(filteredEntries.reduce((s, e) => s + (e.inAmount ?? 0), 0))}
                     </td>
                     <td style={{ textAlign: 'right', padding: '12px 6px', color: '#991B1B' }}>
                       {filteredEntries.reduce((s, e) => s + (e.outQuantity ?? 0), 0).toLocaleString('vi-VN')}
@@ -1748,21 +1754,18 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
               <div style={{ fontWeight: 800 }}>NGƯỜI LẬP BIỂU</div>
               <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, ghi rõ họ tên)</div>
               <div style={{ height: 60 }}></div>
-              <div style={{ fontWeight: 600 }}>Nguyễn Thị Thu Ngân</div>
             </div>
 
             <div>
               <div style={{ fontWeight: 800 }}>KẾ TOÁN TRƯỞNG</div>
               <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, ghi rõ họ tên)</div>
               <div style={{ height: 60 }}></div>
-              <div style={{ fontWeight: 600 }}>Trần Văn Kế Toán</div>
             </div>
 
             <div>
               <div style={{ fontWeight: 800 }}>NGƯỜI ĐẠI DIỆN HỘ KINH DOANH</div>
               <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, đóng dấu nếu có)</div>
               <div style={{ height: 60 }}></div>
-              <div style={{ fontWeight: 700 }}>Cô Ba - Đại diện HKD</div>
             </div>
           </div>
         </div>
