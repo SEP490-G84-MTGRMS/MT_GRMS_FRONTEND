@@ -37,13 +37,28 @@ export const productApi = {
       params.SearchTerm = filter.searchTerm.trim();
     }
 
+    const skus = filter.skus?.map((s) => s.trim()).filter(Boolean);
+    if (skus && skus.length > 0) {
+      params.Skus = skus;
+    }
+
+    const names = filter.names?.map((s) => s.trim()).filter(Boolean);
+    if (names && names.length > 0) {
+      params.Names = names;
+    }
+
+    const barcodes = filter.barcodes?.map((s) => s.trim()).filter(Boolean);
+    if (barcodes && barcodes.length > 0) {
+      params.Barcodes = barcodes;
+    }
+
     if (filter.categoryIds && filter.categoryIds.length > 0) {
       params.CategoryIds = filter.categoryIds;
     } else if (filter.categoryId && filter.categoryId.trim() !== '' && filter.categoryId !== 'ALL') {
       params.CategoryId = filter.categoryId;
     }
 
-    if (filter.status && filter.status.trim() !== '' && filter.status !== 'all') {
+    if (filter.status && filter.status.trim() !== '' && filter.status.toUpperCase() !== 'ALL') {
       params.Status = toBackendProductStatus(filter.status) ?? filter.status;
     }
 
