@@ -21,12 +21,22 @@ import { Loader2 } from 'lucide-react';
 import { CreateTenantModal } from '../../features/admin/components/tenants/CreateTenantModal';
 import './adminPlans.css';
 
+function escapeCsvCell(value: string | number | undefined | null): string {
+  const str = String(value ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 export const TenantManagementPage: FC = () => {
   const navigate = useNavigate();
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [allMatchedTenants, setAllMatchedTenants] = useState<Tenant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedPlan, setSelectedPlan] = useState<'all' | PlanType>('all');
 
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
@@ -36,6 +46,7 @@ export const TenantManagementPage: FC = () => {
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     if (toastTimerRef.current) {
@@ -47,67 +58,140 @@ export const TenantManagementPage: FC = () => {
     }, 2800);
   };
 
-  // Fetch tenants from backend
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const fetchTenants = useCallback(async () => {
+    const reqId = ++requestIdRef.current;
     try {
       setIsLoading(true);
-      const res = await tenantApi.getTenants({
-        keyword: searchQuery.trim() || undefined,
-        status: activeTab !== 'all' ? activeTab.toUpperCase() : undefined,
-        pageSize: 100,
-      });
+      const keywordParam = debouncedQuery || undefined;
+      const [listRes, summaryRes] = await Promise.all([
+        tenantApi.getTenants({
+          keyword: keywordParam,
+          status: activeTab !== 'all' ? activeTab.toUpperCase() : undefined,
+          pageSize: 100,
+        }),
+        activeTab === 'all'
+          ? Promise.resolve(null)
+          : tenantApi.getTenants({
+              keyword: keywordParam,
+              pageSize: 100,
+            }),
+      ]);
 
-      if (res.success && res.data) {
-        setTenants(res.data.items.map(mapBackendTenantToFrontend));
+      if (reqId !== requestIdRef.current) return;
+
+      if (listRes.success && listRes.data) {
+        const mappedList = listRes.data.items.map(mapBackendTenantToFrontend);
+        setTenants(mappedList);
+        if (activeTab === 'all') {
+          setAllMatchedTenants(mappedList);
+        } else if (summaryRes?.success && summaryRes.data) {
+          setAllMatchedTenants(summaryRes.data.items.map(mapBackendTenantToFrontend));
+        }
       } else {
-        showToast(res.message || 'Không thể tải danh sách khách thuê', 'warning');
+        showToast(listRes.message || 'Không thể tải danh sách khách thuê', 'warning');
       }
     } catch (err: unknown) {
+      if (reqId !== requestIdRef.current) return;
       const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       showToast(errorMsg || 'Lỗi khi kết nối với máy chủ Backend', 'warning');
     } finally {
-      setIsLoading(false);
+      if (reqId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  }, [searchQuery, activeTab]);
+  }, [debouncedQuery, activeTab]);
 
   useEffect(() => {
-    fetchTenants();
+    void fetchTenants();
   }, [fetchTenants]);
 
-  // Filtered List
   const filteredTenants = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
     return tenants.filter((t) => {
-      // Tab filter
       const matchTab = activeTab === 'all' || t.status === activeTab;
-      // Plan filter
       const matchPlan = selectedPlan === 'all' || t.plan === selectedPlan;
-      // Search query
-      const q = searchQuery.toLowerCase().trim();
       const matchQuery =
         !q ||
         t.name.toLowerCase().includes(q) ||
         t.subdomain.toLowerCase().includes(q) ||
-        t.taxCode.includes(q) ||
+        t.taxCode.toLowerCase().includes(q) ||
         t.ownerEmail.toLowerCase().includes(q) ||
-        t.ownerName.toLowerCase().includes(q);
+        t.ownerName.toLowerCase().includes(q) ||
+        t.ownerPhone.toLowerCase().includes(q);
 
       return matchTab && matchPlan && matchQuery;
     });
   }, [tenants, activeTab, selectedPlan, searchQuery]);
 
-  // Tab counts
   const tabCounts = useMemo(() => {
+    const source = allMatchedTenants.length > 0 || activeTab === 'all' ? allMatchedTenants : tenants;
     return {
-      all: tenants.length,
-      active: tenants.filter((t) => t.status === 'active').length,
-      expiring: tenants.filter((t) => t.status === 'expiring').length,
-      grace: tenants.filter((t) => t.status === 'grace').length,
-      pending: tenants.filter((t) => t.status === 'pending').length,
-      locked: tenants.filter((t) => t.status === 'locked').length,
+      all: source.length,
+      active: source.filter((t) => t.status === 'active').length,
+      expiring: source.filter((t) => t.status === 'expiring').length,
+      grace: source.filter((t) => t.status === 'grace').length,
+      pending: source.filter((t) => t.status === 'pending').length,
+      locked: source.filter((t) => t.status === 'locked').length,
     };
-  }, [tenants]);
+  }, [allMatchedTenants, tenants, activeTab]);
 
-  // Handlers
+  const handleExportExcel = () => {
+    const headers = [
+      'Mã Subdomain',
+      'Tên Cửa Hàng',
+      'Mã Số Thuế',
+      'Tỉnh/Thành Phố',
+      'Chủ Cửa Hàng',
+      'Email Chủ Cửa Hàng',
+      'Số Điện Thoại',
+      'Gói Dịch Vụ',
+      'Số Chi Nhánh',
+      'Số Nhân Sự',
+      'Hạn Hợp Đồng',
+      'Trạng Thái',
+    ];
+    const rows = filteredTenants.map((t) => [
+      escapeCsvCell(t.subdomain),
+      escapeCsvCell(t.name),
+      escapeCsvCell(t.taxCode),
+      escapeCsvCell(t.city),
+      escapeCsvCell(t.ownerName),
+      escapeCsvCell(t.ownerEmail),
+      escapeCsvCell(t.ownerPhone),
+      escapeCsvCell(t.planName || t.plan),
+      escapeCsvCell(`${t.branchCount}/${t.maxBranches === 'unlimited' ? 'Unlimited' : t.maxBranches}`),
+      escapeCsvCell(`${t.staffCount}/${t.maxStaff === 'unlimited' ? 'Unlimited' : t.maxStaff}`),
+      escapeCsvCell(t.expiryDate || 'Chưa kích hoạt'),
+      escapeCsvCell(t.status.toUpperCase()),
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `MT_GRMS_Tenants_${new Date().toISOString().split('T')[0]}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast(
+      `Đã xuất danh sách ${filteredTenants.length} khách hàng ra tệp CSV/Excel thành công!`,
+      'success',
+    );
+  };
+
   const handleDetail = (tenant: Tenant) => {
     navigate(`/admin/tenants/${tenant.id}`);
   };
@@ -122,7 +206,10 @@ export const TenantManagementPage: FC = () => {
       const res = await tenantApi.unlock(tenant.id);
       if (res.success) {
         setTenants((prev) =>
-          prev.map((t) => (t.id === tenant.id ? { ...t, status: 'active', lockType: undefined } : t))
+          prev.map((t) => (t.id === tenant.id ? { ...t, status: 'active', lockType: undefined } : t)),
+        );
+        setAllMatchedTenants((prev) =>
+          prev.map((t) => (t.id === tenant.id ? { ...t, status: 'active', lockType: undefined } : t)),
         );
         showToast(`Đã dỡ bỏ lệnh khóa và phục hồi dịch vụ cho chuỗi ${tenant.name}.`, 'success');
       } else {
@@ -147,19 +234,8 @@ export const TenantManagementPage: FC = () => {
       });
 
       if (res.success) {
-        setTenants((prev) =>
-          prev.map((t) =>
-            t.id === tenant.id
-              ? {
-                  ...t,
-                  status: 'grace',
-                  graceDaysRemaining: (t.graceDaysRemaining || 0) + days,
-                }
-              : t
-          )
-        );
         showToast(`Đã gia hạn thành công ${days} ngày cho chuỗi ${tenant.name}.`, 'success');
-        fetchTenants();
+        void fetchTenants();
       } else {
         showToast(res.message || 'Không thể gia hạn ân hạn', 'warning');
       }
@@ -177,14 +253,11 @@ export const TenantManagementPage: FC = () => {
       });
 
       if (res.success) {
-        setTenants((prev) =>
-          prev.map((t) => (t.id === tenant.id ? { ...t, status: 'locked', lockType } : t))
-        );
         showToast(
           `Đã áp dụng lệnh khóa (${lockType === 'hard' ? 'Hard-Lock' : 'Soft-Lock'}) cho ${tenant.name}.`,
-          'warning'
+          'warning',
         );
-        fetchTenants();
+        void fetchTenants();
       } else {
         showToast(res.message || 'Không thể áp dụng khóa gian hàng', 'warning');
       }
@@ -196,10 +269,8 @@ export const TenantManagementPage: FC = () => {
 
   return (
     <div className="admin-plans admin-tenant-list" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100%' }}>
-      {/* Toast Notification */}
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Page Header */}
       <div className="plans-hero">
         <div>
           <p className="plans-eyebrow">KHÁCH HÀNG THUÊ</p>
@@ -212,7 +283,7 @@ export const TenantManagementPage: FC = () => {
           <button
             type="button"
             className="admin-btn admin-btn-secondary"
-            onClick={() => showToast('Đang kết xuất danh sách khách hàng ra tệp Excel (.xlsx)...')}
+            onClick={handleExportExcel}
           >
             <ExportIcon size={14} />
             <span>Xuất Excel</span>
@@ -228,7 +299,6 @@ export const TenantManagementPage: FC = () => {
         </div>
       </div>
 
-      {/* Filter & Search Toolbar */}
       <div style={{ flexShrink: 0 }}>
         <TenantSearchToolbar
           searchQuery={searchQuery}
@@ -239,11 +309,10 @@ export const TenantManagementPage: FC = () => {
           selectedPlan={selectedPlan}
           onPlanChange={setSelectedPlan}
           visibleCount={filteredTenants.length}
-          totalCount={tenants.length}
+          totalCount={tabCounts.all}
         />
       </div>
 
-      {/* Tenant Data Table / Loading */}
       {isLoading ? (
         <div
           style={{
@@ -273,7 +342,6 @@ export const TenantManagementPage: FC = () => {
         />
       )}
 
-      {/* Modals */}
       <ExtendGraceModal
         tenant={selectedTenant}
         isOpen={isGraceOpen}
