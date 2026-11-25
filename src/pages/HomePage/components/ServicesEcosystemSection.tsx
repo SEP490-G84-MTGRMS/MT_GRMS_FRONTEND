@@ -1,197 +1,73 @@
 import type { FC } from 'react';
+import {
+  BarChart3,
+  QrCode,
+  FileSpreadsheet,
+  Users,
+  ScanBarcode,
+  Layers,
+  Calculator,
+  Truck,
+  Clock,
+} from 'lucide-react';
 import { ServiceCard } from './ServiceCard';
 
 export const ServicesEcosystemSection: FC = () => {
+  const iconColor = 'var(--blue-primary, #0066FF)';
   const services = [
     {
-      title: 'Xem báo cáo điều hành mọi lúc mọi nơi',
+      title: 'Theo dõi cửa hàng từ xa thời gian thực',
       description:
-        'Giám đốc, kế toán trưởng có thể theo dõi tình hình tài chính ngay trên di động, kịp thời ra quyết định điều hành doanh nghiệp.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <path d="M9 15l2 2 4-4" />
-        </svg>
-      ),
+        'Chủ tiệm nắm bắt doanh thu theo giờ, tiền mặt tại két thu ngân và ca làm nhân viên ngay trên điện thoại dù không có mặt tại quầy.',
+      icon: <BarChart3 size={34} color={iconColor} strokeWidth={1.9} />,
     },
     {
-      title: 'Kết nối ngân hàng điện tử',
+      title: 'Thanh toán VietQR Napas247 khớp tự động',
       description:
-        'Kết nối với ngân hàng để chuyển tiền, đối chiếu sổ phụ, nắm bắt số dư theo thời gian thực giúp tiết kiệm thời gian, công sức.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M3 21h18M3 10h18M5 10v11M9 10v11M15 10v11M19 10v11M12 2L2 7h20L12 2z" />
-        </svg>
-      ),
+        'Sinh mã QR động đúng số tiền từng hóa đơn POS và tự động xác nhận biến động số dư trong vài giây, chống dán đè mã QR giả.',
+      icon: <QrCode size={34} color={iconColor} strokeWidth={1.9} />,
     },
     {
-      title: 'Kết nối với Cơ quan Thuế',
+      title: 'Sổ sách Thuế Hộ Kinh Doanh chuẩn quy định',
       description:
-        'Cho phép kế toán dễ dàng kê khai đầy đủ các loại thuế theo quy định và nộp thuế điện tử ngay trên phần mềm.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <line x1="9" y1="15" x2="15" y2="9" />
-          <circle cx="9.5" cy="9.5" r="1" fill="var(--blue-primary, #0F766E)" />
-          <circle cx="14.5" cy="14.5" r="1" fill="var(--blue-primary, #0F766E)" />
-        </svg>
-      ),
+        'Tổng hợp doanh thu bán lẻ và xuất bộ sổ kế toán hộ kinh doanh theo quy định hiện hành nhanh gọn, minh bạch, không lo sai số.',
+      icon: <Calculator size={34} color={iconColor} strokeWidth={1.9} />,
     },
     {
-      title: 'Kết nối với hơn 100 đối tác',
+      title: 'Sổ nợ khách quen & Nhắc nợ qua Zalo',
       description:
-        'Kết nối với các hệ thống hóa đơn điện tử, chữ ký số, bán hàng, nhân sự, email, sms,... giảm thiểu nhập liệu chồng chéo, sai lệch dữ liệu.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      ),
+        'Ghi nhận mua chịu tại quầy chỉ với 1 chạm, theo dõi hạn mức công nợ từng khách hàng và gửi thông báo đối soát lịch sự qua Zalo.',
+      icon: <Users size={34} color={iconColor} strokeWidth={1.9} />,
     },
     {
-      title: 'Tự động nhập liệu',
+      title: 'Kho 5.000+ hàng tạp hóa mẫu sẵn có',
       description:
-        'Tự động nhập liệu hóa đơn mua hàng, bán hàng, nhập khẩu dữ liệu từ excel giúp rút ngắn thời gian nhập liệu, tránh sai sót.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="3" y="4" width="18" height="16" rx="3" />
-          <path d="M10 8l4 4-4 4" />
-          <path d="M4 12h10" />
-        </svg>
-      ),
+        'Quét mã vạch sản phẩm FMCG phổ biến là tự động điền tên hàng, thương hiệu và đơn vị tính, rút ngắn tối đa thời gian khai báo ban đầu.',
+      icon: <ScanBarcode size={34} color={iconColor} strokeWidth={1.9} />,
     },
     {
-      title: 'Đầy đủ báo cáo quản trị',
+      title: 'Quy đổi Thùng - Lốc - Lon - Gói tự động',
       description:
-        'Hàng trăm báo cáo quản trị theo mẫu hoặc tự thiết kế chỉnh sửa, đáp ứng nhu cầu của doanh nghiệp thuộc mọi ngành nghề.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="2" y="7" width="20" height="14" rx="3" />
-          <path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3" />
-          <line x1="12" y1="12" x2="12" y2="12.01" />
-        </svg>
-      ),
+        'Nhập hàng theo thùng nhưng bán lẻ theo lốc hoặc lon; hệ thống tự động trừ tồn kho chính xác về đơn vị cơ sở và cảnh báo bán dưới giá vốn.',
+      icon: <Layers size={34} color={iconColor} strokeWidth={1.9} />,
     },
     {
-      title: 'Tự động hóa việc lập báo cáo',
+      title: 'Báo cáo lãi lỗ P&L & Sổ quỹ rõ ràng',
       description:
-        'Tự động tổng hợp số liệu lên báo cáo thuế, báo cáo tài chính và các sổ sách giúp doanh nghiệp nộp báo cáo kịp thời, chính xác.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <path d="M9 13a3 3 0 1 1 3 3" />
-          <polyline points="12 16 12 13 15 13" />
-        </svg>
-      ),
+        'Tự động bóc tách doanh thu thuần, giá vốn theo lô xuất bán và chi phí vận hành (điện, nước, mặt bằng) để tính lợi nhuận thực tế.',
+      icon: <FileSpreadsheet size={34} color={iconColor} strokeWidth={1.9} />,
     },
     {
-      title: 'Hỗ trợ kiểm soát chứng từ hợp lệ',
+      title: 'Quản lý Nhà cung cấp & Công nợ nhập hàng',
       description:
-        'Gợi ý thông tin KH/ NCC dựa trên MST giúp tiết kiệm thời gian nhập liệu. Cảnh báo NCC ngưng hoạt động tránh rủi ro về hoá đơn.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M9 12l2 2 4-4" />
-          <rect x="3" y="3" width="18" height="18" rx="4" />
-          <path d="M12 3v3" />
-        </svg>
-      ),
+        'Kiểm soát đơn đặt hàng PO, phiếu nhập kho GRN đa lô và lịch nhắc thanh toán công nợ nhà phân phối theo tuổi nợ chi tiết.',
+      icon: <Truck size={34} color={iconColor} strokeWidth={1.9} />,
     },
     {
-      title: 'Giám sát tồn kho',
+      title: 'Giám sát tồn kho theo Lô & Hạn dùng FEFO',
       description:
-        'Nắm bắt thông tin tồn kho chi tiết theo từng nhu cầu quản trị của DN như số lô, HSD, màu sắc, chủng loại giúp tránh thất thoát, lãng phí.',
-      icon: (
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--blue-primary, #0F766E)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="9" cy="21" r="1" />
-          <circle cx="20" cy="21" r="1" />
-          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-        </svg>
-      ),
+        'Cảnh báo hàng cận date theo 3 mức màu trực quan và ưu tiên gợi ý xuất bán lô hết hạn trước (FEFO), giảm thiểu hủy hàng hỏng.',
+      icon: <Clock size={34} color={iconColor} strokeWidth={1.9} />,
     },
   ];
 
@@ -199,10 +75,10 @@ export const ServicesEcosystemSection: FC = () => {
     <section className="section-padded bg-soft-blue" id="dich-vu">
       <div className="container">
         <div className="section-heading-center">
-          <span className="sub-heading-pill">HỆ SINH THÁI DỊCH VỤ</span>
-          <h2 className="main-heading">Tiện ích kết nối & Quản trị mở rộng</h2>
+          <span className="sub-heading-pill">HỆ SINH THÁI TIỆN ÍCH</span>
+          <h2 className="main-heading">Trọn bộ nghiệp vụ cho tiệm tạp hóa & siêu thị mini</h2>
           <p className="heading-lead">
-            Đồng bộ dữ liệu đa kênh, kết nối ngân hàng điện tử, hóa đơn thuế và quản trị tồn kho chuyên sâu.
+            Đồng bộ bán hàng tại quầy, thanh toán VietQR, quản trị lô hạn dùng FEFO, công nợ và sổ sách thuế hộ kinh doanh trên một nền tảng duy nhất.
           </p>
         </div>
 

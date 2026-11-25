@@ -51,6 +51,8 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isNameInvalid, setIsNameInvalid] = useState(false);
+  const [isPhoneInvalid, setIsPhoneInvalid] = useState(false);
+  const [isEmailInvalid, setIsEmailInvalid] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -102,9 +104,55 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
   const handleSave = async (e?: FormEvent) => {
     if (e) e.preventDefault();
 
-    if (name.trim().length < 2) {
+    const trimmedName = name.trim();
+    const trimmedAddress = address.trim();
+    const hotline = phone.trim();
+    const contactEmail = email.trim();
+    const trimmedManager = managerName.trim();
+
+    if (trimmedName.length < 2) {
       setIsNameInvalid(true);
       setErrorMessage("Tên chi nhánh phải có ít nhất 2 ký tự.");
+      return;
+    }
+    if (trimmedName.length > 150) {
+      setIsNameInvalid(true);
+      setErrorMessage("Tên chi nhánh không được vượt quá 150 ký tự.");
+      return;
+    }
+    if (trimmedAddress.length > 255) {
+      setErrorMessage("Địa chỉ chi nhánh không được vượt quá 255 ký tự.");
+      return;
+    }
+
+    const digits = hotline.replace(/[^0-9]/g, "").length;
+    if (
+      hotline &&
+      (hotline.length > 20 ||
+        !/^\+?[0-9][0-9 .-]*[0-9]$/.test(hotline) ||
+        digits < 8 ||
+        digits > 15)
+    ) {
+      setIsPhoneInvalid(true);
+      setErrorMessage(
+        "Hotline phải có 8–15 chữ số và không vượt quá 20 ký tự. Có thể dùng dấu + ở đầu, dấu cách, dấu chấm hoặc dấu gạch ngang.",
+      );
+      return;
+    }
+
+    const emailPattern =
+      /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
+    if (
+      contactEmail &&
+      (contactEmail.length > 150 || !emailPattern.test(contactEmail))
+    ) {
+      setIsEmailInvalid(true);
+      setErrorMessage("Email phải đúng định dạng và không vượt quá 150 ký tự.");
+      return;
+    }
+
+    if (trimmedManager.length > 150) {
+      setErrorMessage("Tên quản lý không được vượt quá 150 ký tự.");
       return;
     }
 
@@ -296,7 +344,14 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                     <input
                       type="tel"
                       value={phone}
-                      onChange={(event) => setPhone(event.target.value)}
+                      aria-invalid={isPhoneInvalid || undefined}
+                      onChange={(event) => {
+                        setPhone(event.target.value);
+                        if (isPhoneInvalid) {
+                          setIsPhoneInvalid(false);
+                          setErrorMessage(null);
+                        }
+                      }}
                     />
                   </label>
                   <label>
@@ -304,7 +359,14 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
                     <input
                       inputMode="email"
                       value={email}
-                      onChange={(event) => setEmail(event.target.value)}
+                      aria-invalid={isEmailInvalid || undefined}
+                      onChange={(event) => {
+                        setEmail(event.target.value);
+                        if (isEmailInvalid) {
+                          setIsEmailInvalid(false);
+                          setErrorMessage(null);
+                        }
+                      }}
                     />
                   </label>
                   <label>
@@ -376,28 +438,28 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
             {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
           </button>
         </footer>
-      </form>
-      <AdminToast
-        toast={
-          errorMessage
-            ? {
-                id: "branch-detail-error",
-                message: errorMessage,
-                type: "error",
-              }
-            : saveSuccess
+        <AdminToast
+          toast={
+            errorMessage
               ? {
-                  id: "branch-detail-success",
-                  message: "Đã lưu thông tin chi nhánh.",
-                  type: "success",
+                  id: "branch-detail-error",
+                  message: errorMessage,
+                  type: "error",
                 }
-              : null
-        }
-        onClose={() => {
-          setErrorMessage(null);
-          setSaveSuccess(false);
-        }}
-      />
+              : saveSuccess
+                ? {
+                    id: "branch-detail-success",
+                    message: "Đã lưu thông tin chi nhánh.",
+                    type: "success",
+                  }
+                : null
+          }
+          onClose={() => {
+            setErrorMessage(null);
+            setSaveSuccess(false);
+          }}
+        />
+      </form>
     </div>
   );
 };

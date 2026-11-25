@@ -93,7 +93,7 @@ export const AdminDashboardPage = () => {
       <section className="admin-dash-card"><div className="admin-dash-section-heading"><h2>Giám sát hệ thống</h2><Link to="/admin/settings">Thiết lập SaaS</Link></div><p className="admin-dash-card-caption">Chưa có dữ liệu giám sát tác vụ từ máy chủ.</p></section>
     </div>
     <section className="admin-dash-card"><div className="admin-dash-section-heading"><h2>Khách hàng cần chú ý</h2></div>
-      <div style={{overflowX:"auto"}}><table className="admin-alert-table"><thead><tr><th>Cửa hàng</th><th>Gói dịch vụ</th><th>Tình trạng</th><th>Thời hạn</th></tr></thead><tbody>{alerts.map(a => <tr key={a.subdomain}><td><Link to={"/admin/tenants/" + encodeURIComponent(a.subdomain)}>{a.name}</Link></td><td>{a.planText}</td><td>{a.statusText}</td><td>{a.expiryNotice}</td></tr>)}</tbody></table></div>
+      <div style={{overflowX:"auto"}}><table className="admin-alert-table"><thead><tr><th>Cửa hàng</th><th>Gói dịch vụ</th><th>Tình trạng</th><th>Thời hạn</th></tr></thead><tbody>{alerts.map(a => <tr key={a.id || a.subdomain}><td><Link to={"/admin/tenants/" + encodeURIComponent(a.id || a.subdomain)}>{a.name}</Link></td><td>{a.planText}</td><td>{a.statusText}</td><td>{a.expiryNotice}</td></tr>)}</tbody></table></div>
       {alerts.length === 0 && <p className="admin-dash-card-caption">{alertsFailed ? "Không tải được cảnh báo." : "Không có khách hàng cần chú ý."}</p>}
     </section>
   </div>;

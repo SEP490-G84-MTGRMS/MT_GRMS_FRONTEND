@@ -18,7 +18,7 @@ function expireSession() {
   }));
   const path = window.location.pathname;
   if (!path.startsWith('/auth') && path !== '/login' && path !== '/register') {
-    window.location.assign(`/auth/login?redirect=${encodeURIComponent(path + window.location.search + window.location.hash)}`);
+    window.location.assign(`/auth/login?expired=1&redirect=${encodeURIComponent(path + window.location.search + window.location.hash)}`);
   }
 }
 

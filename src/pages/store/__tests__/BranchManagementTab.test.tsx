@@ -78,4 +78,58 @@ describe('BranchManagementTab', () => {
       isHeadquarter: usedBranches === 1,
     }));
   });
+
+  it('rejects invalid hotline and invalid email in BranchDetailModal without calling updateBranch', async () => {
+    vi.spyOn(branchManagementApi, 'getQuota').mockResolvedValue({
+      success: true,
+      data: { usedBranches: 2, maxBranches: 3, canAddMore: true, currentPlanCode: 'PRO', currentPlanName: 'Gói Pro' },
+    });
+    vi.spyOn(branchManagementApi, 'getBranches').mockResolvedValue({
+      success: true,
+      data: { items: [branch], totalItems: 1, page: 1, pageSize: 10 },
+    });
+    vi.spyOn(branchManagementApi, 'getBranchDetail').mockResolvedValue({
+      success: true,
+      data: {
+        ...branch,
+        totalProducts: 0,
+        totalStock: 0,
+        lowStockCount: 0,
+        totalEmployees: 0,
+        activeEmployees: 0,
+        recentEmployees: [],
+        recentProducts: [],
+      },
+    });
+    const updateBranch = vi.spyOn(branchManagementApi, 'updateBranch').mockResolvedValue({
+      success: true,
+      data: branch,
+    });
+
+    render(<BranchManagementTab onGoToSubscriptions={vi.fn()} />);
+    await screen.findByTitle('Tạm ngưng hoạt động');
+
+    fireEvent.click(screen.getByTitle('Xem chi tiết các thông số chi nhánh'));
+    const dialog = await screen.findByRole('dialog', { name: branch.name });
+    await within(dialog).findByRole('textbox', { name: /tên chi nhánh/i });
+
+    fireEvent.change(within(dialog).getByRole('textbox', { name: /số điện thoại hotline/i }), {
+      target: { value: 'abc' },
+    });
+    fireEvent.change(within(dialog).getByRole('textbox', { name: /email liên hệ/i }), {
+      target: { value: 'invalid' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+
+    expect(await within(dialog).findByText(/Hotline phải có 8–15 chữ số/i)).toBeVisible();
+    expect(updateBranch).not.toHaveBeenCalled();
+
+    fireEvent.change(within(dialog).getByRole('textbox', { name: /số điện thoại hotline/i }), {
+      target: { value: '0912345678' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Lưu thay đổi' }));
+
+    expect(await within(dialog).findByText(/Email phải đúng định dạng/i)).toBeVisible();
+    expect(updateBranch).not.toHaveBeenCalled();
+  });
 });
