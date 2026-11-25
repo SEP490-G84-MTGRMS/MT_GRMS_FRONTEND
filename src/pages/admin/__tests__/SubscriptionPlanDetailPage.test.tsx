@@ -43,7 +43,18 @@ const mockBackendPlan = {
     debtZaloBook: false,
     financialReporting: false,
   },
-  tenants: [],
+  tenants: [
+    {
+      id: 'tenant_99',
+      name: 'Siêu Thị Hòa Lạc',
+      subdomain: 'hoa-lac-mart',
+      activeBranches: 1,
+      activeEmployees: 2,
+      joinedDate: '2026-10-10T00:00:00Z',
+      expiryDate: '2027-10-10T00:00:00Z',
+      status: 'LOCKED',
+    },
+  ],
   createdAt: '2026-10-01T00:00:00Z',
   updatedAt: '2026-11-01T00:00:00Z',
 };
@@ -79,6 +90,10 @@ describe('SubscriptionPlanDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Gói Cơ Bản' })).toBeInTheDocument();
     });
+
+    expect(screen.getByText('Siêu Thị Hòa Lạc')).toBeInTheDocument();
+    expect(screen.getByText('Đã khóa')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Xem' })).toHaveAttribute('href', '/admin/tenants/tenant_99');
 
     const statusSelect = screen.getByLabelText('Trạng thái mở bán');
     fireEvent.change(statusSelect, { target: { value: 'Inactive' } });
