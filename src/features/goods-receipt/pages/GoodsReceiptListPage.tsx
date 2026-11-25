@@ -21,6 +21,7 @@ import { GrnFilterBar, type GrnFilterOption } from '../components/GrnFilterBar';
 import { GrnTable } from '../components/GrnTable';
 import { GrnDetailDrawer } from '../components/GrnDetailDrawer';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { useBranchScope } from '../../../hooks/useBranchScope';
 import '../../purchase-order/purchase-order.css';
 
 const DEFAULT_FILTERS: GrnFilterState = {
@@ -40,10 +41,23 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const {
+    isEmployee: isAuthEmployee,
+    lockedBranchId,
+    scopedBranchIdOrAll,
+  } = useBranchScope(defaultRole);
 
   const roleParam = searchParams.get('role') as UserRole | null;
-  const [role, setRole] = useState<UserRole>(roleParam || defaultRole);
+  const [role, setRole] = useState<UserRole>(
+    isAuthEmployee ? 'employee' : roleParam || defaultRole
+  );
   const branchParam = searchParams.get('branch') || '';
+
+  useEffect(() => {
+    if (isAuthEmployee) {
+      setRole('employee');
+    }
+  }, [isAuthEmployee]);
 
   const [branches, setBranches] = useState<GrnFilterOption[]>([]);
   const [suppliers, setSuppliers] = useState<GrnFilterOption[]>([]);
@@ -53,8 +67,23 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   const [tabCounts, setTabCounts] = useState({ all: 0, today: 0, draft: 0, mismatch: 0 });
 
   const [activeTab, setActiveTab] = useState<GrnFilterTab>('ALL');
-  const [filterInputs, setFilterInputs] = useState<GrnFilterState>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<GrnFilterState>(DEFAULT_FILTERS);
+  const [filterInputs, setFilterInputs] = useState<GrnFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    branchId: scopedBranchIdOrAll,
+  }));
+  const [appliedFilters, setAppliedFilters] = useState<GrnFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    branchId: scopedBranchIdOrAll,
+  }));
+
+  useEffect(() => {
+    setFilterInputs((prev) =>
+      prev.branchId === scopedBranchIdOrAll ? prev : { ...prev, branchId: scopedBranchIdOrAll, pageIndex: 1 }
+    );
+    setAppliedFilters((prev) =>
+      prev.branchId === scopedBranchIdOrAll ? prev : { ...prev, branchId: scopedBranchIdOrAll, pageIndex: 1 }
+    );
+  }, [scopedBranchIdOrAll]);
 
   const [selectedReceipt, setSelectedReceipt] = useState<GoodsReceiptListItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -62,6 +91,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const employeeBranchId = useMemo(() => {
+    if (lockedBranchId) return lockedBranchId;
     if (!branchParam) return branches[0]?.id || '';
     const byId = branches.find((b) => b.id === branchParam);
     if (byId) return byId.id;
@@ -69,7 +99,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
       (b) => b.label.toLowerCase().includes(branchParam.toLowerCase())
     );
     return byLabel?.id || branchParam;
-  }, [branchParam, branches]);
+  }, [lockedBranchId, branchParam, branches]);
 
   const employeeBranchLabel = useMemo(() => {
     return branches.find((b) => b.id === employeeBranchId)?.label || employeeBranchId || 'Chi nhánh';
@@ -204,7 +234,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
   };
 
   const handleReset = () => {
-    const resetBranch = role === 'employee' && employeeBranchId ? employeeBranchId : 'ALL';
+    const resetBranch = role === 'employee' && employeeBranchId ? employeeBranchId : scopedBranchIdOrAll;
     const resetState: GrnFilterState = {
       ...DEFAULT_FILTERS,
       branchId: resetBranch,
@@ -288,7 +318,7 @@ export const GoodsReceiptListPage: FC<{ defaultRole?: UserRole }> = ({
         </div>
 
         <div className="so-list-header-actions">
-          {defaultRole !== 'store_owner' && (
+          {defaultRole !== 'store_owner' && !isAuthEmployee && (
           <div
             style={{
               display: 'flex',

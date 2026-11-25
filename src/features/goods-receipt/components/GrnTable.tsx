@@ -167,9 +167,9 @@ export const GrnTable: FC<GrnTableProps> = ({
   };
 
   const cellEllipsis: CSSProperties = {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    overflowWrap: 'anywhere',
   };
 
   const formatDisplayDate = (rawDate: string, fallback: string) => {
@@ -182,13 +182,13 @@ export const GrnTable: FC<GrnTableProps> = ({
 
   const renderStatusBadge = (status: GrnStatus) => {
     const styles: Record<string, { bg: string; color: string; border: string; label: string }> = {
-      TODAY: { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd', label: 'Scheduled' },
-      DRAFT: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', label: 'Draft' },
-      CONFIRMED: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'Confirmed' },
-      COMPLETED: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'Confirmed' },
-      MISMATCH: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Mismatch' },
-      CANCELED: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Cancelled' },
-      CANCELLED: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Cancelled' },
+      TODAY: { bg: '#f0f9ff', color: '#0369a1', border: '#bae6fd', label: 'Lịch nhận hôm nay' },
+      DRAFT: { bg: '#fffbeb', color: '#b45309', border: '#fde68a', label: 'Bản nháp' },
+      CONFIRMED: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'Đã nhập kho' },
+      COMPLETED: { bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0', label: 'Đã nhập kho' },
+      MISMATCH: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Chênh lệch' },
+      CANCELED: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Đã hủy' },
+      CANCELLED: { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Đã hủy' },
     };
     const st = styles[status] || { bg: '#f8fafc', color: '#334155', border: '#e2e8f0', label: status };
 

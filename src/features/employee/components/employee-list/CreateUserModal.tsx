@@ -1,6 +1,7 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Eye, EyeOff, User, AlertCircle, CheckCircle2, Loader2, Info } from 'lucide-react';
 import { employeeApi } from '../../api/employeeApi';
+import { getRegistrationPasswordStrength } from '../../../auth/authValidation';
 
 export interface CreateUserModalProps {
   isOpen: boolean;
@@ -100,8 +101,9 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
 
   const passwordError = useMemo(() => {
     if (!isUpdateMode && !password) return 'Mật khẩu khởi tạo không được để trống.';
-    if (password && password.length < 6) return 'Mật khẩu phải bao gồm tối thiểu 6 ký tự.';
-    if (password.length > 50) return 'Mật khẩu không vượt quá 50 ký tự.';
+    if (password && getRegistrationPasswordStrength(password) !== 3) {
+      return 'Mật khẩu phải có 8–64 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt và không có khoảng trắng.';
+    }
     return null;
   }, [password, isUpdateMode]);
 
@@ -155,14 +157,14 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           try {
             res = await employeeApi.updateIdentityAccount(employeeId, {
               username: trimmedUsername,
-              password: password.trim(),
+              password,
               role: 'STAFF',
               displayName: trimmedDisplayName,
             });
           } catch (updateErr: any) {
             res = await employeeApi.createIdentityAccount(employeeId, {
               username: trimmedUsername,
-              password: password.trim() || 'Staff@123456',
+              password: password || 'Staff@123456',
               role: 'STAFF',
               displayName: trimmedDisplayName,
             });
@@ -170,7 +172,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
         } else {
           res = await employeeApi.createIdentityAccount(employeeId, {
             username: trimmedUsername,
-            password: password.trim(),
+            password,
             role: 'STAFF',
             displayName: trimmedDisplayName,
           });
@@ -183,7 +185,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
             username: res.username || trimmedUsername,
             role: defaultRole,
             displayName: trimmedDisplayName,
-            password: password.trim(),
+            password,
           });
           onClose();
         }, 600);
@@ -196,7 +198,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
             username: trimmedUsername,
             role: defaultRole,
             displayName: trimmedDisplayName,
-            password: password.trim(),
+            password,
           });
           onClose();
         }, 400);
@@ -518,16 +520,20 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                     <span style={{ fontSize: 11, fontWeight: 400, color: '#64748B' }}>(Để trống nếu không đổi)</span>
                   )}
                 </label>
-                <span style={{ fontSize: 11, color: password.length > 50 ? '#EF4444' : '#94A3B8' }}>
-                  {password.length}/50
+                <span style={{ fontSize: 11, color: password.length > 64 ? '#EF4444' : '#94A3B8' }}>
+                  {password.length}/64
                 </span>
               </div>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  placeholder={isUpdateMode ? 'Nhập mật khẩu mới nếu muốn thay đổi' : 'Tối thiểu 6 ký tự'}
+                  placeholder={
+                    isUpdateMode
+                      ? 'Nhập mật khẩu mới nếu muốn thay đổi'
+                      : '8–64 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt'
+                  }
                   value={password}
-                  maxLength={50}
+                  maxLength={64}
                   onChange={(e) => {
                     setPassword(e.target.value);
                     if (!touched.password) markTouched('password');
@@ -566,10 +572,14 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              {(touched.password || hasSubmitted) && passwordError && (
+              {(touched.password || hasSubmitted) && passwordError ? (
                 <div style={{ fontSize: 12, color: '#DC2626', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span>•</span> {passwordError}
                 </div>
+              ) : (
+                <span style={{ fontSize: 11, color: '#64748B', marginTop: 4, display: 'block' }}>
+                  8–64 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt và không có khoảng trắng.
+                </span>
               )}
             </div>
 
@@ -580,8 +590,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   {isUpdateMode ? 'Xác nhận mật khẩu mới' : 'Xác nhận mật khẩu'}{' '}
                   {!isUpdateMode && <span style={{ color: '#EF4444' }}>*</span>}
                 </label>
-                <span style={{ fontSize: 11, color: confirmPassword.length > 50 ? '#EF4444' : '#94A3B8' }}>
-                  {confirmPassword.length}/50
+                <span style={{ fontSize: 11, color: confirmPassword.length > 64 ? '#EF4444' : '#94A3B8' }}>
+                  {confirmPassword.length}/64
                 </span>
               </div>
               <div style={{ position: 'relative' }}>
@@ -589,7 +599,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   type={showConfirmPassword ? 'text' : 'password'}
                   placeholder={isUpdateMode ? 'Nhập lại mật khẩu mới nếu thay đổi' : 'Nhập lại mật khẩu khởi tạo'}
                   value={confirmPassword}
-                  maxLength={50}
+                  maxLength={64}
                   onChange={(e) => {
                     setConfirmPassword(e.target.value);
                     if (!touched.confirmPassword) markTouched('confirmPassword');

@@ -13,6 +13,7 @@ interface AssignStoreProductModalProps {
 }
 
 interface MasterProduct {
+  rowKey: string;
   id: string;
   sku: string;
   barcode: string;
@@ -21,9 +22,13 @@ interface MasterProduct {
   baseUoM: string;
   costPrice: number;
   moq: number;
+  supplierId?: string;
   supplierCode?: string;
   supplierName?: string;
 }
+
+const buildRowKey = (productId: string, supplierId?: string) =>
+  supplierId ? `${productId}::${supplierId}` : productId;
 
 export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
   isOpen,
@@ -97,6 +102,7 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
         if (cancelled) return;
 
         const mapped: MasterProduct[] = items.map((p) => ({
+          rowKey: buildRowKey(p.id, p.supplierId),
           id: p.id,
           sku: p.sku,
           barcode: p.barcode,
@@ -105,12 +111,17 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
           baseUoM: p.baseUoM || 'Cái',
           costPrice: p.costPrice || 0,
           moq: p.moq > 0 ? p.moq : 1,
+          supplierId: p.supplierId || undefined,
           supplierCode: p.supplierCode,
           supplierName: p.supplierName,
         }));
 
         setMasterProducts(mapped);
-        setAssignedProductIds(items.filter((p) => p.isAlreadyAssigned).map((p) => p.id));
+        setAssignedProductIds(
+          items
+            .filter((p) => p.isAlreadyAssigned)
+            .map((p) => buildRowKey(p.id, p.supplierId))
+        );
       })
       .catch((err: any) => {
         if (!cancelled) {
@@ -150,7 +161,9 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
         return (
           p.name.toLowerCase().includes(kw) ||
           p.sku.toLowerCase().includes(kw) ||
-          (p.barcode && p.barcode.toLowerCase().includes(kw))
+          (p.barcode && p.barcode.toLowerCase().includes(kw)) ||
+          (p.supplierCode && p.supplierCode.toLowerCase().includes(kw)) ||
+          (p.supplierName && p.supplierName.toLowerCase().includes(kw))
         );
       }
       return true;
@@ -159,34 +172,34 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
 
   // Total available assignable products (excluding already assigned)
   const totalAvailableCount = useMemo(() => {
-    return masterProducts.filter((p) => !assignedProductIds.includes(p.id)).length;
+    return masterProducts.filter((p) => !assignedProductIds.includes(p.rowKey)).length;
   }, [masterProducts, assignedProductIds]);
 
   const availableFilteredProducts = useMemo(
-    () => filteredProducts.filter((p) => !assignedProductIds.includes(p.id)),
+    () => filteredProducts.filter((p) => !assignedProductIds.includes(p.rowKey)),
     [filteredProducts, assignedProductIds]
   );
 
   const selectedBranch = stores.find((s) => s.id === selectedBranchId);
 
-  // Toggle single product selection
-  const handleToggleProduct = (pid: string) => {
-    if (assignedProductIds.includes(pid)) return;
+  // Toggle single product-supplier row selection
+  const handleToggleProduct = (rowKey: string) => {
+    if (assignedProductIds.includes(rowKey)) return;
     setSelectedProductIds((prev) =>
-      prev.includes(pid) ? prev.filter((id) => id !== pid) : [...prev, pid]
+      prev.includes(rowKey) ? prev.filter((id) => id !== rowKey) : [...prev, rowKey]
     );
   };
 
-  // Select all or deselect all for currently available (unassigned) filtered products
+  // Select all or deselect all for currently available (unassigned) filtered rows
   const handleSelectAllFiltered = () => {
-    const filteredIds = availableFilteredProducts.map((p) => p.id);
+    const filteredKeys = availableFilteredProducts.map((p) => p.rowKey);
     const allFilteredSelected =
-      filteredIds.length > 0 && filteredIds.every((id) => selectedProductIds.includes(id));
+      filteredKeys.length > 0 && filteredKeys.every((id) => selectedProductIds.includes(id));
 
     if (allFilteredSelected) {
-      setSelectedProductIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+      setSelectedProductIds((prev) => prev.filter((id) => !filteredKeys.includes(id)));
     } else {
-      const newSet = new Set([...selectedProductIds, ...filteredIds]);
+      const newSet = new Set([...selectedProductIds, ...filteredKeys]);
       setSelectedProductIds(Array.from(newSet));
     }
   };
@@ -220,9 +233,16 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
 
     try {
       setIsSubmitting(true);
+      const selectedRows = masterProducts.filter((p) => selectedProductIds.includes(p.rowKey));
+      const uniqueProductIds = Array.from(new Set(selectedRows.map((p) => p.id)));
+      const items = selectedRows.map((p) => ({
+        productId: p.id,
+        supplierId: p.supplierId,
+      }));
       await onAssign({
         storeId: selectedBranchId,
-        productIds: selectedProductIds,
+        productIds: uniqueProductIds,
+        items,
       });
       onClose();
     } catch (err: any) {
@@ -244,7 +264,7 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
 
   const isAllFilteredSelected =
     availableFilteredProducts.length > 0 &&
-    availableFilteredProducts.every((p) => selectedProductIds.includes(p.id));
+    availableFilteredProducts.every((p) => selectedProductIds.includes(p.rowKey));
 
   return (
     <div
@@ -670,13 +690,13 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                         </tr>
                       ) : (
                         filteredProducts.map((p) => {
-                          const isAssigned = assignedProductIds.includes(p.id);
-                          const isSelected = selectedProductIds.includes(p.id);
+                          const isAssigned = assignedProductIds.includes(p.rowKey);
+                          const isSelected = selectedProductIds.includes(p.rowKey);
                           return (
                             <tr
-                              key={p.id}
+                              key={p.rowKey}
                               onClick={() => {
-                                if (!isAssigned) handleToggleProduct(p.id);
+                                if (!isAssigned) handleToggleProduct(p.rowKey);
                               }}
                               style={{
                                 borderBottom: '1px solid #f1f5f9',
@@ -694,7 +714,7 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                                   type="checkbox"
                                   checked={isSelected}
                                   disabled={isAssigned}
-                                  onChange={() => handleToggleProduct(p.id)}
+                                  onChange={() => handleToggleProduct(p.rowKey)}
                                   onClick={(e) => e.stopPropagation()}
                                   style={{
                                     cursor: isAssigned ? 'not-allowed' : 'pointer',
@@ -722,9 +742,10 @@ export const AssignStoreProductModal: FC<AssignStoreProductModalProps> = ({
                                 }}
                               >
                                 <div>{p.name}</div>
-                                {p.supplierName && (
+                                {(p.supplierCode || p.supplierName) && (
                                   <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                                    NCC: {p.supplierName}
+                                    NCC: {p.supplierCode ? `${p.supplierCode} — ` : ''}
+                                    {p.supplierName || ''}
                                   </div>
                                 )}
                               </td>

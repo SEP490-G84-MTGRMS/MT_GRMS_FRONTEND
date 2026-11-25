@@ -412,24 +412,30 @@ export const purchaseOrderApi = {
             ? rowSupplierId
             : undefined;
         Object.entries(dayMap).forEach(([dateKey, cell]) => {
+          // Chỉ coi là Owner chốt khi flag/storeQty còn hiệu lực — không suy diễn lại sau khi đã gỡ chốt.
           const isOwnerAdjusted = Boolean(
-            cell.isOwnerAdjusted || cell.isOwnerOverridden || (cell.storeQty !== null && cell.storeQty !== undefined)
+            (cell.isOwnerAdjusted || cell.isOwnerOverridden) &&
+              cell.storeQty !== null &&
+              cell.storeQty !== undefined
           );
+          const touchedByOwner = cell.modifiedBy === 'store_owner' || Boolean(cell.modifiedAt);
           if (
             cell.finalQty > 0 ||
             cell.employeeQty > 0 ||
             cell.storeQty !== null ||
             isOwnerAdjusted ||
-            cell.modifiedBy === 'store_owner'
+            touchedByOwner
           ) {
             cells.push({
               productId,
               supplierId: safeSupplierId,
               deliveryDate: dateKey,
               employeeQty: cell.employeeQty ?? 0,
-              storeQty: cell.storeQty ?? null,
+              storeQty: isOwnerAdjusted ? (cell.storeQty ?? null) : null,
               isOwnerAdjusted,
-              finalQty: cell.finalQty ?? 0,
+              finalQty: isOwnerAdjusted
+                ? (cell.storeQty ?? cell.finalQty ?? 0)
+                : (cell.employeeQty ?? cell.finalQty ?? 0),
             });
           }
         });
@@ -546,7 +552,13 @@ export const purchaseOrderApi = {
     });
 
     if (res.data?.success && res.data.data) {
-      return res.data.data.map((po: any) => ({
+      const payload: any = res.data.data;
+      const list: any[] = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload.createdPurchaseOrders)
+          ? payload.createdPurchaseOrders
+          : [];
+      return list.map((po: any) => ({
         id: po.id,
         orderCode: po.code,
         supplierId: po.supplierId,

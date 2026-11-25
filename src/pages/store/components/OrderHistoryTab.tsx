@@ -183,11 +183,32 @@ export const OrderHistoryTab: FC = () => {
                             fontWeight: 600,
                             cursor: 'pointer',
                           }}
-                          title="Tải hóa đơn VAT & Biên nhận PDF"
-                          onClick={() => alert(`Đang xuất file biên nhận điện tử cho hợp đồng ${ord.code}...`)}
+                          title="Tải biên nhận điện tử"
+                          onClick={() => {
+                            const receiptContent = [
+                              'BIÊN NHẬN ĐIỆN TỬ HỢP ĐỒNG DỊCH VỤ MT-GRMS',
+                              '==========================================',
+                              `Mã hợp đồng : ${ord.code}`,
+                              `Gói dịch vụ : ${ord.planName}`,
+                              `Hiệu lực    : ${ord.startDate} - ${ord.endDate}`,
+                              `Phương thức : ${ord.paymentMethod}`,
+                              `Tổng tiền   : ${ord.totalAmount}`,
+                              `Trạng thái  : ${ord.status}`,
+                              `Ngày xuất   : ${new Date().toLocaleString('vi-VN')}`,
+                            ].join('\n');
+                            const blob = new Blob([receiptContent], { type: 'text/plain;charset=utf-8' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `BienNhan_${ord.code}.txt`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          }}
                         >
                           <Download size={13} />
-                          <span>PDF</span>
+                          <span>Biên nhận</span>
                         </button>
                       </td>
                     </tr>

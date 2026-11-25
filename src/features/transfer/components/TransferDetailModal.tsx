@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import ExcelJS from 'exceljs';
 import {
   X,
-  Trash2,
   Copy,
+  Trash2,
   Download,
   ExternalLink,
   Printer,
@@ -180,7 +180,6 @@ export const TransferDetailModal: React.FC<TransferDetailModalProps> = ({
       { state: { duplicateFrom: currentTransfer } }
     );
   };
-
   const handleExport = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Chi tiết phiếu chuyển');

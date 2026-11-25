@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { FC } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import type { FC, CSSProperties } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   ClipboardList,
@@ -10,13 +10,14 @@ import {
   Edit3,
   CheckCircle2,
   Package,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   Truck,
+  ArrowUpDown,
+  X,
 } from 'lucide-react';
-import { useAuthStore } from '../../../stores/useAuthStore';
+import { useBranchScope } from '../../../hooks/useBranchScope';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { TablePagination } from '../../../components/common';
 import { branchApi } from '../../purchase-order/api/branchApi';
 import { stocktakeApi } from '../api/stocktakeApi';
 import {
@@ -26,6 +27,7 @@ import {
   type StocktakeStatus,
 } from '../types/stocktake.types';
 import '../../purchase-order/purchase-order.css';
+import '../../supplier/supplier.css';
 import '../../../styles/so-list-page.css';
 
 const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
@@ -47,8 +49,8 @@ export const stocktakeStatusBadge = (status: StocktakeStatus | string) => {
   }
 };
 
-const STATUS_TABS: { value: '' | StocktakeStatus; label: string }[] = [
-  { value: '', label: 'Tất cả phiếu' },
+const STATUS_OPTIONS: { value: '' | StocktakeStatus; label: string }[] = [
+  { value: '', label: '-- Tất cả trạng thái --' },
   { value: 'PENDING_APPROVAL', label: 'Chờ Store Owner duyệt' },
   { value: 'APPROVED', label: 'Đã duyệt kiểm kê' },
   { value: 'DRAFT', label: 'Bản nháp' },
@@ -56,35 +58,41 @@ const STATUS_TABS: { value: '' | StocktakeStatus; label: string }[] = [
   { value: 'REJECTED', label: 'Đã từ chối' },
 ];
 
+type SortField = 'code' | 'branchName' | 'createdAt' | 'lineCount' | 'abnormalLineCount' | 'status';
+type SortDirection = 'asc' | 'desc';
+
 export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }> = ({
   defaultRole = 'store_owner',
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const userRole = useAuthStore((s) => s.user?.role);
-  const userBranchId = useAuthStore((s) => s.user?.branchId);
-  const isStoreOwner =
-    defaultRole === 'store_owner' &&
-    (userRole === 'STORE_OWNER' || userRole === 'ADMIN' || !userRole);
-  const basePath = defaultRole === 'employee' ? '/employee/stocktakes' : '/store-owner/stocktakes';
-  const batchPath = defaultRole === 'employee' ? '/employee/batches' : '/store-owner/batches';
+  const { isStoreOwner, isEmployee, isBranchLocked, scopedBranchId } = useBranchScope(defaultRole);
+  const basePath = isEmployee ? '/employee/stocktakes' : '/store-owner/stocktakes';
+  const batchPath = isEmployee ? '/employee/batches' : '/store-owner/batches';
 
-  const lockedBranch = !isStoreOwner && userBranchId ? userBranchId : '';
-
-  const [draft, setDraft] = useState<StocktakeFilterState>({
+  const [draft, setDraft] = useState<StocktakeFilterState>(() => ({
     keyword: '',
-    branchId: lockedBranch,
+    branchId: scopedBranchId,
     status: '',
     pageIndex: 1,
     pageSize: 15,
-  });
-  const [applied, setApplied] = useState<StocktakeFilterState>({
+  }));
+  const [applied, setApplied] = useState<StocktakeFilterState>(() => ({
     keyword: '',
-    branchId: lockedBranch,
+    branchId: scopedBranchId,
     status: '',
     pageIndex: 1,
     pageSize: 15,
-  });
+  }));
+
+  useEffect(() => {
+    setDraft((prev) =>
+      prev.branchId === scopedBranchId ? prev : { ...prev, branchId: scopedBranchId, pageIndex: 1 }
+    );
+    setApplied((prev) =>
+      prev.branchId === scopedBranchId ? prev : { ...prev, branchId: scopedBranchId, pageIndex: 1 }
+    );
+  }, [scopedBranchId]);
 
   const [items, setItems] = useState<StocktakeListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -93,6 +101,13 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
   const [toast, setToast] = useState<ToastState | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
+
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>('asc');
+
+  const headerRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [hasScrollY, setHasScrollY] = useState(false);
 
   const showToast = useCallback(
     (message: string, type: ToastState['type'] = 'error') => {
@@ -160,14 +175,146 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     void loadData();
   }, [loadData]);
 
-  const handleSelectTab = (status: '' | StocktakeStatus) => {
-    setDraft((prev) => ({ ...prev, status, pageIndex: 1 }));
-    setApplied((prev) => ({ ...prev, status, pageIndex: 1 }));
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortDir === 'asc') {
+        setSortDir('desc');
+      } else {
+        setSortField(null);
+        setSortDir('asc');
+      }
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
   };
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / applied.pageSize));
-  const startItem = totalCount === 0 ? 0 : (applied.pageIndex - 1) * applied.pageSize + 1;
-  const endItem = Math.min(applied.pageIndex * applied.pageSize, totalCount);
+  const sortedItems = useMemo(() => {
+    if (!sortField) return items;
+    return [...items].sort((a, b) => {
+      let valA: string | number = '';
+      let valB: string | number = '';
+      switch (sortField) {
+        case 'code':
+          valA = a.code.toLowerCase();
+          valB = b.code.toLowerCase();
+          break;
+        case 'branchName':
+          valA = (a.branchName || '').toLowerCase();
+          valB = (b.branchName || '').toLowerCase();
+          break;
+        case 'createdAt':
+          valA = new Date(a.createdAt).getTime();
+          valB = new Date(b.createdAt).getTime();
+          break;
+        case 'lineCount':
+          valA = a.lineCount;
+          valB = b.lineCount;
+          break;
+        case 'abnormalLineCount':
+          valA = a.abnormalLineCount;
+          valB = b.abnormalLineCount;
+          break;
+        case 'status':
+          valA = a.status;
+          valB = b.status;
+          break;
+      }
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [items, sortField, sortDir]);
+
+  useEffect(() => {
+    const updateScrollState = () => {
+      if (bodyRef.current) {
+        setHasScrollY(bodyRef.current.scrollHeight > bodyRef.current.clientHeight);
+      }
+    };
+    updateScrollState();
+
+    let observer: ResizeObserver | null = null;
+    if (bodyRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateScrollState);
+      observer.observe(bodyRef.current);
+    }
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      window.removeEventListener('resize', updateScrollState);
+      observer?.disconnect();
+    };
+  }, [sortedItems, applied.pageSize]);
+
+  const handleBodyScroll = () => {
+    if (headerRef.current && bodyRef.current) {
+      headerRef.current.scrollLeft = bodyRef.current.scrollLeft;
+    }
+  };
+
+  const handleApplySearch = () => {
+    setApplied({ ...draft, pageIndex: 1 });
+  };
+
+  const handleReset = () => {
+    const reset: StocktakeFilterState = {
+      keyword: '',
+      branchId: scopedBranchId,
+      status: '',
+      pageIndex: 1,
+      pageSize: applied.pageSize,
+    };
+    setDraft(reset);
+    setApplied(reset);
+  };
+
+  const tableColGroup = (
+    <colgroup>
+      <col style={{ width: '4%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '11%' }} />
+      <col style={{ width: '10%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '6%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '10%' }} />
+    </colgroup>
+  );
+
+  const thStyle: CSSProperties = {
+    backgroundColor: '#f8fafc',
+    padding: '7px 6px',
+    fontSize: 10.5,
+    fontWeight: 700,
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: '0.01em',
+    whiteSpace: 'nowrap',
+    lineHeight: 1.2,
+    boxSizing: 'border-box',
+    borderBottom: '1px solid #cbd5e1',
+    userSelect: 'none',
+  };
+
+  const tdStyle: CSSProperties = {
+    padding: '6px 6px',
+    borderBottom: '1px solid #f1f5f9',
+    verticalAlign: 'middle',
+    fontSize: 12.5,
+    color: '#334155',
+    boxSizing: 'border-box',
+  };
+
+  const sortIcon = (field: SortField) => (
+    <ArrowUpDown
+      size={11}
+      style={{ color: sortField === field ? '#0f766e' : '#94a3b8', flexShrink: 0 }}
+    />
+  );
 
   return (
     <div
@@ -175,6 +322,7 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
       style={{
         width: '100%',
         height: '100%',
+        maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
@@ -184,19 +332,20 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
     >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Header */}
+      {/* ── Header chuẩn StoreProductManagementPage ── */}
       <div className="so-list-header">
         <div>
           <h1 className="so-list-title">
             <ClipboardList size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Danh sách Phiếu Kiểm Kê Hàng Hóa</span>
+            <span>Danh Sách Phiếu Kiểm Kê Hàng Hóa</span>
             {isLoading && (
-              <Loader2 size={16} className="animate-spin" style={{ color: '#0f766e' }} />
+              <Loader2
+                size={16}
+                className="animate-spin"
+                style={{ color: 'var(--blue-primary, #0f766e)' }}
+              />
             )}
           </h1>
-          <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 2 }}>
-            Theo dõi toàn bộ các đợt kiểm kê tại chi nhánh, phê duyệt chênh lệch/xuất hủy và lập phiếu trả hàng NCC
-          </div>
         </div>
 
         <div className="so-list-header-actions">
@@ -204,9 +353,10 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
             type="button"
             className="po-btn po-btn-secondary"
             onClick={() => navigate(batchPath)}
+            title="Xem danh sách tồn kho & lô hàng"
           >
             <Package size={14} />
-            <span>Tồn kho &amp; Lô FEFO</span>
+            <span>Tồn kho &amp; Lô hàng</span>
           </button>
           {isStoreOwner && (
             <button
@@ -222,147 +372,199 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
           <button
             type="button"
             className="po-btn po-btn-primary"
-            style={{ backgroundColor: '#0f766e' }}
             onClick={() => navigate(`${basePath}/create`)}
           >
             <Plus size={14} />
-            <span>+ Tạo Phiếu Kiểm Kê</span>
+            <span>Tạo phiếu kiểm kê</span>
           </button>
         </div>
       </div>
 
-      {/* Status Tabs + Filter Bar */}
-      <div
-        style={{
-          flexShrink: 0,
-          marginBottom: 10,
-          backgroundColor: '#ffffff',
-          border: '1px solid #e2e8f0',
-          borderRadius: 8,
-          padding: '10px 14px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 10,
-        }}
-      >
-        {/* Quick Status Tabs */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            flexWrap: 'wrap',
-            borderBottom: '1px solid #f1f5f9',
-            paddingBottom: 8,
-          }}
-        >
-          {STATUS_TABS.map((tab) => {
-            const active = applied.status === tab.value;
-            return (
-              <button
-                key={tab.value || 'ALL'}
-                type="button"
-                onClick={() => handleSelectTab(tab.value)}
+      {/* ── Filter Bar 1 card gọn gàng đồng bộ StoreProductFilterBar ── */}
+      <div style={{ flexShrink: 0, marginBottom: 8 }}>
+        <div className="so-list-filter">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(240px, 1.4fr) minmax(200px, 1fr) minmax(200px, 1fr) auto',
+              gap: '10px 14px',
+              alignItems: 'center',
+              minWidth: 0,
+            }}
+          >
+            {/* Từ khóa */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <label
+                htmlFor="stocktake-keyword"
                 style={{
-                  height: 30,
-                  padding: '0 12px',
-                  borderRadius: 9999,
                   fontSize: 12,
-                  fontWeight: active ? 700 : 600,
-                  cursor: 'pointer',
-                  border: active ? '1px solid #0f766e' : '1px solid #e2e8f0',
-                  backgroundColor: active ? '#f0fdfa' : '#ffffff',
-                  color: active ? '#0f766e' : '#475569',
-                  transition: 'all 0.15s ease',
+                  fontWeight: 700,
+                  color: '#475569',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+                Từ khóa:
+              </label>
+              <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                <input
+                  id="stocktake-keyword"
+                  type="text"
+                  className="so-list-filter-input"
+                  placeholder="Nhập mã phiếu (KK-...), người tạo..."
+                  value={draft.keyword}
+                  onChange={(e) => setDraft((prev) => ({ ...prev, keyword: e.target.value }))}
+                  onKeyDown={(e) => e.key === 'Enter' && handleApplySearch()}
+                  style={{
+                    width: '100%',
+                    height: 32,
+                    paddingRight: draft.keyword ? 28 : 10,
+                    fontWeight: 500,
+                    borderColor: draft.keyword ? '#0d9488' : '#cbd5e1',
+                    backgroundColor: draft.keyword ? '#f0fdfa' : '#ffffff',
+                  }}
+                />
+                {draft.keyword && (
+                  <button
+                    type="button"
+                    onClick={() => setDraft((prev) => ({ ...prev, keyword: '' }))}
+                    title="Xóa từ khóa"
+                    style={{
+                      position: 'absolute',
+                      right: 4,
+                      top: 5,
+                      width: 22,
+                      height: 22,
+                      border: 'none',
+                      background: 'transparent',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
 
-        {/* Search & Branch Filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: '1 1 240px', maxWidth: 340 }}>
-            <Search
-              size={14}
-              color="#64748b"
-              style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}
-            />
-            <input
-              type="text"
-              placeholder="Tìm theo mã phiếu kiểm kê (KK-...), người tạo..."
-              value={draft.keyword}
-              onChange={(e) => setDraft((prev) => ({ ...prev, keyword: e.target.value }))}
-              onKeyDown={(e) => e.key === 'Enter' && setApplied({ ...draft, pageIndex: 1 })}
+            {/* Chi nhánh */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <label
+                htmlFor="stocktake-branch"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#475569',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Chi nhánh:
+              </label>
+              <select
+                id="stocktake-branch"
+                className={`so-list-filter-select ${draft.branchId && !isBranchLocked ? 'so-list-filter-select--active' : ''}`}
+                value={draft.branchId}
+                disabled={isBranchLocked}
+                onChange={(e) => {
+                  const nextBranch = e.target.value;
+                  setDraft((prev) => ({ ...prev, branchId: nextBranch, pageIndex: 1 }));
+                  setApplied((prev) => ({ ...prev, branchId: nextBranch, pageIndex: 1 }));
+                }}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  height: 32,
+                  backgroundColor: isBranchLocked ? '#f1f5f9' : undefined,
+                  cursor: isBranchLocked ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <option value="">-- Tất cả chi nhánh --</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Trạng thái */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <label
+                htmlFor="stocktake-status"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#475569',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Trạng thái:
+              </label>
+              <select
+                id="stocktake-status"
+                className={`so-list-filter-select ${draft.status ? 'so-list-filter-select--active' : ''}`}
+                value={draft.status}
+                onChange={(e) => {
+                  const nextStatus = e.target.value as '' | StocktakeStatus;
+                  setDraft((prev) => ({ ...prev, status: nextStatus, pageIndex: 1 }));
+                  setApplied((prev) => ({ ...prev, status: nextStatus, pageIndex: 1 }));
+                }}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  height: 32,
+                  cursor: 'pointer',
+                }}
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value || 'ALL'} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Nút Tìm kiếm + Đặt lại */}
+            <div
+              className="so-list-filter-actions"
               style={{
-                width: '100%',
-                height: 34,
-                padding: '0 10px 0 32px',
-                borderRadius: 6,
-                border: '1px solid #cbd5e1',
-                fontSize: 13,
-                boxSizing: 'border-box',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                width: 'max-content',
+                flexWrap: 'nowrap',
+                gap: 8,
+                marginLeft: 0,
               }}
-            />
+            >
+              <button
+                type="button"
+                className="so-list-filter-search"
+                onClick={handleApplySearch}
+                style={{ flexShrink: 0 }}
+              >
+                <Search size={14} />
+                <span>Tìm kiếm</span>
+              </button>
+              <button
+                type="button"
+                className="so-list-filter-reset"
+                onClick={handleReset}
+                style={{ flexShrink: 0 }}
+              >
+                <RotateCcw size={13} />
+                <span>Đặt lại</span>
+              </button>
+            </div>
           </div>
-
-          <select
-            value={draft.branchId}
-            disabled={Boolean(lockedBranch)}
-            onChange={(e) => setDraft((prev) => ({ ...prev, branchId: e.target.value }))}
-            style={{
-              height: 34,
-              padding: '0 10px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-              fontSize: 13,
-              backgroundColor: lockedBranch ? '#f1f5f9' : '#ffffff',
-            }}
-          >
-            <option value="">Tất cả chi nhánh</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            className="po-btn po-btn-primary"
-            style={{ height: 34, backgroundColor: '#0f766e' }}
-            onClick={() => setApplied({ ...draft, pageIndex: 1 })}
-          >
-            <Search size={14} />
-            <span>Tìm kiếm</span>
-          </button>
-
-          <button
-            type="button"
-            className="po-btn po-btn-secondary"
-            style={{ height: 34 }}
-            onClick={() => {
-              const reset: StocktakeFilterState = {
-                keyword: '',
-                branchId: lockedBranch,
-                status: '',
-                pageIndex: 1,
-                pageSize: 15,
-              };
-              setDraft(reset);
-              setApplied(reset);
-            }}
-          >
-            Đặt lại
-          </button>
         </div>
       </div>
 
       {loadError && (
         <div
           style={{
+            flexShrink: 0,
             marginBottom: 8,
             padding: '8px 12px',
             borderRadius: 6,
@@ -376,42 +578,93 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
         </div>
       )}
 
-      {/* Table */}
-      <div className="so-list-table-card">
-        <div className="so-list-table-body" style={{ overflowX: 'auto' }}>
-          <table className="so-list-table" style={{ minWidth: 1180, width: '100%' }}>
+      {/* ── Table Card đồng bộ StoreProductTable (Sticky header + Sortable + TablePagination) ── */}
+      <div className="so-list-table-card so-list-table-card--dense">
+        <div
+          ref={headerRef}
+          className="so-list-table-head"
+          style={{ paddingRight: hasScrollY ? 6 : 0 }}
+        >
+          <table className="so-list-table" style={{ minWidth: 1180, tableLayout: 'fixed' }}>
+            {tableColGroup}
             <thead>
               <tr>
-                <th className="so-list-th" style={{ width: 45, textAlign: 'center' }}>
-                  STT
+                <th style={{ ...thStyle, textAlign: 'center' }}>STT</th>
+                <th
+                  style={{ ...thStyle, cursor: 'pointer' }}
+                  onClick={() => handleSort('code')}
+                  title="Sắp xếp theo mã phiếu"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <span>Mã phiếu</span>
+                    {sortIcon('code')}
+                  </div>
                 </th>
-                <th className="so-list-th">Mã phiếu kiểm kê</th>
-                <th className="so-list-th">Chi nhánh</th>
-                <th className="so-list-th">Phạm vi kiểm kê</th>
-                <th className="so-list-th">Ngày kiểm kê</th>
-                <th className="so-list-th">Người kiểm kê</th>
-                <th className="so-list-th" style={{ textAlign: 'right' }}>
-                  Số dòng
+                <th
+                  style={{ ...thStyle, cursor: 'pointer' }}
+                  onClick={() => handleSort('branchName')}
+                  title="Sắp xếp theo chi nhánh"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <span>Chi nhánh</span>
+                    {sortIcon('branchName')}
+                  </div>
                 </th>
-                <th className="so-list-th" style={{ textAlign: 'right' }}>
-                  Dòng bất thường
+                <th style={thStyle}>Phạm vi kiểm kê</th>
+                <th
+                  style={{ ...thStyle, cursor: 'pointer' }}
+                  onClick={() => handleSort('createdAt')}
+                  title="Sắp xếp theo ngày kiểm kê"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <span>Ngày kiểm kê</span>
+                    {sortIcon('createdAt')}
+                  </div>
                 </th>
-                <th className="so-list-th" style={{ textAlign: 'right', color: '#dc2626' }}>
-                  SL Lỗi NCC
+                <th style={thStyle}>Người kiểm kê</th>
+                <th
+                  style={{ ...thStyle, textAlign: 'right', cursor: 'pointer' }}
+                  onClick={() => handleSort('lineCount')}
+                  title="Sắp xếp theo số dòng"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }}>
+                    <span>Số dòng</span>
+                    {sortIcon('lineCount')}
+                  </div>
                 </th>
-                <th className="so-list-th" style={{ textAlign: 'right', color: '#b45309' }}>
-                  Hỏng / Hết hạn
+                <th
+                  style={{ ...thStyle, textAlign: 'right', cursor: 'pointer' }}
+                  onClick={() => handleSort('abnormalLineCount')}
+                  title="Sắp xếp theo số dòng bất thường"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, justifyContent: 'flex-end' }}>
+                    <span>Bất thường</span>
+                    {sortIcon('abnormalLineCount')}
+                  </div>
                 </th>
-                <th className="so-list-th" style={{ textAlign: 'center' }}>
-                  Trạng thái
+                <th style={{ ...thStyle, textAlign: 'right', color: '#dc2626' }}>Lỗi NCC</th>
+                <th style={{ ...thStyle, textAlign: 'right', color: '#b45309' }}>Hỏng / Hết hạn</th>
+                <th
+                  style={{ ...thStyle, textAlign: 'center', cursor: 'pointer' }}
+                  onClick={() => handleSort('status')}
+                  title="Sắp xếp theo trạng thái"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                    <span>Trạng thái</span>
+                    {sortIcon('status')}
+                  </div>
                 </th>
-                <th className="so-list-th" style={{ textAlign: 'right' }}>
-                  Thao tác
-                </th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>Thao tác</th>
               </tr>
             </thead>
+          </table>
+        </div>
+
+        <div ref={bodyRef} className="so-list-table-body" onScroll={handleBodyScroll}>
+          <table className="so-list-table" style={{ minWidth: 1180, tableLayout: 'fixed' }}>
+            {tableColGroup}
             <tbody>
-              {items.length === 0 ? (
+              {sortedItems.length === 0 ? (
                 <tr>
                   <td
                     colSpan={12}
@@ -434,21 +687,27 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                       <span style={{ fontWeight: 600, color: '#475569' }}>
                         Chưa có phiếu kiểm kê hàng hóa nào khớp bộ lọc
                       </span>
-                      <span style={{ fontSize: 12, color: '#94a3b8' }}>
-                        Nhân viên chi nhánh hoặc chủ cửa hàng có thể bấm &quot;+ Tạo Phiếu Kiểm Kê&quot; hoặc chọn lô trên màn hình FEFO để kiểm kê.
-                      </span>
+                      <button
+                        type="button"
+                        className="po-btn po-btn-primary"
+                        style={{ marginTop: 4 }}
+                        onClick={() => navigate(`${basePath}/create`)}
+                      >
+                        <Plus size={14} />
+                        <span>Tạo phiếu kiểm kê</span>
+                      </button>
                     </div>
                   </td>
                 </tr>
               ) : (
-                items.map((item, idx) => {
+                sortedItems.map((item, idx) => {
                   const st = stocktakeStatusBadge(item.status);
-                  const canEdit =
-                    item.status === 'DRAFT' || item.status === 'NEEDS_RECOUNT';
-                  const canApprove =
-                    isStoreOwner && item.status === 'PENDING_APPROVAL';
+                  const canEdit = item.status === 'DRAFT' || item.status === 'NEEDS_RECOUNT';
+                  const canApprove = isStoreOwner && item.status === 'PENDING_APPROVAL';
                   const canCreateReturn =
-                    isStoreOwner && item.status === 'APPROVED' && item.totalDefectiveQty > 0;
+                    isStoreOwner &&
+                    item.status === 'APPROVED' &&
+                    ((item.returnEligibleLines ?? 0) > 0 || item.totalDefectiveQty > 0);
                   const isHighlighted = highlightId === item.id;
 
                   return (
@@ -457,10 +716,10 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                       className="so-list-row"
                       style={isHighlighted ? { backgroundColor: '#f0fdfa' } : undefined}
                     >
-                      <td className="so-list-td" style={{ textAlign: 'center', color: '#64748b' }}>
+                      <td style={{ ...tdStyle, textAlign: 'center', color: '#64748b' }}>
                         {(applied.pageIndex - 1) * applied.pageSize + idx + 1}
                       </td>
-                      <td className="so-list-td">
+                      <td style={tdStyle}>
                         <button
                           type="button"
                           onClick={() => navigate(`${basePath}/${item.id}`)}
@@ -470,36 +729,77 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                             padding: 0,
                             cursor: 'pointer',
                             textAlign: 'left',
+                            maxWidth: '100%',
                           }}
+                          title={item.code}
                         >
-                          <span style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color: '#0f766e',
+                              fontSize: 12.5,
+                              fontFamily: 'var(--font-mono, monospace)',
+                            }}
+                          >
                             {item.code}
                           </span>
                         </button>
                       </td>
-                      <td className="so-list-td">
-                        <span style={{ fontWeight: 600, color: '#334155' }}>
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: '#1e293b',
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={item.branchName}
+                        >
                           {item.branchName}
                         </span>
                       </td>
-                      <td className="so-list-td">
-                        <span style={{ fontSize: 12.5, color: '#475569' }}>
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            color: '#475569',
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={`${SCOPE_TYPE_LABELS[item.scopeType] || item.scopeType}${item.scopeReference ? ` (${item.scopeReference})` : ''}`}
+                        >
                           {SCOPE_TYPE_LABELS[item.scopeType] || item.scopeType}
                           {item.scopeReference ? ` (${item.scopeReference})` : ''}
                         </span>
                       </td>
-                      <td className="so-list-td" style={{ fontSize: 12, color: '#475569' }}>
+                      <td style={{ ...tdStyle, fontSize: 12, color: '#475569', whiteSpace: 'nowrap' }}>
                         {new Date(item.createdAt).toLocaleString('vi-VN')}
                       </td>
-                      <td className="so-list-td" style={{ fontWeight: 500, color: '#334155' }}>
-                        {item.createdByName || 'Nhân viên'}
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            fontWeight: 500,
+                            color: '#334155',
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          title={item.createdByName || 'Nhân viên'}
+                        >
+                          {item.createdByName || 'Nhân viên'}
+                        </span>
                       </td>
-                      <td className="so-list-td" style={{ textAlign: 'right', fontWeight: 600 }}>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>
                         {fmt(item.lineCount)}
                       </td>
                       <td
-                        className="so-list-td"
                         style={{
+                          ...tdStyle,
                           textAlign: 'right',
                           fontWeight: 700,
                           color: item.abnormalLineCount > 0 ? '#d97706' : '#64748b',
@@ -508,8 +808,8 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                         {fmt(item.abnormalLineCount)}
                       </td>
                       <td
-                        className="so-list-td"
                         style={{
+                          ...tdStyle,
                           textAlign: 'right',
                           fontWeight: 700,
                           color: item.totalDefectiveQty > 0 ? '#dc2626' : '#64748b',
@@ -518,8 +818,8 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                         {fmt(item.totalDefectiveQty)}
                       </td>
                       <td
-                        className="so-list-td"
                         style={{
+                          ...tdStyle,
                           textAlign: 'right',
                           fontWeight: 700,
                           color: item.totalDamagedAndExpiredQty > 0 ? '#b45309' : '#64748b',
@@ -527,11 +827,11 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                       >
                         {fmt(item.totalDamagedAndExpiredQty)}
                       </td>
-                      <td className="so-list-td" style={{ textAlign: 'center' }}>
+                      <td className="so-list-td--status" style={{ ...tdStyle, textAlign: 'center' }}>
                         <span
                           style={{
                             display: 'inline-block',
-                            padding: '3px 9px',
+                            padding: '2px 8px',
                             borderRadius: 9999,
                             fontSize: 11,
                             fontWeight: 700,
@@ -544,8 +844,8 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
                           {st.label}
                         </span>
                       </td>
-                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right' }}>
-                        <div className="so-list-actions">
+                      <td className="so-list-td--actions" style={{ ...tdStyle, textAlign: 'center' }}>
+                        <div className="so-list-actions" style={{ justifyContent: 'center' }}>
                           <button
                             type="button"
                             className="so-list-action-btn so-list-action-btn--icon"
@@ -602,39 +902,19 @@ export const StocktakeListPage: FC<{ defaultRole?: 'store_owner' | 'employee' }>
           </table>
         </div>
 
-        {/* Pager */}
-        <div className="so-list-pager">
-          <div>
-            Hiển thị <b>{startItem}</b> - <b>{endItem}</b> trên <b>{totalCount}</b> phiếu kiểm kê
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button
-              type="button"
-              className="so-list-pager-btn"
-              disabled={applied.pageIndex <= 1}
-              onClick={() =>
-                setApplied((prev) => ({ ...prev, pageIndex: prev.pageIndex - 1 }))
-              }
-            >
-              <ChevronLeft size={13} />
-              <span>Trước</span>
-            </button>
-            <span style={{ padding: '0 8px', fontWeight: 600, color: '#0f172a' }}>
-              Trang {applied.pageIndex} / {totalPages}
-            </span>
-            <button
-              type="button"
-              className="so-list-pager-btn"
-              disabled={applied.pageIndex >= totalPages}
-              onClick={() =>
-                setApplied((prev) => ({ ...prev, pageIndex: prev.pageIndex + 1 }))
-              }
-            >
-              <span>Sau</span>
-              <ChevronRight size={13} />
-            </button>
-          </div>
-        </div>
+        {/* ── Footer Phân trang chuẩn đồng bộ StoreProductTable ── */}
+        <TablePagination
+          currentPage={applied.pageIndex}
+          pageSize={applied.pageSize}
+          totalItems={totalCount}
+          pageSizeOptions={[15, 25, 50]}
+          onPageChange={(page) => setApplied((prev) => ({ ...prev, pageIndex: page }))}
+          onPageSizeChange={(size) =>
+            setApplied((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }))
+          }
+          itemLabel="phiếu kiểm kê"
+          isLoading={isLoading}
+        />
       </div>
     </div>
   );

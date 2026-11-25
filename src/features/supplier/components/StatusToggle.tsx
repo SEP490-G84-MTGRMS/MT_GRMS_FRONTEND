@@ -67,7 +67,7 @@ export const StatusToggle: FC<StatusToggleProps> = ({
     </button>
     {showLabel ? (
       <span style={{ fontSize: 13.5, color: checked ? '#0f766e' : '#64748b', fontWeight: 600 }}>
-        {checked ? 'Enable' : 'Disable'}
+        {checked ? 'Hoạt động' : 'Tạm ngưng'}
       </span>
     ) : null}
   </div>

@@ -11,6 +11,7 @@ import { PoListFilterBar } from '../components/po-list/PoListFilterBar';
 import { PoListTable } from '../components/po-list/PoListTable';
 import { downloadPoInvoicePdf } from '../lib/poInvoicePdf';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { useBranchScope } from '../../../hooks/useBranchScope';
 import {
   formatDeliveryDateGateMessage,
   isDeliveryDateReached,
@@ -114,6 +115,7 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { isBranchLocked, lockedBranchId, scopedBranchId } = useBranchScope();
   const supplierIdFromUrl = searchParams.get('supplierId') || searchParams.get('supplier') || '';
   const codeFromUrl = searchParams.get('code') || searchParams.get('keyword') || '';
 
@@ -147,6 +149,19 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ đọc toast khi vào trang
   }, [location.state]);
 
+  const prevScopedBranchRef = useRef<string>(scopedBranchId);
+  useEffect(() => {
+    if (prevScopedBranchRef.current === scopedBranchId) return;
+    prevScopedBranchRef.current = scopedBranchId;
+    setAppliedFilters((prev) => ({
+      ...prev,
+      branchCodes: [],
+      branchNames: [],
+      pageIndex: 1,
+    }));
+    setPageIndex(1);
+  }, [scopedBranchId]);
+
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -156,11 +171,16 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
         appliedFilters.supplierCodes,
         appliedFilters.supplierNames
       );
-      const branchId = resolveUniqueId(
+      const chipBranchId = resolveUniqueId(
         branchOptions,
         appliedFilters.branchCodes,
         appliedFilters.branchNames
       );
+      const branchId = lockedBranchId
+        ? lockedBranchId
+        : chipBranchId !== 'all'
+          ? chipBranchId
+          : scopedBranchId || 'all';
 
       // BE chỉ hỗ trợ 1 keyword — dùng mã PO đầu tiên để thu hẹp server-side
       const keyword =
@@ -244,7 +264,7 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters, pageIndex, pageSize, supplierOptions, branchOptions]);
+  }, [appliedFilters, pageIndex, pageSize, supplierOptions, branchOptions, lockedBranchId, scopedBranchId]);
 
   useEffect(() => {
     void loadOrders();
@@ -412,6 +432,7 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <PoListFilterBar
           initialValues={appliedFilters}
+          lockBranch={isBranchLocked}
           onSearch={handleSearch}
           onReset={handleReset}
           branches={branchOptions}
@@ -443,6 +464,10 @@ export const StoreOwnerPurchaseOrderListPage: FC = () => {
           }
         }}
         onEditOrder={(order) => {
+          if (String(order.sourceType || '').toUpperCase() === 'SUPPLIER_RETURN') {
+            showToast(`PO đổi hàng ${order.poCode} không thể chỉnh sửa trên ma trận.`, 'warning');
+            return;
+          }
           const params = new URLSearchParams();
           if (order.branchId) params.set('branchId', order.branchId);
           if (order.supplierId) params.set('supplier', order.supplierId);

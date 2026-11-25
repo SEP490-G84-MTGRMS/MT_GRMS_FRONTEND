@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   ClipboardCheck,
   ChefHat,
-  Tag,
 } from 'lucide-react';
 import type { BatchItem, BatchStatus } from '../types/batch.types';
 import { TablePagination } from '../../../components/common';
@@ -22,7 +21,6 @@ interface BatchTableProps {
   onPageChange: (newPage: number) => void;
   onPageSizeChange: (newSize: number) => void;
   onSelectBatch: (batch: BatchItem) => void;
-  onDiscountClick: (batch: BatchItem) => void;
   onWriteOffClick: (batch: BatchItem) => void;
   onResetFilters: () => void;
 }
@@ -87,7 +85,6 @@ export const BatchTable: FC<BatchTableProps> = ({
   onPageChange,
   onPageSizeChange,
   onSelectBatch,
-  onDiscountClick,
   onWriteOffClick: _onWriteOffClick,
   onResetFilters,
 }) => {
@@ -259,13 +256,13 @@ export const BatchTable: FC<BatchTableProps> = ({
     );
   };
 
-  const renderDaysLeft = (days: number, expiryDate?: string) => {
+  const renderDaysLeft = (days: number, expiryDate?: string, status?: BatchStatus) => {
     if (days >= 9999 || !expiryDate || expiryDate === '—') {
       return (
         <span style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'monospace' }}>—</span>
       );
     }
-    if (days < 0) {
+    if (days < 0 || status === 'Expired') {
       return (
         <span
           style={{
@@ -282,12 +279,13 @@ export const BatchTable: FC<BatchTableProps> = ({
         </span>
       );
     }
-    if (days <= 3) {
+    // Màu theo Status BE (ngưỡng NearExpiryThresholdDays từng SP) — không hardcode 30 ngày
+    if (status === 'Critical') {
       return (
         <span style={{ color: '#d97706', fontWeight: 800, fontFamily: 'monospace' }}>{days}</span>
       );
     }
-    if (days <= 30) {
+    if (status === 'Warning') {
       return (
         <span style={{ color: '#2563eb', fontWeight: 700, fontFamily: 'monospace' }}>{days}</span>
       );
@@ -495,7 +493,9 @@ export const BatchTable: FC<BatchTableProps> = ({
                       {row.expiryDate || '—'}
                     </td>
 
-                    <td style={{ textAlign: 'right' }}>{renderDaysLeft(row.daysLeft, row.expiryDate)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {renderDaysLeft(row.daysLeft, row.expiryDate, row.status)}
+                    </td>
 
                     {(() => {
                       const { stockUnit, purchaseUnit, rate, sameUnit, rateLabel } = getUnitMeta(row);
@@ -618,22 +618,6 @@ export const BatchTable: FC<BatchTableProps> = ({
                         >
                           <Eye size={13} />
                         </button>
-                        {row.status !== 'Expired' && (
-                          <button
-                            type="button"
-                            className="so-list-action-btn so-list-action-btn--icon"
-                            onClick={() => onDiscountClick(row)}
-                            title="Giảm giá FEFO"
-                            aria-label="Giảm giá FEFO"
-                            style={{
-                              color: '#1d4ed8',
-                              borderColor: '#bfdbfe',
-                              background: '#eff6ff',
-                            }}
-                          >
-                            <Tag size={14} />
-                          </button>
-                        )}
                         {onQuickStocktake && (
                           <button
                             type="button"

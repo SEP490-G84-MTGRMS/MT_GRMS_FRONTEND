@@ -11,13 +11,11 @@ import {
   Folder,
   Plus,
   Loader2,
-  History,
   Tag,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { readFileAsDataUrl } from '../../../utils/imageFile';
 import { productApi } from '../api/productApi';
-import { PriceHistoryModal } from './PriceHistoryModal';
 import { masterCatalogApi } from '../../admin/api/masterCatalogApi';
 import type { MasterProductSuggestion } from '../../admin/types/masterCatalog.types';
 
@@ -217,7 +215,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [barcode, setBarcode] = useState('');
   const [productName, setProductName] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [showPriceHistory, setShowPriceHistory] = useState(false);
 
   // Master Catalog auto-lookup state
   const [masterSuggestion, setMasterSuggestion] = useState<MasterProductSuggestion | null>(null);
@@ -277,7 +274,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (!isOpen) {
       setIsCategoryDropdownOpen(false);
       setCategorySearchKeyword('');
-      setShowPriceHistory(false);
     }
   }, [isOpen]);
 
@@ -315,6 +311,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
   const [productStatus, setProductStatus] = useState<'Active' | 'Discontinued'>('Active');
   const [hasBatches, setHasBatches] = useState<boolean>(false);
+  /** Số ngày cận hạn; rỗng = mặc định 30. */
+  const [nearExpiryThresholdDays, setNearExpiryThresholdDays] = useState<string>('');
   const [allowRepack, setAllowRepack] = useState<boolean>(false);
   /** Giá đ/kg khi đóng khay (PROCESSED). Mặc định = RAW khi bật chia khay. */
   const [processedSellingPrice, setProcessedSellingPrice] = useState<number>(0);
@@ -414,6 +412,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             : 'Active'
         );
         setHasBatches(Boolean(productToEdit.hasBatches));
+        setNearExpiryThresholdDays(
+          productToEdit.nearExpiryThresholdDays && productToEdit.nearExpiryThresholdDays > 0
+            ? String(productToEdit.nearExpiryThresholdDays)
+            : ''
+        );
         setAllowRepack(Boolean(productToEdit.allowRepack));
         {
           const raw = productToEdit.sellingPrice || 0;
@@ -522,13 +525,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             });
         }
 
-        {
-          const desc = (productToEdit.description || '').trim();
-          const note = (productToEdit.internalNote || '').trim();
-          setDescription(
-            desc && note && desc !== note ? `${desc}\n${note}` : desc || note
-          );
-        }
+        setDescription((productToEdit.description || '').trim());
 
         setWarningMsg('');
         setValidationPopupMsg('');
@@ -546,6 +543,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         setIsFavorite(false);
         setProductStatus('Active');
         setHasBatches(false);
+        setNearExpiryThresholdDays('');
         setAllowRepack(false);
         setIsSubmitting(false);
 
@@ -635,7 +633,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const trimmedBarcode = barcode.trim();
   const isMainBarcodeDuplicateWithUom =
     trimmedBarcode !== '' &&
-    unitRows.some((u) => (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
+    unitRows.some((u) => !u.isBaseUnit && (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
   const barcodeError =
     barcode !== ''
       ? trimmedBarcode.length > 50 || /\s/.test(barcode)
@@ -1132,10 +1130,15 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         isFavorite,
         status: productStatus,
         hasBatches: hasBatches || repackOn,
+        nearExpiryThresholdDays: (() => {
+          if (!(hasBatches || repackOn)) return null;
+          const n = Number(nearExpiryThresholdDays);
+          return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+        })(),
         allowRepack: repackOn,
         eligibleForVatReduction,
         description: description.trim() || undefined,
-        internalNote: '',
+        internalNote: productToEdit?.internalNote ?? undefined,
         isBaseUnitPurchaseUnit: Boolean(base.isPurchaseUnit),
         purchaseUnit: purchase.unitName.trim() || base.unitName.trim(),
         uomConversions: unitsToSave,
@@ -1218,31 +1221,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {isEditing && productToEdit && (
-              <button
-                type="button"
-                onClick={() => setShowPriceHistory(true)}
-                disabled={isSubmitting}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  height: 34,
-                  padding: '0 12px',
-                  borderRadius: 8,
-                  border: '1px solid #ddd6fe',
-                  background: '#f5f3ff',
-                  color: '#6d28d9',
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                }}
-                title="Xem lịch sử thay đổi giá trước khi chỉnh sửa"
-              >
-                <History size={15} />
-                Lịch sử giá
-              </button>
-            )}
             <button
               type="button"
               className="custom-modal-close"
@@ -2386,6 +2364,30 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 />
               </div>
 
+              {(hasBatches || (allowRepack && isPurchaseUnitKg)) && (
+                <div style={{ ...toggleRowStyle, alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={toggleTitleStyle}>Thời gian cận hạn</div>
+                    <div style={toggleHintStyle}>
+                      Lô còn ≤ số ngày này được đánh dấu cận hạn. Để trống = 30 ngày.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      className="filter-input"
+                      style={{ width: 88, textAlign: 'right', fontWeight: 600 }}
+                      placeholder="30"
+                      value={nearExpiryThresholdDays}
+                      onChange={(e) => setNearExpiryThresholdDays(e.target.value)}
+                    />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>ngày</span>
+                  </div>
+                </div>
+              )}
+
               <div style={toggleRowStyle}>
                 <div>
                   <div style={{ ...toggleTitleStyle, color: isPurchaseUnitKg ? '#0F172A' : '#94A3B8' }}>
@@ -2474,7 +2476,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* FOOTER: (14) Bỏ qua, (15) Lưu & Thêm mới, (16) Lưu        */}
+        {/* FOOTER: Bỏ qua, Lưu/Cập nhật                              */}
         {/* ========================================================= */}
         <div
           className="custom-modal-footer"
@@ -2501,43 +2503,37 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            {/* (14) Bỏ qua */}
+            {/* Bỏ qua */}
             <button
               type="button"
               className="btn-secondary-white"
               onClick={onClose}
               disabled={isSubmitting}
-              style={{ borderRadius: 8, padding: '8px 18px' }}
+              style={{
+                borderRadius: 8,
+                width: 120,
+                height: 40,
+                minHeight: 40,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
               Bỏ qua
             </button>
 
-            {/* (15) Lưu & Thêm hàng mới */}
-            {!isEditing && (
-              <button
-                type="button"
-                className="btn-secondary-white"
-                style={{
-                  borderRadius: 8,
-                  padding: '8px 18px',
-                  borderColor: '#CBD5E1',
-                }}
-                disabled={isSubmitting}
-                onClick={() => handleSubmit(true)}
-              >
-                {isSubmitting ? 'Đang lưu...' : 'Lưu & thêm mới'}
-              </button>
-            )}
-
-            {/* (16) 💾 Lưu */}
+            {/* 💾 Lưu/Cập nhật */}
             <button
               type="button"
               className="btn-primary-teal"
               style={{
                 borderRadius: 8,
-                padding: '8px 20px',
+                width: 120,
+                height: 40,
+                minHeight: 40,
                 display: 'inline-flex',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: 6,
               }}
               disabled={isSubmitting}
@@ -2670,14 +2666,6 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       )}
 
     </div>
-    {showPriceHistory && productToEdit && (
-      <PriceHistoryModal
-        isOpen={showPriceHistory}
-        onClose={() => setShowPriceHistory(false)}
-        productId={productToEdit.id}
-        productName={productToEdit.productName}
-      />
-    )}
     </>
   );
 };

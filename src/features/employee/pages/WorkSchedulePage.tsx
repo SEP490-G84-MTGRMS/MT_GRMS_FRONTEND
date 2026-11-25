@@ -577,27 +577,43 @@ export const WorkSchedulePage: React.FC = () => {
             ? updated.shiftId
             : undefined;
 
+      const dayInfo = weekData.days.find((d) => d.key === updated.dayOfWeek);
+      const rawWorkDate = updated.workDate || dayInfo?.dateIso;
+      const workDate = rawWorkDate ? String(rawWorkDate).slice(0, 10) : undefined;
+
+      let durationHours: number | undefined;
+      let isCheckInNextDay: boolean | undefined;
+      if (rawStart && rawEnd) {
+        const [sh, sm] = rawStart.split(':').map(Number);
+        const [eh, em] = rawEnd.split(':').map(Number);
+        if (!Number.isNaN(sh) && !Number.isNaN(sm) && !Number.isNaN(eh) && !Number.isNaN(em)) {
+          let mins = eh * 60 + em - (sh * 60 + sm);
+          if (mins <= 0) {
+            mins += 24 * 60;
+            isCheckInNextDay = true;
+          } else {
+            isCheckInNextDay = false;
+          }
+          durationHours = Number((mins / 60).toFixed(2));
+        }
+      }
+
       await scheduleApi.updateSchedule(updated.id, {
-        shiftName: updated.shiftName,
+        employeeId: updated.employeeId,
+        branchId: updated.branchId,
+        workDate,
         shiftConfigId,
+        shiftCode: matchingShift?.code,
+        shiftName: updated.shiftName,
         plannedStartTime: startTime,
         plannedEndTime: endTime,
+        durationHours,
+        isCheckInNextDay,
       });
 
       await fetchSchedules();
-      setNotificationModal({
-        isOpen: true,
-        type: 'success',
-        title: 'Thành công',
-        message: 'Cập nhật ca làm việc thành công.',
-      });
     } catch (err: any) {
-      setNotificationModal({
-        isOpen: true,
-        type: 'error',
-        title: 'Lỗi cập nhật',
-        message: err?.response?.data?.message || err?.message || 'Cập nhật ca làm việc thất bại.',
-      });
+      throw err;
     }
   };
 

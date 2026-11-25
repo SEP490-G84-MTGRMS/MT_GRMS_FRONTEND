@@ -27,7 +27,7 @@ export interface BatchItem {
   mfgDate: string; // Ngày sản xuất (DD/MM/YYYY)
   expiryDate: string; // Hạn sử dụng (DD/MM/YYYY)
   rawExpiryDate: string; // YYYY-MM-DD để tính toán chính xác
-  daysLeft: number; // Âm: Quá hạn, 0-3: Khẩn cấp, 4-30: Cảnh báo, >30: An toàn
+  daysLeft: number; // Âm: Quá hạn; Status theo NearExpiryThresholdDays của SP (mặc định 30)
   qtyInitial: number; // Số lượng nhập ban đầu
   qtyCurrent: number; // Số lượng tồn thực tế của lô
   qtyReserved?: number; // Số lượng đang giữ chỗ trả NCC
@@ -47,6 +47,10 @@ export interface BatchItem {
   originalGrnNo: string; // Mã phiếu nhập gốc (vd: GRN-2026-0801, GRN-20261008-01)
   originalGrnId?: string; // ID phiếu nhập gốc
   discountPercent?: number; // % giảm giá FEFO đã áp dụng
+  isFefoDiscountActive?: boolean;
+  fefoDiscountStartAtUtc?: string;
+  fefoDiscountEndAtUtc?: string;
+  fefoDiscountStatus?: 'None' | 'Scheduled' | 'Active' | 'Completed';
   movements: BatchMovement[];
   /** SP đơn vị nhập/gốc là kg */
   isWeightProduct?: boolean;

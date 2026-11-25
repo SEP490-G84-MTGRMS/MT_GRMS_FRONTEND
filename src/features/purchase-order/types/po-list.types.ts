@@ -1,5 +1,5 @@
 export type PurchaseOrderStatus =
-  | 'PENDING_APPROVAL'     // Chờ duyệt
+  | 'PENDING_APPROVAL'     // Chờ nhập
   | 'APPROVED'             // Đã duyệt
   | 'DISPATCHED'           // Đã gửi NCC
   | 'SENT'                 // Đã gửi NCC

@@ -571,9 +571,9 @@ export const BatchFilterBar: FC<BatchFilterBarProps> = ({
             >
               <option value="ALL">-- Tất cả --</option>
               <option value="Expired">Quá hạn (≤ 0 ngày)</option>
-              <option value="Critical">Khẩn cấp (1 - 3 ngày)</option>
-              <option value="Warning">Cảnh báo (4 - 30 ngày)</option>
-              <option value="Normal">An toàn (&gt; 30 ngày)</option>
+              <option value="Critical">Khẩn cấp (≤ 3 ngày trong ngưỡng SP)</option>
+              <option value="Warning">Cận hạn (theo ngưỡng SP)</option>
+              <option value="Normal">An toàn (ngoài ngưỡng SP)</option>
             </select>
           </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { RotateCcw, Truck, Plus, Loader2, ClipboardList } from 'lucide-react';
-import { useAuthStore } from '../../../stores/useAuthStore';
+import { useBranchScope } from '../../../hooks/useBranchScope';
 import type {
   SupplierReturnListItem,
   SupplierReturnFilterState,
@@ -10,37 +10,45 @@ import type {
 import { supplierReturnApi } from '../api/supplierReturnApi';
 import { branchApi } from '../../purchase-order/api/branchApi';
 import { supplierApi } from '../../supplier/api/supplierApi';
-import { SupplierReturnFilterBar } from '../components/SupplierReturnFilterBar';
+import {
+  SupplierReturnFilterBar,
+  type SupplierReturnLookupOption,
+} from '../components/SupplierReturnFilterBar';
 import { SupplierReturnTable } from '../components/SupplierReturnTable';
 import { AdminToast, type ToastState } from '../../admin/components';
 import '../../purchase-order/purchase-order.css';
+import '../../supplier/supplier.css';
 import '../../../styles/so-list-page.css';
 
 const DEFAULT_FILTERS: SupplierReturnFilterState = {
   keyword: '',
+  returnCodes: [],
+  grnCodes: [],
+  supplierCodes: [],
+  supplierNames: [],
+  branchNames: [],
   branchId: '',
   supplierId: '',
   status: '',
   pageIndex: 1,
-  pageSize: 10,
+  pageSize: 20,
 };
 
 export const SupplierReturnListPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const role = useAuthStore((s) => s.user?.role);
-  const userBranchId = useAuthStore((s) => s.user?.branchId);
-  const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
-  const lockedBranch = !isStoreOwner && userBranchId ? userBranchId : '';
+  const { isBranchLocked, scopedBranchId } = useBranchScope();
 
-  const [draft, setDraft] = useState<SupplierReturnFilterState>({
+  const [applied, setApplied] = useState<SupplierReturnFilterState>(() => ({
     ...DEFAULT_FILTERS,
-    branchId: lockedBranch,
-  });
-  const [applied, setApplied] = useState<SupplierReturnFilterState>({
-    ...DEFAULT_FILTERS,
-    branchId: lockedBranch,
-  });
+    branchId: scopedBranchId,
+  }));
+
+  useEffect(() => {
+    setApplied((prev) =>
+      prev.branchId === scopedBranchId ? prev : { ...prev, branchId: scopedBranchId, pageIndex: 1 }
+    );
+  }, [scopedBranchId]);
 
   const [items, setItems] = useState<SupplierReturnListItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -57,16 +65,8 @@ export const SupplierReturnListPage: FC = () => {
     return () => window.clearTimeout(t);
   }, [location.state, location.pathname, navigate]);
 
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([
-    { id: 'BR-01', name: 'BR-01 Main Store' },
-    { id: 'BR-02', name: 'BR-02 Thu Duc Hub' },
-  ]);
-
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([
-    { id: 'sup-vinamilk', name: 'Công ty Cổ phần Sữa Việt Nam (Vinamilk)' },
-    { id: 'sup-pepsi', name: 'Suntory PepsiCo Việt Nam' },
-    { id: 'sup-orion', name: 'Công ty TNHH Thực phẩm Orion Vina' },
-  ]);
+  const [branches, setBranches] = useState<SupplierReturnLookupOption[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierReturnLookupOption[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,10 +77,22 @@ export const SupplierReturnListPage: FC = () => {
       .then(([bRes, sRes]) => {
         if (!isMounted) return;
         if (bRes.items?.length) {
-          setBranches(bRes.items.map((b) => ({ id: b.id, name: `${b.code || ''} — ${b.name}`.trim() })));
+          setBranches(
+            bRes.items.map((b) => ({
+              id: b.id,
+              code: b.code || '',
+              name: b.name || '',
+            }))
+          );
         }
         if (sRes.items?.length) {
-          setSuppliers(sRes.items.map((s) => ({ id: s.id, name: `${s.code} — ${s.name}` })));
+          setSuppliers(
+            sRes.items.map((s) => ({
+              id: s.id,
+              code: s.code || '',
+              name: s.name || '',
+            }))
+          );
         }
       })
       .catch(() => {});
@@ -129,7 +141,7 @@ export const SupplierReturnListPage: FC = () => {
     >
       <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      {/* Top Header */}
+      {/* Top Header — chuẩn /store-owner/suppliers/products */}
       <div className="so-list-header">
         <div>
           <h1 className="so-list-title">
@@ -169,28 +181,23 @@ export const SupplierReturnListPage: FC = () => {
             title="Tạo phiếu yêu cầu trả hàng NCC mới từ phiếu nhập kho COMPLETED"
           >
             <Plus size={14} />
-            <span>+ Tạo Phiếu Trả Hàng</span>
+            <span>Tạo Phiếu Trả Hàng</span>
           </button>
         </div>
       </div>
 
-      {/* ── UNIFIED FILTER BAR ── */}
+      {/* ── FILTER BAR CHUẨN TÁCH RIÊNG TỪNG Ô TÌM KIẾM ── */}
       <div style={{ flexShrink: 0, marginBottom: 8 }}>
         <SupplierReturnFilterBar
-          draft={draft}
-          totalFiltered={items.length}
-          totalAll={totalCount}
-          lockBranch={Boolean(lockedBranch)}
+          initialValues={applied}
+          lockBranch={isBranchLocked}
           suppliers={suppliers}
           branches={branches}
-          onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
-          onSearch={() => setApplied({ ...draft, pageIndex: 1 })}
+          items={items}
+          onSearch={(next) => setApplied({ ...next, pageIndex: 1 })}
           onReset={() => {
-            const reset = { ...DEFAULT_FILTERS, branchId: lockedBranch };
-            setDraft(reset);
-            setApplied(reset);
+            setApplied({ ...DEFAULT_FILTERS, branchId: scopedBranchId });
           }}
-          onCreateNew={() => navigate('/store-owner/supplier-returns/create')}
         />
       </div>
 
@@ -211,7 +218,7 @@ export const SupplierReturnListPage: FC = () => {
         </div>
       )}
 
-      {/* Table */}
+      {/* ── BẢNG DỮ LIỆU TÁCH CỘT & XUỐNG DÒNG ĐẦY ĐỦ ── */}
       <SupplierReturnTable
         items={items}
         totalCount={totalCount}

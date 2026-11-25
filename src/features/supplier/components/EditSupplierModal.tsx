@@ -172,7 +172,7 @@ export const EditSupplierModal: FC<Props> = ({ isOpen, supplier, onClose, onSubm
         name: name.trim(),
         contactPerson: contactPerson.trim() || undefined,
         phone: phone.trim(),
-        email: email.trim() || undefined,
+        email: email.trim(),
         status,
         taxCode: taxCode.trim(),
         address: address.trim(),

@@ -20,7 +20,6 @@ import { batchApi } from '../api/batchApi';
 import { BatchFilterBar, type BatchSuggestProduct } from '../components/BatchFilterBar';
 import { BatchTable } from '../components/BatchTable';
 import { BatchDetailDrawer } from '../components/BatchDetailDrawer';
-import { BatchDiscountModal } from '../components/BatchDiscountModal';
 import {
   BatchExpiryAlertModal,
   type BatchAlertMode,
@@ -29,6 +28,7 @@ import { AdminToast, type ToastState } from '../../admin/components';
 import { productApi } from '../../product/api/productApi';
 import '../../purchase-order/purchase-order.css';
 import '../../supplier/supplier.css';
+import { useBranchScope } from '../../../hooks/useBranchScope';
 
 const DEFAULT_FILTERS: BatchFilterState = {
   keyword: '',
@@ -48,25 +48,34 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const roleParam = searchParams.get('role') as UserRole | null;
   const skuParam = searchParams.get('sku');
   const fromInventory = searchParams.get('from') === 'inventory';
-  const role: UserRole = roleParam || defaultRole;
-  const employeeBranchId = searchParams.get('branch') || '';
+  const {
+    isStoreOwner,
+    isEmployee,
+    lockedBranchId,
+    scopedBranchIdOrAll,
+  } = useBranchScope(defaultRole);
+  const role: UserRole = isEmployee ? 'employee' : 'store_owner';
+  const employeeBranchId = isEmployee ? lockedBranchId : '';
 
   const [batches, setBatches] = useState<BatchItem[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [filterInputs, setFilterInputs] = useState<BatchFilterState>(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<BatchFilterState>(DEFAULT_FILTERS);
+  const [filterInputs, setFilterInputs] = useState<BatchFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    branchId: scopedBranchIdOrAll,
+  }));
+  const [appliedFilters, setAppliedFilters] = useState<BatchFilterState>(() => ({
+    ...DEFAULT_FILTERS,
+    branchId: scopedBranchIdOrAll,
+  }));
   const [pageIndex, setPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [catalogProducts, setCatalogProducts] = useState<BatchSuggestProduct[]>([]);
 
   const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [discountBatch, setDiscountBatch] = useState<BatchItem | null>(null);
-  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [kpi, setKpi] = useState<BatchKpiSummary | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [alertMode, setAlertMode] = useState<BatchAlertMode>('near_expiry');
@@ -166,16 +175,28 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
     if (statusParam && ['Expired', 'Critical', 'Warning', 'Normal'].includes(statusParam)) {
       updated.status = statusParam;
     }
-    if (role === 'employee' && branchParam) {
-      updated.branchId = branchParam;
+    if (isEmployee) {
+      updated.branchId = lockedBranchId || 'ALL';
     } else if (branchParam && branchParam !== 'ALL') {
       updated.branchId = branchParam;
+    } else {
+      updated.branchId = scopedBranchIdOrAll;
     }
 
     setFilterInputs(updated);
     setAppliedFilters(updated);
     setPageIndex(1);
-  }, [searchParams, role]);
+  }, [searchParams, isEmployee, lockedBranchId, scopedBranchIdOrAll]);
+
+  // Đồng bộ Topbar branch selector (Store Owner) / khóa chi nhánh (Employee)
+  const prevScopedBranchRef = useRef<string>(scopedBranchIdOrAll);
+  useEffect(() => {
+    if (prevScopedBranchRef.current === scopedBranchIdOrAll) return;
+    prevScopedBranchRef.current = scopedBranchIdOrAll;
+    setFilterInputs((prev) => ({ ...prev, branchId: scopedBranchIdOrAll }));
+    setAppliedFilters((prev) => ({ ...prev, branchId: scopedBranchIdOrAll }));
+    setPageIndex(1);
+  }, [scopedBranchIdOrAll]);
 
   const loadBatches = useCallback(async () => {
     const fetchId = ++fetchIdRef.current;
@@ -232,7 +253,7 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
   };
 
   const handleReset = () => {
-    const resetBranch = role === 'employee' && employeeBranchId ? employeeBranchId : 'ALL';
+    const resetBranch = scopedBranchIdOrAll;
     const resetState: BatchFilterState = {
       ...DEFAULT_FILTERS,
       branchId: resetBranch,
@@ -255,27 +276,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
 
   const handleUpdateLocation = (_batchId: string, _newLocation: string) => {
     showToast('Chưa có API cập nhật vị trí kệ — thay đổi chưa được lưu.', 'warning');
-  };
-
-  const handleOpenDiscount = (batch: BatchItem) => {
-    if (batch.status === 'Expired') {
-      showToast('Lô hàng đã quá hạn sử dụng, không thể áp dụng giảm giá. Bắt buộc xuất hủy!', 'error');
-      return;
-    }
-    setDiscountBatch(batch);
-    setIsDiscountModalOpen(true);
-  };
-
-  const handleApplyDiscount = async (batchId: string, discountPercent: number) => {
-    try {
-      await batchApi.applyFefoDiscount(batchId, discountPercent);
-      setIsDiscountModalOpen(false);
-      setDiscountBatch(null);
-      showToast(`Đã lưu giảm giá FEFO ${discountPercent}% cho lô hàng.`, 'success');
-      await loadBatches();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Không thể lưu giảm giá FEFO.', 'error');
-    }
   };
 
   const handleWriteOff = (batch: BatchItem) => {
@@ -421,7 +421,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
           setPageIndex(1);
         }}
         onSelectBatch={handleSelectBatch}
-        onDiscountClick={handleOpenDiscount}
         onWriteOffClick={handleWriteOff}
         onResetFilters={handleReset}
       />
@@ -431,7 +430,6 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         batch={selectedBatch}
         onClose={() => setIsDrawerOpen(false)}
         onUpdateLocation={handleUpdateLocation}
-        onDiscountClick={handleOpenDiscount}
         onWriteOffClick={handleWriteOff}
         onStocktakeClick={(b) => {
           setIsDrawerOpen(false);
@@ -443,16 +441,10 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
         }}
       />
 
-      <BatchDiscountModal
-        isOpen={isDiscountModalOpen}
-        batch={discountBatch}
-        onClose={() => setIsDiscountModalOpen(false)}
-        onApplyDiscount={handleApplyDiscount}
-      />
-
       <BatchExpiryAlertModal
         isOpen={isAlertOpen}
         mode={alertMode}
+        canManageDiscount={isStoreOwner}
         branchId={
           role === 'employee' && employeeBranchId
             ? employeeBranchId
@@ -461,6 +453,10 @@ export const BatchListPage: FC<{ defaultRole?: UserRole }> = ({
               : ''
         }
         onClose={() => setIsAlertOpen(false)}
+        onDiscountSaved={async (message) => {
+          showToast(message, 'success');
+          await loadBatches();
+        }}
         onCreated={(codes) => {
           setIsAlertOpen(false);
           const msg =

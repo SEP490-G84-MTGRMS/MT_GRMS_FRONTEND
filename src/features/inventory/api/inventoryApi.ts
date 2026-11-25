@@ -8,6 +8,7 @@ import type {
 const mapStatus = (status: string | undefined): InventoryItem['status'] => {
   if (status === 'LOW_STOCK') return 'Low';
   if (status === 'OUT_OF_STOCK') return 'Out';
+  if (status === 'NEAR_EXPIRY') return 'NearExpiry';
   return 'OK';
 };
 
@@ -47,17 +48,10 @@ export const inventoryApi = {
     kpiSummary: InventoryKpiSummary;
   }> {
     const params = new URLSearchParams();
-    const keyword = [
-      ...(filters.skus ?? []),
-      ...(filters.names ?? []),
-      ...(filters.branchCodes ?? []),
-      ...(filters.branchNames ?? []),
-    ]
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .join(' ')
-      .trim();
-    if (keyword) params.append('keyword', keyword);
+    filters.skus?.filter(Boolean).forEach((v) => params.append('skus', v.trim()));
+    filters.names?.filter(Boolean).forEach((v) => params.append('names', v.trim()));
+    filters.branchCodes?.filter(Boolean).forEach((v) => params.append('branchCodes', v.trim()));
+    filters.branchNames?.filter(Boolean).forEach((v) => params.append('branchNames', v.trim()));
     if (filters.branchId) params.append('branchId', filters.branchId);
     if (filters.category) params.append('category', filters.category);
     if (filters.location) params.append('locationShelf', filters.location);
@@ -67,7 +61,9 @@ export const inventoryApi = {
           ? 'LOW_STOCK'
           : filters.stockStatus === 'Out'
             ? 'OUT_OF_STOCK'
-            : 'OK';
+            : filters.stockStatus === 'NearExpiry'
+              ? 'NEAR_EXPIRY'
+              : 'OK';
       params.append('status', apiStatus);
     }
     params.append('pageIndex', String(filters.pageIndex));
@@ -83,7 +79,7 @@ export const inventoryApi = {
       const quarantined = Number(i.quarantinedQty ?? 0);
       const reserved = Number(i.reservedQty ?? 0);
       return {
-        id: i.productId || i.id || `${i.sku}-${i.branchId}`,
+        id: `${i.productId || i.id || i.sku}-${i.branchId}`,
         productId: i.productId,
         sku: i.sku,
         productName: i.productName,
@@ -105,6 +101,7 @@ export const inventoryApi = {
         batchCount: Number(i.batchCount ?? i.batches?.length ?? 0),
         quarantined,
         reserved,
+        expiredQty: Number(i.expiredQty ?? 0),
       };
     });
 

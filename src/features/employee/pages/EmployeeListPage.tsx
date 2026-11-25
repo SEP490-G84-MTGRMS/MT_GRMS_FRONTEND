@@ -5,7 +5,6 @@ import {
   Plus,
   ClipboardCheck,
   MoreHorizontal,
-  Upload,
   Download,
   User,
   AlertTriangle,
@@ -28,6 +27,7 @@ import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalR
 import { ImportEmployeeModal } from '../components/employee-list/ImportEmployeeModal';
 import { TablePagination, NotificationModal, ConfirmModal } from '../../../components/common';
 import { matchesAnyVietnameseSearch } from '../lib/vietnamTime';
+import { exportEmployeesToExcel } from '../lib/employeeExcelExporter';
 import '../employee.css';
 
 const ACTIVE_BRANCH_STORAGE_KEY = 'mtgrms_active_branch';
@@ -146,11 +146,11 @@ export const EmployeeListPage: React.FC = () => {
 
       const filteredItems = trimmedKeyword
         ? res.items.filter((emp) =>
-            matchesAnyVietnameseSearch(
-              [emp.fullName, emp.employeeCode, emp.phone, emp.citizenId, emp.email],
-              trimmedKeyword
-            )
+          matchesAnyVietnameseSearch(
+            [emp.fullName, emp.employeeCode, emp.phone, emp.citizenId, emp.email],
+            trimmedKeyword
           )
+        )
         : res.items;
 
       // Ưu tiên nhân viên đang làm việc (active) hiển thị lên đầu
@@ -412,9 +412,73 @@ export const EmployeeListPage: React.FC = () => {
     alert(`Đã từ chối ${ids.length} yêu cầu!`);
   };
 
-  const handleExportExcel = () => {
-    alert(`Đang xuất danh sách ${totalItems} nhân viên ra file Excel...`);
+  const handleExportExcel = async () => {
     setShowActionDropdown(false);
+    try {
+      const currentBranchId =
+        activeBranch && activeBranch.id && activeBranch.id !== 'ALL'
+          ? activeBranch.id
+          : undefined;
+
+      const trimmedKeyword = (searchTerm || debouncedKeyword).trim();
+      const res = await employeeApi.getEmployeesPaged({
+        branchId: currentBranchId,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page: 1,
+        pageSize: 10000,
+      });
+
+      const filteredItems = trimmedKeyword
+        ? res.items.filter((emp) =>
+            matchesAnyVietnameseSearch(
+              [emp.fullName, emp.employeeCode, emp.phone, emp.citizenId, emp.email],
+              trimmedKeyword
+            )
+          )
+        : res.items;
+
+      const sortedItems = [...filteredItems].sort((a, b) => {
+        const aActive = a.status === 'active' ? 0 : 1;
+        const bActive = b.status === 'active' ? 0 : 1;
+        return aActive - bActive;
+      });
+
+      if (sortedItems.length === 0) {
+        setNotification({
+          isOpen: true,
+          type: 'warning',
+          title: 'Không có dữ liệu',
+          message: 'Không có nhân viên nào phù hợp với bộ lọc hiện tại để xuất file Excel.',
+        });
+        return;
+      }
+
+      const statusLabel =
+        statusFilter === 'active'
+          ? 'Đang làm việc'
+          : statusFilter === 'inactive'
+            ? 'Đã nghỉ việc'
+            : 'Tất cả trạng thái';
+
+      await exportEmployeesToExcel(sortedItems, {
+        branchName: activeBranch?.name,
+        statusLabel,
+      });
+
+      setNotification({
+        isOpen: true,
+        type: 'success',
+        title: 'Xuất Excel thành công',
+        message: `Đã xuất danh sách ${sortedItems.length} nhân viên ra file Excel (.xlsx).`,
+      });
+    } catch (err: any) {
+      setNotification({
+        isOpen: true,
+        type: 'error',
+        title: 'Xuất Excel thất bại',
+        message: err?.response?.data?.message || err?.message || 'Không thể xuất file Excel danh sách nhân viên.',
+      });
+    }
   };
 
   const formatVND = (num?: number) => {
@@ -635,28 +699,6 @@ export const EmployeeListPage: React.FC = () => {
                     alignItems: 'center',
                     gap: 8,
                   }}
-                  onClick={() => {
-                    setShowImportModal(true);
-                    setShowActionDropdown(false);
-                  }}
-                >
-                  <Upload size={15} />
-                  <span>Nhập file Excel</span>
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    width: '100%',
-                    padding: '10px 16px',
-                    textAlign: 'left',
-                    background: 'transparent',
-                    border: 'none',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
                   onClick={handleExportExcel}
                 >
                   <Download size={15} />
@@ -809,7 +851,7 @@ export const EmployeeListPage: React.FC = () => {
                       </div>
                     </td>
                     <td style={{ fontWeight: 600, color: '#0F766E' }}>{emp.employeeCode}</td>
-                                        <td>
+                    <td>
                       <div className="emp-name-badge">
                         <span>{emp.fullName}</span>
                         {emp.hasFaceId && (
@@ -845,9 +887,8 @@ export const EmployeeListPage: React.FC = () => {
                     </td>
                     <td>
                       <span
-                        className={`emp-status-pill ${
-                          emp.status === 'active' ? 'active' : 'inactive'
-                        }`}
+                        className={`emp-status-pill ${emp.status === 'active' ? 'active' : 'inactive'
+                          }`}
                       >
                         {emp.status === 'active' ? 'Đang làm việc' : 'Đã nghỉ'}
                       </span>
@@ -890,20 +931,20 @@ export const EmployeeListPage: React.FC = () => {
           </table>
         </div>
 
-          {/* Enterprise Standard TablePagination */}
-          <TablePagination
-            currentPage={page}
-            pageSize={pageSize}
-            totalItems={totalItems}
-            pageSizeOptions={[10, 20, 50]}
-            onPageChange={(newPage) => setPage(newPage)}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setPage(1);
-            }}
-            itemLabel="nhân viên"
-            isLoading={isLoading}
-          />
+        {/* Enterprise Standard TablePagination */}
+        <TablePagination
+          currentPage={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          pageSizeOptions={[10, 20, 50]}
+          onPageChange={(newPage) => setPage(newPage)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+          itemLabel="nhân viên"
+          isLoading={isLoading}
+        />
       </div>
 
       {/* ─── MODALS ─── */}

@@ -44,14 +44,10 @@ export const SupplierReturnFormPage: FC = () => {
           }
         }
       })
-      .catch(() => {
-        // Fallback
-        if (isMounted && branches.length === 0) {
-          setBranches([
-            { id: 'BR-01', name: 'BR-01 Main Store' },
-            { id: 'BR-02', name: 'BR-02 Thu Duc Hub' },
-          ]);
-        }
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+        setBranches([]);
+        setErrorMsg(err instanceof Error ? err.message : 'Không thể tải danh sách chi nhánh.');
       });
 
     return () => {
@@ -69,16 +65,17 @@ export const SupplierReturnFormPage: FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Fetch eligible completed GRNs
+  // Fetch eligible completed GRNs (reset selectedGrnId when branch changes — RTV-07)
   useEffect(() => {
     let isMounted = true;
+    setSelectedGrnId('');
     setIsLoadingGrns(true);
     supplierReturnApi
       .getEligibleGrns(branchId)
       .then((grns) => {
         if (!isMounted) return;
         setEligibleGrns(grns);
-        if (grns.length > 0 && !selectedGrnId) {
+        if (grns.length > 0) {
           setSelectedGrnId(grns[0].id);
         }
       })

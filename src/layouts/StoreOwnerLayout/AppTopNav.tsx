@@ -129,7 +129,7 @@ const NAV_GROUPS: NavGroup[] = [
         ],
       },
       {
-        title: "Kho & Hạn dùng (FEFO)",
+        title: "Kho & Hạn dùng",
         items: [
           {
             label: "Tồn kho cửa hàng",
@@ -191,15 +191,15 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/purchase-orders/dispatch-hub",
           },
           {
-            label: "Danh sách đơn mua hàng (PO)",
+            label: "Danh sách đơn mua hàng",
             to: "/store-owner/purchase-orders/list",
           },
           {
-            label: "Phiếu nhập kho (GRN) & Lịch nhận",
+            label: "Phiếu nhập kho & Lịch nhận",
             to: "/store-owner/goods-receipts",
           },
           {
-            label: "Trả hàng nhà cung cấp (RTV)",
+            label: "Trả hàng nhà cung cấp",
             to: "/store-owner/supplier-returns",
           },
         ],
@@ -1402,10 +1402,12 @@ export const AppTopNav: FC = () => {
               flexShrink: 0,
             }}
           >
-            {/* 0. Dropdown chọn chi nhánh */}
-            <div className="topnav-branch-desktop">
-              <BranchSelectorDropdown />
-            </div>
+            {/* 0. Dropdown chọn chi nhánh (chỉ Store Owner) */}
+            {!isEmployee && (
+              <div className="topnav-branch-desktop">
+                <BranchSelectorDropdown />
+              </div>
+            )}
 
             {/* 1. Hỗ trợ */}
             <button

@@ -582,7 +582,7 @@ export const ReceiveTransferPage: React.FC = () => {
               className="btn-primary-teal"
               onClick={handleConfirm}
               disabled={isSaving}
-              style={{ justifyContent: 'center' }}
+              style={{ flex: 1, justifyContent: 'center' }}
             >
               <Check size={15} /> {isSaving ? 'Đang xác nhận…' : 'Nhận hàng'}
             </button>

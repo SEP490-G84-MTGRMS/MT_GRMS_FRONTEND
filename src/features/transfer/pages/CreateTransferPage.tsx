@@ -44,6 +44,7 @@ export const CreateTransferPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
+  const [createdTime] = useState(() => formatDateTimeVN(new Date()));
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   const duplicateFrom = (location.state as { duplicateFrom?: TransferOrder } | null)?.duplicateFrom ?? null;
@@ -68,6 +69,7 @@ export const CreateTransferPage: React.FC = () => {
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
@@ -560,7 +562,7 @@ export const CreateTransferPage: React.FC = () => {
             <User size={16} color="#0F766E" />
             <span>{user?.fullName || user?.email || 'Chủ cửa hàng'}</span>
           </div>
-          <span>{formatDateTimeVN(new Date())}</span>
+          <span>{createdTime}</span>
         </div>
       </div>
 
