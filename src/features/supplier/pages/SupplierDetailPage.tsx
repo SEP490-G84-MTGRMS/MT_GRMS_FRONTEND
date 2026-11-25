@@ -489,6 +489,7 @@ export const SupplierDetailPage: FC<Props> = ({
                 }
               }}
               onEditBank={() => setIsBankModalOpen(true)}
+              onEditVat={() => setIsVatModalOpen(true)}
             />
           )}
 

@@ -117,12 +117,12 @@ export const StoreProductManagementPage: FC = () => {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Current active store (if a single store is selected)
+  // Current active store (only when a single store is explicitly selected)
   const currentStore = useMemo(() => {
     if (appliedFilters.storeId !== 'ALL') {
-      return stores.find((s) => s.id === appliedFilters.storeId) || stores[0];
+      return stores.find((s) => s.id === appliedFilters.storeId) ?? null;
     }
-    return stores[0];
+    return null;
   }, [stores, appliedFilters.storeId]);
 
   // Filter Search & Reset Handlers
@@ -373,7 +373,7 @@ export const StoreProductManagementPage: FC = () => {
           onExportExcel={handleExportExcel}
           onImportExcel={handleImportExcel}
           excelBusy={excelBusy}
-          fallbackStoreId={currentStore?.id ?? stores[0]?.id ?? null}
+          fallbackStoreId={currentStore?.id ?? null}
         />
       </div>
 
