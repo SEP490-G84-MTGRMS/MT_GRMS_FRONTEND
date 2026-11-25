@@ -218,11 +218,13 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
         setCurrentPlan(savedPlan);
         if (savedPlan.status !== status) {
           const statusResponse = await planApi.toggleStatus(savedPlan.id);
-          if (!statusResponse.success || statusResponse.data !== true) {
+          if (!statusResponse.success || typeof statusResponse.data !== "boolean") {
             setStatus(savedPlan.status);
             throw new Error(statusResponse.message || "Thông tin gói đã lưu nhưng chưa đổi được trạng thái mở bán. Vui lòng thử lại.");
           }
-          savedPlan = { ...savedPlan, status };
+          const resolvedStatus: PlanStatus = statusResponse.data ? "Active" : "Inactive";
+          savedPlan = { ...savedPlan, status: resolvedStatus };
+          setStatus(resolvedStatus);
           setCurrentPlan(savedPlan);
         }
         setName(savedPlan.name);
@@ -336,7 +338,14 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
           try {
             const response = await planApi.toggleStatus(currentPlan.id);
             if (!response.success) throw new Error(response.message || "Không thể đổi trạng thái gói.");
-            const nextStatus = currentPlan.status === "Active" ? "Inactive" : "Active";
+            const nextStatus: PlanStatus =
+              typeof response.data === "boolean"
+                ? response.data
+                  ? "Active"
+                  : "Inactive"
+                : currentPlan.status === "Active"
+                  ? "Inactive"
+                  : "Active";
             setCurrentPlan({ ...currentPlan, status: nextStatus });
             setStatus(nextStatus);
             setToastMessage("Đã cập nhật trạng thái mở bán.");
