@@ -341,6 +341,10 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateTransferPage /></ProtectedRoute>,
       },
       {
+        path: 'transfers/request',
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateUrgentTransferRequestPage /></ProtectedRoute>,
+      },
+      {
         path: 'transfers/:id',
         element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><TransferDetailPage /></ProtectedRoute>,
       },
@@ -687,6 +691,10 @@ export const router = createBrowserRouter([
       {
         path: 'transfers/create',
         element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateTransferPage /></ProtectedRoute>,
+      },
+      {
+        path: 'transfers/request',
+        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CreateUrgentTransferRequestPage /></ProtectedRoute>,
       },
       {
         path: 'transfers/:id',
