@@ -65,7 +65,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [customer?.id, isOpen]);
+  }, [customer?.id, customer?.currentDebtAR, isOpen]);
 
   if (!isOpen || !customer) return null;
 
@@ -75,16 +75,33 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
     return true;
   });
 
-  const totalIncreased = ledgers
-    .filter((l) => l.transactionType === 'DEBT_INCREASE')
-    .reduce((sum, l) => sum + l.amount, 0);
+  const summarySource = ledgers[0];
+  const totalIncreased =
+    typeof summarySource?.totalIncreased === 'number'
+      ? summarySource.totalIncreased
+      : ledgers
+          .filter((l) => l.transactionType === 'DEBT_INCREASE')
+          .reduce((sum, l) => sum + l.amount, 0);
 
-  const totalDecreased = ledgers
-    .filter((l) => l.transactionType === 'DEBT_DECREASE')
-    .reduce((sum, l) => sum + l.amount, 0);
+  const totalDecreased =
+    typeof summarySource?.totalDecreased === 'number'
+      ? summarySource.totalDecreased
+      : ledgers
+          .filter((l) => l.transactionType === 'DEBT_DECREASE')
+          .reduce((sum, l) => sum + l.amount, 0);
+
+  const displayedCurrentBalance =
+    typeof summarySource?.currentBalance === 'number'
+      ? summarySource.currentBalance
+      : customer.currentDebtAR;
+
+  const totalLedgerCount =
+    typeof summarySource?.totalCount === 'number'
+      ? summarySource.totalCount
+      : ledgers.length;
 
   const safeFullName = sanitizeCustomerText(customer.fullName, 'Khách hàng');
-  const hasDebt = customer.currentDebtAR > 0;
+  const hasDebt = displayedCurrentBalance > 0;
 
   return (
     <div className="customer-drawer-backdrop" onClick={onClose}>
@@ -146,7 +163,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                   marginTop: '4px',
                 }}
               >
-                {formatCurrency(customer.currentDebtAR)}
+                {formatCurrency(displayedCurrentBalance)}
               </div>
             </div>
 
@@ -242,7 +259,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                 transition: 'all 0.15s ease',
               }}
             >
-              Tất cả ({ledgers.length})
+              Tất cả ({totalLedgerCount})
             </button>
             <button
               type="button"
@@ -303,6 +320,12 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {filteredLedgers.map((item) => {
                 const isIncrease = item.transactionType === 'DEBT_INCREASE';
+                const isReturnOffset =
+                  item.entryType === 'GoodsReturnOffset' ||
+                  item.entryType === 'RETURN_OFFSET';
+                const hasBalanceTrail =
+                  typeof item.balanceBefore === 'number' ||
+                  typeof item.balanceAfter === 'number';
 
                 return (
                   <div
@@ -337,6 +360,22 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                           >
                             <ArrowUpRight className="w-3.5 h-3.5" /> Ghi nợ (Mua hàng)
                           </span>
+                        ) : isReturnOffset ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '9999px',
+                              background: '#EEF2FF',
+                              color: '#4338CA',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            <ArrowDownLeft className="w-3.5 h-3.5" /> Trả hàng trừ nợ
+                          </span>
                         ) : (
                           <span
                             style={{
@@ -351,7 +390,7 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                               fontWeight: 700,
                             }}
                           >
-                            <ArrowDownLeft className="w-3.5 h-3.5" /> Ghi có (Thu nợ)
+                            <ArrowDownLeft className="w-3.5 h-3.5" /> Thu nợ
                           </span>
                         )}
 
@@ -385,10 +424,31 @@ export const CustomerDebtLedgerDrawer: FC<CustomerDebtLedgerDrawerProps> = ({
                       </div>
                     </div>
 
-                    {/* Middle Row: Note & Reference docs */}
+                    {/* Middle Row: Note & Balance Trail */}
                     <div style={{ fontSize: '0.82rem', color: '#334155', fontWeight: 500 }}>
-                      {item.note || (isIncrease ? 'Đơn hàng mua nợ tại POS' : 'Khách trả nợ')}
+                      {item.note || (isIncrease ? 'Đơn hàng mua nợ tại POS' : isReturnOffset ? 'Trả hàng trừ công nợ' : 'Khách trả nợ')}
                     </div>
+
+                    {hasBalanceTrail && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '6px 10px',
+                          background: '#F8FAFC',
+                          borderRadius: '8px',
+                          border: '1px solid #E2E8F0',
+                          fontSize: '0.74rem',
+                          color: '#475569',
+                        }}
+                      >
+                        <span style={{ fontWeight: 600 }}>Số dư trước → Số dư sau:</span>
+                        <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, color: '#0F172A' }}>
+                          {formatCurrency(item.balanceBefore)} → {formatCurrency(item.balanceAfter)}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Bottom Row: Doc links & Balance after */}
                     <div

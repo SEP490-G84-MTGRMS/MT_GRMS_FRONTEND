@@ -7,7 +7,6 @@ import {
   Mail,
   MapPin,
   Calendar,
-  Building,
   QrCode,
   Edit2,
   History,
@@ -63,7 +62,16 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [customer?.id, customer?.invoices, customer?.payments]);
+  }, [
+    customer?.id,
+    customer?.currentDebtAR,
+    customer?.fullName,
+    customer?.email,
+    customer?.address,
+    customer?.membershipTier,
+    customer?.invoices,
+    customer?.payments,
+  ]);
 
   if (!customer) return null;
 
@@ -92,7 +100,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                 </h3>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b', fontFamily: 'var(--font-mono, monospace)' }}>
-                {customer.phoneNumber}
+                {resolvedCustomer.phoneNumber}
               </p>
             </div>
           </div>
@@ -120,13 +128,13 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                   color: hasDebt ? '#D97706' : '#059669',
                 }}
               >
-                {formatCurrency(customer.currentDebtAR)}
+                {formatCurrency(resolvedCustomer.currentDebtAR)}
               </p>
               <div style={{ marginTop: '8px' }}>
                 {onViewLedger && (
                   <button
                     type="button"
-                    onClick={() => onViewLedger(customer)}
+                    onClick={() => onViewLedger(resolvedCustomer)}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -161,13 +169,13 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                     color: 'var(--blue-primary, #0F766E)',
                   }}
                 >
-                  {customer.loyaltyPoints.toLocaleString('vi-VN')} điểm
+                  {resolvedCustomer.loyaltyPoints.toLocaleString('vi-VN')} điểm
                 </p>
               </div>
               <div style={{ paddingTop: '8px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b' }}>
                 <span>Tổng chi:</span>
                 <span style={{ fontWeight: 700, color: 'var(--text-main, #111827)' }}>
-                  {formatCurrency(customer.totalSpending)}
+                  {formatCurrency(resolvedCustomer.totalSpending)}
                 </span>
               </div>
             </div>
@@ -204,30 +212,23 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                 <Phone className="w-4 h-4" style={{ color: '#94a3b8' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Số điện thoại:</span>
                 <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, color: '#334155' }}>
-                  {customer.phoneNumber}
+                  {resolvedCustomer.phoneNumber}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Mail className="w-4 h-4" style={{ color: '#94a3b8' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Email:</span>
-                <span style={{ color: '#334155' }}>{customer.email || 'Chưa cập nhật'}</span>
+                <span style={{ color: '#334155' }}>{resolvedCustomer.email || 'Chưa cập nhật'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <MapPin className="w-4 h-4" style={{ color: '#94a3b8', marginTop: '2px' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Địa chỉ:</span>
                 <span style={{ flex: 1, color: '#334155' }}>{safeAddress}</span>
               </div>
-              {customer.taxCode && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Building className="w-4 h-4" style={{ color: '#94a3b8' }} />
-                  <span style={{ color: '#64748b', width: '110px' }}>Mã số thuế:</span>
-                  <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{customer.taxCode}</span>
-                </div>
-              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Calendar className="w-4 h-4" style={{ color: '#94a3b8' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Ngày tạo hồ sơ:</span>
-                <span style={{ color: '#334155' }}>{new Date(customer.createdAt).toLocaleDateString('vi-VN')}</span>
+                <span style={{ color: '#334155' }}>{new Date(resolvedCustomer.createdAt).toLocaleDateString('vi-VN')}</span>
               </div>
             </div>
           )}
@@ -351,7 +352,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
         {/* Footer Actions */}
         <div className="customer-drawer-footer">
           <button
-            onClick={() => onOpenEdit(customer)}
+            onClick={() => onOpenEdit(resolvedCustomer)}
             className="btn-secondary-pill"
             style={{ flex: 1, justifyContent: 'center' }}
           >
@@ -361,7 +362,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
 
           {hasDebt && onOpenCollect && (
             <button
-              onClick={() => onOpenCollect(customer)}
+              onClick={() => onOpenCollect(resolvedCustomer)}
               className="btn-primary-pill"
               style={{ flex: 1, justifyContent: 'center' }}
             >

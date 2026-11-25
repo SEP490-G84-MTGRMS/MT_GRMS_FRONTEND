@@ -16,11 +16,11 @@ interface CustomerFormModalProps {
     phoneNumber: string;
     email?: string;
     address?: string;
-    taxCode?: string;
     membershipTier: MembershipTier;
   }) => Promise<void>;
   initialData?: CustomerDto | null;
   isSubmitting: boolean;
+  canAssignTier?: boolean;
 }
 
 export const CustomerFormModal: FC<CustomerFormModalProps> = ({
@@ -29,6 +29,7 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
   onSubmit,
   initialData,
   isSubmitting,
+  canAssignTier = true,
 }) => {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -92,7 +93,7 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
         phoneNumber: cleanPhone,
         email: email.trim() || undefined,
         address: sanitizeCustomerText(address) || undefined,
-        membershipTier,
+        membershipTier: canAssignTier ? membershipTier : 'Standard',
       });
     } catch (err: any) {
       setErrorMsg(err.message || 'Có lỗi xảy ra khi lưu khách hàng.');
@@ -195,10 +196,15 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
                 <div style={{ position: 'relative' }}>
                   <Award className="w-4 h-4 customer-search-icon" />
                   <select
-                    value={membershipTier}
+                    value={canAssignTier ? membershipTier : 'Standard'}
                     onChange={(e) => setMembershipTier(e.target.value as MembershipTier)}
+                    disabled={!canAssignTier}
                     className="form-select"
-                    style={{ paddingLeft: '40px' }}
+                    style={{
+                      paddingLeft: '40px',
+                      backgroundColor: !canAssignTier ? '#F1F5F9' : undefined,
+                      color: !canAssignTier ? '#64748B' : undefined,
+                    }}
                   >
                     <option value="Standard">Standard (Chuẩn)</option>
                     <option value="Silver">Silver (Bạc)</option>

@@ -41,8 +41,6 @@ export interface CustomerDto {
   fullName: string;
   email?: string;
   address?: string;
-  taxCode?: string;
-  companyName?: string;
   loyaltyPoints: number;
   membershipTier: MembershipTier;
   currentDebtAR: number;
@@ -51,7 +49,6 @@ export interface CustomerDto {
   createdAt: string;
   invoices?: CustomerInvoiceSummary[];
   payments?: CustomerDebtPaymentSummary[];
-  branchId?: string;
 }
 
 /**
@@ -62,7 +59,6 @@ export interface CreateCustomerInput {
   fullName: string;
   email?: string;
   address?: string;
-  taxCode?: string;
   membershipTier?: MembershipTier;
 }
 
@@ -73,9 +69,7 @@ export interface UpdateCustomerInput {
   fullName?: string;
   email?: string;
   address?: string;
-  taxCode?: string;
   membershipTier?: MembershipTier;
-  status?: 'Active' | 'Inactive';
 }
 
 /**
@@ -93,8 +87,15 @@ export interface CollectDebtInput {
 export interface CustomerDebtLedgerDto {
   id: string;
   customerId: string;
+  entryType?: string;
   transactionType: 'DEBT_INCREASE' | 'DEBT_DECREASE';
   amount: number;
+  balanceBefore?: number;
+  balanceAfter?: number;
+  totalIncreased?: number;
+  totalDecreased?: number;
+  currentBalance?: number;
+  totalCount?: number;
   referenceDocId?: string;
   paymentMethod?: 'Cash' | 'VietQR';
   cashTransactionCode?: string;

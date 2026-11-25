@@ -9,9 +9,6 @@ export interface CustomerFilterBarProps {
   onTierChange?: (val: string) => void;
   selectedDebtStatus: DebtFilterStatus;
   onDebtStatusChange: (val: DebtFilterStatus) => void;
-  selectedBranch?: string;
-  onBranchChange?: (branch: string) => void;
-  branches?: { id: string; name: string }[];
   sortOrder?: string;
   onSortOrderChange?: (sort: string) => void;
   timeRange?: string;
@@ -29,7 +26,6 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
   onTierChange,
   selectedDebtStatus,
   onDebtStatusChange,
-  onBranchChange,
   sortOrder = 'name_asc',
   onSortOrderChange,
   timeRange = 'ALL',
@@ -58,13 +54,15 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
 
   const handleReset = () => {
     setSearchInput('');
+    if (onResetFilters) {
+      onResetFilters();
+      return;
+    }
     onSearchChange('');
     onTierChange?.('ALL');
     onDebtStatusChange('ALL');
-    onBranchChange?.('ALL');
     onSortOrderChange?.('name_asc');
     onTimeRangeChange?.('ALL');
-    onResetFilters?.();
   };
 
   const isFiltered =
@@ -78,7 +76,7 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
     <div className="so-list-filter" style={{ marginBottom: 8 }}>
       {/* ── ROW 1: Responsive CSS Grid ── */}
       <div className="so-filter-grid-3">
-        {/* Col 1: Search keyword (name, phone, code, tax) */}
+        {/* Col 1: Search keyword (name, phone, code) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span className="so-list-filter-label" style={{ minWidth: 65 }}>Tìm kiếm:</span>
           <div style={{ position: 'relative', width: '100%', minWidth: 0 }}>
@@ -86,7 +84,7 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
               type="text"
               className="so-list-filter-input"
               style={{ width: '100%', minWidth: 0, paddingLeft: 28, paddingRight: 24 }}
-              placeholder="Tên, SĐT, mã KH, MST..."
+              placeholder="Tên, SĐT, mã KH..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleKeyDown}

@@ -139,7 +139,6 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                 const hasDebt = debt > 0;
                 const code = c.customerCode || c.id.slice(0, 8).toUpperCase();
                 const safeFullName = sanitizeCustomerText(c.fullName, 'Khách hàng');
-                const safeCompanyName = sanitizeCustomerText(c.companyName);
 
                 return (
                   <tr
@@ -156,7 +155,6 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                       <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: 2 }}>
                         <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{code}</span>
                         {c.phoneNumber ? ` • ${c.phoneNumber}` : ''}
-                        {safeCompanyName ? ` (${safeCompanyName})` : ''}
                       </div>
                     </td>
 

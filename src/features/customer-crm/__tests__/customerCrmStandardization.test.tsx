@@ -1,7 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CustomerTable } from '../components/CustomerTable';
 import { CustomerFilterBar } from '../components/CustomerFilterBar';
+import { CustomerDebtLedgerDrawer } from '../components/CustomerDebtLedgerDrawer';
+import { CustomerManagementPage } from '../pages/CustomerManagementPage';
+import { customerApi } from '../api/customerApi';
 import type { CustomerDto } from '../types/customer.types';
 
 const mockCustomers: CustomerDto[] = [
@@ -34,6 +39,9 @@ const mockCustomers: CustomerDto[] = [
 ];
 
 describe('Customer CRM Layout Standardization', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
   it('renders CustomerTable with gold standard .so-list-table-card and synchronized head/body', () => {
     const handleSelect = vi.fn();
     const handleCollect = vi.fn();
@@ -108,13 +116,14 @@ describe('Customer CRM Layout Standardization', () => {
     );
 
     expect(container.querySelector('.so-list-filter')).toBeTruthy();
-    const input = screen.getByPlaceholderText('Tên, SĐT, mã KH, MST...') as HTMLInputElement;
+    const input = screen.getByPlaceholderText('Tên, SĐT, mã KH...') as HTMLInputElement;
     expect(input.value).toBe('Nguyễn');
 
     // Trigger reset button
     const resetBtn = screen.getByTitle('Đặt lại toàn bộ bộ lọc');
     fireEvent.click(resetBtn);
-    expect(handleReset).toHaveBeenCalled();
+    expect(input.value).toBe('');
+    expect(handleReset).toHaveBeenCalledTimes(1);
   });
 
   it('renders pinned pagination with default 15 items per page and handles page change', () => {
@@ -140,5 +149,104 @@ describe('Customer CRM Layout Standardization', () => {
     const sizeSelect = container.querySelector('.table-pagination-size-select') as HTMLSelectElement;
     expect(sizeSelect).toBeTruthy();
     expect(sizeSelect.value).toBe('15');
+  });
+
+  it('renders CustomerDebtLedgerDrawer with balanceBefore -> balanceAfter, return offset label, and BE full-history totals', async () => {
+    vi.spyOn(customerApi, 'getCustomerDebtLedger').mockResolvedValueOnce([
+      {
+        id: 'l-1',
+        customerId: 'cust-1',
+        entryType: 'GoodsReturnOffset',
+        transactionType: 'DEBT_DECREASE',
+        amount: 200000,
+        balanceBefore: 1000000,
+        balanceAfter: 800000,
+        totalIncreased: 5000000,
+        totalDecreased: 4200000,
+        currentBalance: 800000,
+        totalCount: 60,
+        referenceDocId: 'ORD-001',
+        note: 'Trả hàng trừ công nợ',
+        createdAt: '2026-11-20T10:00:00Z',
+      },
+      {
+        id: 'l-2',
+        customerId: 'cust-1',
+        entryType: 'DebtRepayment',
+        transactionType: 'DEBT_DECREASE',
+        amount: 500000,
+        balanceBefore: 1500000,
+        balanceAfter: 1000000,
+        totalIncreased: 5000000,
+        totalDecreased: 4200000,
+        currentBalance: 800000,
+        totalCount: 60,
+        paymentMethod: 'Cash',
+        cashTransactionCode: 'PT-01',
+        note: 'Thu nợ tiền mặt',
+        createdAt: '2026-11-19T10:00:00Z',
+      },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <CustomerDebtLedgerDrawer
+          isOpen={true}
+          customer={mockCustomers[0]}
+          onClose={vi.fn()}
+          onOpenCollect={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Trả hàng trừ nợ')).toBeTruthy();
+    });
+    expect(screen.getByText('Thu nợ')).toBeTruthy();
+    expect(screen.getAllByText(/Số dư trước → Số dư sau:/).length).toBe(2);
+    expect(screen.getByText('Tất cả (60)')).toBeTruthy();
+    // Full-history totals from BE (5.000.000 & 4.200.000), not sum of only the 2 visible rows
+    expect(screen.getByText(/\+5\.000\.000/)).toBeTruthy();
+    expect(screen.getByText(/-4\.200\.000/)).toBeTruthy();
+  });
+
+  it('BUG-035: clears URL-synced search input on the FIRST click of Đặt lại without reverting', async () => {
+    vi.spyOn(customerApi, 'getCustomers').mockResolvedValue(mockCustomers);
+    vi.spyOn(customerApi, 'getKpiSummary').mockResolvedValue({
+      totalCustomers: 2,
+      totalDebtAR: 8000000,
+      debtorCount: 1,
+      totalLoyaltyPoints: 470,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/store-owner/customers?search=KH001']}>
+          <CustomerManagementPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const searchInput = await screen.findByPlaceholderText('Tên, SĐT, mã KH...') as HTMLInputElement;
+    await waitFor(() => {
+      expect(searchInput.value).toBe('KH001');
+    });
+
+    const resetBtn = screen.getByTitle('Đặt lại toàn bộ bộ lọc');
+    fireEvent.click(resetBtn);
+
+    await waitFor(() => {
+      expect(searchInput.value).toBe('');
+    });
+    // Ensure subsequent renders do not restore stale URL keyword
+    await waitFor(() => {
+      expect(customerApi.getCustomers).toHaveBeenLastCalledWith(
+        expect.objectContaining({ search: '' })
+      );
+    });
   });
 });

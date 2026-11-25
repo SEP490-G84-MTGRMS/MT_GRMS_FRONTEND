@@ -106,6 +106,39 @@ describe('customerApi Live Neon Integration Tests', () => {
     });
   });
 
+  describe('updateCustomer', () => {
+    it('should omit removed ghost fields (taxCode, status) when updating customer', async () => {
+      const updated = {
+        id: 'cust-1',
+        customerCode: 'KH001',
+        fullName: 'Nguyễn Văn B',
+        phoneNumber: '0988776655',
+        currentDebtAR: 0,
+        membershipTier: 'Gold',
+      };
+      vi.mocked(financeHttpClient.put).mockResolvedValueOnce({
+        data: { success: true, data: updated },
+      } as any);
+
+      await customerApi.updateCustomer('cust-1', {
+        fullName: ' Nguyễn Văn B ',
+        email: ' b@example.com ',
+        address: ' Hà Nội ',
+        membershipTier: 'Gold',
+      });
+
+      const [, sentPayload] = vi.mocked(financeHttpClient.put).mock.calls[0];
+      expect(sentPayload).toEqual({
+        fullName: 'Nguyễn Văn B',
+        email: 'b@example.com',
+        address: 'Hà Nội',
+        membershipTier: 'Gold',
+      });
+      expect(sentPayload).not.toHaveProperty('status');
+      expect(sentPayload).not.toHaveProperty('taxCode');
+    });
+  });
+
   describe('collectDebt', () => {
     const input = {
       customerId: 'customer-1',
@@ -169,7 +202,7 @@ describe('customerApi Live Neon Integration Tests', () => {
   });
 
   describe('getCustomerDebtLedger', () => {
-    it('should map Backend customer debt entries correctly to DEBT_DECREASE and DEBT_INCREASE', async () => {
+    it('should map Backend customer debt entries with balanceBefore/After, entryType, and full-history totals', async () => {
       const mockEntries = [
         {
           id: 'ent-1',
@@ -177,7 +210,12 @@ describe('customerApi Live Neon Integration Tests', () => {
           customerId: 'cust-1',
           entryType: 'DebtRepayment',
           amount: 5000000,
+          balanceBefore: 8000000,
           balanceAfter: 3000000,
+          totalIncreased: 12000000,
+          totalDecreased: 9000000,
+          currentBalance: 3000000,
+          totalCount: 65,
           referenceCode: 'REC-001',
           description: 'Thu nợ',
           occurredAtUtc: '2026-11-02T12:00:00Z',
@@ -186,9 +224,30 @@ describe('customerApi Live Neon Integration Tests', () => {
           id: 'ent-2',
           entryCode: 'CDE-002',
           customerId: 'cust-1',
+          entryType: 'GoodsReturnOffset',
+          amount: 1000000,
+          balanceBefore: 9000000,
+          balanceAfter: 8000000,
+          totalIncreased: 12000000,
+          totalDecreased: 9000000,
+          currentBalance: 3000000,
+          totalCount: 65,
+          referenceCode: 'ORD-001',
+          description: 'Trả hàng trừ công nợ',
+          occurredAtUtc: '2026-11-01T11:00:00Z',
+        },
+        {
+          id: 'ent-3',
+          entryCode: 'CDE-003',
+          customerId: 'cust-1',
           entryType: 'DebtIncurred',
           amount: 8000000,
+          balanceBefore: 0,
           balanceAfter: 8000000,
+          totalIncreased: 12000000,
+          totalDecreased: 9000000,
+          currentBalance: 3000000,
+          totalCount: 65,
           referenceCode: 'ORD-001',
           description: 'Bán nợ',
           occurredAtUtc: '2026-11-01T10:00:00Z',
@@ -201,9 +260,18 @@ describe('customerApi Live Neon Integration Tests', () => {
 
       const ledgers = await customerApi.getCustomerDebtLedger('cust-1');
 
-      expect(ledgers).toHaveLength(2);
+      expect(ledgers).toHaveLength(3);
       expect(ledgers[0].transactionType).toBe('DEBT_DECREASE');
-      expect(ledgers[1].transactionType).toBe('DEBT_INCREASE');
+      expect(ledgers[0].entryType).toBe('DebtRepayment');
+      expect(ledgers[0].balanceBefore).toBe(8000000);
+      expect(ledgers[0].balanceAfter).toBe(3000000);
+      expect(ledgers[0].totalIncreased).toBe(12000000);
+      expect(ledgers[0].totalDecreased).toBe(9000000);
+      expect(ledgers[0].currentBalance).toBe(3000000);
+      expect(ledgers[0].totalCount).toBe(65);
+      expect(ledgers[1].transactionType).toBe('DEBT_DECREASE');
+      expect(ledgers[1].entryType).toBe('GoodsReturnOffset');
+      expect(ledgers[2].transactionType).toBe('DEBT_INCREASE');
     });
   });
 

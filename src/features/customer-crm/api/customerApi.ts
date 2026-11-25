@@ -26,6 +26,10 @@ interface BackendCustomerDebtLedgerItem {
   description: string;
   occurredAtUtc: string;
   paymentMethod?: string | null;
+  totalIncreased?: number | null;
+  totalDecreased?: number | null;
+  currentBalance?: number | null;
+  totalCount?: number | null;
 }
 
 /**
@@ -102,7 +106,6 @@ export const customerApi = {
       email: input.email !== undefined ? input.email.trim() : undefined,
       address: input.address !== undefined ? input.address.trim() : undefined,
       membershipTier: input.membershipTier,
-      status: input.status,
     });
 
     if (!res.data.success || !res.data.data) {
@@ -181,20 +184,28 @@ export const customerApi = {
       }
 
       return res.data.data.map((entry) => {
-        const isRepayment = entry.entryType === 'DebtRepayment';
-        const isDecrease = isRepayment || entry.entryType === 'GoodsReturnOffset';
+        const isRepayment =
+          entry.entryType === 'DebtRepayment' || entry.entryType === 'DEBT_REPAYMENT';
+        const isReturnOffset =
+          entry.entryType === 'GoodsReturnOffset' || entry.entryType === 'RETURN_OFFSET';
+        const isDecrease = isRepayment || isReturnOffset;
         const pmUpper = (entry.paymentMethod || '').toUpperCase();
         const isBankMethod = pmUpper
-          ? pmUpper === 'BANK' || pmUpper === 'VIETQR'
+          ? pmUpper === 'BANK' || pmUpper === 'VIETQR' || pmUpper === 'TENANTBANK'
           : Boolean(entry.description?.includes('Bank')) || Boolean(entry.description?.includes('VietQR'));
 
         return {
           id: entry.id,
           customerId: entry.customerId,
+          entryType: entry.entryType,
           transactionType: isDecrease ? 'DEBT_DECREASE' : 'DEBT_INCREASE',
           amount: entry.amount,
           balanceBefore: entry.balanceBefore ?? undefined,
           balanceAfter: entry.balanceAfter ?? undefined,
+          totalIncreased: entry.totalIncreased ?? undefined,
+          totalDecreased: entry.totalDecreased ?? undefined,
+          currentBalance: entry.currentBalance ?? undefined,
+          totalCount: entry.totalCount ?? undefined,
           referenceDocId: isRepayment ? undefined : entry.referenceCode,
           paymentMethod: isRepayment ? (isBankMethod ? 'VietQR' : 'Cash') : undefined,
           cashTransactionCode: isRepayment ? entry.referenceCode || entry.entryCode : undefined,
