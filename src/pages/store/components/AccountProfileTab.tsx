@@ -249,7 +249,7 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
               <div className="security-row-title">Mật khẩu</div>
               <div className="security-row-desc">
                 Để bảo mật tài khoản tốt hơn, hãy sử dụng mật khẩu mạnh và thay đổi định kỳ 6 tháng/lần.
-                MT-GRMS sẽ tự động đăng xuất tài khoản khỏi tất cả thiết bị trước khi đổi mật khẩu thành công.
+                MT-GRMS sẽ giữ phiên làm việc hiện tại và tự động hủy các phiên đăng nhập cũ trên tất cả thiết bị khác sau khi đổi mật khẩu thành công.
               </div>
             </div>
           </div>

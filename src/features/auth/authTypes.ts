@@ -98,6 +98,11 @@ export interface ResetPasswordPayload {
   newPassword: string;
 }
 
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export class ApiError extends Error {
   status: number;
   statusCode: number;
