@@ -188,7 +188,7 @@
 .tax-hero-grid .tax-topbar-actions {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
@@ -196,9 +196,12 @@
 .tax-period-selector {
   flex: 0 1 auto;
   min-width: 0;
+  flex-wrap: wrap;
+  box-sizing: border-box;
 }
 
-.tax-hero-grid .tax-period-selector { width: 100%; }
+.tax-hero-grid .tax-period-selector { width: 100%; grid-column: 1 / -1; }
+.tax-hero-grid .tax-topbar-actions > .btn-primary-pill { justify-self: end; }
 
 .tax-hero-grid .tax-topbar-title-group {
   align-items: flex-start;
@@ -230,7 +233,7 @@
     flex-direction: row;
     align-items: center;
   }
-  .tax-hero-grid .tax-topbar-actions { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+  .tax-hero-grid .tax-topbar-actions { grid-template-columns: auto auto minmax(0, 1fr); }
 }
 
 @media (max-width: 760px) {

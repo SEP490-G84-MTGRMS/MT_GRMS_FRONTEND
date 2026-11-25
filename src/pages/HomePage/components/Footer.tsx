@@ -67,10 +67,10 @@ export const Footer: FC = () => {
         <div className="footer-links-col">
           <h4>Liên hệ hỗ trợ</h4>
           <p>
-            <strong>Hotline / Zalo:</strong> 0123.456.789
+            <strong>Hotline / Zalo:</strong> 1900 6886
           </p>
           <p>
-            <strong>Email:</strong> email@gmail.com
+            <strong>Email:</strong> hotro@thviet.vn
           </p>
           <p>
             <strong>Địa chỉ:</strong> Khu Công nghệ cao Hòa Lạc, Km29 Đại lộ

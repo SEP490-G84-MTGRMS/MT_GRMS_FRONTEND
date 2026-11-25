@@ -1,3 +1,6 @@
+import { isAxiosError } from 'axios';
+import { mapProblemDetailsToVietnamese } from '../../../api/problemDetailsMapper';
+import { useCashbookSubmissionKey } from '../hooks/useCashbookSubmissionKey';
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +11,7 @@ interface CreateReceiptModalProps {
   isOpen: boolean;
   accounts: CashAccount[];
   onClose: () => void;
-  onSubmit: (dto: CreateReceiptDTO) => Promise<void>;
+  onSubmit: (dto: CreateReceiptDTO, idempotencyKey: string) => Promise<void>;
   initialCategory?: string;
 }
 
@@ -39,6 +42,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
   const [description, setDescription] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const getSubmissionKey = useCashbookSubmissionKey(isOpen);
 
   const applyCategoryDefaults = (cat: string) => {
     setCategory(cat);
@@ -84,6 +88,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMsg('');
 
     const parsedAmount = Number(amountStr.replace(/\D/g, ''));
@@ -112,7 +117,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
 
     try {
       setIsSubmitting(true);
-      await onSubmit({
+      const dto: CreateReceiptDTO = {
         accountId,
         amount: parsedAmount,
         category,
@@ -122,10 +127,11 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
         categoryCode: selectedCategory.code,
         taxTreatment,
         taxTreatmentReason: taxTreatmentReason.trim() || undefined,
-      });
+      };
+      await onSubmit(dto, getSubmissionKey(dto));
       onClose();
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Lỗi khi lưu phiếu thu');
+      setErrorMsg(isAxiosError(err) ? mapProblemDetailsToVietnamese(err) : err instanceof Error ? err.message : 'Lỗi khi lưu phiếu thu');
     } finally {
       setIsSubmitting(false);
     }
@@ -147,7 +153,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
         <form onSubmit={handleSubmit}>
           <div className="cb-modal-body">
             {errorMsg && (
-              <div className="cb-overdraft-alert">
+              <div className="cb-overdraft-alert" role="alert">
                 <AlertTriangle size={15} className="shrink-0" /> <span>{errorMsg}</span>
               </div>
             )}
@@ -162,7 +168,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
               >
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.accountName} ({acc.currentBalance.toLocaleString('vi-VN')} đ)
+                    {acc.accountName}{acc.branchName ? ` — ${acc.branchName}` : ''} ({acc.currentBalance.toLocaleString('vi-VN')} đ)
                   </option>
                 ))}
               </select>
@@ -173,7 +179,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
               <input
                 type="text"
                 className="cb-form-input"
-                placeholder="Ví dụ: 1,500,000"
+                placeholder="Ví dụ: 1.500.000"
                 value={amountStr ? Number(amountStr.replace(/\D/g, '')).toLocaleString('vi-VN') : ''}
                 onChange={(e) => setAmountStr(e.target.value)}
                 required
@@ -207,10 +213,9 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
 
             <div className="cb-form-group">
               <label className="cb-form-label">Đối tượng nộp tiền *</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="cb-counterparty-fields">
                 <select
                   className="cb-form-select"
-                  style={{ width: '140px' }}
                   value={counterpartyType}
                   onChange={(e) => setCounterpartyType(e.target.value as CounterpartyType)}
                 >
@@ -254,7 +259,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
             </button>
             <button
               type="submit"
-              className="cb-btn cb-btn-receipt"
+              className="cb-btn cb-btn-primary"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Đang lưu...' : 'Lưu phiếu thu'}

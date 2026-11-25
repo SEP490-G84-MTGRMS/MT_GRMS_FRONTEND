@@ -39,6 +39,7 @@ export const StoreOwnerLayout: FC = () => {
 
       {/* Main Content */}
       <main
+        className="so-layout-main"
         style={{
           flex: 1,
           width: '100%',
@@ -49,6 +50,7 @@ export const StoreOwnerLayout: FC = () => {
           display: 'flex',
           flexDirection: 'column',
           minHeight: 0,
+          boxSizing: 'border-box',
         }}
       >
         <ProtectedRoute allowedRoles={['STORE_OWNER']}>

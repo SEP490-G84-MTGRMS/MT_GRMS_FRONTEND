@@ -30,7 +30,7 @@ import { AccountingBooksView } from '../components/AccountingBooksView';
 import { TaxOverviewCard } from '../components/TaxOverviewCard';
 import { TaxDeclarationPreviewModal } from '../components/TaxDeclarationPreviewModal';
 import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
-import { isUsingMockData, taxSnapshotApi } from '../api/taxSnapshotApi';
+import { taxSnapshotApi } from '../api/taxSnapshotApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import {
   TaxPeriodType,
@@ -54,6 +54,9 @@ export const TaxSnapshotPage: FC = () => {
   const { user } = useAuthStore();
   const canManageTax = user?.role === 'STORE_OWNER';
 
+  const currentYear = new Date().getFullYear();
+  const selectableYears = [currentYear + 1, currentYear, currentYear - 1, currentYear - 2];
+
   const {
     summary,
     isSummaryLoading,
@@ -62,6 +65,8 @@ export const TaxSnapshotPage: FC = () => {
     refetchSummary,
     snapshots,
     isSnapshotsLoading,
+    snapshotsError,
+    refetchSnapshots,
     filterParams,
     setCalculationMethod,
     setPeriod,
@@ -70,7 +75,7 @@ export const TaxSnapshotPage: FC = () => {
     updateTaxRates,
     resetTaxRatesToDefault,
     createSnapshot,
-  } = useTaxSnapshots(2026);
+  } = useTaxSnapshots(currentYear);
 
   // Modals & Drawers
   const [isRateConfigOpen, setIsRateConfigOpen] = useState<boolean>(false);
@@ -138,7 +143,12 @@ export const TaxSnapshotPage: FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const pCode = filterParams.periodType === TaxPeriodType.Quarter ? `Q${filterParams.periodNumber}` : `T${filterParams.periodNumber}`;
+      const pCode =
+        filterParams.periodType === TaxPeriodType.Quarter
+          ? `Q${filterParams.periodNumber}`
+          : filterParams.periodType === TaxPeriodType.Year
+          ? 'NAM'
+          : `T${filterParams.periodNumber}`;
       a.download = `BaoCaoThue_${filterParams.year}_${pCode}.xlsx`;
       document.body.appendChild(a);
       a.click();
@@ -161,8 +171,7 @@ export const TaxSnapshotPage: FC = () => {
   };
 
   const handlePeriodTypeChange = (pType: TaxPeriodType) => {
-    const defaultNumber = pType === TaxPeriodType.Month ? 1 : pType === TaxPeriodType.Quarter ? 1 : filterParams.year;
-    setPeriod(pType, defaultNumber);
+    setPeriod(pType, 1);
   };
 
   const handlePeriodNumberChange = (num: number) => {
@@ -214,27 +223,6 @@ export const TaxSnapshotPage: FC = () => {
 
       {/* Main Content Container */}
       <div className="tax-content-container">
-        {/* Demo Banner */}
-        {isUsingMockData() && (
-          <div
-            style={{
-              padding: '10px 16px',
-              borderRadius: 10,
-              background: '#FFFBEB',
-              border: '1px solid #FDE68A',
-              marginTop: 16,
-              marginBottom: 4,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}
-          >
-            <span style={{ fontSize: '0.84rem', color: '#92400E' }}>
-              Chế độ dữ liệu mẫu: máy chủ chưa kết nối, số liệu chỉ để xem thiết kế, không dùng để kê khai.
-            </span>
-          </div>
-        )}
-
         {/* Desktop: controls on the left, annual overview on the right. */}
         <div className="tax-hero-grid">
         <div className="tax-topbar-wrapper">
@@ -262,7 +250,7 @@ export const TaxSnapshotPage: FC = () => {
                   >
                     {summary?.householdGroupName
                       ? `${summary.householdGroupName} (${summary.booksSummary?.primaryBookCode || 'S2a-HKD'})`
-                      : 'Nhóm 2: 1 – 3 tỷ (Sổ S2a)'}
+                      : 'Chưa có dữ liệu phân nhóm thuế'}
                   </span>
                 </div>
               </div>
@@ -363,8 +351,9 @@ export const TaxSnapshotPage: FC = () => {
                     outline: 'none',
                   }}
                 >
-                  <option value={2026}>2026</option>
-                  <option value={2025}>2025</option>
+                  {selectableYears.map((yr) => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
                 </select>
               </div>
 
@@ -400,7 +389,7 @@ export const TaxSnapshotPage: FC = () => {
                     <div className="tax-actions-menu-separator" />
                     {canManageTax && <button type="button" role="menuitem" onClick={() => { setIsRateConfigOpen(true); setIsActionMenuOpen(false); }}><SlidersHorizontal size={16} /> Cấu hình thuế</button>}
                     {canManageTax && <button type="button" role="menuitem" onClick={() => { setPinModalInitialTab('change'); setIsPinModalOpen(true); setIsActionMenuOpen(false); }}><KeyRound size={16} /> Mã PIN bảo mật</button>}
-                    {canManageTax && <button type="button" role="menuitem" disabled={isExportingExcel || isSummaryLoading} onClick={() => { void handleExportExcel(); setIsActionMenuOpen(false); }}><Download size={16} /> {isExportingExcel ? 'Đang xuất…' : 'Xuất báo cáo Excel'}</button>}
+                    {canManageTax && <button type="button" role="menuitem" disabled={isExportingExcel || isSummaryLoading || !summary || Boolean(summaryError)} onClick={() => { void handleExportExcel(); setIsActionMenuOpen(false); }}><Download size={16} /> {isExportingExcel ? 'Đang xuất…' : 'Xuất báo cáo Excel'}</button>}
                   </div>
                 )}
               </div>
@@ -410,9 +399,14 @@ export const TaxSnapshotPage: FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(true)}
-                  className="btn-primary-pill"
+                  disabled={!summary || isSummaryLoading || isSummaryRefetching || Boolean(summaryError)}
+                  className={existingFinalizedSnapshot ? 'btn-secondary-pill' : 'btn-primary-pill'}
                 >
-                  <span>Chốt kỳ sổ {periodLabel}</span>
+                  <span>
+                    {existingFinalizedSnapshot
+                      ? `Đã chốt · Chốt bổ sung ${periodLabel}`
+                      : `Chốt kỳ sổ ${periodLabel}`}
+                  </span>
                 </button>
               )}
             </div>
@@ -440,9 +434,9 @@ export const TaxSnapshotPage: FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <AlertCircle size={20} style={{ color: '#DC2626' }} />
               <div>
-                <strong style={{ fontSize: '0.88rem', color: '#991B1B' }}>Không thể kết nối máy chủ tính thuế</strong>
+                <strong style={{ fontSize: '0.88rem', color: '#991B1B' }}>Không thể tải dữ liệu thuế</strong>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#B91C1C' }}>
-                  Đang hiển thị số liệu ngoại tuyến. Bấm thử lại để kết nối lại máy chủ.
+                  {summaryError.message || 'Vui lòng thử lại để tải dữ liệu từ máy chủ.'}
                 </p>
               </div>
             </div>
@@ -527,11 +521,13 @@ export const TaxSnapshotPage: FC = () => {
         <div className="tax-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAuxiliaryView(null); }}>
           <section ref={auxiliaryDialogRef} className="tax-auxiliary-modal" role="dialog" aria-modal="true" aria-labelledby="tax-auxiliary-title">
             <header className="tax-auxiliary-header">
-              <div><h2 id="tax-auxiliary-title">{auxiliaryView === 'history' ? 'Lịch sử chốt kỳ' : 'Phân tích doanh thu & thuế'}</h2><p>{periodLabel}</p></div>
+              <div><h2 id="tax-auxiliary-title">{auxiliaryView === 'history' ? 'Lịch sử chốt kỳ' : 'Phân tích doanh thu & thuế'}</h2><p>{auxiliaryView === 'history' ? `Năm ${filterParams.year}` : periodLabel}</p></div>
               <button type="button" className="tax-drawer-close-btn" aria-label="Đóng" onClick={() => setAuxiliaryView(null)}><X size={18} /></button>
             </header>
             <div className="tax-auxiliary-body">
-              {auxiliaryView === 'history' ? (
+              {snapshotsError ? (
+                <div role="alert"><p>Không thể tải lịch sử chốt kỳ: {snapshotsError.message}</p><button type="button" className="btn-secondary-pill" onClick={() => void refetchSnapshots()}>Thử lại</button></div>
+              ) : auxiliaryView === 'history' ? (
                 <TaxSnapshotsHistoryView
                   snapshots={snapshots as any}
                   isLoading={isSnapshotsLoading}

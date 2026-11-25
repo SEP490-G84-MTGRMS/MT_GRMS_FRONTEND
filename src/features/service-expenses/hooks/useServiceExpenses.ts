@@ -6,6 +6,7 @@ import {
   getExpenseSummary,
   getServiceExpenses,
   payServiceExpense,
+  rejectServiceExpense,
 } from '../api/expenseApi';
 import type {
   CreateExpenseRequest,
@@ -126,6 +127,27 @@ export const useCancelExpense = () => {
       expenseId: string;
       reason: string;
     }) => cancelServiceExpense(expenseId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: expenseKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: expenseKeys.summaries() });
+    },
+  });
+};
+
+/**
+ * Hook mutation to reject a pending expense voucher approval
+ */
+export const useRejectExpense = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      expenseId,
+      reason,
+    }: {
+      expenseId: string;
+      reason: string;
+    }) => rejectServiceExpense(expenseId, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: expenseKeys.lists() });
       queryClient.invalidateQueries({ queryKey: expenseKeys.summaries() });

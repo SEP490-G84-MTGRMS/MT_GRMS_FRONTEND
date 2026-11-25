@@ -1,3 +1,6 @@
+import { isAxiosError } from 'axios';
+import { mapProblemDetailsToVietnamese } from '../../../api/problemDetailsMapper';
+import { useCashbookSubmissionKey } from '../hooks/useCashbookSubmissionKey';
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { CashAccount, FundTransferDTO } from '../types/cashbook.types';
@@ -7,7 +10,7 @@ interface InternalTransferModalProps {
   isOpen: boolean;
   accounts: CashAccount[];
   onClose: () => void;
-  onSubmit: (dto: FundTransferDTO) => Promise<void>;
+  onSubmit: (dto: FundTransferDTO, idempotencyKey: string) => Promise<void>;
 }
 
 const MAX_NOTE_LENGTH = 255;
@@ -21,9 +24,9 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
   const [fromAccountId, setFromAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
   const [amount, setAmount] = useState<number | ''>('');
-  const [transferFee, setTransferFee] = useState<number | ''>(0);
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const getSubmissionKey = useCashbookSubmissionKey(isOpen);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +40,6 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
         setToAccountId('');
       }
       setAmount('');
-      setTransferFee(0);
       setNote('Chuyển tiền nội bộ giữa các tài khoản quỹ');
       setErrorMessage(null);
     }
@@ -51,6 +53,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMessage(null);
 
     const numAmount = Number(amount);
@@ -79,16 +82,17 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
 
     try {
       setIsSubmitting(true);
-      await onSubmit({
+      const dto: FundTransferDTO = {
         fromAccountId,
         toAccountId,
         amount: numAmount,
-        transferFee: Number(transferFee) || 0,
+        transferFee: 0,
         note: note.trim() || 'Chuyển tiền nội bộ',
-      });
+      };
+      await onSubmit(dto, getSubmissionKey(dto));
       onClose();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Lỗi khi thực hiện chuyển quỹ');
+    } catch (err: unknown) {
+      setErrorMessage(isAxiosError(err) ? mapProblemDetailsToVietnamese(err) : err instanceof Error ? err.message : 'Lỗi khi thực hiện chuyển quỹ');
     } finally {
       setIsSubmitting(false);
     }
@@ -137,12 +141,19 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
             <select
               className="cb-form-select"
               value={fromAccountId}
-              onChange={(e) => setFromAccountId(e.target.value)}
+              onChange={(e) => {
+                const nextFrom = e.target.value;
+                setFromAccountId(nextFrom);
+                if (nextFrom === toAccountId) {
+                  const fallbackDest = accounts.find((a) => a.id !== nextFrom && a.isActive) || accounts.find((a) => a.id !== nextFrom);
+                  setToAccountId(fallbackDest ? fallbackDest.id : '');
+                }
+              }}
               required
             >
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.accountName} · {acc.currentBalance.toLocaleString('vi-VN')} đ
+                  {acc.accountName}{acc.branchName ? ` (${acc.branchName})` : ''} · {acc.currentBalance.toLocaleString('vi-VN')} đ
                 </option>
               ))}
             </select>
@@ -166,7 +177,7 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
                 .filter((a) => a.id !== fromAccountId)
                 .map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.accountName} · {acc.currentBalance.toLocaleString('vi-VN')} đ
+                    {acc.accountName}{acc.branchName ? ` (${acc.branchName})` : ''} · {acc.currentBalance.toLocaleString('vi-VN')} đ
                   </option>
                 ))}
             </select>
@@ -186,8 +197,9 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
               placeholder="0"
               value={amount}
               onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
-              min="1000"
-              step="1000"
+              min={1000}
+              max={availableBalance > 0 ? availableBalance : undefined}
+              step={1000}
               required
             />
             {Number(amount) > 0 && (
@@ -195,20 +207,6 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
                 {Number(amount).toLocaleString('vi-VN')} đ
               </div>
             )}
-          </div>
-
-          {/* Phí chuyển khoản nếu có */}
-          <div className="cb-form-group">
-            <label className="cb-form-label">Phí ngân hàng</label>
-            <input
-              type="number"
-              className="cb-form-input"
-              placeholder="0"
-              value={transferFee}
-              onChange={(e) => setTransferFee(e.target.value === '' ? '' : Number(e.target.value))}
-              min="0"
-              step="1000"
-            />
           </div>
 
           {/* Ghi chú */}

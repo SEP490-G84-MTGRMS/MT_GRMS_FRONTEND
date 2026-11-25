@@ -7,6 +7,7 @@ import { payslipApi, extractErrorMessage } from '../../api/payslipApi';
 import { scheduleApi } from '../../api/scheduleApi';
 import { attendancePolicyApi } from '../../api/attendancePolicyApi';
 import { getVietnamCurrentMonthIso } from '../../lib/vietnamTime';
+import { NotificationModal } from '../../../../components/common';
 
 interface CreatePayslipModalProps {
   isOpen: boolean;
@@ -34,12 +35,14 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
   const [batchNote, setBatchNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialPeriodMonth) {
       setPeriodMonth(initialPeriodMonth);
     }
     setSubmitError(null);
+    setSuccessMessage(null);
   }, [initialPeriodMonth, isOpen]);
 
   useEffect(() => {
@@ -129,8 +132,9 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
       if (onCalculationSuccess) {
         onCalculationSuccess(createdList.length);
       } else {
-        alert(`Đã tính toán và khởi tạo thành công ${createdList.length} phiếu lương cho kỳ ${periodMonth}!`);
-        onClose();
+        setSuccessMessage(
+          `Đã tính toán và khởi tạo thành công ${createdList.length} phiếu lương cho kỳ ${periodMonth}!`
+        );
       }
     } catch (err: any) {
       const msg = extractErrorMessage(err, 'Lỗi khi tính toán bảng lương.');
@@ -351,6 +355,19 @@ export const CreatePayslipModal: React.FC<CreatePayslipModalProps> = ({
           setIsAttendanceConfigOpen(false);
         }}
       />
+
+      {successMessage && (
+        <NotificationModal
+          isOpen={true}
+          type="success"
+          title="Khởi tạo bảng lương thành công"
+          message={successMessage}
+          onClose={() => {
+            setSuccessMessage(null);
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 };

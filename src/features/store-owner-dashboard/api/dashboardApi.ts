@@ -4,7 +4,7 @@ export type DashboardPeriod = 'today' | 'yesterday' | 'last7days' | 'thisMonth';
 
 export interface DashboardBranch { id: string; name: string }
 export interface DashboardScope { fromUtc: string; toUtc: string; asOfUtc: string; branchId: string | null; branchName: string }
-export interface DashboardTrendPoint { date: string; revenue: number; cogs: number; expenses: number; netProfit: number }
+export interface DashboardTrendPoint { date: string; revenue: number; cogs?: number; expenses?: number; netProfit?: number }
 export interface DashboardTopProduct { productId: string; productName: string; quantitySold: number; revenue: number }
 export interface DashboardStockItem { productId: string; branchId: string; productName: string; branchName: string; availableQty: number; minStock: number; unit: string }
 export interface DashboardExpiryItem { productId: string; branchId: string; productName: string; branchName: string; batchCode: string | null; expiryDate: string; quantityOnHand: number }

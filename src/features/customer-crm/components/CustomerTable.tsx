@@ -10,7 +10,7 @@ export interface CustomerTableProps {
   isLoading: boolean;
   onSelect: (customer: CustomerDto) => void;
   onEdit: (customer: CustomerDto) => void;
-  onCollect: (customer: CustomerDto) => void;
+  onCollect?: (customer: CustomerDto) => void;
   onViewLedger?: (customer: CustomerDto) => void;
   currentPage?: number;
   pageSize?: number;
@@ -65,10 +65,10 @@ export const CustomerTable: FC<CustomerTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '34%' }} />
+      <col style={{ width: '28%' }} />
+      <col style={{ width: '22%' }} />
+      <col style={{ width: '16%' }} />
       <col style={{ width: '12%' }} />
-      <col style={{ width: '18%' }} />
-      <col style={{ width: '14%' }} />
       <col style={{ width: '22%' }} />
     </colgroup>
   );
@@ -86,7 +86,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
           <thead>
             <tr>
               <th className="so-list-th">Khách hàng</th>
-              <th className="so-list-th">Mã số thuế</th>
+              <th className="so-list-th">Liên hệ / Địa chỉ</th>
               <th className="so-list-th" style={{ textAlign: 'right' }}>Công nợ hiện tại</th>
               <th className="so-list-th" style={{ textAlign: 'right' }}>Điểm tích lũy</th>
               <th className="so-list-th" style={{ textAlign: 'right', paddingRight: '16px' }}>Thao tác</th>
@@ -139,7 +139,6 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                 const hasDebt = debt > 0;
                 const code = c.customerCode || c.id.slice(0, 8).toUpperCase();
                 const safeFullName = sanitizeCustomerText(c.fullName, 'Khách hàng');
-                const safeCompanyName = sanitizeCustomerText(c.companyName);
 
                 return (
                   <tr
@@ -156,13 +155,32 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                       <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: 2 }}>
                         <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{code}</span>
                         {c.phoneNumber ? ` • ${c.phoneNumber}` : ''}
-                        {safeCompanyName ? ` (${safeCompanyName})` : ''}
                       </div>
                     </td>
 
-                    {/* Cột 2: Mã số thuế */}
-                    <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', color: '#334155' }}>
-                      {c.taxCode || '—'}
+                    {/* Cột 2: Liên hệ / Địa chỉ */}
+                    <td className="so-list-td" style={{ color: '#475569', fontSize: '12.5px' }}>
+                      {c.email && (
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.email}>
+                          {c.email}
+                        </div>
+                      )}
+                      {sanitizeCustomerText(c.address) && (
+                        <div
+                          style={{
+                            fontSize: '11.5px',
+                            color: '#64748b',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            marginTop: c.email ? 2 : 0,
+                          }}
+                          title={sanitizeCustomerText(c.address)}
+                        >
+                          {sanitizeCustomerText(c.address)}
+                        </div>
+                      )}
+                      {!c.email && !sanitizeCustomerText(c.address) && '—'}
                     </td>
 
                     {/* Cột 3: Công nợ hiện tại */}
@@ -187,7 +205,7 @@ export const CustomerTable: FC<CustomerTableProps> = ({
                     {/* Cột 5: Thao tác */}
                     <td className="so-list-td" style={{ textAlign: 'right', paddingRight: '14px' }} onClick={(e) => e.stopPropagation()}>
                       <div className="so-list-actions">
-                        {hasDebt && (
+                        {hasDebt && onCollect && (
                           <button
                             type="button"
                             className="so-list-action-btn so-list-action-btn--warning"

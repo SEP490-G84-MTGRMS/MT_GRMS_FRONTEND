@@ -3,7 +3,7 @@ import {
   MOCK_FUNDS,
   MOCK_CUSTOMERS,
   MOCK_PNL_MONTH,
-} from '../data/mockFinanceData';
+} from './mockFinanceData';
 import {
   calculateDaysOverdue,
   getFinancialNow,

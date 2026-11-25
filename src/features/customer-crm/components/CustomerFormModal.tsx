@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
-import { X, User, Phone, Mail, MapPin, Award, Building } from 'lucide-react';
+import { X, User, Phone, Mail, MapPin, Award } from 'lucide-react';
 import type { CustomerDto, MembershipTier } from '../types/customer.types';
 import {
   sanitizeCustomerText,
@@ -16,11 +16,11 @@ interface CustomerFormModalProps {
     phoneNumber: string;
     email?: string;
     address?: string;
-    taxCode?: string;
     membershipTier: MembershipTier;
   }) => Promise<void>;
   initialData?: CustomerDto | null;
   isSubmitting: boolean;
+  canAssignTier?: boolean;
 }
 
 export const CustomerFormModal: FC<CustomerFormModalProps> = ({
@@ -29,12 +29,12 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
   onSubmit,
   initialData,
   isSubmitting,
+  canAssignTier = true,
 }) => {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
-  const [taxCode, setTaxCode] = useState('');
   const [membershipTier, setMembershipTier] = useState<MembershipTier>('Standard');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -46,14 +46,12 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
       setPhoneNumber(initialData.phoneNumber || '');
       setEmail(initialData.email || '');
       setAddress(sanitizeCustomerText(initialData.address));
-      setTaxCode(initialData.taxCode || '');
       setMembershipTier(initialData.membershipTier || 'Standard');
     } else {
       setFullName('');
       setPhoneNumber('');
       setEmail('');
       setAddress('');
-      setTaxCode('');
       setMembershipTier('Standard');
     }
     setErrorMsg('');
@@ -95,8 +93,7 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
         phoneNumber: cleanPhone,
         email: email.trim() || undefined,
         address: sanitizeCustomerText(address) || undefined,
-        taxCode: taxCode.trim() || undefined,
-        membershipTier,
+        membershipTier: canAssignTier ? membershipTier : 'Standard',
       });
     } catch (err: any) {
       setErrorMsg(err.message || 'Có lỗi xảy ra khi lưu khách hàng.');
@@ -199,10 +196,15 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
                 <div style={{ position: 'relative' }}>
                   <Award className="w-4 h-4 customer-search-icon" />
                   <select
-                    value={membershipTier}
+                    value={canAssignTier ? membershipTier : 'Standard'}
                     onChange={(e) => setMembershipTier(e.target.value as MembershipTier)}
+                    disabled={!canAssignTier}
                     className="form-select"
-                    style={{ paddingLeft: '40px' }}
+                    style={{
+                      paddingLeft: '40px',
+                      backgroundColor: !canAssignTier ? '#F1F5F9' : undefined,
+                      color: !canAssignTier ? '#64748B' : undefined,
+                    }}
                   >
                     <option value="Standard">Standard (Chuẩn)</option>
                     <option value="Silver">Silver (Bạc)</option>
@@ -213,36 +215,19 @@ export const CustomerFormModal: FC<CustomerFormModalProps> = ({
               </div>
             </div>
 
-            {/* Email & MST */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <div style={{ position: 'relative' }}>
-                  <Mail className="w-4 h-4 customer-search-icon" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="customer@gmail.com"
-                    className="form-input"
-                    style={{ paddingLeft: '40px' }}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Mã số thuế</label>
-                <div style={{ position: 'relative' }}>
-                  <Building className="w-4 h-4 customer-search-icon" />
-                  <input
-                    type="text"
-                    value={taxCode}
-                    onChange={(e) => setTaxCode(e.target.value)}
-                    placeholder="0312345678"
-                    className="form-input"
-                    style={{ paddingLeft: '40px', fontFamily: 'var(--font-mono, monospace)' }}
-                  />
-                </div>
+            {/* Email */}
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <div style={{ position: 'relative' }}>
+                <Mail className="w-4 h-4 customer-search-icon" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="customer@gmail.com"
+                  className="form-input"
+                  style={{ paddingLeft: '40px' }}
+                />
               </div>
             </div>
 

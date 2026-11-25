@@ -10,6 +10,7 @@ interface Props {
   onLinkCustomer?: (supplierId: string, customerId: string) => void;
   onEditGeneral?: () => void;
   onEditBank?: () => void;
+  onEditVat?: () => void;
   // Legacy fallback
   onEdit?: (tab?: 'basic' | 'terms' | 'bank') => void;
 }
@@ -19,6 +20,7 @@ export const SupplierGeneralProfileTab: FC<Props> = ({
   canEdit = true,
   onEditGeneral,
   onEditBank,
+  onEditVat,
   onEdit,
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -58,17 +60,33 @@ export const SupplierGeneralProfileTab: FC<Props> = ({
           <h2 className="supplier-detail-card-title" data-testid="general-info-card-title" style={{ margin: 0 }}>
             Thông tin chung
           </h2>
-          {canEdit && (onEditGeneral || onEdit) && (
-            <button
-              type="button"
-              onClick={handleTriggerEditGeneral}
-              className="admin-btn admin-btn-secondary"
-              data-testid="btn-edit-general-info"
-              style={{ height: 28, fontSize: 11.5, padding: '0 10px', gap: 4 }}
-            >
-              <Edit3 size={12} />
-              <span>Sửa thông tin chung</span>
-            </button>
+          {canEdit && (onEditGeneral || onEdit || onEditVat) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {onEditVat && (
+                <button
+                  type="button"
+                  onClick={onEditVat}
+                  className="admin-btn admin-btn-secondary"
+                  data-testid="btn-edit-vat-info"
+                  style={{ height: 28, fontSize: 11.5, padding: '0 10px', gap: 4 }}
+                >
+                  {supplier.taxCode || supplier.companyName ? <Edit3 size={12} /> : <Plus size={12} />}
+                  <span>{supplier.taxCode || supplier.companyName ? 'Sửa VAT' : '+ Thêm VAT'}</span>
+                </button>
+              )}
+              {(onEditGeneral || onEdit) && (
+                <button
+                  type="button"
+                  onClick={handleTriggerEditGeneral}
+                  className="admin-btn admin-btn-secondary"
+                  data-testid="btn-edit-general-info"
+                  style={{ height: 28, fontSize: 11.5, padding: '0 10px', gap: 4 }}
+                >
+                  <Edit3 size={12} />
+                  <span>Sửa thông tin chung</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
 

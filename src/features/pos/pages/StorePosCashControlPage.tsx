@@ -26,7 +26,7 @@ import { useAuthStore } from '../../../stores/useAuthStore';
 
 export const StorePosCashControlPage: FC = () => {
   const { user } = useAuthStore();
-  const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
+  const currentTenantId = user?.tenantId || '';
 
   // Chi nhánh đang chọn đồng bộ từ TopNav
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
@@ -36,7 +36,6 @@ export const StorePosCashControlPage: FC = () => {
   const [threshold, setThreshold] = useState<number>(200000);
   const [shiftTotalLimit, setShiftTotalLimit] = useState<number>(0);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-
   // Toast chuẩn AdminToast
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -144,15 +143,19 @@ export const StorePosCashControlPage: FC = () => {
       });
 
       // Cập nhật lưu local dự phòng offline
-      const storageKey = `pos_payment_config_${currentTenantId}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          parsed.cashOutApprovalThreshold = threshold;
-          parsed.cashOutShiftTotalLimit = shiftTotalLimit;
-          localStorage.setItem(storageKey, JSON.stringify(parsed));
-        } catch { }
+      if (currentTenantId) {
+        const storageKey = `pos_payment_config_${currentTenantId}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            parsed.cashOutApprovalThreshold = threshold;
+            parsed.cashOutShiftTotalLimit = shiftTotalLimit;
+            localStorage.setItem(storageKey, JSON.stringify(parsed));
+          } catch {
+            // ignore malformed local cache
+          }
+        }
       }
 
       showToast('Đã lưu cấu hình hạn mức duyệt chi két thành công!', 'success');

@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { X, Printer } from 'lucide-react';
 import type { LedgerTransaction } from '../types/cashbook.types';
 import { formatMoney } from '../../finance/utils/formatters';
+import { useAuthStore } from '../../../stores/useAuthStore';
 
 interface PrintReceiptModalProps {
   isOpen: boolean;
@@ -14,11 +15,41 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
   onClose,
   transaction,
 }) => {
+  const tenantName = useAuthStore((state) => state.user?.tenantName);
   if (!isOpen || !transaction) return null;
 
-  const isReceipt = transaction.transactionType === 'RECEIPT';
-  const isPayment = transaction.transactionType === 'PAYMENT';
-  const title = isReceipt ? 'PHIẾU THU TIỀN' : isPayment ? 'PHIẾU CHI TIỀN' : 'PHIẾU ĐIỀU CHỈNH';
+  const isAdjustment = transaction.transactionType === 'ADJUSTMENT';
+  const isReceipt = transaction.transactionType === 'RECEIPT' || (isAdjustment && transaction.amount >= 0);
+  const isPayment = transaction.transactionType === 'PAYMENT' || (isAdjustment && transaction.amount < 0);
+  const title = isAdjustment
+    ? (isPayment ? 'PHIẾU ĐIỀU CHỈNH GIẢM (CHI)' : 'PHIẾU ĐIỀU CHỈNH TĂNG (THU)')
+    : isReceipt
+    ? 'PHIẾU THU TIỀN'
+    : 'PHIẾU CHI TIỀN';
+  const formCode = isPayment ? '02-TT' : '01-TT';
+  const counterpartyLabels: Record<string, string> = {
+    CUSTOMER: 'Khách hàng',
+    SUPPLIER: 'Nhà cung cấp',
+    EMPLOYEE: 'Nhân viên',
+    TAX_AUTHORITY: 'Cơ quan thuế',
+    INTERNAL: 'Nội bộ',
+    OTHER: 'Khác',
+  };
+  const referenceDocLabels: Record<string, string> = {
+    POS_ORDER: 'Hóa đơn bán hàng',
+    SERVICE_EXPENSE: 'Phiếu chi vận hành',
+    DEBT_PAYMENT: 'Thu nợ khách hàng',
+    TAX_PAYMENT: 'Nộp thuế',
+    INTERNAL_TRANSFER: 'Chuyển quỹ nội bộ',
+    AUDIT: 'Kiểm kê quỹ',
+    MANUAL: 'Chứng từ thủ công',
+  };
+  const counterpartyTypeLabel = transaction.counterpartyType
+    ? (counterpartyLabels[transaction.counterpartyType] || transaction.counterpartyType)
+    : '';
+  const referenceDocTypeLabel = transaction.referenceDocType
+    ? (referenceDocLabels[transaction.referenceDocType] || transaction.referenceDocType)
+    : 'Hóa đơn';
 
   const handlePrint = () => {
     window.print();
@@ -100,14 +131,14 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div>
               <div style={{ fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', color: '#334155' }}>
-                HỆ THỐNG CỬA HÀNG BÁN LẺ MT-GRMS
+                {tenantName || 'Hộ kinh doanh'}
               </div>
               <div style={{ fontSize: '11px', color: '#64748B' }}>
                 {transaction.accountName}
               </div>
             </div>
             <div style={{ textAlign: 'right', fontSize: '11px', color: '#64748B' }}>
-              <div>Mẫu số: <strong>01-TT</strong></div>
+              <div>Mẫu số: <strong>{formCode}</strong></div>
               <div>Số: <strong style={{ color: '#0F766E' }}>{transaction.transactionCode}</strong></div>
             </div>
           </div>
@@ -126,7 +157,7 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
           <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '6px 12px', fontSize: '12.5px' }}>
             <span style={{ color: '#64748B', fontWeight: 600 }}>{isReceipt ? 'Người nộp tiền:' : 'Người nhận tiền:'}</span>
             <span style={{ fontWeight: 700, color: '#0F172A' }}>
-              {transaction.counterpartyName || 'Khách vãng lai'} {transaction.counterpartyType && `(${transaction.counterpartyType})`}
+              {transaction.counterpartyName || 'Khách vãng lai'} {counterpartyTypeLabel && `(${counterpartyTypeLabel})`}
             </span>
 
             <span style={{ color: '#64748B', fontWeight: 600 }}>Tài khoản quỹ:</span>
@@ -143,7 +174,7 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
               <>
                 <span style={{ color: '#64748B', fontWeight: 600 }}>Chứng từ gốc kèm theo:</span>
                 <span style={{ fontWeight: 700, color: '#0284C7' }}>
-                  {transaction.referenceDocId} ({transaction.referenceDocType || 'Hóa đơn'})
+                  {transaction.referenceDocId} ({referenceDocTypeLabel})
                 </span>
               </>
             )}

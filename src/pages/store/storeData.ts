@@ -80,57 +80,38 @@ export interface SubscriptionPlanItem {
 }
 
 export const INITIAL_STORE_INFO: StoreInfo = {
-  tenantId: "t-001-minhduc",
-  name: "Chuỗi Siêu thị Mini Minh Đức",
-  subdomain: "sieu-thi-minh-duc",
-  code: "MD-RETAIL-01",
-  taxCode: "0109887766",
-  hotline: "0369880798",
-  address: "Số 186 Đường Cầu Giấy, Phường Quan Hoa, Quận Cầu Giấy, Hà Nội",
-  city: "Hà Nội",
-  email: "minhduc.retail@gmail.com",
+  tenantId: "",
+  name: "",
+  subdomain: "",
+  code: "",
+  taxCode: "",
+  hotline: "",
+  address: "",
+  city: "",
+  email: "",
   status: "ACTIVE",
-  currentPlan: "Gói dùng thử",
-  subscriptionExpiresAt: "2026-10-19",
-  daysRemaining: 3,
-  branchesCount: 99,
+  currentPlan: "",
+  subscriptionExpiresAt: "",
+  daysRemaining: 0,
+  branchesCount: 1,
   industry: "Tạp hóa & Siêu thị",
-  walletBalance: 1250000,
+  walletBalance: 0,
 };
 
 export const INITIAL_USER_PROFILE: UserProfile = {
-  userId: "usr-001",
-  fullName: "Nhật Long",
-  userName: "0369880798",
-  role: "Admin",
-  phone: "+84369880798",
-  email: "nhatlong.dev@gmail.com",
-  dateOfBirth: "1995-08-15",
-  address: "Số 186 Cầu Giấy, Hà Nội",
-  note: "Quản trị viên trưởng chuỗi siêu thị Minh Đức",
+  userId: "",
+  fullName: "",
+  userName: "",
+  role: "",
+  phone: "",
+  email: "",
+  dateOfBirth: "",
+  address: "",
+  note: "",
   isTwoFactorEnabled: false,
 };
 
-export const INITIAL_SESSIONS: UserSessionItem[] = [
-  {
-    id: "ses-1",
-    deviceName: "Máy tính Windows",
-    browser: "Chrome",
-    ipAddress: "113.190.234.12",
-    lastActive: "16/10/2026",
-    isCurrent: true,
-    status: "unverified",
-  },
-  {
-    id: "ses-2",
-    deviceName: "iPhone 15 Pro Max",
-    browser: "Safari Mobile",
-    ipAddress: "14.238.99.102",
-    lastActive: "15/10/2026",
-    isCurrent: false,
-    status: "active",
-  },
-];
+export const INITIAL_SESSIONS: UserSessionItem[] = [];
 
 export const INITIAL_TRANSACTIONS: WalletTransaction[] = [
   {

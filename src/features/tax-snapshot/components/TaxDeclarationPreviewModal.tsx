@@ -77,8 +77,8 @@ export const TaxDeclarationPreviewModal: FC<Props> = ({ isOpen, filter, onClose 
               <h2>{preview.formTitle.toUpperCase()}</h2>
               <p className="tax-form-period">[01] Kỳ tính thuế: <strong>{preview.periodLabel}</strong></p>
               <div className="tax-form-checks">
-                <span>☐ Hộ kinh doanh, cá nhân kinh doanh thuộc đối tượng nộp thuế TNCN trên doanh thu tính thuế</span>
-                <span>☒ Hộ kinh doanh, cá nhân kinh doanh nộp thuế theo phương pháp kê khai</span>
+                <span>{!preview.requiresBusinessActivityAppendix ? '☒' : '☐'} Hộ kinh doanh, cá nhân kinh doanh thuộc đối tượng nộp thuế TNCN trên doanh thu tính thuế</span>
+                <span>{preview.requiresBusinessActivityAppendix ? '☒' : '☐'} Hộ kinh doanh, cá nhân kinh doanh nộp thuế theo phương pháp kê khai</span>
                 <span>☐ Chỉ có hoạt động kinh doanh trên nền tảng thương mại điện tử, nền tảng số</span>
                 <span>☐ Khai các loại thuế khác (TTĐB, tài nguyên, bảo vệ môi trường/phí)</span>
                 <span>☐ Đề nghị cấp hóa đơn điện tử có mã theo lần phát sinh</span>

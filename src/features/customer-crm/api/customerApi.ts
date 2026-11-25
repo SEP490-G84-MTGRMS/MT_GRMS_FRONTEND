@@ -6,7 +6,6 @@ import type {
   UpdateCustomerInput,
   CollectDebtInput,
   CustomerKpiSummary,
-  VietQrConfig,
   DebtFilterStatus,
   CustomerDebtLedgerDto,
 } from '../types/customer.types';
@@ -26,6 +25,11 @@ interface BackendCustomerDebtLedgerItem {
   referenceCode: string;
   description: string;
   occurredAtUtc: string;
+  paymentMethod?: string | null;
+  totalIncreased?: number | null;
+  totalDecreased?: number | null;
+  currentBalance?: number | null;
+  totalCount?: number | null;
 }
 
 /**
@@ -46,7 +50,7 @@ export const customerApi = {
         search: params?.search || undefined,
         tier: params?.tier && params.tier !== 'ALL' ? params.tier : undefined,
         debtStatus:
-          params?.debtStatus && params.debtStatus !== 'ALL' && params.debtStatus !== 'DEBT'
+          params?.debtStatus && params.debtStatus !== 'ALL'
             ? params.debtStatus
             : undefined,
       },
@@ -102,7 +106,6 @@ export const customerApi = {
       email: input.email !== undefined ? input.email.trim() : undefined,
       address: input.address !== undefined ? input.address.trim() : undefined,
       membershipTier: input.membershipTier,
-      status: input.status,
     });
 
     if (!res.data.success || !res.data.data) {
@@ -181,24 +184,31 @@ export const customerApi = {
       }
 
       return res.data.data.map((entry) => {
-        const isDecrease =
-          entry.entryType === 'DebtRepayment' || entry.entryType === 'GoodsReturnOffset';
-        const isBankMethod =
-          Boolean(entry.description?.includes('Bank')) ||
-          Boolean(entry.description?.includes('VietQR'));
+        const isRepayment =
+          entry.entryType === 'DebtRepayment' || entry.entryType === 'DEBT_REPAYMENT';
+        const isReturnOffset =
+          entry.entryType === 'GoodsReturnOffset' || entry.entryType === 'RETURN_OFFSET';
+        const isDecrease = isRepayment || isReturnOffset;
+        const pmUpper = (entry.paymentMethod || '').toUpperCase();
+        const isBankMethod = pmUpper
+          ? pmUpper === 'BANK' || pmUpper === 'VIETQR' || pmUpper === 'TENANTBANK'
+          : Boolean(entry.description?.includes('Bank')) || Boolean(entry.description?.includes('VietQR'));
 
         return {
           id: entry.id,
           customerId: entry.customerId,
+          entryType: entry.entryType,
           transactionType: isDecrease ? 'DEBT_DECREASE' : 'DEBT_INCREASE',
           amount: entry.amount,
-          referenceDocId: entry.referenceCode,
-          paymentMethod:
-            entry.entryType === 'DebtRepayment' ? (isBankMethod ? 'VietQR' : 'Cash') : undefined,
-          cashTransactionCode:
-            entry.entryType === 'DebtRepayment'
-              ? entry.referenceCode || entry.entryCode
-              : entry.entryCode,
+          balanceBefore: entry.balanceBefore ?? undefined,
+          balanceAfter: entry.balanceAfter ?? undefined,
+          totalIncreased: entry.totalIncreased ?? undefined,
+          totalDecreased: entry.totalDecreased ?? undefined,
+          currentBalance: entry.currentBalance ?? undefined,
+          totalCount: entry.totalCount ?? undefined,
+          referenceDocId: isRepayment ? undefined : entry.referenceCode,
+          paymentMethod: isRepayment ? (isBankMethod ? 'VietQR' : 'Cash') : undefined,
+          cashTransactionCode: isRepayment ? entry.referenceCode || entry.entryCode : undefined,
           note: entry.description,
           createdAt: entry.occurredAtUtc,
         };
@@ -208,29 +218,4 @@ export const customerApi = {
     }
   },
 
-  /**
-   * Generate VietQR configuration payload for instant QR scanning
-   */
-  generateVietQr(customer: CustomerDto, amount: number): VietQrConfig {
-    const bankId = '970422'; // MB Bank Napas Bin
-    const bankName = 'MB Bank (Ngân hàng Quân Đội)';
-    const accountNo = '090123456789';
-    const accountName = 'NGUYEN TRUONG AN';
-    const cleanPhone = customer.phoneNumber.replace(/\D/g, '');
-    const description = `THUNO ${cleanPhone}`;
-    const safeAmount = Math.max(0, Math.round(amount));
-
-    // Dynamic QR URL using vietqr standard
-    const qrDataUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.png?amount=${safeAmount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
-
-    return {
-      bankId,
-      bankName,
-      accountNo,
-      accountName,
-      amount: safeAmount,
-      description,
-      qrDataUrl,
-    };
-  },
 };

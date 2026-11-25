@@ -128,15 +128,7 @@ export const SupplierBranchTable: FC<SupplierBranchTableProps> = ({
   }, [sortedAssignments, pageSize]);
 
   const tableColGroup = (
-    <colgroup>
-      <col style={{ width: '11%' }} /> {/* MÃ CỬA HÀNG */}
-      <col style={{ width: '20%' }} /> {/* TÊN CỬA HÀNG / CHI NHÁNH */}
-      <col style={{ width: '11%' }} /> {/* MÃ NCC */}
-      <col style={{ width: '18%' }} /> {/* TÊN NHÀ CUNG CẤP */}
-      <col style={{ width: '14%' }} /> {/* NGÀY GIAO */}
-      <col style={{ width: '12%' }} /> {/* TRẠNG THÁI */}
-      <col style={{ width: '14%' }} /> {/* THAO TÁC */}
-    </colgroup>
+    <colgroup><col style={{ width: '11%' }} /><col style={{ width: '20%' }} /><col style={{ width: '11%' }} /><col style={{ width: '18%' }} /><col style={{ width: '14%' }} /><col style={{ width: '12%' }} /><col style={{ width: '14%' }} /></colgroup>
   );
 
   const thBaseStyle: React.CSSProperties = {

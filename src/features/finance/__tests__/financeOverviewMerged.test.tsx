@@ -144,4 +144,14 @@ describe('Finance overview unified contract', () => {
       branchId: 'ALL', presetPeriod: 'CUSTOM', startDate: '2026-10-12', endDate: '2026-10-18',
     }));
   });
+
+  it('opens PnlExportModal when clicking Xuất báo cáo button on P&L tab', async () => {
+    renderPage('/store-owner/finance?tab=pnl');
+    await screen.findByText('Bậc thang Lợi nhuận P&L (Kế toán dồn tích)');
+
+    const exportBtn = screen.getByRole('button', { name: /Xuất báo cáo/i });
+    fireEvent.click(exportBtn);
+
+    expect(await screen.findByText('In & Xuất Báo Cáo Tài Chính P&L')).toBeDefined();
+  });
 });

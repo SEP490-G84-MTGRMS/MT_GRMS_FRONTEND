@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { FC } from 'react';
 import {
@@ -7,19 +7,19 @@ import {
   Mail,
   MapPin,
   Calendar,
-  Building,
   QrCode,
   Edit2,
   History,
 } from 'lucide-react';
 import type { CustomerDto } from '../types/customer.types';
+import { customerApi } from '../api/customerApi';
 import { sanitizeCustomerText } from '../utils/customerValidation';
 
 interface CustomerDrawerDetailProps {
   customer: CustomerDto | null;
   onClose: () => void;
   onOpenEdit: (customer: CustomerDto) => void;
-  onOpenCollect: (customer: CustomerDto) => void;
+  onOpenCollect?: (customer: CustomerDto) => void;
   onViewLedger?: (customer: CustomerDto) => void;
 }
 
@@ -41,12 +41,47 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
 }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'info' | 'invoices' | 'payments'>('info');
+  const [detailCustomer, setDetailCustomer] = useState<CustomerDto | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDetailCustomer(null);
+    if (!customer?.id) return () => { cancelled = true; };
+
+    const needsDetail = !Array.isArray(customer.invoices) || !Array.isArray(customer.payments);
+    if (!needsDetail) return () => { cancelled = true; };
+
+    customerApi.getCustomerById(customer.id).then((fetched) => {
+      if (!cancelled && fetched) {
+        setDetailCustomer(fetched);
+      }
+    }).catch(() => {
+      // Ignore detail fetch failure and keep summary fields
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    customer?.id,
+    customer?.currentDebtAR,
+    customer?.fullName,
+    customer?.email,
+    customer?.address,
+    customer?.membershipTier,
+    customer?.invoices,
+    customer?.payments,
+  ]);
 
   if (!customer) return null;
 
-  const safeFullName = sanitizeCustomerText(customer.fullName, 'Khách hàng');
-  const safeAddress = sanitizeCustomerText(customer.address, 'Chưa cập nhật');
-  const safeDebt = Math.max(0, Number(customer.currentDebtAR) || 0);
+  const resolvedCustomer: CustomerDto = detailCustomer && detailCustomer.id === customer.id
+    ? { ...customer, ...detailCustomer }
+    : customer;
+
+  const safeFullName = sanitizeCustomerText(resolvedCustomer.fullName, 'Khách hàng');
+  const safeAddress = sanitizeCustomerText(resolvedCustomer.address, 'Chưa cập nhật');
+  const safeDebt = Math.max(0, Number(resolvedCustomer.currentDebtAR) || 0);
   const hasDebt = safeDebt > 0;
 
   return (
@@ -65,7 +100,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                 </h3>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: '#64748b', fontFamily: 'var(--font-mono, monospace)' }}>
-                {customer.phoneNumber}
+                {resolvedCustomer.phoneNumber}
               </p>
             </div>
           </div>
@@ -93,13 +128,13 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                   color: hasDebt ? '#D97706' : '#059669',
                 }}
               >
-                {formatCurrency(customer.currentDebtAR)}
+                {formatCurrency(resolvedCustomer.currentDebtAR)}
               </p>
               <div style={{ marginTop: '8px' }}>
                 {onViewLedger && (
                   <button
                     type="button"
-                    onClick={() => onViewLedger(customer)}
+                    onClick={() => onViewLedger(resolvedCustomer)}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -134,13 +169,13 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                     color: 'var(--blue-primary, #0F766E)',
                   }}
                 >
-                  {customer.loyaltyPoints.toLocaleString('vi-VN')} điểm
+                  {resolvedCustomer.loyaltyPoints.toLocaleString('vi-VN')} điểm
                 </p>
               </div>
               <div style={{ paddingTop: '8px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b' }}>
                 <span>Tổng chi:</span>
                 <span style={{ fontWeight: 700, color: 'var(--text-main, #111827)' }}>
-                  {formatCurrency(customer.totalSpending)}
+                  {formatCurrency(resolvedCustomer.totalSpending)}
                 </span>
               </div>
             </div>
@@ -158,13 +193,13 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
               onClick={() => setActiveTab('invoices')}
               className={`customer-drawer-tab-btn ${activeTab === 'invoices' ? 'active' : ''}`}
             >
-              Lịch sử mua hàng ({customer.invoices?.length || 0})
+              Lịch sử mua hàng ({resolvedCustomer.invoices?.length || 0})
             </button>
             <button
               onClick={() => setActiveTab('payments')}
               className={`customer-drawer-tab-btn ${activeTab === 'payments' ? 'active' : ''}`}
             >
-              Lịch sử thu nợ ({customer.payments?.length || 0})
+              Lịch sử thu nợ ({resolvedCustomer.payments?.length || 0})
             </button>
           </div>
         </div>
@@ -177,38 +212,31 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
                 <Phone className="w-4 h-4" style={{ color: '#94a3b8' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Số điện thoại:</span>
                 <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 700, color: '#334155' }}>
-                  {customer.phoneNumber}
+                  {resolvedCustomer.phoneNumber}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Mail className="w-4 h-4" style={{ color: '#94a3b8' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Email:</span>
-                <span style={{ color: '#334155' }}>{customer.email || 'Chưa cập nhật'}</span>
+                <span style={{ color: '#334155' }}>{resolvedCustomer.email || 'Chưa cập nhật'}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <MapPin className="w-4 h-4" style={{ color: '#94a3b8', marginTop: '2px' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Địa chỉ:</span>
                 <span style={{ flex: 1, color: '#334155' }}>{safeAddress}</span>
               </div>
-              {customer.taxCode && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Building className="w-4 h-4" style={{ color: '#94a3b8' }} />
-                  <span style={{ color: '#64748b', width: '110px' }}>Mã số thuế:</span>
-                  <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{customer.taxCode}</span>
-                </div>
-              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <Calendar className="w-4 h-4" style={{ color: '#94a3b8' }} />
                 <span style={{ color: '#64748b', width: '110px' }}>Ngày tạo hồ sơ:</span>
-                <span style={{ color: '#334155' }}>{new Date(customer.createdAt).toLocaleDateString('vi-VN')}</span>
+                <span style={{ color: '#334155' }}>{new Date(resolvedCustomer.createdAt).toLocaleDateString('vi-VN')}</span>
               </div>
             </div>
           )}
 
           {activeTab === 'invoices' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {customer.invoices && customer.invoices.length > 0 ? (
-                customer.invoices.map((inv) => (
+              {resolvedCustomer.invoices && resolvedCustomer.invoices.length > 0 ? (
+                resolvedCustomer.invoices.map((inv) => (
                   <div
                     key={inv.id}
                     style={{
@@ -279,8 +307,8 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
 
           {activeTab === 'payments' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {customer.payments && customer.payments.length > 0 ? (
-                customer.payments.map((p) => (
+              {resolvedCustomer.payments && resolvedCustomer.payments.length > 0 ? (
+                resolvedCustomer.payments.map((p) => (
                   <div
                     key={p.id}
                     style={{
@@ -324,7 +352,7 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
         {/* Footer Actions */}
         <div className="customer-drawer-footer">
           <button
-            onClick={() => onOpenEdit(customer)}
+            onClick={() => onOpenEdit(resolvedCustomer)}
             className="btn-secondary-pill"
             style={{ flex: 1, justifyContent: 'center' }}
           >
@@ -332,9 +360,9 @@ export const CustomerDrawerDetail: FC<CustomerDrawerDetailProps> = ({
             <span>Chỉnh sửa hồ sơ</span>
           </button>
 
-          {hasDebt && (
+          {hasDebt && onOpenCollect && (
             <button
-              onClick={() => onOpenCollect(customer)}
+              onClick={() => onOpenCollect(resolvedCustomer)}
               className="btn-primary-pill"
               style={{ flex: 1, justifyContent: 'center' }}
             >

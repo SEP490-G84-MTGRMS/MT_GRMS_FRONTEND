@@ -18,7 +18,19 @@ export interface ExpenseFilterBarProps {
   onReset: () => void;
   onPeriodLabelChange?: (label: string) => void;
   branches?: { id: string; name: string }[];
+  categories?: string[];
 }
+
+const DEFAULT_CATEGORY_OPTIONS: string[] = [
+  'Thuê mặt bằng',
+  'Điện nước',
+  'Internet & Viễn thông',
+  'Bảo trì sửa chữa',
+  'Vệ sinh môi trường',
+  'Tiền điện',
+  'Tiền nước',
+  'Chi phí khác',
+];
 
 export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
   filters,
@@ -26,6 +38,7 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
   onReset,
   onPeriodLabelChange,
   branches,
+  categories,
 }) => {
   const currentMonthIso = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const [searchInput, setSearchInput] = useState(filters.keyword || '');
@@ -35,9 +48,9 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
   const [customTo, setCustomTo] = useState('');
   const [internalBranches, setInternalBranches] = useState<{ id: string; name: string }[]>([]);
 
-  // Tự động tải danh sách chi nhánh nếu component cha không truyền xuống
+  // Tự động tải danh sách chi nhánh nếu component cha không truyền prop branches
   useEffect(() => {
-    if (!branches || branches.length === 0) {
+    if (branches === undefined) {
       let isMounted = true;
       employeeApi.getBranches().then((list) => {
         if (isMounted && list && list.length > 0) {
@@ -52,10 +65,16 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
 
   const activeBranches = branches && branches.length > 0 ? branches : internalBranches;
 
-  // Synchronize search input when external filters (such as URL search param) change
+  // Synchronize search input and period dropdown when external filters (such as URL search param) change
   useEffect(() => {
     setSearchInput(filters.keyword || '');
   }, [filters.keyword]);
+
+  useEffect(() => {
+    if (!filters.fromDate && !filters.toDate && selectedPeriod !== 'all') {
+      setSelectedPeriod('all');
+    }
+  }, [filters.fromDate, filters.toDate, selectedPeriod]);
 
   // Apply date range according to selected period
   const applyPeriod = (
@@ -141,15 +160,8 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
 
   return (
     <div className="so-list-filter" style={{ marginBottom: 8 }}>
-      {/* ── ROW 1: 4 columns CSS Grid (~38px) ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '10px 14px',
-          alignItems: 'center',
-        }}
-      >
+      {/* ── ROW 1: Responsive CSS Grid ── */}
+      <div className="so-filter-grid-4">
         {/* Col 1: Search voucher code / description / vendor */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span className="so-list-filter-label" style={{ minWidth: 65 }}>Chứng từ:</span>
@@ -209,14 +221,21 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
             style={{ width: '100%', minWidth: 0 }}
             value={filters.category || ''}
             onChange={(e) =>
-              onFilterChange({ category: (e.target.value as ExpenseCategory) || undefined })
+              onFilterChange({ category: e.target.value || undefined })
             }
             title="Lọc theo danh mục chi phí"
           >
             <option value="">-- Tất cả danh mục chi --</option>
-            {(Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => (
-              <option key={cat} value={cat}>
-                {EXPENSE_CATEGORY_LABELS[cat]}
+            {Array.from(
+              new Map(
+                [...(categories || []), ...DEFAULT_CATEGORY_OPTIONS].map((cat) => {
+                  const label = EXPENSE_CATEGORY_LABELS[cat as ExpenseCategory] || cat;
+                  return [label.toLowerCase(), { value: cat, label }];
+                })
+              ).values()
+            ).map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>
@@ -264,17 +283,8 @@ export const ExpenseFilterBar: FC<ExpenseFilterBarProps> = ({
         </div>
       </div>
 
-      {/* ── ROW 2: 4 columns CSS Grid (~38px) ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '10px 14px',
-          alignItems: 'center',
-          paddingTop: 8,
-          borderTop: '1px dashed #f1f5f9',
-        }}
-      >
+      {/* ── ROW 2: Responsive CSS Grid ── */}
+      <div className="so-filter-grid-4 so-filter-grid-row2">
         {/* Col 1: Expense period / date range */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span className="so-list-filter-label" style={{ minWidth: 65 }}>Thời gian:</span>

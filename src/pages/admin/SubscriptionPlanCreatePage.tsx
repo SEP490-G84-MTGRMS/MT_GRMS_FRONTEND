@@ -1,7 +1,8 @@
 import './adminPlans.css';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PlanStatus, PlanQuotaConfig, PlanFeatureConfig } from '../../features/admin/types/plan.types';
+import { AdminToast, type ToastState } from '../../features/admin/components';
 import {
   PlanBasicInfoForm,
   PlanQuotasForm,
@@ -44,7 +45,18 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast({ id: Date.now().toString(), message, type });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+    }, 3200);
+  };
 
   const handleReset = () => {
     setCode('');
@@ -111,19 +123,19 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
       });
 
       if (res.success && res.data) {
-        setToastMessage(`Đã khởi tạo thành công gói cước "${name}"!`);
+        showToast(`Đã khởi tạo thành công gói cước "${name}"!`, 'success');
         setTimeout(() => {
           setIsSubmitting(false);
           navigate('/admin/subscriptions');
         }, 800);
       } else {
         setIsSubmitting(false);
-        setToastMessage(res.message || 'Không thể khởi tạo gói cước');
+        showToast(res.message || 'Không thể khởi tạo gói cước', 'error');
       }
     } catch (err: unknown) {
       setIsSubmitting(false);
       const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setToastMessage(errorMsg || 'Lỗi khi kết nối với máy chủ Backend');
+      showToast(errorMsg || 'Lỗi khi kết nối với máy chủ Backend', 'error');
     }
   };
 
@@ -137,32 +149,7 @@ export const SubscriptionPlanCreatePage: React.FC = () => {
         boxSizing: 'border-box',
       }}
     >
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            background: '#16a34a',
-            color: '#ffffff',
-            padding: '10px 20px',
-            borderRadius: '9999px',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
-            fontSize: '13px',
-            fontWeight: 600,
-            zIndex: 9999,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          {toastMessage}
-        </div>
-      )}
+      <AdminToast toast={toast} onClose={() => setToast(null)} />
 
       {/* Header compact */}
       <div className="plans-page-heading" style={{ marginBottom: '16px' }}>

@@ -17,8 +17,11 @@ const formatDate = (value?: string) => {
 export const TaxOverviewCard: FC<Props> = ({ summary, isLoading }) => {
   const [expanded, setExpanded] = useState(false);
 
-  if (isLoading || !summary) {
+  if (isLoading) {
     return <section className="tax-overview-card tax-overview-loading" aria-busy="true">Đang tổng hợp doanh thu năm…</section>;
+  }
+  if (!summary) {
+    return <section className="tax-overview-card tax-overview-loading">Chưa tải được dữ liệu tổng hợp thuế.</section>;
   }
 
   const threshold = summary.taxExemptionThreshold || 1_000_000_000;

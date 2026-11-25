@@ -9,9 +9,6 @@ export interface CustomerFilterBarProps {
   onTierChange?: (val: string) => void;
   selectedDebtStatus: DebtFilterStatus;
   onDebtStatusChange: (val: DebtFilterStatus) => void;
-  selectedBranch?: string;
-  onBranchChange?: (branch: string) => void;
-  branches?: { id: string; name: string }[];
   sortOrder?: string;
   onSortOrderChange?: (sort: string) => void;
   timeRange?: string;
@@ -25,13 +22,10 @@ export interface CustomerFilterBarProps {
 export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
   searchTerm,
   onSearchChange,
-  selectedTier: _selectedTier = 'ALL',
+  selectedTier = 'ALL',
   onTierChange,
   selectedDebtStatus,
   onDebtStatusChange,
-  selectedBranch = 'ALL',
-  onBranchChange,
-  branches = [],
   sortOrder = 'name_asc',
   onSortOrderChange,
   timeRange = 'ALL',
@@ -60,34 +54,29 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
 
   const handleReset = () => {
     setSearchInput('');
+    if (onResetFilters) {
+      onResetFilters();
+      return;
+    }
     onSearchChange('');
     onTierChange?.('ALL');
     onDebtStatusChange('ALL');
-    onBranchChange?.('ALL');
     onSortOrderChange?.('name_asc');
     onTimeRangeChange?.('ALL');
-    onResetFilters?.();
   };
 
   const isFiltered =
     Boolean(searchTerm) ||
     selectedDebtStatus !== 'ALL' ||
-    (selectedBranch && selectedBranch !== 'ALL') ||
+    (selectedTier && selectedTier !== 'ALL') ||
     timeRange !== 'ALL' ||
     sortOrder !== 'name_asc';
 
   return (
     <div className="so-list-filter" style={{ marginBottom: 8 }}>
-      {/* ── ROW 1: 3 columns CSS Grid (~38px) ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1.4fr 1fr 1fr',
-          gap: '10px 14px',
-          alignItems: 'center',
-        }}
-      >
-        {/* Col 1: Search keyword (name, phone, code, tax) */}
+      {/* ── ROW 1: Responsive CSS Grid ── */}
+      <div className="so-filter-grid-3">
+        {/* Col 1: Search keyword (name, phone, code) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span className="so-list-filter-label" style={{ minWidth: 65 }}>Tìm kiếm:</span>
           <div style={{ position: 'relative', width: '100%', minWidth: 0 }}>
@@ -95,7 +84,7 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
               type="text"
               className="so-list-filter-input"
               style={{ width: '100%', minWidth: 0, paddingLeft: 28, paddingRight: 24 }}
-              placeholder="Tên, SĐT, mã KH, MST..."
+              placeholder="Tên, SĐT, mã KH..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -154,37 +143,27 @@ export const CustomerFilterBar: FC<CustomerFilterBarProps> = ({
           </select>
         </div>
 
-        {/* Col 3: Branch selector */}
+        {/* Col 3: Membership tier selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Chi nhánh:</span>
+          <span className="so-list-filter-label" style={{ minWidth: 65 }}>Hạng thẻ:</span>
           <select
-            className={`so-list-filter-select ${selectedBranch && selectedBranch !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            className={`so-list-filter-select ${selectedTier && selectedTier !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
             style={{ width: '100%', minWidth: 0 }}
-            value={selectedBranch}
-            onChange={(e) => onBranchChange?.(e.target.value)}
-            title="Lọc theo chi nhánh"
+            value={selectedTier}
+            onChange={(e) => onTierChange?.(e.target.value)}
+            title="Lọc theo hạng thành viên"
           >
-            <option value="ALL">-- Toàn hệ thống --</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
+            <option value="ALL">-- Tất cả hạng --</option>
+            <option value="Standard">Standard (Chuẩn)</option>
+            <option value="Silver">Silver (Bạc)</option>
+            <option value="Gold">Gold (Vàng)</option>
+            <option value="VIP">VIP</option>
           </select>
         </div>
       </div>
 
-      {/* ── ROW 2: 4 columns CSS Grid (~38px) ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: '10px 14px',
-          alignItems: 'center',
-          paddingTop: 8,
-          borderTop: '1px dashed #f1f5f9',
-        }}
-      >
+      {/* ── ROW 2: Responsive CSS Grid ── */}
+      <div className="so-filter-grid-4 so-filter-grid-row2">
         {/* Col 1: Sort order */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
           <span className="so-list-filter-label" style={{ minWidth: 65 }}>Sắp xếp:</span>

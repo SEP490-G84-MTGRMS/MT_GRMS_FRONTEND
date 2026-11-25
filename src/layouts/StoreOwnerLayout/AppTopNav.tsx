@@ -1187,6 +1187,7 @@ export const AppTopNav: FC = () => {
         aria-label="Điều hướng chính"
       >
         <div
+          className="topnav-inner"
           style={{
             display: "flex",
             alignItems: "center",
@@ -1213,6 +1214,7 @@ export const AppTopNav: FC = () => {
             }}
           >
             <img
+              className="topnav-brand-logo"
               src="/logo/thviet_logo_white.png"
               alt="THViet - Quản Lý Tạp Hóa Việt"
               style={{ height: 38, width: "auto", objectFit: "contain" }}
@@ -1221,13 +1223,15 @@ export const AppTopNav: FC = () => {
 
           {/* Menus List */}
           <div
+            className="topnav-menus-desktop"
             style={{
               display: "flex",
               alignItems: "stretch",
               height: 50,
               gap: 2,
               overflowX: "auto",
-              scrollbarWidth: "none",
+              scrollbarWidth: "thin",
+              minWidth: 0,
               flex: 1,
             }}
           >
@@ -1251,7 +1255,7 @@ export const AppTopNav: FC = () => {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 7,
-                      padding: "0 14px",
+                      padding: "0 clamp(6px, calc((100vw - 1240px) / 50), 14px)",
                       height: "100%",
                       textDecoration: "none",
                       fontSize: 13.5,
@@ -1319,7 +1323,7 @@ export const AppTopNav: FC = () => {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 7,
-                      padding: "0 14px",
+                      padding: "0 clamp(6px, calc((100vw - 1240px) / 50), 14px)",
                       height: "100%",
                       background: "none",
                       border: "none",
@@ -1388,6 +1392,7 @@ export const AppTopNav: FC = () => {
 
           {/* Right actions: Chọn chi nhánh + Hỗ trợ + Góp ý + Divider + Thông báo + Cài đặt + Profile */}
           <div
+            className="topnav-right-actions"
             style={{
               display: "flex",
               alignItems: "center",
@@ -1397,11 +1402,16 @@ export const AppTopNav: FC = () => {
             }}
           >
             {/* 0. Dropdown chọn chi nhánh (chỉ Store Owner) */}
-            {!isEmployee && <BranchSelectorDropdown />}
+            {!isEmployee && (
+              <div className="topnav-branch-desktop">
+                <BranchSelectorDropdown />
+              </div>
+            )}
 
             {/* 1. Hỗ trợ */}
             <button
               type="button"
+              className="topnav-support-btn"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -1436,6 +1446,7 @@ export const AppTopNav: FC = () => {
 
             {/* 2. Divider */}
             <div
+              className="topnav-divider"
               style={{
                 width: 1,
                 height: 18,
@@ -1451,6 +1462,7 @@ export const AppTopNav: FC = () => {
 
             {/* 5. Settings Gear icon with Interactive Dropdown */}
             <div
+              className="topnav-settings-wrap"
               style={{ position: "relative" }}
               ref={settingsMenuRef}
               onMouseEnter={handleSettingsEnter}
@@ -1980,6 +1992,8 @@ export const AppTopNav: FC = () => {
             }}
             className="topnav-hamburger"
             title="Menu"
+            aria-label="Mở menu điều hướng"
+            aria-expanded={mobileOpen}
           >
             <MenuIcon size={16} />
           </button>
@@ -2037,6 +2051,9 @@ export const AppTopNav: FC = () => {
                 }}
               >
                 Quản lý Chuỗi Tạp Hóa
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <BranchSelectorDropdown />
               </div>
             </div>
             {visibleNavGroups.map((group) => (

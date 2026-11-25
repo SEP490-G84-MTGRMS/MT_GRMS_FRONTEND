@@ -17,10 +17,9 @@ import type {
   Employee,
   Branch,
   EmployeeStatus,
-  ApprovalRequest,
-  DebtTransaction,
 } from '../types';
 import { employeeApi } from '../api/employeeApi';
+import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
 import { EmployeeFormModal } from '../components/employee-list/EmployeeFormModal';
 import { EmployeeDetailModal } from '../components/employee-list/EmployeeDetailModal';
 import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalRequestsModal';
@@ -38,7 +37,7 @@ export const EmployeeListPage: React.FC = () => {
   // State data
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
-  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
+  const [pendingRequestCount, setPendingRequestCount] = useState<number>(0);
   const [totalItems, setTotalItems] = useState<number>(0);
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -153,19 +152,13 @@ export const EmployeeListPage: React.FC = () => {
         )
         : res.items;
 
-      // Ưu tiên nhân viên đang làm việc (active) hiển thị lên đầu
-      const sortedItems = [...filteredItems].sort((a, b) => {
-        const aActive = a.status === 'active' ? 0 : 1;
-        const bActive = b.status === 'active' ? 0 : 1;
-        return aActive - bActive;
-      });
-
+      // Thứ tự Active trước / CreatedAt giảm dần đã được sắp xếp từ SQL (EmployeeRepository.GetPagedListAsync)
       if (trimmedKeyword) {
         const startIdx = (page - 1) * pageSize;
-        setEmployees(sortedItems.slice(startIdx, startIdx + pageSize));
-        setTotalItems(sortedItems.length);
+        setEmployees(filteredItems.slice(startIdx, startIdx + pageSize));
+        setTotalItems(filteredItems.length);
       } else {
-        setEmployees(sortedItems);
+        setEmployees(filteredItems);
         setTotalItems(res.totalItems);
       }
     } catch (err: any) {
@@ -239,7 +232,7 @@ export const EmployeeListPage: React.FC = () => {
     }
   };
 
-  const handleSaveEmployee = (savedEmp: Employee, isAddNew: boolean = false) => {
+  const handleSaveEmployee = (savedEmp: Employee, isAddNew: boolean = false, warning?: string) => {
     fetchEmployees();
 
     if (selectedDetailEmployee?.id === savedEmp.id) {
@@ -249,6 +242,20 @@ export const EmployeeListPage: React.FC = () => {
     if (!isAddNew) {
       setShowFormModal(false);
       setEditingEmployee(null);
+    }
+
+    if (warning) {
+      setNotification({
+        isOpen: true,
+        type: 'warning',
+        title: 'Đã lưu nhân viên nhưng chưa cấp được tài khoản',
+        message: `Hồ sơ nhân viên "${savedEmp.fullName}" đã được lưu vào hệ thống, nhưng tự động cấp tài khoản đăng nhập thất bại: ${warning} Vui lòng mở chi tiết nhân viên để cấp lại tài khoản.`,
+        itemCode: savedEmp.employeeCode,
+      });
+      return;
+    }
+
+    if (!isAddNew) {
       setNotification({
         isOpen: true,
         type: 'success',
@@ -378,39 +385,20 @@ export const EmployeeListPage: React.FC = () => {
     }
   };
 
-  const handleAddPayment = (employeeId: string, payment: DebtTransaction) => {
-    setEmployees((prev) =>
-      prev.map((e) => {
-        if (e.id === employeeId) {
-          const updatedDebt = payment.remainingDebtAfter;
-          const updatedHistory = [payment, ...(e.debtHistory || [])];
-          const updated = { ...e, debtAmount: updatedDebt, debtHistory: updatedHistory };
-          if (selectedDetailEmployee?.id === employeeId) {
-            setSelectedDetailEmployee(updated);
-          }
-          return updated;
-        }
-        return e;
-      })
-    );
-  };
+  // Approval requests (đồng bộ từ Backend qua scheduleApprovalApi)
+  const fetchPendingApprovalCount = useCallback(async () => {
+    try {
+      const branchParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
+      const res = await scheduleApprovalApi.getPendingRequests(branchParam);
+      setPendingRequestCount(res.total ?? res.items.length);
+    } catch {
+      // Giữ nguyên số lượng hiện tại nếu lỗi mạng tạm thời
+    }
+  }, [activeBranch]);
 
-  // Approval requests
-  const pendingRequestCount = approvalRequests.filter((r) => r.status === 'pending').length;
-
-  const handleApproveRequests = (ids: string[]) => {
-    setApprovalRequests((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'approved' } : r))
-    );
-    alert(`Đã phê duyệt thành công ${ids.length} yêu cầu!`);
-  };
-
-  const handleRejectRequests = (ids: string[]) => {
-    setApprovalRequests((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'rejected' } : r))
-    );
-    alert(`Đã từ chối ${ids.length} yêu cầu!`);
-  };
+  useEffect(() => {
+    fetchPendingApprovalCount();
+  }, [fetchPendingApprovalCount]);
 
   const handleExportExcel = async () => {
     setShowActionDropdown(false);
@@ -977,23 +965,37 @@ export const EmployeeListPage: React.FC = () => {
             setEmployeeToDelete(target);
           }
         }}
-        onAddPayment={handleAddPayment}
       />
 
       {/* 3. Modal Duyệt yêu cầu */}
       <ApprovalRequestsModal
         isOpen={showApprovalModal}
         onClose={() => setShowApprovalModal(false)}
-        requests={approvalRequests}
-        onApprove={handleApproveRequests}
-        onReject={handleRejectRequests}
+        branchId={activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined}
+        onSuccess={() => {
+          fetchPendingApprovalCount();
+          setNotification({
+            isOpen: true,
+            type: 'success',
+            title: 'Đã xử lý yêu cầu',
+            message: 'Trạng thái phiếu yêu cầu đã được cập nhật vào hệ thống.',
+          });
+        }}
       />
 
       {/* 4. Modal Import Excel */}
       <ImportEmployeeModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onImportSuccess={() => { }}
+        onImportSuccess={(count) => {
+          fetchEmployees();
+          setNotification({
+            isOpen: true,
+            type: 'success',
+            title: 'Nhập dữ liệu thành công',
+            message: `Đã nhập ${count} nhân viên và làm mới danh sách.`,
+          });
+        }}
       />
 
       {/* 5. Modal Xác nhận xóa nhân viên */}

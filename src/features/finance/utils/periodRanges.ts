@@ -23,3 +23,13 @@ export function resolvePresetRange(preset: FinancePeriodPreset, now = new Date()
   if (preset === 'THIS_YEAR') start = new Date(end.getFullYear(), 0, 1);
   return { startDate: localYmd(start), endDate: localYmd(end) };
 }
+
+export const FINANCE_PERIOD_PRESETS: Array<{ value: FinancePeriodPreset; label: string }> = [
+  { value: 'TODAY', label: 'Hôm nay' },
+  { value: 'LAST_7_DAYS', label: '7 ngày qua' },
+  { value: 'THIS_MONTH', label: 'Tháng này' },
+  { value: 'LAST_MONTH', label: 'Tháng trước' },
+  { value: 'THIS_QUARTER', label: 'Quý này' },
+  { value: 'THIS_YEAR', label: 'Năm nay' },
+  { value: 'CUSTOM', label: 'Tùy chọn ngày' },
+];

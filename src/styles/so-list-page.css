@@ -304,13 +304,18 @@
   box-sizing: border-box;
 }
 
-.so-list-table tbody td:first-child,
-.so-list-table tbody td:last-child,
-.so-list-td--actions,
-.so-list-td--status {
-  overflow: visible !important;
-  text-overflow: clip !important;
-  white-space: nowrap;
+.so-list-table--readable thead th,
+.so-list-table--readable tbody td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.so-list-table--readable .so-list-code {
+  white-space: normal;
+}
+
+.so-list-table--readable .so-list-actions {
+  flex-wrap: wrap;
 }
 
 .so-list-code {
@@ -543,4 +548,109 @@
   color: #94a3b8;
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+/* ── Responsive Filter Grids (shared across FE-07, FE-08, FE-15, FE-17) ── */
+.so-filter-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.so-filter-grid-3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.so-filter-grid-row2 {
+  padding-top: 8px;
+  border-top: 1px dashed #f1f5f9;
+}
+
+@media (max-width: 1024px) {
+  .so-filter-grid-4,
+  .so-filter-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .so-list-filter {
+    padding: 10px;
+    gap: 8px;
+  }
+  .so-filter-grid-4,
+  .so-filter-grid-3 {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .so-list-filter-actions {
+    justify-content: flex-start !important;
+    flex-wrap: wrap;
+  }
+}
+
+/* ── Compact KPI Summary Strip (FE-07) ── */
+.so-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.so-kpi-strip-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.so-kpi-strip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.so-kpi-strip-value {
+  font-size: 15px;
+  font-weight: 800;
+  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .so-kpi-strip {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .po-matrix-container {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .so-list-table-card {
+    flex: 0 0 auto !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  .so-list-table-body {
+    flex: 0 0 auto !important;
+    min-height: 280px !important;
+    max-height: 65vh !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+  }
 }

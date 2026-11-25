@@ -4,6 +4,8 @@ import '@testing-library/jest-dom';
 import { taxSnapshotApi } from '../api/taxSnapshotApi';
 import { SecurityPinModal } from '../components/SecurityPinModal';
 import { CreateTaxSnapshotModal } from '../components/CreateTaxSnapshotModal';
+import { TaxSnapshotsHistoryView } from '../components/TaxSnapshotsHistoryView';
+import { AccountingBooksView } from '../components/AccountingBooksView';
 import {
   TaxCalculationMethod,
   TaxPeriodType,
@@ -39,7 +41,7 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
 
       expect(financeHttpClient.post).toHaveBeenCalledWith('/tax/household/pin/change', {
         currentPin: '1234',
-        password: null,
+        currentPassword: null,
         newPin: '5678',
         confirmNewPin: '5678',
       });
@@ -312,11 +314,19 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
       // Proceed to Step 2
       fireEvent.click(nextStepBtn);
 
-      // Step 2: Enter PIN
+      // Step 2: Enter PIN — consent checkbox MUST default to unchecked (BUG-033)
       const pinInput = screen.getByLabelText('Mã PIN bảo mật');
       fireEvent.change(pinInput, { target: { value: '1234' } });
 
+      const consentCheckbox = screen.getByRole('checkbox', { name: /Tôi xác nhận số liệu trên là chính xác/i });
+      expect(consentCheckbox).not.toBeChecked();
+
       const toStep3Btn = screen.getByRole('button', { name: /^Tiếp tục/i });
+      expect(toStep3Btn).toBeDisabled();
+
+      fireEvent.click(consentCheckbox);
+      expect(consentCheckbox).toBeChecked();
+      expect(toStep3Btn).not.toBeDisabled();
       fireEvent.click(toStep3Btn);
 
       // Step 3: Seal with HMAC
@@ -337,60 +347,72 @@ describe('Security PIN Lifecycle & Supersede UI Tests', () => {
       });
     });
 
-    it('rejects finalize in mock runner when period is locked and allowSupersedeExisting is false', async () => {
-      vi.mocked(financeHttpClient.post).mockRejectedValue(new Error('Network error fallback to mock'));
+    it('surfaces a locked-period rejection from the server without creating a local snapshot', async () => {
+      vi.mocked(financeHttpClient.post).mockRejectedValue({ response: { data: { message: 'Kỳ tính thuế đã được chốt và khóa sổ.' } } });
+      await expect(taxSnapshotApi.createSnapshot({ year: 2026, periodType: TaxPeriodType.Quarter, periodNumber: 4,
+        calculationMethod: TaxCalculationMethod.RevenuePercentage, applyVatReduction2026: false, pin: '1234' })).rejects.toThrow('đã được chốt và khóa sổ');
+    });
 
-      // 1. Chốt kỳ ban đầu cho Quý 4/2026 (Revision 0)
-      const firstSnapshot = await taxSnapshotApi.createSnapshot({
+    it('fails closed in HMAC verification modal when integrity verification fails (BUG-075)', async () => {
+      vi.mocked(financeHttpClient.get).mockRejectedValueOnce(new Error('Network error'));
+
+      const snapshot: HouseholdTaxSnapshotDto = {
+        id: 'SNAP-2026-Q1-FAIL',
         year: 2026,
         periodType: TaxPeriodType.Quarter,
-        periodNumber: 4,
+        periodNumber: 1,
+        taxableRevenueInPeriod: 200000000,
+        totalTaxAmount: 3000000,
+        vatAmount: 2000000,
+        pitAmount: 1000000,
+        vatRate: 1.0,
+        pitRate: 0.5,
+        isTaxExempt: false,
+        householdGroup: HouseholdTaxGroup.Group2_1BTo3B,
         calculationMethod: TaxCalculationMethod.RevenuePercentage,
-        applyVatReduction2026: false,
-        pin: '1234',
+        finalizedBy: 'StoreOwner',
+        finalizedAtUtc: '2026-04-10T10:00:00Z',
+        annualAccumulatedRevenue: 500000000,
+        auditSignatureHash: 'abcdef1234567890abcdef1234567890',
+      };
+
+      render(
+        <TaxSnapshotsHistoryView
+          snapshots={[snapshot]}
+          isLoading={false}
+          onViewDetail={vi.fn()}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Kiểm tra HMAC/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Phát hiện sai lệch chữ ký số/i)).toBeInTheDocument();
       });
-      expect(firstSnapshot.revisionNumber).toBe(0);
 
-      // 2. Chốt lại nhưng allowSupersedeExisting = false -> Ném lỗi TAX_PERIOD_LOCKED
-      await expect(
-        taxSnapshotApi.createSnapshot({
-          year: 2026,
-          periodType: TaxPeriodType.Quarter,
-          periodNumber: 4,
-          calculationMethod: TaxCalculationMethod.RevenuePercentage,
-          applyVatReduction2026: false,
-          pin: '1234',
-          allowSupersedeExisting: false,
-        })
-      ).rejects.toThrow(/Kỳ tính thuế.*đã được chốt và khóa sổ/);
+      expect(screen.queryByText(/Chữ ký HMAC-SHA256 hợp lệ/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Đã xác minh' })).not.toBeInTheDocument();
+      expect(screen.getByText('Đóng')).toBeInTheDocument();
+    });
 
-      // 3. Chốt lại có allowSupersedeExisting = true nhưng thiếu lý do -> Ném lỗi thiếu lý do
-      await expect(
-        taxSnapshotApi.createSnapshot({
-          year: 2026,
-          periodType: TaxPeriodType.Quarter,
-          periodNumber: 4,
-          calculationMethod: TaxCalculationMethod.RevenuePercentage,
-          applyVatReduction2026: false,
-          pin: '1234',
-          allowSupersedeExisting: true,
-          rectificationReason: '',
-        })
-      ).rejects.toThrow(/Bắt buộc phải nhập lý do thay thế/);
+    it('does not hardcode personal signer names in A4 print signature footer (BUG-078)', async () => {
+      vi.mocked(financeHttpClient.get).mockResolvedValue({ data: { data: [] } });
+      render(
+        <AccountingBooksView
+          summary={mockSummary}
+          year={2026}
+          periodType={TaxPeriodType.Quarter}
+          periodNumber={3}
+        />
+      );
 
-      // 4. Chốt lại có allowSupersedeExisting = true và có lý do -> Thành công Revision 1
-      const superseded = await taxSnapshotApi.createSnapshot({
-        year: 2026,
-        periodType: TaxPeriodType.Quarter,
-        periodNumber: 4,
-        calculationMethod: TaxCalculationMethod.RevenuePercentage,
-        applyVatReduction2026: false,
-        pin: '1234',
-        allowSupersedeExisting: true,
-        rectificationReason: 'Điều chỉnh số liệu bổ sung Q4',
+      await waitFor(() => {
+        expect(screen.getByText('NGƯỜI ĐẠI DIỆN HỘ KINH DOANH')).toBeInTheDocument();
       });
-      expect(superseded.revisionNumber).toBe(1);
-      expect(superseded.supersededSnapshotId).toBe(firstSnapshot.id);
+
+      expect(screen.queryByText('Nguyễn Thị Thu Ngân')).not.toBeInTheDocument();
+      expect(screen.queryByText('Trần Văn Kế Toán')).not.toBeInTheDocument();
+      expect(screen.queryByText('Cô Ba - Đại diện HKD')).not.toBeInTheDocument();
     });
   });
 });
