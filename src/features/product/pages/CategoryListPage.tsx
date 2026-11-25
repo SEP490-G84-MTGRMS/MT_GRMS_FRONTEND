@@ -610,6 +610,7 @@ export const CategoryListPage: React.FC = () => {
       <CategoryModal
         isOpen={isCategoryModalOpen}
         categoryToEdit={categoryToEdit}
+        existingCategories={categories}
         onClose={() => setIsCategoryModalOpen(false)}
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}

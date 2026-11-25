@@ -432,7 +432,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
             unitName: productToEdit.baseUnit || '',
             convertsToQty: 1,
             convertsToId: null,
-            barcode: productToEdit.barcode || '',
+            barcode: '',
             costPrice: productToEdit.costPrice || 0,
             sellingPrice: productToEdit.sellingPrice || 0,
             isBaseUnit: true,
@@ -501,7 +501,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   unitName: baseUnitApi?.unitName || productToEdit.baseUnit || '',
                   convertsToQty: 1,
                   convertsToId: null,
-                  barcode: baseUnitApi?.barcode || productToEdit.barcode || '',
+                  barcode: '',
                   costPrice: productToEdit.costPrice || 0,
                   sellingPrice: baseUnitApi?.price ?? productToEdit.sellingPrice ?? 0,
                   isBaseUnit: true,
@@ -635,7 +635,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const trimmedBarcode = barcode.trim();
   const isMainBarcodeDuplicateWithUom =
     trimmedBarcode !== '' &&
-    unitRows.some((u) => (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
+    unitRows.some((u) => !u.isBaseUnit && (u.barcode || '').trim().toLowerCase() === trimmedBarcode.toLowerCase());
   const barcodeError =
     barcode !== ''
       ? trimmedBarcode.length > 50 || /\s/.test(barcode)
@@ -712,9 +712,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     const isDuplicateBarcodeWithMain =
       !row.isBaseUnit && trimmedBarcode !== '' && lowerBarcode === trimmedBarcode.toLowerCase();
     const isDuplicateBarcodeWithOther =
+      !row.isBaseUnit &&
       uBarcode !== '' &&
       unitRows.some(
-        (other) => other.id !== row.id && (other.barcode || '').trim().toLowerCase() === lowerBarcode
+        (other) => !other.isBaseUnit && other.id !== row.id && (other.barcode || '').trim().toLowerCase() === lowerBarcode
       );
 
     const rowBarcodeError =
