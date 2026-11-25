@@ -42,9 +42,13 @@ async function fetchAllTenantPages(params: { keyword?: string; status?: string }
   }
 
   const firstItems = firstRes.data.items ?? [];
+  if (firstItems.length === 0) {
+    return firstRes;
+  }
+
   const effectivePageSize = firstRes.data.pageSize || pageSize;
   const totalItems = Math.max(firstRes.data.totalItems ?? firstItems.length, firstItems.length);
-  const totalPages = Math.min(Math.ceil(totalItems / effectivePageSize), 50);
+  const totalPages = Math.ceil(totalItems / effectivePageSize);
 
   if (totalPages <= 1) {
     return {
@@ -57,29 +61,39 @@ async function fetchAllTenantPages(params: { keyword?: string; status?: string }
     };
   }
 
-  const pageRequests = [];
-  for (let page = 2; page <= totalPages; page += 1) {
-    pageRequests.push(
-      tenantApi.getTenants({
-        ...params,
-        page,
-        pageSize: effectivePageSize,
-      }),
-    );
-  }
-
-  const restResponses = await Promise.all(pageRequests);
   const seenIds = new Set<string>(firstItems.map((item) => item.id));
   const mergedItems = [...firstItems];
+  const batchSize = 20;
 
-  for (const pageRes of restResponses) {
-    if (pageRes.success && pageRes.data?.items) {
-      for (const item of pageRes.data.items) {
-        if (!seenIds.has(item.id)) {
-          seenIds.add(item.id);
-          mergedItems.push(item);
+  for (let startPage = 2; startPage <= totalPages; startPage += batchSize) {
+    const endPage = Math.min(startPage + batchSize - 1, totalPages);
+    const pageRequests = [];
+    for (let page = startPage; page <= endPage; page += 1) {
+      pageRequests.push(
+        tenantApi.getTenants({
+          ...params,
+          page,
+          pageSize: effectivePageSize,
+        }),
+      );
+    }
+
+    const batchResponses = await Promise.all(pageRequests);
+    let addedInBatch = 0;
+    for (const pageRes of batchResponses) {
+      if (pageRes.success && pageRes.data?.items) {
+        for (const item of pageRes.data.items) {
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id);
+            mergedItems.push(item);
+            addedInBatch += 1;
+          }
         }
       }
+    }
+
+    if (addedInBatch === 0) {
+      break;
     }
   }
 

@@ -160,4 +160,74 @@ describe('TenantManagementPage', () => {
     revokeObjectUrlSpy.mockRestore();
     anchorClickSpy.mockRestore();
   });
+
+  it('fetches beyond 50 pages when totalItems is 5001 and exports all 5001 rows (5002 CSV lines)', async () => {
+    let capturedBlob: Blob | null = null;
+    const createObjectUrlSpy = vi.spyOn(URL, 'createObjectURL').mockImplementation((obj: Blob | MediaSource) => {
+      capturedBlob = obj as Blob;
+      return 'blob:mock-csv-5001';
+    });
+    const revokeObjectUrlSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    const anchorClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const fullDataset = Array.from({ length: 5001 }, (_, idx) => ({
+      id: `tenant_${idx + 1}`,
+      subdomain: `cua-hang-${idx + 1}`,
+      name: `Cửa Hàng Thứ ${idx + 1}`,
+      ownerName: `Chủ ${idx + 1}`,
+      ownerEmail: `owner${idx + 1}@mtgrms.vn`,
+      ownerPhone: '0912345678',
+      plan: 'Gói Pro',
+      branchCount: 1,
+      maxBranches: 5,
+      staffCount: 2,
+      maxStaff: 20,
+      status: 'ACTIVE',
+    }));
+
+    vi.mocked(tenantApi.getTenants).mockImplementation(async (params) => {
+      const page = params?.page ?? 1;
+      const size = params?.pageSize ?? 100;
+      const start = (page - 1) * size;
+      return {
+        success: true,
+        data: {
+          items: fullDataset.slice(start, start + size),
+          totalItems: 5001,
+          page,
+          pageSize: size,
+        },
+      };
+    });
+
+    render(
+      <MemoryRouter>
+        <TenantManagementPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Tất cả trạng thái (5001)' })).toBeInTheDocument();
+    });
+
+    expect(tenantApi.getTenants).toHaveBeenCalledWith(expect.objectContaining({ page: 51, pageSize: 100 }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Xuất Excel/i }));
+    expect(capturedBlob).not.toBeNull();
+
+    const csvText = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(capturedBlob!);
+    });
+    const lines = csvText.replace(/^\uFEFF/, '').split('\r\n');
+    // 1 header line + 5001 tenant rows = 5002 lines
+    expect(lines.length).toBe(5002);
+    expect(csvText).toContain('cua-hang-5001');
+
+    createObjectUrlSpy.mockRestore();
+    revokeObjectUrlSpy.mockRestore();
+    anchorClickSpy.mockRestore();
+  });
 });
