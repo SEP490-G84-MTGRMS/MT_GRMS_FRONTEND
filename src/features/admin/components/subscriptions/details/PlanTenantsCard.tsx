@@ -95,7 +95,11 @@ export const PlanTenantsCard: React.FC<PlanTenantsCardProps> = ({ plan }) => {
                       ? { label: 'Đang ân hạn', bg: '#fef3c7', color: '#b45309' }
                       : rawStatus === 'EXPIRING'
                         ? { label: 'Sắp hết hạn', bg: '#ffedd5', color: '#c2410c' }
-                        : { label: 'Đang hoạt động', bg: '#dcfce7', color: '#15803d' };
+                        : rawStatus === 'PENDING' || rawStatus === 'NO_PLAN' || rawStatus === 'INACTIVE'
+                          ? { label: 'Chờ kích hoạt', bg: '#f1f5f9', color: '#475569' }
+                          : rawStatus === 'TRIAL'
+                            ? { label: 'Đang dùng thử', bg: '#e0f2fe', color: '#0369a1' }
+                            : { label: 'Đang hoạt động', bg: '#dcfce7', color: '#15803d' };
 
                 return (
                   <tr key={t.id}>

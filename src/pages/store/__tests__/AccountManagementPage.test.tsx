@@ -38,8 +38,6 @@ describe('AccountManagementPage', () => {
         maxBranches: 1,
         staffCount: 1,
         maxStaff: 3,
-        branches: [],
-        createdAt: '2026-11-01T00:00:00Z',
         address: 'Số 10 Trần Phú, Hà Nội',
       },
     });

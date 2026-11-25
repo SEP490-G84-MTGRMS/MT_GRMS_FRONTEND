@@ -54,6 +54,16 @@ const mockBackendPlan = {
       expiryDate: '2027-10-10T00:00:00Z',
       status: 'LOCKED',
     },
+    {
+      id: 'tenant_100',
+      name: 'Tạp Hóa Mới Đăng Ký',
+      subdomain: 'tap-hoa-moi',
+      activeBranches: 1,
+      activeEmployees: 1,
+      joinedDate: '2026-11-25T00:00:00Z',
+      expiryDate: undefined,
+      status: 'PENDING',
+    },
   ],
   createdAt: '2026-10-01T00:00:00Z',
   updatedAt: '2026-11-01T00:00:00Z',
@@ -93,7 +103,11 @@ describe('SubscriptionPlanDetailPage', () => {
 
     expect(screen.getByText('Siêu Thị Hòa Lạc')).toBeInTheDocument();
     expect(screen.getByText('Đã khóa')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Xem' })).toHaveAttribute('href', '/admin/tenants/tenant_99');
+    expect(screen.getByText('Tạp Hóa Mới Đăng Ký')).toBeInTheDocument();
+    expect(screen.getByText('Chờ kích hoạt')).toBeInTheDocument();
+    const viewLinks = screen.getAllByRole('link', { name: 'Xem' });
+    expect(viewLinks[0]).toHaveAttribute('href', '/admin/tenants/tenant_99');
+    expect(viewLinks[1]).toHaveAttribute('href', '/admin/tenants/tenant_100');
 
     const statusSelect = screen.getByLabelText('Trạng thái mở bán');
     fireEvent.change(statusSelect, { target: { value: 'Inactive' } });

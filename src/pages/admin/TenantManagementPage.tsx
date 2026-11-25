@@ -29,10 +29,75 @@ function escapeCsvCell(value: string | number | undefined | null): string {
   return str;
 }
 
+async function fetchAllTenantPages(params: { keyword?: string; status?: string }) {
+  const pageSize = 100;
+  const firstRes = await tenantApi.getTenants({
+    ...params,
+    page: 1,
+    pageSize,
+  });
+
+  if (!firstRes.success || !firstRes.data) {
+    return firstRes;
+  }
+
+  const firstItems = firstRes.data.items ?? [];
+  const effectivePageSize = firstRes.data.pageSize || pageSize;
+  const totalItems = Math.max(firstRes.data.totalItems ?? firstItems.length, firstItems.length);
+  const totalPages = Math.min(Math.ceil(totalItems / effectivePageSize), 50);
+
+  if (totalPages <= 1) {
+    return {
+      ...firstRes,
+      data: {
+        ...firstRes.data,
+        items: firstItems,
+        totalItems,
+      },
+    };
+  }
+
+  const pageRequests = [];
+  for (let page = 2; page <= totalPages; page += 1) {
+    pageRequests.push(
+      tenantApi.getTenants({
+        ...params,
+        page,
+        pageSize: effectivePageSize,
+      }),
+    );
+  }
+
+  const restResponses = await Promise.all(pageRequests);
+  const seenIds = new Set<string>(firstItems.map((item) => item.id));
+  const mergedItems = [...firstItems];
+
+  for (const pageRes of restResponses) {
+    if (pageRes.success && pageRes.data?.items) {
+      for (const item of pageRes.data.items) {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          mergedItems.push(item);
+        }
+      }
+    }
+  }
+
+  return {
+    ...firstRes,
+    data: {
+      ...firstRes.data,
+      items: mergedItems,
+      totalItems: Math.max(totalItems, mergedItems.length),
+    },
+  };
+}
+
 export const TenantManagementPage: FC = () => {
   const navigate = useNavigate();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [allMatchedTenants, setAllMatchedTenants] = useState<Tenant[]>([]);
+  const [totalMatchedCount, setTotalMatchedCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,16 +136,14 @@ export const TenantManagementPage: FC = () => {
       setIsLoading(true);
       const keywordParam = debouncedQuery || undefined;
       const [listRes, summaryRes] = await Promise.all([
-        tenantApi.getTenants({
+        fetchAllTenantPages({
           keyword: keywordParam,
           status: activeTab !== 'all' ? activeTab.toUpperCase() : undefined,
-          pageSize: 100,
         }),
         activeTab === 'all'
           ? Promise.resolve(null)
-          : tenantApi.getTenants({
+          : fetchAllTenantPages({
               keyword: keywordParam,
-              pageSize: 100,
             }),
       ]);
 
@@ -91,8 +154,11 @@ export const TenantManagementPage: FC = () => {
         setTenants(mappedList);
         if (activeTab === 'all') {
           setAllMatchedTenants(mappedList);
+          setTotalMatchedCount(Math.max(listRes.data.totalItems ?? mappedList.length, mappedList.length));
         } else if (summaryRes?.success && summaryRes.data) {
-          setAllMatchedTenants(summaryRes.data.items.map(mapBackendTenantToFrontend));
+          const mappedSummary = summaryRes.data.items.map(mapBackendTenantToFrontend);
+          setAllMatchedTenants(mappedSummary);
+          setTotalMatchedCount(Math.max(summaryRes.data.totalItems ?? mappedSummary.length, mappedSummary.length));
         }
       } else {
         showToast(listRes.message || 'Không thể tải danh sách khách thuê', 'warning');
@@ -133,14 +199,14 @@ export const TenantManagementPage: FC = () => {
   const tabCounts = useMemo(() => {
     const source = allMatchedTenants.length > 0 || activeTab === 'all' ? allMatchedTenants : tenants;
     return {
-      all: source.length,
+      all: Math.max(source.length, totalMatchedCount),
       active: source.filter((t) => t.status === 'active').length,
       expiring: source.filter((t) => t.status === 'expiring').length,
       grace: source.filter((t) => t.status === 'grace').length,
       pending: source.filter((t) => t.status === 'pending').length,
       locked: source.filter((t) => t.status === 'locked').length,
     };
-  }, [allMatchedTenants, tenants, activeTab]);
+  }, [allMatchedTenants, tenants, activeTab, totalMatchedCount]);
 
   const handleExportExcel = () => {
     const headers = [

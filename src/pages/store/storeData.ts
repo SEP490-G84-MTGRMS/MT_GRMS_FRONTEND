@@ -111,26 +111,7 @@ export const INITIAL_USER_PROFILE: UserProfile = {
   isTwoFactorEnabled: false,
 };
 
-export const INITIAL_SESSIONS: UserSessionItem[] = [
-  {
-    id: "ses-1",
-    deviceName: "Máy tính Windows",
-    browser: "Chrome",
-    ipAddress: "113.190.234.12",
-    lastActive: "16/10/2026",
-    isCurrent: true,
-    status: "unverified",
-  },
-  {
-    id: "ses-2",
-    deviceName: "iPhone 15 Pro Max",
-    browser: "Safari Mobile",
-    ipAddress: "14.238.99.102",
-    lastActive: "15/10/2026",
-    isCurrent: false,
-    status: "active",
-  },
-];
+export const INITIAL_SESSIONS: UserSessionItem[] = [];
 
 export const INITIAL_TRANSACTIONS: WalletTransaction[] = [
   {

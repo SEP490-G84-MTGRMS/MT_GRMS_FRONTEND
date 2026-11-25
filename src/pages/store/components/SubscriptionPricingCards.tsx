@@ -347,27 +347,57 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
     );
   }
 
+  const normalizedCurrentPlan = (currentPlanName || "").trim().toLowerCase();
+  const isUnselectedPlan =
+    trialState === "ELIGIBLE" ||
+    !normalizedCurrentPlan ||
+    normalizedCurrentPlan.includes("chưa kích hoạt") ||
+    normalizedCurrentPlan.includes("chưa chọn");
+
+  const exactMatchedPlan = !isUnselectedPlan
+    ? plans.find(
+        (p) =>
+          p.code.toLowerCase() === normalizedCurrentPlan ||
+          p.name.trim().toLowerCase() === normalizedCurrentPlan,
+      )
+    : undefined;
+
+  const matchedCurrentPlan = !isUnselectedPlan
+    ? exactMatchedPlan ??
+      plans.find(
+        (p) =>
+          p.name.toLowerCase().includes(normalizedCurrentPlan) ||
+          normalizedCurrentPlan.includes(p.name.toLowerCase()) ||
+          (p.code.toUpperCase() === "PRO" &&
+            (/\bpro\b/i.test(normalizedCurrentPlan) ||
+              normalizedCurrentPlan.includes("chuyên nghiệp"))) ||
+          (p.code.toUpperCase() === "STANDARD" &&
+            (normalizedCurrentPlan.includes("standard") ||
+              normalizedCurrentPlan.includes("thường") ||
+              normalizedCurrentPlan.includes("cơ bản"))) ||
+          (p.code.toUpperCase() === "TRIAL" &&
+            (normalizedCurrentPlan.includes("trial") ||
+              normalizedCurrentPlan.includes("dùng thử"))),
+      )
+    : undefined;
+
+  const isCurrentPro =
+    !isUnselectedPlan &&
+    (matchedCurrentPlan
+      ? matchedCurrentPlan.code.toUpperCase() === "PRO"
+      : /\bpro\b/i.test(normalizedCurrentPlan) ||
+        normalizedCurrentPlan.includes("chuyên nghiệp"));
+
   return (
     <div className="pricing-cards-grid">
       {plans.map((plan) => {
-        const normalizedCurrentPlan = (currentPlanName || "").trim().toLowerCase();
-        const isUnselectedPlan =
-          trialState === "ELIGIBLE" ||
-          !normalizedCurrentPlan ||
-          normalizedCurrentPlan.includes("chưa kích hoạt") ||
-          normalizedCurrentPlan.includes("chưa chọn");
-        const isCurrentPro =
-          !isUnselectedPlan &&
-          (normalizedCurrentPlan.includes("pro") ||
-            normalizedCurrentPlan.includes("chuyên nghiệp"));
-        const isCurrentPlan = !isUnselectedPlan
-          ? plan.name.toLowerCase().includes(normalizedCurrentPlan) ||
-            normalizedCurrentPlan.includes(plan.name.toLowerCase()) ||
-            normalizedCurrentPlan.toUpperCase().includes(plan.code.toUpperCase())
-          : false;
+        const isCurrentPlan = Boolean(
+          matchedCurrentPlan && matchedCurrentPlan.id === plan.id,
+        );
         const isActiveCurrentPlan = isCurrentPlan && trialState !== "EXPIRED";
         const isExpiredCurrentPlan = isCurrentPlan && trialState === "EXPIRED";
-        const isDowngradeBlocked = isCurrentPro && plan.code.toUpperCase() !== "PRO";
+        const isDowngradeBlocked =
+          isCurrentPro && plan.code.toUpperCase() === "STANDARD";
         const isTrialDisabled =
           isCurrentPro || Boolean(trialState && trialState !== "ELIGIBLE");
 
