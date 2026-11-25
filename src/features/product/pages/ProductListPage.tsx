@@ -348,6 +348,7 @@ export const ProductListPage: React.FC = () => {
         // Cập nhật nhóm hàng qua backend API
         const updatedDto = await categoryApi.updateCategory(id, {
           name,
+          code,
           description,
         });
         setCategories((prev) =>
@@ -1269,6 +1270,7 @@ export const ProductListPage: React.FC = () => {
       <CategoryModal
         isOpen={isCategoryModalOpen}
         categoryToEdit={categoryToEdit}
+        existingCategories={categories}
         onClose={() => setIsCategoryModalOpen(false)}
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
