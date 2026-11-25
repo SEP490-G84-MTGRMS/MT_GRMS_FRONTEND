@@ -1,6 +1,6 @@
 // src/pages/store/components/StoreWalletTopupModal.tsx
 import { useState, useEffect, useRef, type FC } from 'react';
-import { X, CheckCircle2, Copy, Check, ArrowRight, Loader2, RefreshCw, AlertCircle, QrCode } from 'lucide-react';
+import { X, CheckCircle2, Copy, Check, ArrowRight, Loader2, RefreshCw, AlertCircle, QrCode, Info } from 'lucide-react';
 import type { StoreInfo } from '../storeData';
 import { walletApi, type TopupOrderResponse } from '../api/walletApi';
 
@@ -621,8 +621,9 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                    💡 Hệ thống tự động cộng tiền sau 3-5 giây khi chuyển khoản đúng nội dung.
+                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <Info size={13} strokeWidth={1.9} style={{ flexShrink: 0, color: 'var(--blue-primary)' }} />
+                    <span>Hệ thống tự động cộng tiền sau 3-5 giây khi chuyển khoản đúng nội dung.</span>
                   </div>
                 </div>
 
