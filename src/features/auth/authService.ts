@@ -13,6 +13,7 @@ import {
   type SendRegistrationOtpResult,
   type ResetPasswordPayload,
   type ChangePasswordPayload,
+  type UpdateProfilePayload,
   type UserProfile,
 } from './authTypes';
 
@@ -94,6 +95,9 @@ export const mapAuthProblemMessage = (
     INVALID_CURRENT_PASSWORD: 'Mật khẩu hiện tại không chính xác.',
     PASSWORD_SAME_AS_OLD: 'Mật khẩu mới không được trùng với mật khẩu hiện tại.',
     WEAK_PASSWORD: 'Mật khẩu mới phải có 8–64 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt và không có khoảng trắng.',
+    INVALID_FULL_NAME: 'Họ và tên phải có từ 2 đến 100 ký tự.',
+    INVALID_PHONE: 'Số điện thoại phải gồm 10 chữ số hợp lệ tại Việt Nam.',
+    PHONE_EXISTS: 'Số điện thoại này đã được sử dụng bởi một tài khoản khác.',
   };
   return map[normalized] || fallbackMessage || 'Không thể hoàn tất yêu cầu. Vui lòng thử lại.';
 };
@@ -294,6 +298,40 @@ export const authService = {
           ? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.'
           : 'Không thể đổi mật khẩu. Vui lòng thử lại.');
 
+      const message = mapAuthProblemMessage(errorCode, rawMessage);
+      throw new ApiError(status, message, errorCode, data, err.response);
+    }
+  },
+
+  async updateProfile(payload: UpdateProfilePayload): Promise<UserProfile> {
+    try {
+      const response = await httpClient.put<any>('/auth/me/profile', payload);
+      const unwrap = unwrapLogin(response.data);
+      if (!unwrap?.user) {
+        throw new Error('Dữ liệu phản hồi hồ sơ không hợp lệ.');
+      }
+      return unwrap.user;
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+      const data = err.response?.data;
+      const status =
+        err.response?.status ??
+        data?.statusCode ??
+        data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
+      const errorCode =
+        data?.code ??
+        data?.errorCode ??
+        (status === 400 ? 'BAD_REQUEST' : 'UPDATE_PROFILE_FAILED');
+      const rawMessage =
+        data?.detail ??
+        data?.message ??
+        data?.title ??
+        (status === 0
+          ? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.'
+          : 'Không thể cập nhật hồ sơ cá nhân. Vui lòng thử lại.');
       const message = mapAuthProblemMessage(errorCode, rawMessage);
       throw new ApiError(status, message, errorCode, data, err.response);
     }

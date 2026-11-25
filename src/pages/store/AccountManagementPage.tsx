@@ -8,7 +8,7 @@ import {
   type UserProfile,
   type UserSessionItem,
 } from './storeData';
-import type { AccountTabKey } from './components/AccountSidebarNav';
+import { AccountSidebarNav, type AccountTabKey } from './components/AccountSidebarNav';
 import { AccountProfileTab } from './components/AccountProfileTab';
 import { WalletLedgerTab } from './components/WalletLedgerTab';
 import { TermsOfServiceTab } from './components/TermsOfServiceTab';
@@ -17,15 +17,17 @@ import { storeApi, mapBackendStoreToFrontend } from './api/storeApi';
 import { authService } from '../../features/auth/authService';
 import { useAuthStore } from '../../stores/useAuthStore';
 
+const VALID_ACCOUNT_TABS: AccountTabKey[] = ['account-profile', 'wallet', 'terms'];
+
 export const AccountManagementPage: FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user: authUser } = useAuthStore();
   const tabParam = searchParams.get('tab') as AccountTabKey | null;
 
   const [activeTab, setActiveTab] = useState<AccountTabKey>(
-    tabParam && ['account-profile', 'wallet', 'terms'].includes(tabParam)
+    tabParam && VALID_ACCOUNT_TABS.includes(tabParam)
       ? tabParam
-      : 'account-profile'
+      : 'account-profile',
   );
 
   const [userProfile, setUserProfile] = useState<UserProfile>(() =>
@@ -33,13 +35,13 @@ export const AccountManagementPage: FC = () => {
       ? {
           ...INITIAL_USER_PROFILE,
           userId: authUser.id,
-          fullName: authUser.fullName || INITIAL_USER_PROFILE.fullName,
-          userName: authUser.phone || authUser.email || INITIAL_USER_PROFILE.userName,
-          role: authUser.role || INITIAL_USER_PROFILE.role,
+          fullName: authUser.fullName || '',
+          userName: authUser.phone || authUser.email || '',
+          role: authUser.role || '',
           phone: authUser.phone || '',
           email: authUser.email || '',
         }
-      : INITIAL_USER_PROFILE
+      : INITIAL_USER_PROFILE,
   );
   const [sessions, setSessions] = useState<UserSessionItem[]>(() => {
     const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
@@ -86,25 +88,25 @@ export const AccountManagementPage: FC = () => {
       ]);
       if (!active) return;
 
-      if (storeRes.status === 'fulfilled' && storeRes.value.success && storeRes.value.data) {
-        setStoreInfo((prev) => mapBackendStoreToFrontend(storeRes.value.data, prev.walletBalance));
+      const loadedStore =
+        storeRes.status === 'fulfilled' && storeRes.value.success && storeRes.value.data
+          ? storeRes.value.data
+          : null;
+
+      if (loadedStore) {
+        setStoreInfo((prev) => mapBackendStoreToFrontend(loadedStore, prev.walletBalance));
       }
       if (meRes.status === 'fulfilled' && meRes.value) {
         const me = meRes.value;
         setUserProfile((prev) => ({
           ...prev,
           userId: me.id,
-          fullName: me.fullName || prev.fullName,
+          fullName: me.fullName || '',
           userName: me.phone || me.email || prev.userName,
           role: me.role || prev.role,
-          phone: me.phone || '',
+          phone: me.phone || loadedStore?.hotline || '',
           email: me.email || '',
-          note: storeRes.status === 'fulfilled' && storeRes.value.success && storeRes.value.data
-            ? `Quản trị gian hàng ${storeRes.value.data.name}`
-            : prev.note,
-          address: storeRes.status === 'fulfilled' && storeRes.value.success && storeRes.value.data?.address
-            ? storeRes.value.data.address
-            : prev.address,
+          address: loadedStore?.address || '',
         }));
       }
       if (twoFactorRes.status === 'fulfilled' && twoFactorRes.value) {
@@ -121,7 +123,7 @@ export const AccountManagementPage: FC = () => {
   }, []);
 
   useEffect(() => {
-    if (tabParam && tabParam !== activeTab && ['account-profile', 'wallet', 'terms'].includes(tabParam)) {
+    if (tabParam && tabParam !== activeTab && VALID_ACCOUNT_TABS.includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam, activeTab]);
@@ -132,7 +134,29 @@ export const AccountManagementPage: FC = () => {
     }
   }, [searchParams]);
 
-  const handleUpdateUserProfile = (updated: Partial<UserProfile>) => {
+  const handleSelectTab = (tab: AccountTabKey) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
+  const handleUpdateUserProfile = async (updated: Partial<UserProfile>) => {
+    if (updated.fullName !== undefined || updated.phone !== undefined) {
+      const saved = await authService.updateProfile({
+        fullName: (updated.fullName ?? userProfile.fullName).trim(),
+        phone: updated.phone ?? userProfile.phone,
+      });
+      setUserProfile((prev) => ({
+        ...prev,
+        fullName: saved.fullName,
+        phone: saved.phone || updated.phone || prev.phone,
+        userName: saved.phone || saved.email || prev.userName,
+      }));
+      useAuthStore.getState().updateUser({
+        fullName: saved.fullName,
+        phone: saved.phone || updated.phone,
+      });
+      return;
+    }
     setUserProfile((prev) => ({ ...prev, ...updated }));
   };
 
@@ -144,7 +168,6 @@ export const AccountManagementPage: FC = () => {
     setSessions((prev) => prev.filter((s) => s.id !== sessionId));
   };
 
-  // Nạp tiền ví
   const handleTopupSuccess = (amount: number, newBalance?: number) => {
     const newBal = newBalance !== undefined ? newBalance : storeInfo.walletBalance + amount;
 
@@ -158,8 +181,9 @@ export const AccountManagementPage: FC = () => {
 
   return (
     <div className="store-hub-container">
-      {/* Nội dung chính tương ứng từng tab */}
-      <div style={{ width: '100%', minWidth: 0 }}>
+      <AccountSidebarNav activeTab={activeTab} onSelectTab={handleSelectTab} />
+
+      <div className="store-hub-main" style={{ width: '100%', minWidth: 0 }}>
         {activeTab === 'account-profile' && (
           <AccountProfileTab
             userProfile={userProfile}
@@ -179,7 +203,6 @@ export const AccountManagementPage: FC = () => {
         {activeTab === 'terms' && <TermsOfServiceTab />}
       </div>
 
-      {/* Modal Nạp ví VietQR */}
       {showTopupModal && (
         <StoreWalletTopupModal
           storeInfo={storeInfo}

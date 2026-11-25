@@ -6,7 +6,6 @@ import {
   Laptop,
   Smartphone,
   Trash2,
-  FileEdit,
   CheckCircle2,
 } from 'lucide-react';
 import type { UserProfile, UserSessionItem } from '../storeData';
@@ -19,7 +18,7 @@ import { TwoFactorVerificationModal } from './TwoFactorVerificationModal';
 interface AccountProfileTabProps {
   userProfile: UserProfile;
   sessions: UserSessionItem[];
-  onUpdateProfile: (updated: Partial<UserProfile>) => void;
+  onUpdateProfile: (updated: Partial<UserProfile>) => Promise<void> | void;
   onTerminateSession: (sessionId: string) => void;
 }
 
@@ -164,8 +163,11 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
           {/* Row 2 */}
           <div className="profile-info-item">
             <span className="profile-info-label">Điện thoại</span>
-            <span className="profile-info-value" style={{ fontFamily: 'var(--font-mono)' }}>
-              {userProfile.phone}
+            <span
+              className={`profile-info-value ${!userProfile.phone ? 'muted' : ''}`}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              {userProfile.phone || 'Chưa cập nhật'}
             </span>
           </div>
 
@@ -174,49 +176,16 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
             <span
               className={`profile-info-value ${!userProfile.email ? 'muted' : ''}`}
             >
-              {userProfile.email || 'Chưa có'}
+              {userProfile.email || 'Chưa cập nhật'}
             </span>
           </div>
 
           <div className="profile-info-item">
-            <span className="profile-info-label">Sinh nhật</span>
-            <span
-              className={`profile-info-value ${!userProfile.dateOfBirth ? 'muted' : ''}`}
-            >
-              {userProfile.dateOfBirth || 'Chưa có'}
-            </span>
-          </div>
-
-          {/* Row 3: Địa chỉ */}
-          <div className="profile-info-item full-width">
-            <span className="profile-info-label">Địa chỉ</span>
+            <span className="profile-info-label">Địa chỉ cửa hàng</span>
             <span
               className={`profile-info-value ${!userProfile.address ? 'muted' : ''}`}
             >
-              {userProfile.address || 'Chưa có'}
-            </span>
-          </div>
-
-          {/* Row 4: Ghi chú */}
-          <div
-            className="profile-info-item full-width"
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              borderBottom: 'none',
-              paddingTop: 4,
-            }}
-          >
-            <FileEdit size={16} color="#64748B" />
-            <span
-              style={{
-                fontSize: 13.5,
-                color: userProfile.note ? '#475569' : '#94A3B8',
-              }}
-            >
-              {userProfile.note || 'Chưa có ghi chú'}
+              {userProfile.address || 'Chưa cập nhật'}
             </span>
           </div>
         </div>
@@ -441,23 +410,6 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => showToast(`Đã kiểm tra an toàn cho ${session.deviceName}`)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-pill)',
-                    border: '1px solid #CBD5E1',
-                    backgroundColor: '#FFFFFF',
-                    color: '#334155',
-                    fontSize: 12.5,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Kiểm tra
-                </button>
-
                 {!session.isCurrent && (
                   <button
                     type="button"
@@ -493,8 +445,8 @@ export const AccountProfileTab: FC<AccountProfileTabProps> = ({
         <EditProfileModal
           userProfile={userProfile}
           onClose={() => setShowEditModal(false)}
-          onSave={(updated) => {
-            onUpdateProfile(updated);
+          onSave={async (updated) => {
+            await onUpdateProfile(updated);
             showToast('Đã cập nhật thông tin cá nhân thành công!');
           }}
         />

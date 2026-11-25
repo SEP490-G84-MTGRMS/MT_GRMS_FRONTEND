@@ -103,6 +103,11 @@ export interface ChangePasswordPayload {
   newPassword: string;
 }
 
+export interface UpdateProfilePayload {
+  fullName: string;
+  phone?: string;
+}
+
 export class ApiError extends Error {
   status: number;
   statusCode: number;
