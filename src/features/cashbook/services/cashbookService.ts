@@ -159,7 +159,7 @@ function mapBackendEntryToLedgerTransaction(
     branchId: entry.branchId || 'ALL',
     transactionType: isAdjustment ? 'ADJUSTMENT' : isReceipt ? 'RECEIPT' : 'PAYMENT',
     category: defaultCategory,
-    amount: Number(entry.amount),
+    amount: isAdjustment && !isReceipt ? -Math.abs(Number(entry.amount)) : Math.abs(Number(entry.amount)),
     balanceAfter: Number(entry.balanceAfter),
     counterpartyType: counterpartyType,
     counterpartyName: entry.referenceCode || entry.sourceType,

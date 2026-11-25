@@ -18,9 +18,14 @@ export const PrintReceiptModal: FC<PrintReceiptModalProps> = ({
   const tenantName = useAuthStore((state) => state.user?.tenantName);
   if (!isOpen || !transaction) return null;
 
-  const isReceipt = transaction.transactionType === 'RECEIPT';
-  const isPayment = transaction.transactionType === 'PAYMENT';
-  const title = isReceipt ? 'PHIẾU THU TIỀN' : isPayment ? 'PHIẾU CHI TIỀN' : 'PHIẾU ĐIỀU CHỈNH';
+  const isAdjustment = transaction.transactionType === 'ADJUSTMENT';
+  const isReceipt = transaction.transactionType === 'RECEIPT' || (isAdjustment && transaction.amount >= 0);
+  const isPayment = transaction.transactionType === 'PAYMENT' || (isAdjustment && transaction.amount < 0);
+  const title = isAdjustment
+    ? (isPayment ? 'PHIẾU ĐIỀU CHỈNH GIẢM (CHI)' : 'PHIẾU ĐIỀU CHỈNH TĂNG (THU)')
+    : isReceipt
+    ? 'PHIẾU THU TIỀN'
+    : 'PHIẾU CHI TIỀN';
   const formCode = isPayment ? '02-TT' : '01-TT';
   const counterpartyLabels: Record<string, string> = {
     CUSTOMER: 'Khách hàng',

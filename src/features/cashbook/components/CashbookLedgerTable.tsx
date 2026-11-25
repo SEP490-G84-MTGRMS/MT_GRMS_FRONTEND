@@ -632,8 +632,8 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                           </button>
                         )}
 
-                        {/* Action: Void / Reverse Transaction */}
-                        {!isVoided && !isComp && onVoidTransaction && (
+                        {/* Action: Void / Reverse Transaction (manual entries only) */}
+                        {!isVoided && !isComp && !tx.isAutomated && (!tx.sourceType || tx.sourceType === 'MANUAL') && onVoidTransaction && (
                           <button
                             type="button"
                             className="so-list-action-btn so-list-action-btn--danger"

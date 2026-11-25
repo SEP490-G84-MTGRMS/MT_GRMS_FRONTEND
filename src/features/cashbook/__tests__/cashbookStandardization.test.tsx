@@ -286,13 +286,13 @@ describe('Phase 1: Cashbook Page UI/UX Standardization Suite', () => {
     const closeBtns = screen.getAllByRole('button', { name: /Đóng/i });
     fireEvent.click(closeBtns[0]);
 
-    // Click Void / Hủy button on first row
+    // Automated CRM_DEBT row (PT-20261114-001) must NOT render a Void button; only manual row (PC-20261114-002) shows it
     const voidButtons = container.querySelectorAll('.so-list-action-btn--danger');
-    expect(voidButtons.length).toBeGreaterThan(0);
+    expect(voidButtons.length).toBe(1);
     fireEvent.click(voidButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByText(/Gạch bỏ phiếu \[PT-20261114-001\]/i)).toBeDefined();
+      expect(screen.getByText(/Gạch bỏ phiếu \[PC-20261114-002\]/i)).toBeDefined();
       expect(screen.getByPlaceholderText(/Nhập nhầm tài khoản/i)).toBeDefined();
     });
   });

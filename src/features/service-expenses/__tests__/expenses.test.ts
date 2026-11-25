@@ -410,6 +410,25 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
       expect(result.items[2].dueDate).toBe('');
       expect(result.items[2].expenseDate).toBe('2026-11-01');
     });
+
+    it('TC-EXP-12: should not inject fallback note on approveServiceExpense and should send +07:00 date bounds', async () => {
+      const postSpy = vi.spyOn(financeHttpClient, 'post').mockResolvedValueOnce({
+        data: { success: true, data: { id: 'exp-1', voucherCode: 'EXP-1', status: 'Approved', amount: 100000 } },
+      } as any);
+      await expenseApi.approveServiceExpense('exp-1');
+      expect(postSpy).toHaveBeenCalledWith('/expenses/exp-1/approve', { expenseId: 'exp-1', note: undefined });
+
+      const getSpy = vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce({
+        data: { success: true, data: [], totalItems: 0 },
+      } as any);
+      await expenseApi.getServiceExpenses({ fromDate: '2026-11-01', toDate: '2026-11-30' });
+      expect(getSpy).toHaveBeenCalledWith('/expenses', {
+        params: expect.objectContaining({
+          fromDate: '2026-11-01T00:00:00+07:00',
+          toDate: '2026-11-30T23:59:59+07:00',
+        }),
+      });
+    });
   });
 });
 

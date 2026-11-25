@@ -520,7 +520,7 @@ export const reportsPnlService = {
           const grossProfit = Number(s.grossProfit || 0);
           const grossMarginPct = Number(s.grossMarginPercentage || 0);
           const operatingExpenses = Number(s.operatingExpenses?.totalAmount || 0);
-          const shrinkageLoss = 0;
+          const shrinkageLoss = Number(s.shrinkageLoss || 0);
           const netProfit = Number(s.netProfit || 0);
           const netMarginPct = Number(s.netMarginPercentage || 0);
 

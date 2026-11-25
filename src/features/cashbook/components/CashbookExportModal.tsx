@@ -146,13 +146,13 @@ export const CashbookExportModal: FC<CashbookExportModalProps> = ({
                         {tx.counterpartyName} - {tx.description}
                       </td>
                       <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                        {tx.transactionType === 'RECEIPT'
-                          ? tx.amount.toLocaleString('vi-VN')
+                        {tx.transactionType === 'RECEIPT' || (tx.transactionType === 'ADJUSTMENT' && tx.amount > 0)
+                          ? Math.abs(tx.amount).toLocaleString('vi-VN')
                           : '-'}
                       </td>
                       <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                        {tx.transactionType === 'PAYMENT'
-                          ? tx.amount.toLocaleString('vi-VN')
+                        {tx.transactionType === 'PAYMENT' || (tx.transactionType === 'ADJUSTMENT' && tx.amount < 0)
+                          ? Math.abs(tx.amount).toLocaleString('vi-VN')
                           : '-'}
                       </td>
                       <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 'bold' }}>

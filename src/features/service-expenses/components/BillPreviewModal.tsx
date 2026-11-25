@@ -8,6 +8,23 @@ interface BillPreviewModalProps {
   title: string;
 }
 
+function isSafeAttachmentUrl(url: string | null): boolean {
+  if (!url) return false;
+  const trimmed = url.trim();
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(trimmed)) {
+    return true;
+  }
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//') && !/[\s\u0000-\u001f]/.test(trimmed)) {
+    return true;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 export const BillPreviewModal: FC<BillPreviewModalProps> = ({
   isOpen,
   onClose,
@@ -21,6 +38,9 @@ export const BillPreviewModal: FC<BillPreviewModalProps> = ({
   }, [imageUrl, isOpen]);
 
   if (!isOpen || !imageUrl) return null;
+
+  const trimmedUrl = imageUrl.trim();
+  const isSafeUrl = isSafeAttachmentUrl(trimmedUrl);
 
   return (
     <div className="expense-modal-backdrop" onClick={onClose}>
@@ -37,15 +57,17 @@ export const BillPreviewModal: FC<BillPreviewModalProps> = ({
             </h3>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <a
-              href={imageUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="action-icon-btn"
-              title="Mở ảnh trong tab mới"
-            >
-              <ExportIcon size={14} color="currentColor" />
-            </a>
+            {isSafeUrl && (
+              <a
+                href={trimmedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="action-icon-btn"
+                title="Mở ảnh trong tab mới"
+              >
+                <ExportIcon size={14} color="currentColor" />
+              </a>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -70,7 +92,7 @@ export const BillPreviewModal: FC<BillPreviewModalProps> = ({
             overflow: 'auto',
           }}
         >
-          {hasError ? (
+          {!isSafeUrl || hasError ? (
             <div style={{ textAlign: 'center', padding: '32px 16px' }}>
               <div
                 style={{
@@ -88,15 +110,17 @@ export const BillPreviewModal: FC<BillPreviewModalProps> = ({
                 <CloseIcon size={24} color="#ef4444" />
               </div>
               <p style={{ fontWeight: 700, color: '#1e293b', margin: '0 0 6px 0' }}>
-                Không thể tải ảnh hóa đơn chứng từ
+                {!isSafeUrl ? 'Đường dẫn hóa đơn chứng từ không hợp lệ hoặc không an toàn' : 'Không thể tải ảnh hóa đơn chứng từ'}
               </p>
               <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: 0, maxWidth: '360px' }}>
-                Đường dẫn liên kết không tồn tại hoặc đã hết hạn truy cập. Bạn có thể mở liên kết ngoài bằng nút mở rộng phía trên.
+                {!isSafeUrl
+                  ? 'Hệ thống chỉ hỗ trợ hiển thị ảnh chứng từ qua giao thức HTTPS hoặc ảnh tải lên hợp lệ.'
+                  : 'Đường dẫn liên kết không tồn tại hoặc đã hết hạn truy cập. Bạn có thể mở liên kết ngoài bằng nút mở rộng phía trên.'}
               </p>
             </div>
           ) : (
             <img
-              src={imageUrl}
+              src={trimmedUrl}
               alt="Hóa đơn chứng từ chi phí"
               onError={() => setHasError(true)}
               style={{

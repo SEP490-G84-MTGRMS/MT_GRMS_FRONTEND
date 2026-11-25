@@ -238,6 +238,7 @@ export const FinanceOverviewPage: React.FC = () => {
                   ? ((pnlReportQuery.error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message || 'Không thể tải dữ liệu báo cáo Lãi lỗ.')
                   : null
               }
+              onShowToast={showToast}
             />
           </div>
         )}

@@ -93,8 +93,8 @@ export const getServiceExpenses = async (
     pageSize: params?.pageSize || 20,
   };
   if (params?.branchId && isGuid(params.branchId)) queryParams.branchId = params.branchId;
-  if (params?.fromDate) queryParams.fromDate = `${params.fromDate}T00:00:00Z`;
-  if (params?.toDate) queryParams.toDate = `${params.toDate}T23:59:59Z`;
+  if (params?.fromDate) queryParams.fromDate = `${params.fromDate}T00:00:00+07:00`;
+  if (params?.toDate) queryParams.toDate = `${params.toDate}T23:59:59+07:00`;
   if (params?.keyword?.trim()) queryParams.keyword = params.keyword.trim();
   if (params?.category) queryParams.category = params.category;
   if (params?.status) queryParams.status = params.status;
@@ -176,8 +176,8 @@ export const getExpenseSummary = async (
 ): Promise<ExpenseSummaryDto> => {
   const queryParams: Record<string, any> = {};
   if (branchId && isGuid(branchId)) queryParams.branchId = branchId;
-  if (fromDate) queryParams.fromDate = `${fromDate}T00:00:00Z`;
-  if (toDate) queryParams.toDate = `${toDate}T23:59:59Z`;
+  if (fromDate) queryParams.fromDate = `${fromDate}T00:00:00+07:00`;
+  if (toDate) queryParams.toDate = `${toDate}T23:59:59+07:00`;
 
   try {
     const res = await financeHttpClient.get<ApiResponse<any>>('/expenses/summary', {
@@ -235,7 +235,7 @@ export const createServiceExpense = async (
     sellerTaxCode: data.sellerTaxCode || null,
     evidenceAttachmentUrl: data.attachedBillUrl || null,
     note: data.note || null,
-    expenseDate: data.expenseDate ? `${data.expenseDate}T00:00:00Z` : null,
+    expenseDate: data.expenseDate ? `${data.expenseDate}T00:00:00+07:00` : null,
     dueDate: data.dueDate || null,
   };
 
@@ -265,7 +265,7 @@ export const approveServiceExpense = async (
   try {
     const res = await financeHttpClient.post<ApiResponse<any>>(`/expenses/${expenseId}/approve`, {
       expenseId,
-      note: note || 'Phê duyệt phiếu chi vận hành',
+      note: note?.trim() || undefined,
     });
 
     if (res.data?.data) {

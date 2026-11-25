@@ -1,10 +1,11 @@
-import React from 'react';
-import { AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertCircle, Download } from 'lucide-react';
 import type {
   BranchOption,
   PnlFilterParams,
   PnlReportResponse,
 } from '../../reports-pnl/types/reportsPnl.types';
+import { PnlExportModal } from '../../reports-pnl/components/PnlExportModal';
 import { PnlWaterfallSvg } from './PnlWaterfallSvg';
 import { FINANCE_PERIOD_PRESETS } from '../utils/periodRanges';
 import { FinanceOverviewFilterBar } from './FinanceOverviewFilterBar';
@@ -18,6 +19,7 @@ interface Props {
   isLoading: boolean;
   isFetching: boolean;
   errorMessage?: string | null;
+  onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 const PERIOD_LABELS = Object.fromEntries(FINANCE_PERIOD_PRESETS.map((item) => [item.value, item.label]));
@@ -127,7 +129,9 @@ export const FinancePnlOverviewPanel: React.FC<Props> = ({
   isLoading,
   isFetching,
   errorMessage,
+  onShowToast,
 }) => {
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const selectedBranch = branches.find((branch) => branch.id === filter.branchId);
   const scopeLabel = filter.branchId === 'ALL' || !filter.branchId
     ? `toàn chuỗi (${Math.max(0, branches.filter((branch) => branch.id !== 'ALL').length)} chi nhánh)`
@@ -147,12 +151,32 @@ export const FinancePnlOverviewPanel: React.FC<Props> = ({
 
       {errorMessage && <div className="finance-pnl-error" role="alert"><AlertCircle size={17} />{errorMessage}</div>}
 
-      <div className="finance-pnl-story-banner">
+      <div className="finance-pnl-story-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <strong>Hiệu quả kinh doanh · {formatDisplayDate(filter.startDate)} – {formatDisplayDate(filter.endDate)}</strong>
           <span>Cơ sở: Theo dữ liệu bán hàng và chi phí phát sinh · các giá trị chi tiết thể hiện trực tiếp trong biểu đồ</span>
         </div>
+        <button
+          type="button"
+          className="finance-btn-secondary"
+          disabled={isLoading || !reportData}
+          onClick={() => setIsExportModalOpen(true)}
+          title="Xuất báo cáo Lãi lỗ (P&L) ra Excel hoặc in PDF"
+        >
+          <Download size={15} />
+          <span>Xuất báo cáo</span>
+        </button>
       </div>
+
+      <PnlExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        filter={filter}
+        branches={branches}
+        kpi={reportData?.kpiSummary}
+        pnlTree={reportData?.pnlTree ?? []}
+        onShowToast={onShowToast}
+      />
 
       <div className={`finance-pnl-waterfall-card ${isLoading ? 'loading' : ''}`}>
         {isLoading || !kpi ? (

@@ -333,7 +333,7 @@ export const ExpenseTable: FC<ExpenseTableProps> = ({
                           onClick={() =>
                             onViewBill(
                               item.attachedBillUrl!,
-                              `Chứng từ ${item.expenseId}`
+                              `Chứng từ ${item.voucherCode || item.expenseId}`
                             )
                           }
                           title="Xem hóa đơn đính kèm"

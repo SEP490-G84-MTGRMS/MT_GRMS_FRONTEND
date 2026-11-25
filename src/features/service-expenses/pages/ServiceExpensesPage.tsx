@@ -1,6 +1,7 @@
 import { type FC, useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Receipt, FileSpreadsheet, AlertTriangle, Loader2, Plus } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { employeeApi } from '../../employee/api/employeeApi';
 import {
@@ -131,6 +132,9 @@ export const ServiceExpensesPage: FC = () => {
   const [payingItem, setPayingItem] = useState<ServiceExpenseDto | null>(null);
   const [cancelingItem, setCancelingItem] = useState<ServiceExpenseDto | null>(null);
   const [rejectingItem, setRejectingItem] = useState<ServiceExpenseDto | null>(null);
+  const [approvingSuspiciousItem, setApprovingSuspiciousItem] = useState<ServiceExpenseDto | null>(null);
+  const [approvalReason, setApprovalReason] = useState('');
+  const [approvalReasonError, setApprovalReasonError] = useState('');
   const [previewBill, setPreviewBill] = useState<{
     url: string;
     title: string;
@@ -183,12 +187,45 @@ export const ServiceExpensesPage: FC = () => {
   };
 
   const handleApproveClick = async (item: ServiceExpenseDto) => {
+    if (item.isFlaggedAsSuspiciousSplit) {
+      setApprovingSuspiciousItem(item);
+      setApprovalReason('');
+      setApprovalReasonError('');
+      return;
+    }
+
     try {
       await approveExpenseMutation.mutateAsync({
         expenseId: item.expenseId,
-        note: 'Chủ cửa hàng duyệt phiếu chi',
       });
       showToast(`Đã phê duyệt phiếu chi ${item.voucherCode || item.expenseId} thành công!`, 'success');
+    } catch (err: unknown) {
+      const errObj = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = errObj?.response?.data?.message || errObj?.message || 'Lỗi khi phê duyệt phiếu chi';
+      showToast(msg, 'error');
+    }
+  };
+
+  const handleConfirmSuspiciousApprove = async () => {
+    if (!approvingSuspiciousItem) return;
+    const trimmedReason = approvalReason.trim();
+    if (!trimmedReason) {
+      setApprovalReasonError('Bắt buộc nhập lý do giải trình khi phê duyệt phiếu chi bị gắn cờ nghi vấn.');
+      return;
+    }
+
+    try {
+      await approveExpenseMutation.mutateAsync({
+        expenseId: approvingSuspiciousItem.expenseId,
+        note: trimmedReason,
+      });
+      showToast(
+        `Đã phê duyệt phiếu chi ${approvingSuspiciousItem.voucherCode || approvingSuspiciousItem.expenseId} thành công!`,
+        'success'
+      );
+      setApprovingSuspiciousItem(null);
+      setApprovalReason('');
+      setApprovalReasonError('');
     } catch (err: unknown) {
       const errObj = err as { response?: { data?: { message?: string } }; message?: string };
       const msg = errObj?.response?.data?.message || errObj?.message || 'Lỗi khi phê duyệt phiếu chi';
@@ -314,16 +351,15 @@ export const ServiceExpensesPage: FC = () => {
     : 0;
   const overdueCount = summaryData?.overdueCount ?? clientOverdueCount;
 
-  const escapeCsvCell = (raw: string | number | null | undefined): string => {
+  const sanitizeExcelCell = (raw: string | number | null | undefined): string => {
     const str = String(raw ?? '');
-    const neutralized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
-    return `"${neutralized.replace(/"/g, '""')}"`;
+    return /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
   };
 
   const handleExportExcel = async () => {
     if (isExporting) return;
     setIsExporting(true);
-    showToast('Đang kết xuất danh sách chi phí vận hành ra tệp Excel (.csv)...', 'info');
+    showToast('Đang kết xuất danh sách chi phí vận hành ra tệp Excel (.xlsx)...', 'info');
 
     try {
       const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]));
@@ -354,7 +390,7 @@ export const ServiceExpensesPage: FC = () => {
         'Định Kỳ',
       ];
 
-      const csvRows = [headers.join(',')];
+      const sheetRows: Array<Array<string | number>> = [headers];
 
       for (const item of exportItems) {
         const code = item.voucherCode || item.expenseId;
@@ -367,34 +403,27 @@ export const ServiceExpensesPage: FC = () => {
             : item.status === 'Cancelled'
             ? 'Đã hủy'
             : item.status;
-        const row = [
-          escapeCsvCell(code),
-          escapeCsvCell(catLabel),
-          escapeCsvCell(item.branchName || item.branchId || ''),
-          escapeCsvCell(item.vendorName || ''),
-          escapeCsvCell(item.note || ''),
-          escapeCsvCell(item.dueDate || ''),
-          item.amount,
-          escapeCsvCell(statusLabel),
-          escapeCsvCell(item.isTaxDeductible === false ? 'Loại trừ' : 'Hợp lệ'),
-          escapeCsvCell(item.isRecurring ? 'Định kỳ' : 'Không'),
-        ];
-        csvRows.push(row.join(','));
+        sheetRows.push([
+          sanitizeExcelCell(code),
+          sanitizeExcelCell(catLabel),
+          sanitizeExcelCell(item.branchName || item.branchId || ''),
+          sanitizeExcelCell(item.vendorName || ''),
+          sanitizeExcelCell(item.note || ''),
+          sanitizeExcelCell(item.dueDate || ''),
+          Number(item.amount || 0),
+          sanitizeExcelCell(statusLabel),
+          sanitizeExcelCell(item.isTaxDeductible === false ? 'Loại trừ' : 'Hợp lệ'),
+          sanitizeExcelCell(item.isRecurring ? 'Định kỳ' : 'Không'),
+        ]);
       }
 
-      const csvContent = '\uFEFF' + csvRows.join('\r\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'ChiPhiVanHanh');
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      link.href = url;
-      link.setAttribute('download', `ChiPhi_VanHanh_${dateStr}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      XLSX.writeFile(workbook, `ChiPhi_VanHanh_${dateStr}.xlsx`);
 
-      showToast(`Đã xuất thành công ${exportItems.length} khoản chi ra tệp Excel (.csv).`);
+      showToast(`Đã xuất thành công ${exportItems.length} khoản chi ra tệp Excel (.xlsx).`);
     } catch (err: any) {
       showToast(err.message || 'Lỗi khi xuất file Excel.', 'error');
     } finally {
@@ -473,7 +502,7 @@ export const ServiceExpensesPage: FC = () => {
             className="po-btn po-btn-secondary"
             onClick={handleExportExcel}
             disabled={isExporting}
-            title="Xuất danh sách chi phí ra tệp Excel (.csv)"
+            title="Xuất danh sách chi phí ra tệp Excel (.xlsx)"
           >
             {isExporting ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
             <span>Xuất Excel</span>
@@ -605,6 +634,109 @@ export const ServiceExpensesPage: FC = () => {
         variant="danger"
         isLoading={rejectExpenseMutation.isPending}
       />
+
+      {/* ── 9. Suspicious Split Approval Explanation Modal (BUG-065) ── */}
+      {approvingSuspiciousItem && (
+        <div
+          className="expense-modal-backdrop"
+          onClick={() => {
+            setApprovingSuspiciousItem(null);
+            setApprovalReason('');
+            setApprovalReasonError('');
+          }}
+        >
+          <div
+            className="expense-modal-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="suspicious-approve-title"
+            style={{ maxWidth: '520px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="expense-modal-header">
+              <div className="expense-modal-title">
+                <h3 id="suspicious-approve-title">Giải trình phê duyệt phiếu chi nghi vấn</h3>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => {
+                  setApprovingSuspiciousItem(null);
+                  setApprovalReason('');
+                  setApprovalReasonError('');
+                }}
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div
+                style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  fontSize: '0.84rem',
+                  color: '#991b1b',
+                }}
+              >
+                <strong>Phiếu chi {approvingSuspiciousItem.voucherCode || approvingSuspiciousItem.expenseId}</strong> bị gắn cờ cảnh báo:
+                <div style={{ marginTop: 4 }}>
+                  {approvingSuspiciousItem.suspiciousReason || 'Nghi vấn chia nhỏ hạn mức chi (Anti-Splitting).'}
+                </div>
+              </div>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>
+                <span>Lý do giải trình phê duyệt <span style={{ color: '#dc2626' }}>*</span></span>
+                <textarea
+                  rows={3}
+                  value={approvalReason}
+                  onChange={(e) => {
+                    setApprovalReason(e.target.value);
+                    if (approvalReasonError) setApprovalReasonError('');
+                  }}
+                  placeholder="Nhập rõ lý do xác minh hợp lệ để lưu vào nhật ký kiểm toán..."
+                  style={{
+                    width: '100%',
+                    borderRadius: '8px',
+                    border: approvalReasonError ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                    padding: '10px 12px',
+                    fontSize: '0.86rem',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                  }}
+                />
+              </label>
+              {approvalReasonError && (
+                <div role="alert" style={{ color: '#dc2626', fontSize: '0.8rem', fontWeight: 600 }}>
+                  {approvalReasonError}
+                </div>
+              )}
+            </div>
+            <div className="expense-modal-footer">
+              <button
+                type="button"
+                className="po-btn po-btn-secondary"
+                onClick={() => {
+                  setApprovingSuspiciousItem(null);
+                  setApprovalReason('');
+                  setApprovalReasonError('');
+                }}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="po-btn po-btn-primary"
+                disabled={approveExpenseMutation.isPending}
+                onClick={() => void handleConfirmSuspiciousApprove()}
+              >
+                {approveExpenseMutation.isPending ? 'Đang phê duyệt...' : 'Xác nhận phê duyệt'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
