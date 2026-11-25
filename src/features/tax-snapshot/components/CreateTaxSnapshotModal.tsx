@@ -23,7 +23,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({ 
   const [notes, setNotes] = useState('');
   const [allowSupersede, setAllowSupersede] = useState(false);
   const [rectificationReason, setRectificationReason] = useState('');
-  const [isConfirmed, setIsConfirmed] = useState(true);
+  const [isConfirmed, setIsConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({ 
   useEffect(() => {
     if (!isOpen) return;
     setStep(1); setPin(''); setShowPin(false); setNotes(''); setAllowSupersede(false); setRectificationReason('');
-    setIsConfirmed(true); setIsSubmitting(false); setPinError(null); setSubmitError(null); setSealedSnapshot(null); setIsCopied(false);
+    setIsConfirmed(false); setIsSubmitting(false); setPinError(null); setSubmitError(null); setSealedSnapshot(null); setIsCopied(false);
   }, [isOpen]);
 
   if (!isOpen || !summary) return null;

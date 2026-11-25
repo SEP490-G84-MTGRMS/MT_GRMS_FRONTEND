@@ -322,25 +322,27 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
               ) : (
                 <div className="stack" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div
-                    className={`tax-threshold-alert ${verificationResult?.isIntegrityValid !== false ? 'alert-teal' : 'alert-danger'}`}
+                    className={`tax-threshold-alert ${verificationResult?.isIntegrityValid === true ? 'alert-teal' : 'alert-danger'}`}
                   >
-                    {verificationResult?.isIntegrityValid !== false ? (
+                    {verificationResult?.isIntegrityValid === true ? (
                       <ShieldCheck size={20} className="flex-shrink-0 text-teal" style={{ marginTop: 2 }} />
                     ) : (
                       <ShieldAlert size={20} className="flex-shrink-0 text-red" style={{ marginTop: 2 }} />
                     )}
                     <div>
                       <strong
-                        className={verificationResult?.isIntegrityValid !== false ? 'text-teal' : 'text-red'}
+                        className={verificationResult?.isIntegrityValid === true ? 'text-teal' : 'text-red'}
                         style={{ fontSize: '0.86rem', display: 'block', marginBottom: 2 }}
                       >
-                        {verificationResult?.isIntegrityValid !== false
+                        {verificationResult?.isIntegrityValid === true
                           ? '✓ Chữ ký HMAC-SHA256 hợp lệ'
                           : '⚠️ Phát hiện sai lệch chữ ký số!'}
                       </strong>
                       <p style={{ margin: 0, fontSize: '0.8rem', lineHeight: 1.45 }}>
                         {verificationResult?.message ||
-                          `Dữ liệu 7 sổ TT152 kỳ ${formatTaxPeriodLabel(verifyingSnapshot.periodType, verifyingSnapshot.periodNumber ?? (verifyingSnapshot as any).quarter, verifyingSnapshot.year)} chưa bị chỉnh sửa sau khi chốt.`}
+                          (verificationResult?.isIntegrityValid === true
+                            ? `Dữ liệu 7 sổ TT152 kỳ ${formatTaxPeriodLabel(verifyingSnapshot.periodType, verifyingSnapshot.periodNumber ?? (verifyingSnapshot as any).quarter, verifyingSnapshot.year)} chưa bị chỉnh sửa sau khi chốt.`
+                            : 'Không thể xác minh tính toàn vẹn chữ ký số. Vui lòng thử lại hoặc liên hệ quản trị viên.')}
                       </p>
                     </div>
                   </div>
@@ -418,9 +420,9 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                       type="button"
                       onClick={() => setVerifyingSnapshot(null)}
                       className="btn-primary-pill"
-                      style={{ background: '#0F766E' }}
+                      style={{ background: verificationResult?.isIntegrityValid === true ? '#0F766E' : '#475569' }}
                     >
-                      Đã xác minh
+                      {verificationResult?.isIntegrityValid === true ? 'Đã xác minh' : 'Đóng'}
                     </button>
                   </div>
                 </div>

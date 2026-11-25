@@ -1754,21 +1754,18 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
               <div style={{ fontWeight: 800 }}>NGƯỜI LẬP BIỂU</div>
               <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, ghi rõ họ tên)</div>
               <div style={{ height: 60 }}></div>
-              <div style={{ fontWeight: 600 }}>Nguyễn Thị Thu Ngân</div>
             </div>
 
             <div>
               <div style={{ fontWeight: 800 }}>KẾ TOÁN TRƯỞNG</div>
               <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, ghi rõ họ tên)</div>
               <div style={{ height: 60 }}></div>
-              <div style={{ fontWeight: 600 }}>Trần Văn Kế Toán</div>
             </div>
 
             <div>
               <div style={{ fontWeight: 800 }}>NGƯỜI ĐẠI DIỆN HỘ KINH DOANH</div>
               <div style={{ fontStyle: 'italic', fontSize: '7.5pt', color: '#555555' }}>(Ký, đóng dấu nếu có)</div>
               <div style={{ height: 60 }}></div>
-              <div style={{ fontWeight: 700 }}>Cô Ba - Đại diện HKD</div>
             </div>
           </div>
         </div>
