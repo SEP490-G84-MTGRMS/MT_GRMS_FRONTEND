@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import type { TransferOrder, TransferItem } from '../types';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { transferService } from '../services/transferService';
+import { getTransferErrorMessage, transferService } from '../services/transferService';
+import { formatDateTimeVN } from '../utils/transferDate';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../transfer.css';
 
@@ -20,7 +21,7 @@ export const ReceiveTransferPage: React.FC = () => {
   const canViewFinancials = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
-  const receiver = useAuthStore((state) => state.user?.fullName);
+  const receiver = useAuthStore((state) => state.user?.fullName || state.user?.email);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
   const [transfer, setTransfer] = useState<TransferOrder | null>(null);
@@ -54,9 +55,7 @@ export const ReceiveTransferPage: React.FC = () => {
       setTransfer(result);
       setItems(result.items.map((item) => ({ ...item, receivedQty: item.sentQty, damagedQty: 0, note: '' })));
       setReceiveNote('');
-      setReceiveTime(new Intl.DateTimeFormat('vi-VN', {
-        dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh',
-      }).format(new Date()));
+      setReceiveTime(formatDateTimeVN(new Date()));
       setLoadState('ready');
     }).catch((error: unknown) => {
       if (!disposed) setLoadState(isAxiosError(error) && error.response?.status === 404 ? 'missing' : 'error');
@@ -165,7 +164,7 @@ export const ReceiveTransferPage: React.FC = () => {
       await transferService.receive(id, items, receiveNote.trim());
       navigate(`${transferBasePath}/${transfer.id}`, { replace: true });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Không thể xác nhận nhận hàng.', 'warning');
+      showToast(getTransferErrorMessage(error), 'warning');
     } finally { setIsSaving(false); }
   };
 
@@ -534,9 +533,7 @@ export const ReceiveTransferPage: React.FC = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
             <span style={{ color: '#64748b' }}>Ngày chuyển:</span>
-            <span>{transfer.dispatchedAt
-              ? new Date(transfer.dispatchedAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
-              : 'Chưa có thời điểm chuyển'}</span>
+            <span>{formatDateTimeVN(transfer.dispatchedAt, 'Chưa có thời điểm chuyển')}</span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 8 }}>
