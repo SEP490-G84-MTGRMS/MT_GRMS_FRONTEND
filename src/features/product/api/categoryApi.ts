@@ -10,6 +10,7 @@ export interface CategoryCreatePayload {
 
 export interface CategoryUpdatePayload {
   name: string;
+  code?: string;
   description?: string;
 }
 

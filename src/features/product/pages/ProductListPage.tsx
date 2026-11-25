@@ -324,6 +324,7 @@ export const ProductListPage: React.FC = () => {
         // Cập nhật nhóm hàng qua backend API
         const updatedDto = await categoryApi.updateCategory(id, {
           name,
+          code,
           description,
         });
         setCategories((prev) =>

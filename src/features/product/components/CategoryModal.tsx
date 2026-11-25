@@ -57,7 +57,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
 
   const trimmedCode = code.trim().toUpperCase();
   const codeError =
-    !categoryToEdit && code !== ''
+    code !== ''
       ? trimmedCode.length > 30
         ? 'Mã nhóm hàng không được vượt quá 30 ký tự.'
         : /\s/.test(code) || !/^[A-Z0-9_-]+$/.test(trimmedCode)
@@ -82,7 +82,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       return;
     }
 
-    if (!categoryToEdit && code !== '') {
+    if (code !== '') {
       if (trimmedCode.length > 30 || /\s/.test(code) || !/^[A-Z0-9_-]+$/.test(trimmedCode)) {
         setErrorMsg('Mã nhóm hàng chỉ gồm chữ cái không dấu, số, gạch ngang/dưới và tối đa 30 ký tự.');
         return;
@@ -224,11 +224,9 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                     <label style={{ fontWeight: 600, fontSize: 13.5, color: '#334155' }}>
                       Mã nhóm hàng {categoryToEdit ? '' : <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(Tự sinh nếu để trống)</span>}
                     </label>
-                    {!categoryToEdit && (
-                      <span style={{ fontSize: 11.5, color: code.length > 30 ? '#dc2626' : '#94a3b8' }}>
-                        {code.length}/30
-                      </span>
-                    )}
+                    <span style={{ fontSize: 11.5, color: code.length > 30 ? '#dc2626' : '#94a3b8' }}>
+                      {code.length}/30
+                    </span>
                   </div>
                   <input
                     type="text"
@@ -248,7 +246,6 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                       setErrorMsg('');
                     }}
                     onBlur={() => setTouched((prev) => ({ ...prev, code: true }))}
-                    disabled={Boolean(categoryToEdit)}
                   />
                   {codeError && (
                     <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
