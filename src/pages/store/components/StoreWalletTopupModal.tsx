@@ -13,7 +13,7 @@ interface StoreWalletTopupModalProps {
 const PRESET_AMOUNTS = [50000, 100000, 200000];
 
 export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
-  storeInfo,
+  storeInfo: _storeInfo,
   onClose,
   onSuccess,
 }) => {
@@ -31,6 +31,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
   // Dữ liệu đơn nạp từ API Backend SePay
   const [topupOrder, setTopupOrder] = useState<TopupOrderResponse | null>(null);
   const [isLoadingOrder, setIsLoadingOrder] = useState<boolean>(false);
+  const [retryCount, setRetryCount] = useState<number>(0);
 
   const rawNumericAmount = parseInt(amountInput.replace(/\D/g, ''), 10) || 0;
   const amountToTopup = rawNumericAmount;
@@ -84,32 +85,23 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
         if (res.success && res.data) {
           setTopupOrder(res.data);
         } else {
+          setTopupOrder(null);
           setErrorMessage(res.message || 'Không thể tạo mã VietQR cho số tiền này.');
         }
       } catch (err: unknown) {
         console.warn('Lỗi gọi API tạo đơn nạp ví:', err);
-        // Fallback local QR nếu backend offline hoặc chưa có kết nối
-        const fallbackCode = `${Math.floor(100000 + Math.random() * 900000)}`;
-        const fallbackContent = `WAL ${fallbackCode}`;
-        const fallbackQr = `https://qr.sepay.vn/img?acc=190065228888&bank=MBBank&amount=${amountToTopup}&des=${encodeURIComponent(fallbackContent)}`;
-        setTopupOrder({
-          orderCode: fallbackCode,
-          amount: amountToTopup,
-          bankCode: 'MBBank',
-          bankName: 'MB Bank (Ngân hàng Quân Đội)',
-          accountNumber: '1900 6522 8888',
-          accountName: 'CONG TY TNHH PHAN MEM MT-GRMS',
-          transferContent: fallbackContent,
-          qrUrl: fallbackQr,
-          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        });
+        setTopupOrder(null);
+        const detail = err instanceof Error && err.message ? err.message : '';
+        setErrorMessage(
+          detail || 'Không thể khởi tạo đơn nạp VietQR do lỗi kết nối máy chủ. Vui lòng thử tạo lại mã QR.',
+        );
       } finally {
         setIsLoadingOrder(false);
       }
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [amountToTopup]);
+  }, [amountToTopup, retryCount]);
 
   // 2. Polling kiểm tra trạng thái đơn nạp mỗi 3 giây
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -356,9 +348,45 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                         e.currentTarget.style.display = 'none';
                       }}
                     />
-                  ) : (
+                  ) : amountToTopup < 50000 ? (
                     <div style={{ fontSize: 12, color: '#DC2626', textAlign: 'center', padding: 12, lineHeight: 1.5 }}>
                       Vui lòng nhập số tiền<br />≥ 50.000 đ
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: 14,
+                        textAlign: 'center',
+                      }}
+                    >
+                      <AlertCircle size={30} color="#DC2626" />
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#DC2626', lineHeight: 1.45 }}>
+                        Chưa tạo được mã VietQR
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRetryCount((c) => c + 1)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '7px 14px',
+                          borderRadius: 'var(--radius-pill)',
+                          border: '1.5px solid var(--blue-primary)',
+                          backgroundColor: 'var(--blue-light)',
+                          color: 'var(--blue-primary)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <RefreshCw size={13} />
+                        <span>Thử tạo lại mã QR</span>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -512,7 +540,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                   <div>
                     <div style={{ fontSize: 11, color: '#64748B', fontWeight: 500 }}>Ngân hàng thụ hưởng</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>
-                      {topupOrder?.bankName || 'MB Bank (Ngân hàng Quân Đội)'}
+                      {topupOrder?.bankName || '— Chưa có thông tin đơn nạp —'}
                     </div>
                   </div>
 
@@ -524,26 +552,28 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                           fontFamily: 'var(--font-mono)',
                           fontSize: 14.5,
                           fontWeight: 800,
-                          color: 'var(--blue-primary)',
+                          color: topupOrder?.accountNumber ? 'var(--blue-primary)' : '#94A3B8',
                           fontVariantNumeric: 'tabular-nums',
                         }}
                       >
-                        {topupOrder?.accountNumber || '1900 6522 8888'}
+                        {topupOrder?.accountNumber || '—'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy((topupOrder?.accountNumber || '190065228888').replace(/\s/g, ''), 'acc')}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: isCopiedAcc ? '#15803D' : '#64748B',
-                          padding: 2,
-                        }}
-                        title="Sao chép số tài khoản"
-                      >
-                        {isCopiedAcc ? <Check size={14} color="#15803D" strokeWidth={2.5} /> : <Copy size={14} />}
-                      </button>
+                      {topupOrder?.accountNumber && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(topupOrder.accountNumber.replace(/\s/g, ''), 'acc')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: isCopiedAcc ? '#15803D' : '#64748B',
+                            padding: 2,
+                          }}
+                          title="Sao chép số tài khoản"
+                        >
+                          {isCopiedAcc ? <Check size={14} color="#15803D" strokeWidth={2.5} /> : <Copy size={14} />}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -566,26 +596,28 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                           fontFamily: 'var(--font-mono)',
                           fontSize: 13,
                           fontWeight: 800,
-                          color: '#DC2626',
+                          color: topupOrder?.transferContent ? '#DC2626' : '#94A3B8',
                           letterSpacing: '0.02em',
                         }}
                       >
-                        {topupOrder?.transferContent || `WAL ${storeInfo.code}`}
+                        {topupOrder?.transferContent || '—'}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(topupOrder?.transferContent || `WAL ${storeInfo.code}`, 'content')}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          cursor: 'pointer',
-                          color: isCopiedContent ? '#15803D' : '#64748B',
-                          padding: 2,
-                        }}
-                        title="Sao chép nội dung"
-                      >
-                        {isCopiedContent ? <Check size={14} color="#15803D" strokeWidth={2.5} /> : <Copy size={14} />}
-                      </button>
+                      {topupOrder?.transferContent && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(topupOrder.transferContent, 'content')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: isCopiedContent ? '#15803D' : '#64748B',
+                            padding: 2,
+                          }}
+                          title="Sao chép nội dung"
+                        >
+                          {isCopiedContent ? <Check size={14} color="#15803D" strokeWidth={2.5} /> : <Copy size={14} />}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -679,7 +711,7 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
             <button
               type="button"
               onClick={handleManualCheck}
-              disabled={isProcessing || amountToTopup < 50000}
+              disabled={isProcessing || amountToTopup < 50000 || !topupOrder?.orderCode}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -691,8 +723,8 @@ export const StoreWalletTopupModal: FC<StoreWalletTopupModalProps> = ({
                 border: 'none',
                 fontSize: 13.5,
                 fontWeight: 700,
-                cursor: isProcessing || amountToTopup < 50000 ? 'not-allowed' : 'pointer',
-                opacity: isProcessing || amountToTopup < 50000 ? 0.7 : 1,
+                cursor: isProcessing || amountToTopup < 50000 || !topupOrder?.orderCode ? 'not-allowed' : 'pointer',
+                opacity: isProcessing || amountToTopup < 50000 || !topupOrder?.orderCode ? 0.7 : 1,
                 boxShadow: '0 4px 14px rgba(15, 118, 110, 0.28)',
                 transition: 'all 0.15s ease',
               }}
