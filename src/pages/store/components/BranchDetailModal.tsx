@@ -376,28 +376,28 @@ export const BranchDetailModal: FC<BranchDetailModalProps> = ({
             {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
           </button>
         </footer>
-      </form>
-      <AdminToast
-        toast={
-          errorMessage
-            ? {
-                id: "branch-detail-error",
-                message: errorMessage,
-                type: "error",
-              }
-            : saveSuccess
+        <AdminToast
+          toast={
+            errorMessage
               ? {
-                  id: "branch-detail-success",
-                  message: "Đã lưu thông tin chi nhánh.",
-                  type: "success",
+                  id: "branch-detail-error",
+                  message: errorMessage,
+                  type: "error",
                 }
-              : null
-        }
-        onClose={() => {
-          setErrorMessage(null);
-          setSaveSuccess(false);
-        }}
-      />
+              : saveSuccess
+                ? {
+                    id: "branch-detail-success",
+                    message: "Đã lưu thông tin chi nhánh.",
+                    type: "success",
+                  }
+                : null
+          }
+          onClose={() => {
+            setErrorMessage(null);
+            setSaveSuccess(false);
+          }}
+        />
+      </form>
     </div>
   );
 };
