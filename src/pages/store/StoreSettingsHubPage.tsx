@@ -266,6 +266,7 @@ export const StoreSettingsHubPage: FC = () => {
           >
             <BranchManagementTab
               onGoToSubscriptions={() => handleSelectTab("subscriptions")}
+              onBranchesChanged={refreshStoreAndTrialStatus}
             />
           </div>
         )}
@@ -326,6 +327,7 @@ export const StoreSettingsHubPage: FC = () => {
           onPurchased={(amount) => {
             setStoreInfo((prev) => ({ ...prev, walletBalance: Math.max(0, prev.walletBalance - amount) }));
             setWalletRefreshKey((key) => key + 1);
+            void refreshStoreAndTrialStatus();
           }}
         />
       )}

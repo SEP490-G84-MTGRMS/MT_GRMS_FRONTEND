@@ -121,6 +121,7 @@ export const mockCronJobs: CronJob[] = [
 
 export const mockUrgentAlertTenants: UrgentAlertTenant[] = [
   {
+    id: 'tnt-01',
     subdomain: 'anlac-mart',
     name: 'Chuỗi Tạp Hóa An Lạc',
     ownerName: 'Trần An Lạc',
@@ -131,6 +132,7 @@ export const mockUrgentAlertTenants: UrgentAlertTenant[] = [
     statusType: 'expiring',
   },
   {
+    id: 'tnt-02',
     subdomain: 'bachhoa-tanan',
     name: 'Bách Hóa Tân An',
     ownerName: 'Nguyễn Văn Tân',
@@ -141,6 +143,7 @@ export const mockUrgentAlertTenants: UrgentAlertTenant[] = [
     statusType: 'expiring',
   },
   {
+    id: 'tnt-03',
     subdomain: 'taphoa-babay',
     name: 'Tạp Hóa Bà Bảy',
     ownerName: 'Phạm Thị Bảy',

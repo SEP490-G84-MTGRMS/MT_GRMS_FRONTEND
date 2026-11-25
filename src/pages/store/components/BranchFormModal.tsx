@@ -86,7 +86,6 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
       : false,
   );
   const isHeadquarter = isHeadquarterRequired || headquarterSelected;
-  const [syncCatalog, setSyncCatalog] = useState(true);
 
   // Submission State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -126,47 +125,45 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
       return;
     }
 
-    if (!isEdit) {
-      const hotline = phone.trim();
-      const contactEmail = email.trim();
-      const digits = hotline.replace(/[^0-9]/g, "").length;
-      const emailPattern =
-        /^[A-Za-z0-9!#$%&'*+\/=?^_\x60{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+\/=?^_\x60{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
-      const error = [
-        [
-          branchCode.trim().toUpperCase().length > 30,
-          "Mã chi nhánh không được vượt quá 30 ký tự.",
-        ],
-        [
-          name.trim().length > 150,
-          "Tên chi nhánh không được vượt quá 150 ký tự.",
-        ],
-        [
-          address.trim().length > 255,
-          "Địa chỉ chi nhánh không được vượt quá 255 ký tự.",
-        ],
-        [
-          !!hotline &&
-            (hotline.length > 20 ||
-              !/^\+?[0-9][0-9 .-]*[0-9]$/.test(hotline) ||
-              digits < 8 ||
-              digits > 15),
-          "Hotline phải có 8–15 chữ số và không vượt quá 20 ký tự. Có thể dùng dấu + ở đầu, dấu cách, dấu chấm hoặc dấu gạch ngang.",
-        ],
-        [
-          !!contactEmail &&
-            (contactEmail.length > 150 || !emailPattern.test(contactEmail)),
-          "Email phải đúng định dạng và không vượt quá 150 ký tự.",
-        ],
-        [
-          managerName.trim().length > 150,
-          "Tên quản lý không được vượt quá 150 ký tự.",
-        ],
-      ].find(([invalid]) => invalid)?.[1];
-      if (typeof error === "string") {
-        setErrorMessage(error);
-        return;
-      }
+    const hotline = phone.trim();
+    const contactEmail = email.trim();
+    const digits = hotline.replace(/[^0-9]/g, "").length;
+    const emailPattern =
+      /^[A-Za-z0-9!#$%&'*+\/=?^_\x60{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+\/=?^_\x60{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
+    const error = [
+      [
+        !isEdit && branchCode.trim().toUpperCase().length > 30,
+        "Mã chi nhánh không được vượt quá 30 ký tự.",
+      ],
+      [
+        name.trim().length > 150,
+        "Tên chi nhánh không được vượt quá 150 ký tự.",
+      ],
+      [
+        address.trim().length > 255,
+        "Địa chỉ chi nhánh không được vượt quá 255 ký tự.",
+      ],
+      [
+        !!hotline &&
+          (hotline.length > 20 ||
+            !/^\+?[0-9][0-9 .-]*[0-9]$/.test(hotline) ||
+            digits < 8 ||
+            digits > 15),
+        "Hotline phải có 8–15 chữ số và không vượt quá 20 ký tự. Có thể dùng dấu + ở đầu, dấu cách, dấu chấm hoặc dấu gạch ngang.",
+      ],
+      [
+        !!contactEmail &&
+          (contactEmail.length > 150 || !emailPattern.test(contactEmail)),
+        "Email phải đúng định dạng và không vượt quá 150 ký tự.",
+      ],
+      [
+        managerName.trim().length > 150,
+        "Tên quản lý không được vượt quá 150 ký tự.",
+      ],
+    ].find(([invalid]) => invalid)?.[1];
+    if (typeof error === "string") {
+      setErrorMessage(error);
+      return;
     }
 
     setIsSubmitting(true);
@@ -308,7 +305,7 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} noValidate={!isEdit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div
             className="store-modal-body"
             style={{
@@ -400,7 +397,7 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
                 <input
                   type="text"
                   value={name}
-                  maxLength={isEdit ? undefined : 150}
+                  maxLength={150}
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
                   placeholder="VD: MT-Mart Cầu Giấy"
@@ -438,7 +435,7 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
                 <input
                   type="text"
                   value={address}
-                  maxLength={isEdit ? undefined : 255}
+                  maxLength={255}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành"
                   required
@@ -482,7 +479,7 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
                   <input
                     type="text"
                     value={phone}
-                    maxLength={isEdit ? undefined : 20}
+                    maxLength={20}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="VD: 024.3768.9999"
                     style={{
@@ -517,7 +514,7 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
                   <input
                     type="email"
                     value={email}
-                    maxLength={isEdit ? undefined : 150}
+                    maxLength={150}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="VD: chinhanh@mt-grms.vn"
                     style={{
@@ -554,7 +551,7 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
                 <input
                   type="text"
                   value={managerName}
-                  maxLength={isEdit ? undefined : 150}
+                  maxLength={150}
                   onChange={(e) => setManagerName(e.target.value)}
                   placeholder="VD: Nguyễn Văn An"
                   style={{
@@ -635,50 +632,6 @@ export const BranchFormModal: FC<BranchFormModalProps> = ({
                   </div>
                 </div>
               </label>
-
-              {/* Tự động đồng bộ sản phẩm (Chỉ khi Thêm mới) */}
-              {!isEdit && (
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 10,
-                    cursor: "pointer",
-                    borderTop: "1px dashed #E2E8F0",
-                    paddingTop: 10,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={syncCatalog}
-                    onChange={(e) => setSyncCatalog(e.target.checked)}
-                    style={{
-                      marginTop: 2,
-                      accentColor: "#0F766E",
-                      width: 16,
-                      height: 16,
-                    }}
-                  />
-                  <div>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: "#0F172A",
-                      }}
-                    >
-                      Tự động đồng bộ danh mục sản phẩm từ Chi nhánh chính
-                      (Khuyên dùng)
-                    </span>
-                    <div
-                      style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}
-                    >
-                      Áp dụng toàn bộ danh mục hàng hóa và bảng giá sang chi
-                      nhánh mới để có thể bán hàng ngay.
-                    </div>
-                  </div>
-                </label>
-              )}
             </div>
           </div>
 

@@ -24,10 +24,12 @@ import { TablePagination } from '../../../components/common/TablePagination/Tabl
 
 interface BranchManagementTabProps {
   onGoToSubscriptions: () => void;
+  onBranchesChanged?: () => void;
 }
 
 export const BranchManagementTab: FC<BranchManagementTabProps> = ({
   onGoToSubscriptions,
+  onBranchesChanged,
 }) => {
   const [branches, setBranches] = useState<BranchItemResponse[]>([]);
   const [totalItems, setTotalItems] = useState<number>(0);
@@ -94,6 +96,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
 
   const loadData = async () => {
     await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter, pageIndex, pageSize)]);
+    onBranchesChanged?.();
   };
 
   const hasOnlyBranch = quota?.usedBranches === 1;
@@ -106,6 +109,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       const res = await branchManagementApi.toggleStatus(branch.id, nextActive);
       if (res.success) {
         await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter, pageIndex, pageSize)]);
+        onBranchesChanged?.();
       } else {
         setActionError(res.message || 'Không thể thay đổi trạng thái chi nhánh.');
       }
@@ -135,6 +139,7 @@ export const BranchManagementTab: FC<BranchManagementTabProps> = ({
       if (res.success) {
         setBranchToDelete(null);
         await Promise.all([fetchQuota(), fetchBranches(keyword, statusFilter, pageIndex, pageSize)]);
+        onBranchesChanged?.();
       } else {
         setActionError(res.message || 'Không thể xóa chi nhánh.');
         setBranchToDelete(null);

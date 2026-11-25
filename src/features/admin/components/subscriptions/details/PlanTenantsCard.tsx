@@ -86,50 +86,66 @@ export const PlanTenantsCard: React.FC<PlanTenantsCardProps> = ({ plan }) => {
               </tr>
             </thead>
             <tbody>
-              {tenants.map((t) => (
-                <tr key={t.id}>
-                  <td style={{ padding: '10px 14px' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--blue-primary)', fontSize: 12.5 }}>
-                      {t.subdomain}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-main)' }}>
-                    {t.name}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '10px 14px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    {t.activeBranches} / {plan.quotas.maxBranches === -1 ? '~' : plan.quotas.maxBranches}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '10px 14px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    {t.activeEmployees} / {plan.quotas.maxEmployees === -1 ? '~' : plan.quotas.maxEmployees}
-                  </td>
-                  <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-main)' }}>
-                    {t.expiryDate}
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '10px 14px' }}>
-                    <span
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: 9999,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        backgroundColor: '#dcfce7',
-                        color: '#15803d',
-                      }}
-                    >
-                      Active
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'center', padding: '10px 14px' }}>
-                    <Link
-                      to="/admin/tenants"
-                      className="admin-btn admin-btn-secondary"
-                      style={{ padding: '3px 8px', fontSize: 11.5, height: 'auto', textDecoration: 'none' }}
-                    >
-                      Xem
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {tenants.map((t) => {
+                const rawStatus = (t.status || 'ACTIVE').toUpperCase();
+                const badgeMeta =
+                  rawStatus === 'LOCKED'
+                    ? { label: 'Đã khóa', bg: '#fee2e2', color: '#b91c1c' }
+                    : rawStatus === 'GRACE' || rawStatus === 'GRACE_PERIOD'
+                      ? { label: 'Đang ân hạn', bg: '#fef3c7', color: '#b45309' }
+                      : rawStatus === 'EXPIRING'
+                        ? { label: 'Sắp hết hạn', bg: '#ffedd5', color: '#c2410c' }
+                        : rawStatus === 'PENDING' || rawStatus === 'NO_PLAN' || rawStatus === 'INACTIVE'
+                          ? { label: 'Chờ kích hoạt', bg: '#f1f5f9', color: '#475569' }
+                          : rawStatus === 'TRIAL'
+                            ? { label: 'Đang dùng thử', bg: '#e0f2fe', color: '#0369a1' }
+                            : { label: 'Đang hoạt động', bg: '#dcfce7', color: '#15803d' };
+
+                return (
+                  <tr key={t.id}>
+                    <td style={{ padding: '10px 14px' }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--blue-primary)', fontSize: 12.5 }}>
+                        {t.subdomain}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-main)' }}>
+                      {t.name}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '10px 14px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                      {t.activeBranches} / {plan.quotas.maxBranches === -1 ? '~' : plan.quotas.maxBranches}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '10px 14px', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                      {t.activeEmployees} / {plan.quotas.maxEmployees === -1 ? '~' : plan.quotas.maxEmployees}
+                    </td>
+                    <td style={{ padding: '10px 14px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-main)' }}>
+                      {t.expiryDate || '—'}
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '10px 14px' }}>
+                      <span
+                        style={{
+                          padding: '2px 8px',
+                          borderRadius: 9999,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          backgroundColor: badgeMeta.bg,
+                          color: badgeMeta.color,
+                        }}
+                      >
+                        {badgeMeta.label}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '10px 14px' }}>
+                      <Link
+                        to={`/admin/tenants/${encodeURIComponent(t.id)}`}
+                        className="admin-btn admin-btn-secondary"
+                        style={{ padding: '3px 8px', fontSize: 11.5, height: 'auto', textDecoration: 'none' }}
+                      >
+                        Xem
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <div style={{ marginTop: 10, textAlign: 'right', fontSize: 12, color: 'var(--text-muted)' }}>
