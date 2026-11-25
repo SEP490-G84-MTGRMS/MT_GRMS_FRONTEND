@@ -65,8 +65,8 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
             <Receipt size={18} className="text-teal-700" />
             <h2 className="pos-modal-title">
               {isPreOrder
-                ? 'Phiếu Đặt Hàng Trước (POS-58 / 43mm)'
-                : 'Hóa Đơn Bán Lẻ Siêu Thị Mini (POS-58 / 43mm)'}
+                ? 'Phiếu Đặt Hàng Trước'
+                : 'Hóa Đơn Bán Lẻ'}
             </h2>
           </div>
           <button type="button" className="pos-modal-close-btn" onClick={onClose}>
@@ -169,11 +169,11 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
                         )}
                       </td>
                       <td className="py-1.5 text-center text-slate-700 font-mono">{item.quantity}</td>
-                      <td className="py-1.5 text-right text-slate-700 font-mono tabular-nums">
-                        {item.isGift ? '0' : item.unitPrice.toLocaleString('vi-VN')}
+                      <td className="py-1.5 pr-2 text-right text-slate-700 font-mono tabular-nums whitespace-nowrap">
+                        {item.isGift ? '0' : Math.round(item.unitPrice).toLocaleString('vi-VN')}
                       </td>
-                      <td className="py-1.5 text-right font-semibold text-slate-900 font-mono tabular-nums">
-                        {item.isGift ? '0' : item.totalAmount.toLocaleString('vi-VN')}
+                      <td className="py-1.5 text-right font-semibold text-slate-900 font-mono tabular-nums whitespace-nowrap">
+                        {item.isGift ? '0' : Math.round(item.totalAmount).toLocaleString('vi-VN')}
                       </td>
                     </tr>
                   ))}
@@ -374,15 +374,15 @@ export const PosReceiptModal: FC<Props> = ({ isOpen, receiptData, onClose }) => 
               {isPrinting ? (
                 <>
                   <Loader2 size={15} className="animate-spin" />
-                  <span>Đang gửi lệnh in tới POS-58...</span>
+                  <span>Đang gửi lệnh in bill...</span>
                 </>
               ) : (
                 <>
                   <Printer size={15} />
                   <span>
                     {isPreOrder
-                      ? 'In phiếu đặt hàng (POS-58 1-Click)'
-                      : 'In lại hóa đơn (POS-58 1-Click)'}
+                      ? 'In phiếu đặt hàng'
+                      : 'In bill'}
                   </span>
                 </>
               )}

@@ -46,6 +46,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
   const [cashTendered, setCashTendered] = useState<number>(0);
   const [note, setNote] = useState('Khách nhận hàng đầy đủ tại quầy');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [qrConfig, setQrConfig] = useState<PublicQrConfig | null>(null);
   const [isQrConfigLoading, setIsQrConfigLoading] = useState(false);
@@ -59,6 +60,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
       setQrConfig(null);
       setQrConfigError(null);
       setIsQrConfigLoading(false);
+      setSubmitError(null);
     }
   }, [preOrder]);
 
@@ -148,16 +150,17 @@ export const FulfillPreOrderModal: FC<Props> = ({
     if (isVietQrBlocked) {
       return;
     }
+    setSubmitError(null);
     if (!Number.isSafeInteger(remaining) || remaining < 0 || (paymentMethod === 'CASH' && (!Number.isSafeInteger(cashTendered) || cashTendered < 0))) {
-      alert('Số tiền thanh toán phải là số nguyên không âm.');
+      setSubmitError('Số tiền thanh toán phải là số nguyên không âm.');
       return;
     }
     if (note.trim().length > 500) {
-      alert('Ghi chú tối đa 500 ký tự.');
+      setSubmitError('Ghi chú tối đa 500 ký tự.');
       return;
     }
     if (!isCashSufficient) {
-      alert(`Tiền khách đưa (${cashTendered.toLocaleString('vi-VN')} đ) chưa đủ để thanh toán phần còn lại (${remaining.toLocaleString('vi-VN')} đ)!`);
+      setSubmitError(`Tiền khách đưa (${cashTendered.toLocaleString('vi-VN')} đ) chưa đủ để thanh toán phần còn lại (${remaining.toLocaleString('vi-VN')} đ)!`);
       return;
     }
 
@@ -172,7 +175,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
       });
       onClose();
     } catch (e: any) {
-      alert(`Lỗi khi bàn giao hàng: ${e?.message || 'Không thể kết nối máy chủ'}`);
+      setSubmitError(`Lỗi khi bàn giao hàng: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -192,6 +195,12 @@ export const FulfillPreOrderModal: FC<Props> = ({
 
         {/* Body Modal */}
         <div className="pos-modal-body" style={{ maxHeight: '75vh', overflowY: 'auto', padding: '16px' }}>
+          {submitError && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', marginBottom: 12, borderRadius: 6, backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 12.5, fontWeight: 500 }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{submitError}</span>
+            </div>
+          )}
           {/* Thông tin khách hàng */}
           <div style={{ padding: '10px 14px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
@@ -199,7 +208,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
               <span>SĐT: <b>{preOrder.customerPhone || 'N/A'}</b></span>
             </div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
-              Thời gian hẹn: <span style={{ color: '#b45309', fontWeight: 600 }}>{preOrder.pickupAppointment}</span> &bull; Trạng thái: <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Đang giữ kho</span>
+              Thời gian hẹn: <span style={{ color: '#b45309', fontWeight: 600 }}>{preOrder.pickupAppointment}</span> &bull; Trạng thái: <span style={{ color: '#16a34a', fontWeight: 600 }}>Đang giữ kho</span>
             </div>
           </div>
 
@@ -442,7 +451,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
               style={{ padding: '8px 18px', fontSize: 13.5, backgroundColor: '#0f766e' }}
             >
               <CheckCircle2 size={15} />
-              <span>{isSubmitting ? 'Đang xử lý...' : `✓ Xác Nhận Thu ${remaining.toLocaleString('vi-VN')} đ & Bàn Giao Hàng`}</span>
+              <span>{isSubmitting ? 'Đang xử lý...' : `Xác Nhận Thu ${remaining.toLocaleString('vi-VN')} đ & Bàn Giao Hàng`}</span>
             </button>
           </div>
         </div>

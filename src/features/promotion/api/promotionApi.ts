@@ -182,6 +182,8 @@ export interface LoyaltyConfigDto {
   redemptionRateAmount: number;
   minRedemptionPoints: number;
   allowPointsWithPromotions: boolean;
+  pointsExpiryMonths?: number;
+  maxRedemptionPercent?: number;
 }
 
 export interface LoyaltyLedgerDto {

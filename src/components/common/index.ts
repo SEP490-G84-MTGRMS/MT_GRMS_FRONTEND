@@ -6,4 +6,6 @@ export * from './WaterfallChart';
 export * from './ConfirmSheet';
 export * from './NotificationModal';
 export * from './ConfirmModal';
+export * from './ConfirmDialog';
+export * from './SortableHeader';
 

@@ -121,7 +121,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
     );
     if (soldLotIds.size === 0) return;
     let cancelled = false;
-    httpClient.get('/inventory/batches', { params: { branchId: invoice.branchId, pageSize: 500 } })
+    httpClient.get('/batches', { params: { branchId: invoice.branchId, pageSize: 500 } })
       .then((response) => {
         if (cancelled) return;
         const raw = response.data?.data?.items ?? response.data?.data ?? response.data ?? [];
@@ -1043,7 +1043,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                   : 'pointer',
             }}
           >
-            {isSubmitting ? 'Đang xử lý...' : '✓ Xác Nhận Đổi / Trả Hàng'}
+            {isSubmitting ? 'Đang xử lý...' : 'Xác Nhận Đổi / Trả Hàng'}
           </button>
         </div>
       </div>

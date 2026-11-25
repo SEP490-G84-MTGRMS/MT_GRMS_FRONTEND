@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import type { FC } from 'react';
-import { 
-  QrCode, 
-  Check, 
-  Copy, 
-  Download, 
-  RefreshCw, 
-  CheckCircle2, 
-  Clock, 
+import {
+  QrCode,
+  Check,
+  Copy,
+  Download,
+  RefreshCw,
+  CheckCircle2,
+  Clock,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuthStore } from '../../../../stores/useAuthStore';
@@ -28,7 +29,9 @@ interface Props {
   branchId: string;
   orderCode: string;
   amount: number;
+  expiresAtMs?: number;
   onClose: () => void;
+  onCancelOrder?: () => void;
   onConfirmAndPrint: () => void;
 }
 
@@ -37,34 +40,42 @@ export const VietQrModal: FC<Props> = ({
   branchId,
   orderCode,
   amount,
+  expiresAtMs,
   onClose,
+  onCancelOrder,
   onConfirmAndPrint,
 }) => {
   const { user } = useAuthStore();
   const currentTenantId = user?.tenantId;
 
-  const [countdown, setCountdown] = useState(300);
+  const getRemainingSeconds = () => {
+    if (!expiresAtMs) return 300;
+    return Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000));
+  };
+
+  const [countdown, setCountdown] = useState<number>(() => getRemainingSeconds());
   const [isChecking, setIsChecking] = useState(false);
   const [isSuccessPaid, setIsSuccessPaid] = useState(false);
   const [copiedContent, setCopiedContent] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [isConfigLoading, setIsConfigLoading] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
   const [partialPayment, setPartialPayment] = useState<{
     paidAmount: number;
     remainingAmount: number;
   } | null>(null);
+  const [qrTemplate, setQrTemplate] = useState<'qr_only' | 'compact2'>('qr_only');
 
   // Đọc cấu hình ngân hàng công khai của cửa hàng (Zero-Plaintext: Không chứa API Key)
   const [bankCode, setBankCode] = useState('');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
-  const [bankName, setBankName] = useState('');
   const [customTenantPrefix, setCustomTenantPrefix] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
 
-    setCountdown(300);
+    setCountdown(expiresAtMs ? Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000)) : 300);
     setIsSuccessPaid(false);
     setIsChecking(false);
     setIsConfigLoading(true);
@@ -73,7 +84,6 @@ export const VietQrModal: FC<Props> = ({
     setBankCode('');
     setBankAccountNumber('');
     setBankAccountName('');
-    setBankName('');
     setCustomTenantPrefix('');
     let cancelled = false;
 
@@ -96,7 +106,6 @@ export const VietQrModal: FC<Props> = ({
         if (data.bankCode) setBankCode(data.bankCode);
         if (data.bankAccountNumber) setBankAccountNumber(data.bankAccountNumber);
         if (data.bankAccountName) setBankAccountName(data.bankAccountName);
-        if (data.bankName) setBankName(data.bankName);
         if (data.tenantPrefix) setCustomTenantPrefix(data.tenantPrefix);
       })
       .catch((error) => {
@@ -147,12 +156,12 @@ export const VietQrModal: FC<Props> = ({
 
     connection.start()
       .then(() => {
-        connection.invoke('JoinOrderGroup', orderCode).catch(() => {});
+        connection.invoke('JoinOrderGroup', orderCode).catch(() => { });
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
-      connection.invoke('LeaveOrderGroup', orderCode).catch(() => {});
+      connection.invoke('LeaveOrderGroup', orderCode).catch(() => { });
       void connection.stop();
     };
   }, [isOpen, orderCode, onConfirmAndPrint]);
@@ -183,24 +192,47 @@ export const VietQrModal: FC<Props> = ({
     return () => clearInterval(pollTimer);
   }, [isOpen, isSuccessPaid, orderCode, onConfirmAndPrint, isConfigLoading, configError]);
 
-  // Bộ đếm ngược 5 phút
+  // Bộ đếm ngược đồng bộ theo mốc hết hạn thực tế (không reset lại 5 phút khi đóng/mở lại hoặc chuyển tab)
   useEffect(() => {
     if (!isOpen || isSuccessPaid) return;
+    if (expiresAtMs) {
+      const syncRemaining = () => {
+        setCountdown(Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000)));
+      };
+      syncRemaining();
+      const interval = setInterval(syncRemaining, 1000);
+      return () => clearInterval(interval);
+    }
     const interval = setInterval(() => {
       setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(interval);
-  }, [isOpen, isSuccessPaid]);
+  }, [isOpen, isSuccessPaid, expiresAtMs]);
 
   if (!isOpen) return null;
 
-  if (configError) return <div className="pos-modal-overlay" role="dialog" aria-modal="true"><div className="pos-modal-dialog" style={{ maxWidth: 460, padding: 24, textAlign: 'center' }}><ShieldCheck size={38} color="#b86712"/><h3>Chưa thể nhận VietQR</h3><p style={{ color: '#64748b', fontSize: 13 }}>{configError}</p><button type="button" onClick={onClose} style={{ marginTop: 8, padding: '9px 18px', border: 0, borderRadius: 8, background: '#0f766e', color: '#fff', fontWeight: 700 }}>Đóng</button></div></div>;
+  if (configError) {
+    return (
+      <div className="pos-modal-overlay" role="dialog" aria-modal="true" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div className="pos-modal-dialog" style={{ maxWidth: 460, padding: 24, textAlign: 'center' }}>
+          <ShieldCheck size={38} color="#b86712" style={{ margin: '0 auto 8px' }} />
+          <h3 style={{ margin: '0 0 8px', fontSize: 17, fontWeight: 700, color: '#0f172a' }}>Chưa thể nhận VietQR</h3>
+          <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 14px' }}>{configError}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ marginTop: 4, padding: '9px 18px', border: 0, borderRadius: 8, background: '#0f766e', color: '#fff', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const minutes = Math.floor(countdown / 60);
   const seconds = countdown % 60;
   const timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-  const [qrTemplate, setQrTemplate] = useState<'qr_only' | 'compact2'>('qr_only');
 
   // Tiền tố đơn hàng phân lập theo Tenant viết liền (VD: AN02HD1005) chống app ngân hàng tự động lọc bỏ dấu gạch dưới
   const cleanCode = orderCode.replace(/^HD/i, '');
@@ -248,13 +280,25 @@ export const VietQrModal: FC<Props> = ({
 
   return (
     <div className="pos-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pos-modal-dialog" style={{ maxWidth: 740, width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-        {/* Header Modal */}
-        <div 
+      <div
+        className="pos-modal-dialog"
+        style={{
+          maxWidth: 640,
+          width: '95%',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: 0,
+          overflow: 'hidden',
+          borderRadius: 12,
+        }}
+      >
+        {/* Header theo mẫu thiết kế */}
+        <div
           style={{
-            padding: '10px 18px',
-            backgroundColor: '#0f766e',
-            color: '#ffffff',
+            padding: '12px 18px',
+            backgroundColor: '#ffffff',
+            borderBottom: '1px solid #e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -262,36 +306,54 @@ export const VietQrModal: FC<Props> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <QrCode size={20} className="text-teal-200" />
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>Thanh Toán Chuyển Khoản Dynamic VietQR</div>
-              <div style={{ fontSize: 11, color: '#ccfbf1' }}>Hệ thống tự động gạch nợ qua SePay Webhook realtime</div>
-            </div>
+            <QrCode size={18} color="#0f766e" />
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+              Thanh toán hóa đơn qua Dynamic VietQR
+            </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,0,0,0.2)', padding: '3px 8px', borderRadius: 6, fontSize: 12, color: '#fef08a', fontWeight: 700 }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: countdown === 0 ? '#fef2f2' : '#f0fdfa',
+                border: countdown === 0 ? '1px solid #fecaca' : '1px solid #ccfbf1',
+                padding: '3px 9px',
+                borderRadius: 6,
+                fontSize: 12.5,
+                color: countdown === 0 ? '#dc2626' : '#0f766e',
+                fontWeight: 700,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
               <Clock size={13} />
               <span>{timerText}</span>
             </div>
             <button
               type="button"
               onClick={onClose}
+              title="Đóng tạm thời (giữ đơn chờ chuyển khoản)"
               style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#ffffff',
-                fontSize: 18,
+                width: 30,
+                height: 30,
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: 6,
+                color: '#475569',
                 cursor: 'pointer',
-                padding: '2px 6px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              ✕
+              <X size={16} />
             </button>
           </div>
         </div>
 
-        {/* Thân Modal */}
-        <div style={{ padding: '16px 20px', overflowY: 'auto', flex: 1 }}>
+        {/* Thân Modal theo bố cục dọc chuẩn mẫu thiết kế */}
+        <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1, backgroundColor: '#ffffff' }}>
           {isConfigLoading ? (
             <div style={{ padding: '36px 20px', textAlign: 'center', color: '#475569' }}>
               <RefreshCw size={28} className="animate-spin text-teal-600" style={{ margin: '0 auto 12px' }} />
@@ -299,12 +361,11 @@ export const VietQrModal: FC<Props> = ({
             </div>
           ) : configError ? (
             <div style={{ padding: '24px 20px', textAlign: 'center', backgroundColor: '#fff7ed', border: '1px solid #fdba74', borderRadius: 8 }}>
-              <div style={{ fontSize: 17, fontWeight: 800, color: '#9a3412' }}>Không thể tạo mã QR</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#9a3412' }}>Không thể tạo mã QR</div>
               <div style={{ fontSize: 13.5, color: '#7c2d12', marginTop: 8 }}>{configError}</div>
             </div>
           ) : isSuccessPaid ? (
-            /* Thông báo thanh toán thành công */
-            <div 
+            <div
               style={{
                 padding: '30px 20px',
                 textAlign: 'center',
@@ -313,74 +374,148 @@ export const VietQrModal: FC<Props> = ({
                 border: '1px solid #a7f3d0',
               }}
             >
-              <CheckCircle2 size={54} className="text-emerald-500" style={{ margin: '0 auto 12px' }} />
+              <CheckCircle2 size={52} className="text-emerald-500" style={{ margin: '0 auto 12px' }} />
               <div style={{ fontSize: 18, fontWeight: 800, color: '#065f46' }}>
-                TING TING! THANH TOÁN THÀNH CÔNG
+                THANH TOÁN THÀNH CÔNG
               </div>
               <div style={{ fontSize: 13.5, color: '#047857', marginTop: 6 }}>
-                Đã ghi nhận chuyển khoản <b>{amount.toLocaleString('vi-VN')} đ</b> cho đơn <b>{orderCode}</b>.
+                Đã ghi nhận chuyển khoản <b>{amount.toLocaleString('vi-VN')} VNĐ</b> cho đơn <b>{orderCode}</b>.
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 10 }}>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
                 Hệ thống đang tiến hành in hóa đơn bán lẻ cho khách...
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: 18, alignItems: 'start' }}>
-              {/* CỘT TRÁI: MÃ QR TO RÕ */}
-              <div
-                style={{
-                  backgroundColor: '#ffffff',
-                  border: '1.5px solid #cbd5e1',
-                  borderRadius: 12,
-                  padding: 10,
-                  textAlign: 'center',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                }}
-              >
-                {/* Toggle chế độ xem QR */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => setQrTemplate('qr_only')}
-                    style={{
-                      padding: '3px 9px',
-                      borderRadius: 4,
-                      border: qrTemplate === 'qr_only' ? '1.5px solid #0f766e' : '1px solid #cbd5e1',
-                      backgroundColor: qrTemplate === 'qr_only' ? '#ccfbf1' : '#ffffff',
-                      color: qrTemplate === 'qr_only' ? '#0f766e' : '#64748b',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ⚡ Mã QR To
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setQrTemplate('compact2')}
-                    style={{
-                      padding: '3px 9px',
-                      borderRadius: 4,
-                      border: qrTemplate === 'compact2' ? '1.5px solid #0f766e' : '1px solid #cbd5e1',
-                      backgroundColor: qrTemplate === 'compact2' ? '#ccfbf1' : '#ffffff',
-                      color: qrTemplate === 'compact2' ? '#0f766e' : '#64748b',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    📋 Thẻ Đầy Đủ
-                  </button>
-                </div>
-
-                {/* Khung ảnh QR to */}
+            <div style={{ border: '1px solid #cbd5e1', borderRadius: 8, overflow: 'hidden' }}>
+              {/* Cảnh báo khách chuyển thiếu tiền */}
+              {partialPayment && partialPayment.remainingAmount > 0 && (
                 <div
                   style={{
-                    width: 268,
-                    height: 268,
+                    padding: '6px 12px',
+                    backgroundColor: '#fffbeb',
+                    borderBottom: '1px solid #fde68a',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#b45309', fontWeight: 700, fontSize: 12 }}>
+                    <AlertTriangle size={14} />
+                    <span>Khách chuyển thiếu tiền — Đã nhận: {partialPayment.paidAmount.toLocaleString('vi-VN')} VNĐ · Còn thiếu: {partialPayment.remainingAmount.toLocaleString('vi-VN')} VNĐ</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Dòng 1: Tài khoản nhận tiền (gọn) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '152px 1fr', borderBottom: '1px solid #cbd5e1', alignItems: 'center' }}>
+                <div style={{ padding: '6px 12px', fontSize: 12.5, color: '#475569', fontWeight: 500, borderRight: '1px solid #cbd5e1', backgroundColor: '#f8fafc', height: '100%', display: 'flex', alignItems: 'center' }}>
+                  Tài khoản nhận tiền:
+                </div>
+                <div style={{ padding: '5px 10px' }}>
+                  <div style={{ padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: 5, backgroundColor: '#ffffff', fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+                    {bankCode} - {bankAccountNumber} - {bankAccountName}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dòng 2: Số tiền thanh toán (gọn) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '152px 1fr', borderBottom: '1px solid #cbd5e1', alignItems: 'center' }}>
+                <div style={{ padding: '6px 12px', fontSize: 12.5, color: '#475569', fontWeight: 500, borderRight: '1px solid #cbd5e1', backgroundColor: '#f8fafc', height: '100%', display: 'flex', alignItems: 'center' }}>
+                  Số tiền thanh toán:
+                </div>
+                <div style={{ padding: '6px 12px', display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontSize: 15.5, fontWeight: 800, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
+                    {currentPayAmount.toLocaleString('vi-VN')} VNĐ
+                  </span>
+                  {partialPayment && (
+                    <span style={{ fontSize: 11, color: '#64748b' }}>
+                      (Tổng đơn gốc: {amount.toLocaleString('vi-VN')} VNĐ)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Dòng 3: Nội dung chuyển khoản (gọn) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '152px 1fr', borderBottom: '1px solid #cbd5e1', alignItems: 'center' }}>
+                <div style={{ padding: '6px 12px', fontSize: 12.5, color: '#475569', fontWeight: 500, borderRight: '1px solid #cbd5e1', backgroundColor: '#f8fafc', height: '100%', display: 'flex', alignItems: 'center' }}>
+                  Nội dung chuyển khoản:
+                </div>
+                <div style={{ padding: '5px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <b style={{ fontSize: 12.5, color: '#0f766e', letterSpacing: 0.3, fontFamily: 'var(--font-mono, monospace)' }}>
+                    {transferContent}
+                  </b>
+                  <button
+                    type="button"
+                    onClick={handleCopyContent}
+                    style={{
+                      padding: '2px 7px',
+                      borderRadius: 4,
+                      border: copiedContent ? '1px solid #86efac' : '1px solid #cbd5e1',
+                      backgroundColor: copiedContent ? '#f0fdf4' : '#f8fafc',
+                      color: copiedContent ? '#15803d' : '#334155',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    {copiedContent ? <Check size={11} /> : <Copy size={11} />}
+                    <span>{copiedContent ? 'Đã copy' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Khung trung tâm hiển thị mã QR to rõ */}
+              <div style={{ padding: '12px 16px', backgroundColor: '#f8fafc', textAlign: 'center', borderBottom: '1px solid #cbd5e1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                    {bankAccountName} &bull; {bankCode} - {bankAccountNumber}
+                  </div>
+                  <div style={{ display: 'inline-flex', gap: 5 }}>
+                    <button
+                      type="button"
+                      onClick={() => setQrTemplate('qr_only')}
+                      style={{
+                        padding: '2px 9px',
+                        borderRadius: 4,
+                        border: qrTemplate === 'qr_only' ? '1.5px solid #0f766e' : '1px solid #cbd5e1',
+                        backgroundColor: qrTemplate === 'qr_only' ? '#ccfbf1' : '#ffffff',
+                        color: qrTemplate === 'qr_only' ? '#0f766e' : '#64748b',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Mã QR To
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQrTemplate('compact2')}
+                      style={{
+                        padding: '2px 9px',
+                        borderRadius: 4,
+                        border: qrTemplate === 'compact2' ? '1.5px solid #0f766e' : '1px solid #cbd5e1',
+                        backgroundColor: qrTemplate === 'compact2' ? '#ccfbf1' : '#ffffff',
+                        color: qrTemplate === 'compact2' ? '#0f766e' : '#64748b',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Thẻ Đầy Đủ
+                    </button>
+                  </div>
+                </div>
+
+                {/* Khung ảnh QR lớn, nổi bật */}
+                <div
+                  style={{
+                    width: 280,
+                    height: 280,
                     margin: '0 auto',
                     backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
                     borderRadius: 8,
+                    padding: 6,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -401,250 +536,188 @@ export const VietQrModal: FC<Props> = ({
                   />
                 </div>
 
-                {/* Trạng thái SignalR */}
-                <div
-                  style={{
-                    marginTop: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    color: '#0f766e',
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  <RefreshCw size={13} className="animate-spin text-teal-600" />
-                  <span>Đang đợi khách quét mã...</span>
+                {/* Số tiền đậm bên dưới QR giống mẫu */}
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
+                  {currentPayAmount.toLocaleString('vi-VN')} VNĐ
                 </div>
 
-                {/* Nút tải / copy link */}
-                <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => window.open(qrUrl, '_blank')}
-                    style={{
-                      padding: '3px 8px',
-                      fontSize: 11,
-                      borderRadius: 4,
-                      border: '1px solid #cbd5e1',
-                      backgroundColor: '#f8fafc',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      color: '#475569',
-                    }}
-                  >
-                    <Download size={12} /> Tải ảnh
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(qrUrl);
-                      alert('Đã sao chép link ảnh QR!');
-                    }}
-                    style={{
-                      padding: '3px 8px',
-                      fontSize: 11,
-                      borderRadius: 4,
-                      border: '1px solid #cbd5e1',
-                      backgroundColor: '#f8fafc',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      color: '#475569',
-                    }}
-                  >
-                    <Copy size={12} /> Copy link
-                  </button>
-                </div>
-              </div>
-
-              {/* CỘT PHẢI: THÔNG TIN THANH TOÁN & HÀNH ĐỘNG */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* Cảnh báo khách chuyển thiếu tiền */}
-                {partialPayment && partialPayment.remainingAmount > 0 && (
+                {/* Trạng thái chờ & tải ảnh */}
+                {countdown === 0 ? (
                   <div
                     style={{
-                      padding: '8px 12px',
+                      marginTop: 6,
+                      padding: '5px 10px',
+                      borderRadius: 6,
                       backgroundColor: '#fffbeb',
-                      border: '1.5px solid #f59e0b',
-                      borderRadius: 8,
+                      border: '1px solid #fde68a',
+                      color: '#b45309',
+                      fontSize: 11.5,
+                      fontWeight: 600,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#b45309', fontWeight: 800, fontSize: 12.5 }}>
-                      <AlertTriangle size={15} />
-                      <span>CẢNH BÁO: KHÁCH CHUYỂN THIẾU TIỀN!</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#92400e', marginTop: 2 }}>
-                      Đã nhận: <b>{partialPayment.paidAmount.toLocaleString('vi-VN')} đ</b> · Còn thiếu: <b style={{ color: '#dc2626' }}>{partialPayment.remainingAmount.toLocaleString('vi-VN')} đ</b>
-                    </div>
+                    Đã hết thời gian chờ 5 phút. Bấm &quot;Kiểm tra tiền về&quot; nếu khách vừa chuyển hoặc &quot;Hủy đơn chờ&quot;.
                   </div>
-                )}
-
-                {/* Khung số tiền cần thanh toán */}
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    backgroundColor: '#fef2f2',
-                    border: '1.5px solid #fecaca',
-                    borderRadius: 8,
-                  }}
-                >
-                  <div style={{ fontSize: 11.5, color: '#991b1b', fontWeight: 600 }}>Số tiền cần chuyển khoản:</div>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: '#dc2626', marginTop: 2 }}>
-                    {currentPayAmount.toLocaleString('vi-VN')} đ
-                  </div>
-                  {partialPayment && (
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>
-                      (Tổng đơn gốc: {amount.toLocaleString('vi-VN')} đ)
-                    </div>
-                  )}
-                </div>
-
-                {/* Bảng tóm tắt tài khoản nhận tiền */}
-                <div
-                  style={{
-                    padding: '10px 14px',
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 8,
-                    fontSize: 12.5,
-                    display: 'grid',
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Ngân hàng:</span>
-                    <b style={{ color: '#0f172a' }}>{bankName} ({bankCode})</b>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#64748b' }}>Số tài khoản:</span>
-                    <b style={{ color: '#0f766e', fontSize: 13.5 }}>{bankAccountNumber}</b>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#64748b' }}>Chủ tài khoản:</span>
-                    <b style={{ color: '#0f172a' }}>{bankAccountName}</b>
-                  </div>
-                </div>
-
-                {/* Hộp nội dung chuyển khoản */}
-                <div
-                  style={{
-                    padding: '8px 12px',
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: 8,
-                  }}
-                >
-                  <div style={{ fontSize: 11, color: '#1e40af', fontWeight: 600, marginBottom: 3 }}>
-                    Nội dung chuyển khoản (Bắt buộc giữ nguyên):
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                    <b style={{ fontSize: 14, color: '#1d4ed8', letterSpacing: 0.5 }}>{transferContent}</b>
-                    <button
-                      type="button"
-                      onClick={handleCopyContent}
-                      style={{
-                        padding: '2px 8px',
-                        borderRadius: 4,
-                        border: '1px solid #93c5fd',
-                        backgroundColor: copiedContent ? '#dcfce7' : '#ffffff',
-                        color: copiedContent ? '#15803d' : '#1d4ed8',
-                        fontSize: 11,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 3,
-                      }}
-                    >
-                      {copiedContent ? <Check size={12} /> : <Copy size={12} />}
-                      <span>{copiedContent ? 'Đã copy' : 'Copy'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Nút hành động */}
-                <div style={{ display: 'grid', gap: 6, marginTop: 4 }}>
-                  <button
-                    type="button"
-                    className="pos-btn-primary"
-                    onClick={onConfirmAndPrint}
-                    disabled={isConfigLoading || !!configError}
+                ) : (
+                  <div
                     style={{
-                      width: '100%',
-                      padding: '9px 16px',
-                      backgroundColor: '#0f766e',
-                      color: '#ffffff',
-                      fontWeight: 700,
-                      fontSize: 13,
-                      borderRadius: 6,
-                      border: 'none',
-                      cursor: 'pointer',
+                      marginTop: 5,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: 6,
+                      gap: 10,
+                      flexWrap: 'wrap',
                     }}
                   >
-                    ✓ Xác nhận đã nhận tiền & In Bill
-                  </button>
-
-                  <div style={{ display: 'flex', gap: 8 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#0f766e', fontSize: 12, fontWeight: 600 }}>
+                      <RefreshCw size={12} className="animate-spin text-teal-600" />
+                      <span>Đang đợi khách quét mã...</span>
+                    </span>
                     <button
                       type="button"
-                      onClick={handleCheckPayment}
-                      disabled={isChecking || isSuccessPaid || isConfigLoading || !!configError}
+                      onClick={() => window.open(qrUrl, '_blank')}
                       style={{
-                        flex: 1,
-                        padding: '6px 10px',
+                        padding: '2px 8px',
+                        fontSize: 11,
+                        borderRadius: 4,
+                        border: '1px solid #cbd5e1',
                         backgroundColor: '#ffffff',
-                        color: '#0f766e',
-                        border: '1px solid #0f766e',
-                        fontWeight: 600,
-                        fontSize: 11.5,
-                        borderRadius: 6,
                         cursor: 'pointer',
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
                         gap: 4,
+                        color: '#475569',
                       }}
                     >
-                      <RefreshCw size={12} className={isChecking ? 'animate-spin' : ''} />
-                      <span>{isChecking ? 'Đang đối soát...' : 'Kiểm tra tiền về'}</span>
+                      <Download size={11} /> Tải ảnh
                     </button>
                     <button
                       type="button"
-                      onClick={onClose}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(qrUrl);
+                        setCopiedLink(true);
+                        setTimeout(() => setCopiedLink(false), 2000);
+                      }}
                       style={{
-                        padding: '6px 14px',
-                        backgroundColor: '#f1f5f9',
-                        color: '#475569',
-                        border: '1px solid #cbd5e1',
-                        fontWeight: 600,
-                        fontSize: 11.5,
-                        borderRadius: 6,
+                        padding: '2px 8px',
+                        fontSize: 11,
+                        borderRadius: 4,
+                        border: copiedLink ? '1px solid #86efac' : '1px solid #cbd5e1',
+                        backgroundColor: copiedLink ? '#f0fdf4' : '#ffffff',
                         cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        color: copiedLink ? '#15803d' : '#475569',
                       }}
                     >
-                      Đóng
+                      {copiedLink ? <Check size={11} /> : <Copy size={11} />} {copiedLink ? 'Đã copy link' : 'Copy link'}
                     </button>
                   </div>
-                </div>
+                )}
+              </div>
 
-                {/* Ghi chú bảo mật */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#64748b' }}>
-                  <ShieldCheck size={13} color="#0f766e" />
-                  <span>Bảo mật SePay: Tự động gạch nợ chính xác, chống Fake Bill 100%</span>
-                </div>
+              {/* Dòng ghi chú chuẩn mẫu thiết kế */}
+              <div style={{ padding: '8px 14px', fontSize: 12, fontStyle: 'italic', color: '#475569', backgroundColor: '#ffffff' }}>
+                Hệ thống tự động xác nhận khi nhận tiền từ Napas 247.
               </div>
             </div>
           )}
         </div>
+
+        {/* Footer hành động căn lề phải chuẩn mẫu thiết kế */}
+        {!isConfigLoading && !configError && !isSuccessPaid && (
+          <div
+            style={{
+              padding: '10px 16px',
+              backgroundColor: '#f8fafc',
+              borderTop: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 8,
+              flexWrap: 'wrap',
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleCheckPayment}
+              disabled={isChecking || isSuccessPaid}
+              style={{
+                padding: '7px 11px',
+                backgroundColor: '#ffffff',
+                color: '#0f766e',
+                border: '1px solid #0f766e',
+                fontWeight: 600,
+                fontSize: 12.5,
+                borderRadius: 6,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <RefreshCw size={13} className={isChecking ? 'animate-spin' : ''} />
+              <span>{isChecking ? 'Đang đối soát...' : 'Kiểm tra tiền về'}</span>
+            </button>
+            {onCancelOrder && (
+              <button
+                type="button"
+                onClick={onCancelOrder}
+                style={{
+                  padding: '7px 11px',
+                  backgroundColor: '#fef2f2',
+                  color: '#dc2626',
+                  border: '1px solid #fecaca',
+                  fontWeight: 600,
+                  fontSize: 12.5,
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                }}
+                title="Hủy đơn chờ chuyển khoản và hoàn tồn kho"
+              >
+                Hủy đơn chờ
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '7px 14px',
+                backgroundColor: '#ffffff',
+                color: '#334155',
+                border: '1px solid #cbd5e1',
+                fontWeight: 600,
+                fontSize: 12.5,
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+              title="Đóng tạm thời để bán đơn khác (giữ nguyên đơn chờ chuyển khoản)"
+            >
+              Đóng
+            </button>
+            <button
+              type="button"
+              onClick={onConfirmAndPrint}
+              style={{
+                padding: '7px 14px',
+                backgroundColor: '#0f766e',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: 12.5,
+                borderRadius: 6,
+                border: 'none',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <Check size={14} />
+              <span>Xác Nhận Đã Nhận Tiền &amp; In Bill</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

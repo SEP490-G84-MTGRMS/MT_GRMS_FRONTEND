@@ -19,7 +19,6 @@ import {
   ChevronRight,
   Wallet,
   FileText,
-  CreditCard,
   Boxes,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
@@ -1559,81 +1558,7 @@ export const AppTopNav: FC = () => {
                     </div>
 
                     <div style={{ padding: "8px 0" }}>
-                      {/* Mục 1: Cấu hình VietQR & SePay */}
-                      <Link
-                        to="/store-owner/subscriptions?tab=finance-accounts"
-                        onClick={() => setSettingsMenuOpen(false)}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 12,
-                          padding: "10px 16px",
-                          textDecoration: "none",
-                          color: "inherit",
-                          transition: "background-color 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#ecfdf5";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 8,
-                            backgroundColor: "#ccfbf1",
-                            color: "#0f766e",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            marginTop: 1,
-                          }}
-                        >
-                          <CreditCard size={18} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 13.5,
-                                fontWeight: 700,
-                                color: "#065f46",
-                              }}
-                            >
-                              Tài khoản & Két quỹ
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "#64748b",
-                              marginTop: 2,
-                            }}
-                          >
-                            Ngân hàng, SePay và két theo chi nhánh
-                          </div>
-                        </div>
-                      </Link>
-
-                      <div
-                        style={{
-                          height: 1,
-                          backgroundColor: "#f1f5f9",
-                          margin: "6px 16px",
-                        }}
-                      />
-
-                      {/* Mục 2: Hạn mức & Duyệt chi két POS */}
+                      {/* Mục 1: Hạn mức & Duyệt chi két POS */}
                       <Link
                         to="/store-owner/pos-cash-control"
                         onClick={() => setSettingsMenuOpen(false)}

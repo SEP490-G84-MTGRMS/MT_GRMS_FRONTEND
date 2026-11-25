@@ -43,6 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } else {
       localStorage.removeItem('auth_user');
       localStorage.removeItem('tenant_id');
+      localStorage.removeItem('mtgrms_active_branch');
     }
     set({ user: user || null, token: null, isAuthenticated: Boolean(user) });
   },
@@ -84,6 +85,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.removeItem('access_token');
       localStorage.removeItem('auth_user');
       localStorage.removeItem('tenant_id');
+      localStorage.removeItem('mtgrms_active_branch');
       set({ user: null, token: null, isAuthenticated: false });
     }
   },

@@ -43,8 +43,14 @@ export const AdjustPointsModal: FC<AdjustPointsModalProps> = ({
     try {
       await onSave({ customerPhone: customerPhone.trim(), adjustmentType: adjustType, points, reason: reason.trim() });
       onClose();
-    } catch {
-      // Trang cha hiển thị thông báo lỗi từ máy chủ.
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        'Không thể điều chỉnh điểm. Vui lòng kiểm tra số dư điểm khách hàng.';
+      setError(msg);
     } finally {
       setIsSaving(false);
     }

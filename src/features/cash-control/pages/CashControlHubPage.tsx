@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import type { FC } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  ShieldCheck,
   CheckCircle2,
   Save,
   RefreshCw,
@@ -26,6 +25,8 @@ import {
   UserCheck,
   Building2,
   Printer,
+  Search,
+  RotateCcw,
 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
 import { posShiftApi } from '../../pos/api/posShiftApi';
@@ -37,7 +38,7 @@ import type {
 } from '../../pos/types/posShift.types';
 import { employeeApi } from '../../employee/api/employeeApi';
 import type { Branch } from '../../employee/types';
-import { TablePagination } from '../../../components/common';
+import { TablePagination, SortableHeader, useTableSort } from '../../../components/common';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import '../../pos/pos.css';
 
@@ -57,7 +58,8 @@ const formatVND = (amount: number): string => {
  */
 const formatDate = (isoString?: string): string => {
   if (!isoString) return '---';
-  const d = new Date(isoString);
+  const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(isoString) ? isoString : `${isoString}Z`;
+  const d = new Date(normalized);
   if (isNaN(d.getTime())) return isoString;
   return d.toLocaleString('vi-VN', {
     hour: '2-digit',
@@ -125,6 +127,8 @@ export const CashControlHubPage: FC = () => {
   const [unconfirmedDrops, setUnconfirmedDrops] = useState<ShiftCashMovementDto[]>([]);
   const [resolvedMovements, setResolvedMovements] = useState<ShiftCashMovementDto[]>([]);
   const [pendingFilter, setPendingFilter] = useState<'ALL' | 'DROPS' | 'EXPENSES'>('ALL');
+  const [movementCodeQuery, setMovementCodeQuery] = useState('');
+  const [movementCashierQuery, setMovementCashierQuery] = useState('');
   const [isPendingLoading, setIsPendingLoading] = useState<boolean>(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
@@ -273,28 +277,29 @@ export const CashControlHubPage: FC = () => {
           }
         }
         if (shiftsToday && shiftsToday.length > 0) {
-            const resolvedItems: ShiftCashMovementDto[] = [];
-            for (const s of shiftsToday) {
-              if (s.cashMovements && s.cashMovements.length > 0) {
-                for (const m of s.cashMovements) {
-                  const isApproved = m.status === 'Recorded' || m.status === 1;
-                  const isRejected = m.status === 'Rejected' || m.status === 3;
-                  const isDropConfirmed = (m.category === 'CASH_DRAW' || m.category === 2) && m.isConfirmedByOwner;
-                  if (isApproved || isRejected || isDropConfirmed) {
-                    resolvedItems.push({ ...m, shiftId: s.id });
-                  }
+          const resolvedItems: ShiftCashMovementDto[] = [];
+          for (const s of shiftsToday) {
+            if (s.cashMovements && s.cashMovements.length > 0) {
+              for (const m of s.cashMovements) {
+                const isDrop = m.category === 'CASH_DRAW' || m.category === 2;
+                const isApproved = !isDrop && (m.status === 'Recorded' || m.status === 1);
+                const isRejected = m.status === 'Rejected' || m.status === 3;
+                const isDropConfirmed = isDrop && Boolean(m.isConfirmedByOwner);
+                if (isApproved || isRejected || isDropConfirmed) {
+                  resolvedItems.push({ ...m, shiftId: s.id });
                 }
               }
             }
-            setResolvedMovements((prev) => {
-              const map = new Map<string, ShiftCashMovementDto>();
-              resolvedItems.forEach((item) => map.set(item.id, item));
-              prev.forEach((item) => map.set(item.id, item));
-              return Array.from(map.values()).sort(
-                (a, b) => new Date(b.occurredAtUtc).getTime() - new Date(a.occurredAtUtc).getTime()
-              );
-            });
           }
+          setResolvedMovements((prev) => {
+            const map = new Map<string, ShiftCashMovementDto>();
+            resolvedItems.forEach((item) => map.set(item.id, item));
+            prev.forEach((item) => map.set(item.id, item));
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(b.occurredAtUtc).getTime() - new Date(a.occurredAtUtc).getTime()
+            );
+          });
+        }
       } catch (errHistory) {
         console.warn('Lỗi lấy lịch sử ca để đồng bộ phiếu đã duyệt hôm nay:', errHistory);
       }
@@ -678,11 +683,68 @@ export const CashControlHubPage: FC = () => {
     };
   }, [shifts]);
 
+  const matchesMovementSearch = useCallback(
+    (m: ShiftCashMovementDto) => {
+      const codeQ = movementCodeQuery.trim().toLowerCase();
+      const cashierQ = movementCashierQuery.trim().toLowerCase();
+      if (codeQ) {
+        const hitId = (m.id || '').toLowerCase().includes(codeQ);
+        const hitReason = (m.reason || '').toLowerCase().includes(codeQ);
+        if (!hitId && !hitReason) return false;
+      }
+      if (cashierQ) {
+        if (!(m.createdByName || '').toLowerCase().includes(cashierQ)) return false;
+      }
+      return true;
+    },
+    [movementCodeQuery, movementCashierQuery]
+  );
+
+  const filteredPendingMovements = useMemo(
+    () => pendingMovements.filter(matchesMovementSearch),
+    [pendingMovements, matchesMovementSearch]
+  );
+
+  const filteredUnconfirmedDrops = useMemo(
+    () => unconfirmedDrops.filter(matchesMovementSearch),
+    [unconfirmedDrops, matchesMovementSearch]
+  );
+
+  const filteredResolvedMovements = useMemo(
+    () => resolvedMovements.filter(matchesMovementSearch),
+    [resolvedMovements, matchesMovementSearch]
+  );
+
+  const { sort: resolvedSort, handleSort: handleResolvedSort, sortedItems: sortedResolvedMovements } = useTableSort(
+    filteredResolvedMovements,
+    {
+      id: (r) => r.id,
+      category: (r) => String(r.category || ''),
+      reason: (r) => r.reason || '',
+      createdByName: (r) => r.createdByName || '',
+      amount: (r) => r.amount ?? 0,
+      status: (r) => String(r.status || ''),
+      occurredAtUtc: (r) => r.approvedAtUtc || r.confirmedByOwnerAtUtc || r.occurredAtUtc || '',
+    }
+  );
+
+  const { sort: shiftSort, handleSort: handleShiftSort, sortedItems: sortedShifts } = useTableSort(shifts, {
+    shiftCode: (s) => s.shiftCode || '',
+    openedAtUtc: (s) => s.openedAtUtc || '',
+    closedAtUtc: (s) => s.closedAtUtc || '',
+    cashier: (s) => s.participants?.[0]?.fullName || s.participants?.[0]?.userName || '',
+    openingFloat: (s) => s.openingFloat ?? 0,
+    expectedCash: (s) => s.expectedCash ?? 0,
+    actualCashCounted: (s) => s.actualCashCounted ?? -1,
+    discrepancy: (s) => s.discrepancy ?? 0,
+    handoverStatus: (s) => String(s.handoverStatus || ''),
+  });
+
   // Paginated shifts for Tab 2
   const paginatedShifts = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return shifts.slice(start, start + pageSize);
-  }, [shifts, currentPage, pageSize]);
+    return sortedShifts.slice(start, start + pageSize);
+  }, [sortedShifts, currentPage, pageSize]);
 
   // Helper badge renderer for handover status
   const renderHandoverBadge = (status: number | string) => {
@@ -765,45 +827,12 @@ export const CashControlHubPage: FC = () => {
         fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* ─── 1. TOP HEADER BAR ─── */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 16,
-          paddingBottom: 4,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              backgroundColor: '#ccfbf1',
-              color: '#0f766e',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 2px 4px rgba(15, 118, 110, 0.12)',
-            }}
-          >
-            <ShieldCheck size={26} />
-          </div>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              Quản Trị Ca &amp; Két POS
-            </h1>
-            <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>
-              Kiểm soát dòng tiền mặt &bull; Phê duyệt chi két &amp; rút két &bull; Lịch sử phiên ca &amp; Cấu hình hạn mức
-            </p>
-          </div>
-        </div>
+      {/* ─── 1. COMPACT STANDARD HEADER (SO-LIST-HEADER) ─── */}
+      <div className="so-list-header">
+        <h1 className="so-list-title">Quản Trị Ca &amp; Két POS</h1>
 
         {/* Branch Selection & Refresh Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', maxWidth: '100%', minWidth: 0 }}>
+        <div className="so-list-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', maxWidth: '100%', minWidth: 0 }}>
           {branches.length > 0 && (
             <div
               style={{
@@ -854,24 +883,10 @@ export const CashControlHubPage: FC = () => {
               if (activeTab === 'history') loadHistoryData();
             }}
             disabled={isPendingLoading || isHistoryLoading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              height: 38,
-              padding: '0 14px',
-              borderRadius: 8,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            }}
+            className="so-list-filter-reset"
           >
             <RefreshCw
-              size={15}
+              size={14}
               className={isPendingLoading || isHistoryLoading ? 'animate-spin' : ''}
             />
             <span>Làm mới</span>
@@ -1130,6 +1145,78 @@ export const CashControlHubPage: FC = () => {
             </div>
           </div>
 
+          {/* Bộ lọc chuẩn so-list-filter (Mã phiếu / Lý do & Thu ngân) */}
+          <div className="so-list-filter">
+            <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 14px', flexWrap: 'wrap' }}>
+              <div className="so-list-filter-field" style={{ flex: '1 1 220px', minWidth: 190 }}>
+                <label className="so-list-filter-label">Mã phiếu / Nội dung:</label>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    type="text"
+                    value={movementCodeQuery}
+                    onChange={(e) => setMovementCodeQuery(e.target.value)}
+                    placeholder="Nhập mã phiếu hoặc lý do..."
+                    className="so-list-filter-input"
+                    style={{ width: '100%', paddingLeft: 28, paddingRight: movementCodeQuery ? 26 : 10 }}
+                  />
+                  <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  {movementCodeQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setMovementCodeQuery('')}
+                      style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                      title="Xóa"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="so-list-filter-field" style={{ flex: '0 1 210px', minWidth: 180 }}>
+                <label className="so-list-filter-label">Thu ngân:</label>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    type="text"
+                    value={movementCashierQuery}
+                    onChange={(e) => setMovementCashierQuery(e.target.value)}
+                    placeholder="Tên thu ngân..."
+                    className="so-list-filter-input"
+                    style={{ width: '100%', paddingRight: movementCashierQuery ? 26 : 10 }}
+                  />
+                  {movementCashierQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setMovementCashierQuery('')}
+                      style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                      title="Xóa"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <button type="button" onClick={loadPendingData} className="so-list-filter-search">
+                  <Search size={13} /> Tìm kiếm
+                </button>
+                <button
+                  type="button"
+                  disabled={!movementCodeQuery && !movementCashierQuery && pendingFilter === 'ALL'}
+                  onClick={() => {
+                    setMovementCodeQuery('');
+                    setMovementCashierQuery('');
+                    setPendingFilter('ALL');
+                  }}
+                  className="so-list-filter-reset"
+                >
+                  <RotateCcw size={13} /> Đặt lại
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* ─── ACTION INBOX: YÊU CẦU CA & KÉT CHỜ DUYỆT ─── */}
           <div
             style={{
@@ -1235,8 +1322,8 @@ export const CashControlHubPage: FC = () => {
               {(() => {
                 const showDrops = pendingFilter === 'ALL' || pendingFilter === 'DROPS';
                 const showExpenses = pendingFilter === 'ALL' || pendingFilter === 'EXPENSES';
-                const visibleDrops = showDrops ? unconfirmedDrops : [];
-                const visibleExpenses = showExpenses ? pendingMovements : [];
+                const visibleDrops = showDrops ? filteredUnconfirmedDrops : [];
+                const visibleExpenses = showExpenses ? filteredPendingMovements : [];
                 const totalVisible = visibleDrops.length + visibleExpenses.length;
 
                 if (totalVisible === 0) {
@@ -1488,7 +1575,7 @@ export const CashControlHubPage: FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <History size={18} className="text-teal-700" />
                 <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Lịch sử đã duyệt trong ngày ({resolvedMovements.length})
+                  Lịch sử đã duyệt trong ngày ({sortedResolvedMovements.length})
                 </h3>
               </div>
               <span style={{ fontSize: 12, color: '#64748b' }}>
@@ -1500,29 +1587,48 @@ export const CashControlHubPage: FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: 12, fontWeight: 700 }}>
-                    <th style={{ padding: '10px 16px' }}>Mã phiếu</th>
-                    <th style={{ padding: '10px 16px' }}>Loại phiếu</th>
-                    <th style={{ padding: '10px 16px' }}>Nội dung</th>
-                    <th style={{ padding: '10px 16px' }}>Thu ngân</th>
-                    <th style={{ padding: '10px 16px', textAlign: 'right' }}>Số tiền</th>
-                    <th style={{ padding: '10px 16px', textAlign: 'center' }}>Trạng thái</th>
-                    <th style={{ padding: '10px 16px' }}>Thời gian xử lý</th>
+                    <th style={{ padding: '10px 16px' }}>
+                      <SortableHeader label="Mã phiếu" active={resolvedSort.key === 'id'} direction={resolvedSort.direction} onClick={() => handleResolvedSort('id')} />
+                    </th>
+                    <th style={{ padding: '10px 16px' }}>
+                      <SortableHeader label="Loại phiếu" active={resolvedSort.key === 'category'} direction={resolvedSort.direction} onClick={() => handleResolvedSort('category')} />
+                    </th>
+                    <th style={{ padding: '10px 16px' }}>
+                      <SortableHeader label="Nội dung" active={resolvedSort.key === 'reason'} direction={resolvedSort.direction} onClick={() => handleResolvedSort('reason')} />
+                    </th>
+                    <th style={{ padding: '10px 16px' }}>
+                      <SortableHeader label="Thu ngân" active={resolvedSort.key === 'createdByName'} direction={resolvedSort.direction} onClick={() => handleResolvedSort('createdByName')} />
+                    </th>
+                    <th style={{ padding: '10px 16px', textAlign: 'right' }}>
+                      <SortableHeader label="Số tiền" align="right" active={resolvedSort.key === 'amount'} direction={resolvedSort.direction} onClick={() => handleResolvedSort('amount')} />
+                    </th>
+                    <th style={{ padding: '10px 16px', textAlign: 'center' }}>
+                      <SortableHeader label="Trạng thái" align="center" active={resolvedSort.key === 'status'} direction={resolvedSort.direction} onClick={() => handleResolvedSort('status')} />
+                    </th>
+                    <th style={{ padding: '10px 16px' }}>
+                      <SortableHeader label="Thời gian xử lý" active={resolvedSort.key === 'occurredAtUtc'} direction={resolvedSort.direction} onClick={() => handleResolvedSort('occurredAtUtc')} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {resolvedMovements.length === 0 ? (
+                  {sortedResolvedMovements.length === 0 ? (
                     <tr>
                       <td colSpan={7} style={{ padding: '36px 16px', textAlign: 'center', color: '#64748b' }}>
                         <CheckCircle2 size={32} className="text-emerald-500" style={{ margin: '0 auto 8px' }} />
-                        <div style={{ fontWeight: 600, color: '#334155' }}>Chưa có phiếu đã xử lý trong ngày hôm nay.</div>
+                        <div style={{ fontWeight: 600, color: '#334155' }}>Chưa có phiếu đã xử lý phù hợp với bộ lọc.</div>
                         <div style={{ fontSize: 12, marginTop: 4 }}>
                           Khi bạn duyệt chi hoặc xác nhận nhận tiền rút két, các khoản tiền đã xử lý sẽ lưu vào đây.
                         </div>
                       </td>
                     </tr>
                   ) : (
-                    resolvedMovements.map((r) => {
+                    sortedResolvedMovements.map((r) => {
                       const isDrop = r.category === 'CASH_DRAW' || r.category === 2;
+                      const isDeposit =
+                        r.category === 'CASH_DEPOSIT' ||
+                        r.category === 3 ||
+                        r.movementType === 'IN' ||
+                        r.movementType === 1;
                       const isRejected = r.status === 'Rejected' || r.status === 3;
 
                       return (
@@ -1535,6 +1641,10 @@ export const CashControlHubPage: FC = () => {
                               <span style={{ backgroundColor: '#ccfbf1', color: '#0f766e', border: '1px solid #99f6e4', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11.5 }}>
                                 Nộp két sắt
                               </span>
+                            ) : isDeposit ? (
+                              <span style={{ backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11.5 }}>
+                                Nạp tiền vào két
+                              </span>
                             ) : (
                               <span style={{ backgroundColor: '#ffedd5', color: '#ea580c', border: '1px solid #fed7aa', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11.5 }}>
                                 Chi tại quầy POS
@@ -1542,7 +1652,7 @@ export const CashControlHubPage: FC = () => {
                             )}
                           </td>
                           <td style={{ padding: '12px 16px', color: '#1e293b' }}>
-                            <div>{r.reason || (isDrop ? 'Rút tiền nộp két sắt' : 'Chi tiền tại quầy')}</div>
+                            <div>{r.reason || (isDrop ? 'Rút tiền nộp két sắt' : isDeposit ? 'Nạp tiền vào két' : 'Chi tiền tại quầy')}</div>
                             {r.rejectionReason && (
                               <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 2 }}>
                                 <b>Lý do từ chối:</b> {r.rejectionReason}
@@ -1558,10 +1668,10 @@ export const CashControlHubPage: FC = () => {
                               textAlign: 'right',
                               fontWeight: 700,
                               fontVariantNumeric: 'tabular-nums',
-                              color: isDrop ? '#0f766e' : '#ea580c',
+                              color: isDrop ? '#0f766e' : isDeposit ? '#15803d' : '#ea580c',
                             }}
                           >
-                            {isDrop ? `+${formatVND(r.amount)}` : `-${formatVND(r.amount)}`}
+                            {isDrop || isDeposit ? `+${formatVND(r.amount)}` : `-${formatVND(r.amount)}`}
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                             {isRejected ? (
@@ -1751,28 +1861,47 @@ export const CashControlHubPage: FC = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', color: '#475569', fontWeight: 600 }}>
-                    <th style={{ padding: '10px 14px' }}>Mã ca</th>
-                    <th style={{ padding: '10px 14px' }}>Thời gian mở - đóng</th>
-                    <th style={{ padding: '10px 14px' }}>Thu ngân</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>Tiền đầu ca</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>Tiền lý thuyết</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>Thực đếm</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>Chênh lệch</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'center' }}>Bàn giao</th>
+                    <th style={{ padding: '10px 14px' }}>
+                      <SortableHeader label="Mã ca" active={shiftSort.key === 'shiftCode'} direction={shiftSort.direction} onClick={() => handleShiftSort('shiftCode')} />
+                    </th>
+                    <th style={{ padding: '10px 14px' }}>
+                      <SortableHeader label="Giờ mở ca" active={shiftSort.key === 'openedAtUtc'} direction={shiftSort.direction} onClick={() => handleShiftSort('openedAtUtc')} />
+                    </th>
+                    <th style={{ padding: '10px 14px' }}>
+                      <SortableHeader label="Giờ đóng ca" active={shiftSort.key === 'closedAtUtc'} direction={shiftSort.direction} onClick={() => handleShiftSort('closedAtUtc')} />
+                    </th>
+                    <th style={{ padding: '10px 14px' }}>
+                      <SortableHeader label="Thu ngân" active={shiftSort.key === 'cashier'} direction={shiftSort.direction} onClick={() => handleShiftSort('cashier')} />
+                    </th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>
+                      <SortableHeader label="Tiền đầu ca" align="right" active={shiftSort.key === 'openingFloat'} direction={shiftSort.direction} onClick={() => handleShiftSort('openingFloat')} />
+                    </th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>
+                      <SortableHeader label="Tiền lý thuyết" align="right" active={shiftSort.key === 'expectedCash'} direction={shiftSort.direction} onClick={() => handleShiftSort('expectedCash')} />
+                    </th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>
+                      <SortableHeader label="Thực đếm" align="right" active={shiftSort.key === 'actualCashCounted'} direction={shiftSort.direction} onClick={() => handleShiftSort('actualCashCounted')} />
+                    </th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>
+                      <SortableHeader label="Chênh lệch" align="right" active={shiftSort.key === 'discrepancy'} direction={shiftSort.direction} onClick={() => handleShiftSort('discrepancy')} />
+                    </th>
+                    <th style={{ padding: '10px 14px', textAlign: 'center' }}>
+                      <SortableHeader label="Bàn giao" align="center" active={shiftSort.key === 'handoverStatus'} direction={shiftSort.direction} onClick={() => handleShiftSort('handoverStatus')} />
+                    </th>
                     <th style={{ padding: '10px 14px', textAlign: 'center' }}>Thao tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {isHistoryLoading ? (
                     <tr>
-                      <td colSpan={9} style={{ padding: '36px', textAlign: 'center', color: '#64748B' }}>
+                      <td colSpan={10} style={{ padding: '36px', textAlign: 'center', color: '#64748B' }}>
                         <RefreshCw size={20} className="animate-spin text-teal-700" style={{ margin: '0 auto 8px' }} />
                         <div>Đang tải lịch sử ca làm việc từ hệ thống...</div>
                       </td>
                     </tr>
                   ) : paginatedShifts.length === 0 ? (
                     <tr>
-                      <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
+                      <td colSpan={10} style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
                         <AlertCircle size={24} color="#94A3B8" style={{ margin: '0 auto 8px' }} />
                         <div style={{ fontWeight: 600, color: '#334155' }}>Không có ca làm việc nào trong khoảng thời gian này</div>
                         <div style={{ fontSize: 12, marginTop: 4 }}>Hãy chọn khoảng thời gian khác hoặc chuyển đổi chi nhánh.</div>
@@ -1789,12 +1918,14 @@ export const CashControlHubPage: FC = () => {
 
                       return (
                         <tr key={s.id} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background-color 0.15s' }}>
-                          <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0F172A', fontVariantNumeric: 'tabular-nums' }}>
+                          <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0F172A', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono, monospace)' }}>
                             {s.shiftCode}
                           </td>
-                          <td style={{ padding: '12px 14px', color: '#334155', fontSize: 12 }}>
-                            <div><b>Mở:</b> {formatDate(s.openedAtUtc)}</div>
-                            <div><b>Đóng:</b> {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981' }}>Đang mở</span>}</div>
+                          <td style={{ padding: '12px 14px', color: '#334155', fontSize: 12, fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
+                            {formatDate(s.openedAtUtc)}
+                          </td>
+                          <td style={{ padding: '12px 14px', color: '#334155', fontSize: 12, fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
+                            {s.closedAtUtc ? formatDate(s.closedAtUtc) : <span style={{ color: '#10B981', fontWeight: 600, fontFamily: 'inherit' }}>Đang mở</span>}
                           </td>
                           <td style={{ padding: '12px 14px', color: '#1E293B' }}>
                             {uniqueParticipants.length > 0 ? (
@@ -3010,8 +3141,8 @@ export const CashControlHubPage: FC = () => {
                   const diff = zReportData.discrepancy !== null && zReportData.discrepancy !== undefined
                     ? zReportData.discrepancy
                     : (zReportData.actualCashCounted !== null && zReportData.actualCashCounted !== undefined
-                        ? zReportData.actualCashCounted - zReportData.expectedCashInTill
-                        : 0);
+                      ? zReportData.actualCashCounted - zReportData.expectedCashInTill
+                      : 0);
                   const diffColor = diff === 0 ? '#059669' : diff > 0 ? '#059669' : '#DC2626';
                   return (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 13.5, color: diffColor, marginTop: 2 }}>

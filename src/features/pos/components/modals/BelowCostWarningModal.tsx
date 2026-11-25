@@ -130,7 +130,7 @@ export const BelowCostWarningModal: FC<Props> = ({
               borderRadius: 'var(--radius-pill)',
             }}
           >
-            <b>✓ Quản Lý Xác Thực PIN & Cho Phép Xuất Đơn</b>
+            <b>Quản Lý Xác Thực PIN & Cho Phép Xuất Đơn</b>
           </button>
         </div>
       </div>

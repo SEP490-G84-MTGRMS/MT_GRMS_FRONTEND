@@ -9,14 +9,10 @@ import {
   Banknote,
   PackageCheck,
   Printer,
-  ChevronDown,
-  ChevronUp,
   ChevronRight,
   X,
   XCircle,
   CheckCircle2,
-  User,
-  Phone,
   FileText,
   DollarSign,
   CreditCard,
@@ -25,8 +21,10 @@ import {
   Ticket,
   Star,
   Gift,
+  Loader2,
 } from 'lucide-react';
-import { TablePagination } from '../../../components/common';
+import { TablePagination, ConfirmDialog, SortableHeader, useTableSort } from '../../../components/common';
+import { AdminToast, type ToastState } from '../../admin/components';
 import type { InvoiceDTO, PreOrderDTO } from '../types/inventory.types';
 import { ReturnExchangeModal } from '../components/modals/ReturnExchangeModal';
 import { CreatePreOrderModal } from '../components/modals/CreatePreOrderModal';
@@ -45,20 +43,73 @@ import './invoice-management-list.css';
  * Tách và làm sạch thời gian hẹn nhận hàng từ Note đơn đặt trước
  * Tránh hiển thị chuỗi dài gồm cả SĐT, ghi chú xuất hàng và tag hệ thống [CHỐT CUỐI NGÀY: ...]
  */
-const parsePreOrderPickupAndNotes = (rawNote?: string | null) => {
+const parseOrderDateToLocal = (raw?: string | null): Date | null => {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+  const d = new Date(hasTz ? trimmed : `${trimmed}Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+const matchesTimePreset = (
+  rawDate: string | undefined,
+  preset: 'all' | 'today' | 'yesterday' | 'week' | 'month',
+): boolean => {
+  if (preset === 'all') return true;
+  const d = parseOrderDateToLocal(rawDate);
+  if (!d) return false;
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  if (preset === 'today') {
+    return d >= startOfToday && d <= endOfToday;
+  }
+  if (preset === 'yesterday') {
+    const startYesterday = new Date(startOfToday);
+    startYesterday.setDate(startYesterday.getDate() - 1);
+    const endYesterday = new Date(startOfToday.getTime() - 1);
+    return d >= startYesterday && d <= endYesterday;
+  }
+  if (preset === 'week') {
+    const dayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon
+    const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - diffToMonday);
+    return d >= startOfWeek && d <= endOfToday;
+  }
+  if (preset === 'month') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    return d >= startOfMonth && d <= endOfToday;
+  }
+  return true;
+};
+
+const parsePreOrderPickupAndNotes = (rawNote?: string | null, expectedPickupDate?: string | null) => {
+  const formattedPickup = expectedPickupDate
+    ? (parseOrderDateToLocal(expectedPickupDate)?.toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) ?? '')
+    : '';
+
   if (!rawNote || !rawNote.trim()) {
     return {
-      pickupAppointment: '17:30 - Hôm nay',
+      pickupAppointment: formattedPickup || '—',
       fulfillmentNote: null as string | null,
       notes: null as string | null,
     };
   }
 
-  // 1. Trích xuất thời gian hẹn nhận (VD: "Hẹn nhận: 12/11/2026 15:40" hoặc "12/11/2026 15:40")
-  let pickupAppointment = '';
-  const matchAppt = rawNote.match(/Hẹn nhận:\s*([^.|]+)/i);
-  if (matchAppt && matchAppt[1]) {
-    pickupAppointment = matchAppt[1].trim();
+  // 1. Ưu tiên dùng expectedPickupDate từ DB; chỉ fallback regex cho đơn cũ chưa có cột riêng
+  let pickupAppointment = formattedPickup;
+  if (!pickupAppointment) {
+    const matchAppt = rawNote.match(/Hẹn nhận:\s*([^.|]+)/i);
+    if (matchAppt && matchAppt[1]) {
+      pickupAppointment = matchAppt[1].trim();
+    }
   }
 
   // 2. Trích xuất ghi chú xuất hàng/bàn giao nếu có
@@ -74,16 +125,12 @@ const parsePreOrderPickupAndNotes = (rawNote?: string | null) => {
     .replace(/Khách:\s*[^.|]+[.]?/i, '')
     .replace(/\|\s*Xuất hàng:[^|]*/gi, '')
     .replace(/\[CHỐT CUỐI NGÀY:[^\]]*\]/gi, '')
+    .replace(/\[ĐÃ VÀO KÉT SẮT\]/gi, '')
     .replace(/[|]/g, '')
     .trim();
 
-  if (!pickupAppointment) {
-    const firstPart = rawNote.split(/[|.]/)[0]?.trim();
-    pickupAppointment = firstPart || '17:30 - Hôm nay';
-  }
-
   return {
-    pickupAppointment,
+    pickupAppointment: pickupAppointment || '—',
     fulfillmentNote,
     notes: cleanNote.length > 0 ? cleanNote : null,
   };
@@ -111,6 +158,7 @@ export const InvoiceManagementPage: FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || searchParams.get('orderId') || '';
+  const urlTab = searchParams.get('tab');
   const showPendingPayments = searchParams.get('status') === 'PENDING_PAYMENT';
   const pendingBranchId = searchParams.get('branchId');
 
@@ -122,13 +170,21 @@ export const InvoiceManagementPage: FC = () => {
       : '/pos';
 
   // Chế độ xem: 'invoices' (Hóa đơn bán lẻ) vs 'preorders' (Đơn đặt trước)
-  const [activeTab, setActiveTab] = useState<'invoices' | 'preorders'>('invoices');
+  const [activeTab, setActiveTab] = useState<'invoices' | 'preorders'>(() =>
+    urlTab === 'preorders' ? 'preorders' : 'invoices'
+  );
 
-  // Bộ lọc
+  // Bộ lọc (tách Mã đơn & Khách hàng/SĐT + Trạng thái đặt trước)
+  const [draftSearchQuery, setDraftSearchQuery] = useState('');
+  const [draftCustomerQuery, setDraftCustomerQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [timePreset, setTimePreset] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
+  const [customerQuery, setCustomerQuery] = useState('');
+  const [timePreset, setTimePreset] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<'ALL' | 'VIETQR' | 'CASH' | 'DEBT' | 'CREDIT'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED' | 'RETURNED' | 'PENDING_PAYMENT'>(showPendingPayments ? 'PENDING_PAYMENT' : 'ALL');
+  const [preOrderStatusFilter, setPreOrderStatusFilter] = useState<'ALL' | 'RESERVED' | 'COMPLETED' | 'CANCELLED'>('ALL');
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [cancelTargetPreOrder, setCancelTargetPreOrder] = useState<PreOrderDTO | null>(null);
   const [returnRecordsByOrder, setReturnRecordsByOrder] = useState<Record<string, ReturnRecord[]>>({});
 
   // Danh sách hóa đơn có thể hủy / cập nhật trạng thái (Phân lập theo Cửa Hàng / Tenant)
@@ -179,6 +235,7 @@ export const InvoiceManagementPage: FC = () => {
   const [invoices, setInvoices] = useState<InvoiceDTO[]>([]);
   const [preOrders, setPreOrders] = useState<PreOrderDTO[]>([]);
   const [activeShiftCash, setActiveShiftCash] = useState<number | undefined>(undefined);
+  const [activeShiftId, setActiveShiftId] = useState<string | undefined>(undefined);
   const returnRequestRef = useRef<{ signature: string; key: string } | null>(null);
   const [catalogProducts, setCatalogProducts] = useState<Product[]>([]);
   const [catalogCustomers, setCatalogCustomers] = useState<Customer[]>([]);
@@ -236,7 +293,9 @@ export const InvoiceManagementPage: FC = () => {
     return {
       orderUuid: o.id,
       invoiceId: o.orderCode || o.id,
-      createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
+      isOutsideShift: !isPreOrderFlag && o.shiftId === null,
+      createdAt: o.orderDate ? (parseOrderDateToLocal(o.orderDate)?.toLocaleString('vi-VN') ?? '') : '',
+      createdAtIso: o.orderDate || '',
       branchId: o.branchId || '',
       branchName: o.branchName || '—',
       cashierId: '',
@@ -271,7 +330,14 @@ export const InvoiceManagementPage: FC = () => {
       orderOrigin: isPreOrderFlag ? 'PRE_ORDER' : 'RETAIL',
       items: (o.items || []).map((it: any) => ({
         itemId: it.id,
-        batchId: it.batchId || it.BatchId || '',
+        batchId:
+          it.batchCode ||
+          it.BatchCode ||
+          it.stockAllocations?.[0]?.batchCode ||
+          it.StockAllocations?.[0]?.BatchCode ||
+          it.batchId ||
+          it.BatchId ||
+          '',
         stockAllocations: it.stockAllocations || it.StockAllocations || [],
         productId: it.productId,
         productName: it.productName,
@@ -289,10 +355,18 @@ export const InvoiceManagementPage: FC = () => {
   };
 
   const mapPreOrderToInvoice = (pre: PreOrderDTO): InvoiceDTO => {
+    const rawMethod = pre.paymentMethod || 'CASH';
+    const isBankMethod = rawMethod === 'VIETQR' || rawMethod === 'BANK';
+    const isDebtMethod = rawMethod === 'DEBT' || rawMethod === 'CREDIT';
+    const resolvedMethodLabel =
+      pre.paymentMethodLabel ||
+      (isBankMethod ? 'Chuyển khoản VietQR' : isDebtMethod ? 'Ghi nợ' : 'Tiền mặt');
+
     return {
       orderUuid: pre.orderUuid,
       invoiceId: pre.preOrderId,
       createdAt: pre.createdAt,
+      createdAtIso: pre.createdAtIso,
       branchId: pre.branchId,
       branchName: pre.branchName,
       cashierId: '',
@@ -306,8 +380,8 @@ export const InvoiceManagementPage: FC = () => {
       debtAmount: 0,
       paidDebtAmount: 0,
       debtPaymentRecords: [],
-      paymentMethod: 'CASH',
-      paymentMethodLabel: 'Tiền mặt',
+      paymentMethod: rawMethod,
+      paymentMethodLabel: resolvedMethodLabel,
       status: pre.status === 'CANCELLED' ? 'CANCELLED' : 'COMPLETED',
       statusLabel: pre.status === 'CANCELLED' ? 'Đã hủy' : 'Hoàn thành',
       isPreOrder: true,
@@ -316,12 +390,15 @@ export const InvoiceManagementPage: FC = () => {
     };
   };
 
-  // Nạp tiền mặt trong két ca làm việc đang mở của chi nhánh
+  // Nạp tiền mặt và shiftId trong két ca làm việc đang mở của chi nhánh
   useEffect(() => {
     const targetBranchId = branchFilter !== 'ALL' ? branchFilter : assignedBranch.id;
     setActiveShiftCash(undefined);
+    setActiveShiftId(undefined);
+    if (!targetBranchId || targetBranchId === 'ALL') return;
     posShiftApi.getCurrentShift(targetBranchId).then((s) => {
       setActiveShiftCash(s?.expectedCash);
+      setActiveShiftId(s?.id);
     }).catch(() => { });
   }, [branchFilter, assignedBranch.id]);
 
@@ -330,11 +407,16 @@ export const InvoiceManagementPage: FC = () => {
   // Nạp dữ liệu thực tế từ Backend API theo Tenant
   useEffect(() => {
     let isMounted = true;
+    setIsLoadingOrders(true);
     setInvoices([]);
     setPreOrders([]);
     setReturnRecordsByOrder({});
     posOrderApi
-      .getOrders(showPendingPayments ? { status: 'PendingPayment', branchId: pendingBranchId || undefined, pageSize: 100 } : undefined)
+      .getOrders(
+        showPendingPayments
+          ? { status: 'PendingPayment', branchId: pendingBranchId || undefined, pageSize: 100 }
+          : { pageSize: 500 }
+      )
       .then((res) => {
         if (!isMounted) return;
         if (!res || !res.items || res.items.length === 0) {
@@ -367,19 +449,26 @@ export const InvoiceManagementPage: FC = () => {
             const totalOrderAmount = o.finalAmount ?? o.totalAmount ?? 0;
             const depositAmount = o.depositAmount || 0;
             const remainingAmount = Math.max(0, totalOrderAmount - depositAmount);
-            const parsedNoteInfo = parsePreOrderPickupAndNotes(o.note);
+            const parsedNoteInfo = parsePreOrderPickupAndNotes(o.note, o.expectedPickupDate);
+            const rawMethod = (o.paymentMethod || 'CASH') as PreOrderDTO['paymentMethod'];
+            const isBankMethod = rawMethod === 'VIETQR' || rawMethod === 'BANK';
+            const isDebtMethod = rawMethod === 'DEBT' || rawMethod === 'CREDIT';
             return {
               orderUuid: o.id,
               preOrderId: o.orderCode || o.id,
-              createdAt: o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : '',
+              createdAt: o.orderDate ? (parseOrderDateToLocal(o.orderDate)?.toLocaleString('vi-VN') ?? '') : '',
+              createdAtIso: o.orderDate || '',
               branchId: o.branchId || '',
               branchName: o.branchName || '—',
               cashierName: o.cashierName || 'Thu ngân POS',
               fulfilledByCashierName: o.fulfilledByCashierName,
-              fulfilledAt: o.fulfilledAtUtc ? new Date(o.fulfilledAtUtc).toLocaleString('vi-VN') : undefined,
+              fulfilledAt: o.fulfilledAtUtc ? (parseOrderDateToLocal(o.fulfilledAtUtc)?.toLocaleString('vi-VN') ?? undefined) : undefined,
+              expectedPickupDate: o.expectedPickupDate || null,
               pickupAppointment: parsedNoteInfo.pickupAppointment,
               fulfillmentNote: parsedNoteInfo.fulfillmentNote,
               notes: parsedNoteInfo.notes,
+              paymentMethod: rawMethod,
+              paymentMethodLabel: isBankMethod ? 'Chuyển khoản VietQR' : isDebtMethod ? 'Ghi nợ' : 'Tiền mặt',
               customerName: o.customerName || 'Khách quen',
               customerPhone: o.customerPhone || '0987654321',
               totalMerchandiseAmount: o.totalAmount || totalOrderAmount,
@@ -403,7 +492,14 @@ export const InvoiceManagementPage: FC = () => {
                     : 'Đang giữ kho',
               items: (o.items || []).map((it: any) => ({
                 itemId: it.id,
-                batchId: it.batchId || '',
+                batchId:
+                  it.batchCode ||
+                  it.BatchCode ||
+                  it.stockAllocations?.[0]?.batchCode ||
+                  it.StockAllocations?.[0]?.BatchCode ||
+                  it.batchId ||
+                  it.BatchId ||
+                  '',
                 stockAllocations: it.stockAllocations || [],
                 productId: it.productId,
                 productName: it.productName,
@@ -422,7 +518,10 @@ export const InvoiceManagementPage: FC = () => {
           setPreOrders(mappedPreOrders);
         }
       })
-      .catch((err) => console.warn('Fetch orders error:', err));
+      .catch((err) => console.warn('Fetch orders error:', err))
+      .finally(() => {
+        if (isMounted) setIsLoadingOrders(false);
+      });
 
     return () => {
       isMounted = false;
@@ -531,14 +630,24 @@ export const InvoiceManagementPage: FC = () => {
         stt: idx + 1,
         name: it.productName,
         quantity: it.quantity,
-        unitPrice: it.isGift ? 0 : it.unitPrice,
-        totalPrice: it.isGift ? 0 : it.totalAmount,
-        totalAmount: it.isGift ? 0 : it.totalAmount,
+        unitPrice: it.isGift ? 0 : Math.round(it.unitPrice),
+        totalPrice: it.isGift ? 0 : Math.round(it.totalAmount),
+        totalAmount: it.isGift ? 0 : Math.round(it.totalAmount),
         isGift: Boolean(it.isGift),
       })),
-      totalItemAmount: printingInvoice.totalMerchandiseAmount,
+      totalItemAmount: Math.round(printingInvoice.totalMerchandiseAmount),
       itemDiscountAmount: 0,
-      orderDiscountAmount: printingInvoice.totalDiscount,
+      orderDiscountAmount:
+        printingInvoice.promotionDiscountAmount && printingInvoice.promotionDiscountAmount > 0
+          ? Math.round(printingInvoice.promotionDiscountAmount)
+          : Math.max(
+              0,
+              Math.round(
+                printingInvoice.totalDiscount -
+                  (printingInvoice.voucherDiscountAmount || 0) -
+                  (printingInvoice.pointsDiscountAmount || 0)
+              )
+            ),
       voucherDiscountAmount: printingInvoice.voucherDiscountAmount || undefined,
       appliedVoucherCode: printingInvoice.appliedVoucherCode || undefined,
       appliedPromotionSummary: printingInvoice.appliedPromotionSummary || undefined,
@@ -562,9 +671,21 @@ export const InvoiceManagementPage: FC = () => {
   const [preOrderPage, setPreOrderPage] = useState(1);
   const [preOrderPageSize, setPreOrderPageSize] = useState(15);
 
+  // Đồng bộ tab từ URL query param ?tab=preorders (DEF-SC71-003)
+  useEffect(() => {
+    if (urlTab === 'preorders') {
+      setActiveTab('preorders');
+      setPreOrderPage(1);
+    } else if (urlTab === 'invoices') {
+      setActiveTab('invoices');
+      setInvoicePage(1);
+    }
+  }, [urlTab]);
+
   // Đồng bộ tham số tìm kiếm từ URL (khi điều hướng từ trang Khách nợ CRM hoặc Sổ quỹ sang)
   useEffect(() => {
     if (urlSearch) {
+      setDraftSearchQuery(urlSearch);
       setSearchQuery(urlSearch);
       if (urlSearch.startsWith('PO') || urlSearch.startsWith('PRE-')) {
         setActiveTab('preorders');
@@ -578,24 +699,26 @@ export const InvoiceManagementPage: FC = () => {
     }
   }, [urlSearch]);
 
-  // Toast feedback
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  // Toast feedback chuẩn AdminToast
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: String(Date.now()), message: msg, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
   };
 
   // Xác nhận hủy hóa đơn (chặn Thu ngân với mã 403)
   const handleConfirmCancelInvoice = async () => {
     if (!cancelModalInvoice) return;
     if (!isStoreOwnerOrManager) {
-      alert('Thu ngân không có quyền hủy hóa đơn đã thanh toán. Vui lòng liên hệ Quản lý hoặc Chủ cửa hàng!');
+      showToast('Thu ngân không có quyền hủy hóa đơn đã thanh toán. Vui lòng liên hệ Quản lý hoặc Chủ cửa hàng!', 'error');
       setCancelModalInvoice(null);
       return;
     }
 
     if (!cancelReason.trim() || cancelReason.trim().length > 300 || cancelNote.trim().length > 500) {
-      alert('Lý do hủy bắt buộc, tối đa 300 ký tự; ghi chú tối đa 500 ký tự.');
+      showToast('Lý do hủy bắt buộc, tối đa 300 ký tự; ghi chú tối đa 500 ký tự.', 'warning');
       return;
     }
     try {
@@ -607,11 +730,11 @@ export const InvoiceManagementPage: FC = () => {
     } catch (e: any) {
       console.warn('Backend cancelOrder error:', e);
       if (e?.response?.status === 403) {
-        alert(e?.response?.data?.message || 'Bạn không có quyền hủy hóa đơn này!');
+        showToast(e?.response?.data?.message || 'Bạn không có quyền hủy hóa đơn này!', 'error');
         setCancelModalInvoice(null);
         return;
       }
-      alert(e?.response?.data?.message || 'Không thể hủy hóa đơn. Vui lòng thử lại.');
+      showToast(e?.response?.data?.message || 'Không thể hủy hóa đơn. Vui lòng thử lại.', 'error');
       return;
     }
     setInvoices((prev) =>
@@ -621,25 +744,29 @@ export const InvoiceManagementPage: FC = () => {
           : i
       )
     );
-    showToast(`Đã hủy thành công hóa đơn ${cancelModalInvoice.invoiceId} (${cancelReason})!`);
+    showToast(`Đã hủy thành công hóa đơn ${cancelModalInvoice.invoiceId} (${cancelReason})!`, 'success');
     window.dispatchEvent(new Event('mtgrms:customer-debt-changed'));
     setCancelModalInvoice(null);
     setCancelNote('');
   };
 
-  // Hủy đơn đặt trước và hoàn lại tồn kho giữ
-  const handleCancelPreOrder = async (pre: PreOrderDTO) => {
-    if (pre.depositAmount > 0) {
-      alert('Đơn đã nhận tiền cọc cần được hoàn tiền và đối soát trước khi hủy. Vui lòng liên hệ Chủ cửa hàng.');
+  // Hủy đơn đặt trước và hoàn lại tồn kho giữ (Chủ cửa hàng được phép xác nhận hoàn cọc & hủy đơn - DEF-SC71-001)
+  const handleCancelPreOrder = (pre: PreOrderDTO) => {
+    if (pre.depositAmount > 0 && !isStoreOwner) {
+      showToast('Chỉ Chủ cửa hàng mới có quyền xác nhận hoàn cọc và hủy đơn đặt trước đã nhận cọc.', 'error');
       return;
     }
-    if (!window.confirm(`Bạn có chắc chắn muốn hủy đơn đặt trước ${pre.preOrderId}? Tồn kho đã giữ sẽ được tự động hoàn lại vào kho hàng.`)) {
-      return;
-    }
+    setCancelTargetPreOrder(pre);
+  };
+
+  const confirmCancelPreOrder = async () => {
+    if (!cancelTargetPreOrder) return;
+    const pre = cancelTargetPreOrder;
+    setCancelTargetPreOrder(null);
     try {
       await posOrderApi.cancelOrder(pre.orderUuid || pre.preOrderId, {
-        reason: 'Khách hàng hủy đơn đặt trước',
-        note: 'Hủy đơn đặt trước từ màn hình Quản lý Đơn hàng',
+        reason: pre.depositAmount > 0 ? 'Chủ cửa hàng xác nhận hoàn cọc và hủy đơn đặt trước' : 'Khách hàng hủy đơn đặt trước',
+        note: pre.depositAmount > 0 ? `Hoàn cọc ${pre.depositAmount.toLocaleString('vi-VN')} đ` : 'Hủy đơn đặt trước từ màn hình Quản lý Đơn hàng',
         userRole: user?.role || 'CASHIER',
       });
       setPreOrders((prev) =>
@@ -649,10 +776,10 @@ export const InvoiceManagementPage: FC = () => {
             : p
         )
       );
-      showToast(`Đã hủy thành công đơn đặt trước ${pre.preOrderId}!`);
+      showToast(`Đã hủy thành công đơn đặt trước ${pre.preOrderId} và giải phóng tồn kho giữ!`, 'success');
     } catch (e: any) {
       console.error('Cancel PreOrder failed:', e);
-      alert(`Lỗi khi hủy đơn đặt trước: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`);
+      showToast(`Lỗi khi hủy đơn đặt trước: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`, 'error');
     }
   };
 
@@ -693,7 +820,7 @@ export const InvoiceManagementPage: FC = () => {
       showToast(`Đã ghi nhận đổi/trả cho hóa đơn ${returnExchangeModalInvoice.invoiceId}. Mã phiếu đổi/trả: ${res?.orderCode || 'Đã ghi nhận'}`);
 
       // Nạp lại danh sách từ API (chỉ lấy hóa đơn bán lẻ)
-      posOrderApi.getOrders().then((orderRes) => {
+      posOrderApi.getOrders({ pageSize: 500 }).then((orderRes) => {
         if (orderRes && orderRes.items) {
           setReturnRecordsByOrder(collectReturnRecords(orderRes.items));
           const invoiceOrders = orderRes.items.filter(
@@ -710,9 +837,11 @@ export const InvoiceManagementPage: FC = () => {
 
       // Tự động đồng bộ lại tiền mặt trong két quầy của ca hiện tại
       const targetBranchId = branchFilter !== 'ALL' ? branchFilter : assignedBranch.id;
-      posShiftApi.getCurrentShift(targetBranchId).then((s) => {
-        if (s) setActiveShiftCash(s.expectedCash);
-      }).catch(() => { });
+      if (targetBranchId && targetBranchId !== 'ALL') {
+        posShiftApi.getCurrentShift(targetBranchId).then((s) => {
+          if (s) setActiveShiftCash(s.expectedCash);
+        }).catch(() => { });
+      }
     } catch (e: any) {
       throw e;
     }
@@ -800,6 +929,7 @@ export const InvoiceManagementPage: FC = () => {
         orderUuid: createdUuid,
         preOrderId,
         createdAt: new Date().toLocaleString('vi-VN'),
+        createdAtIso: backendRes?.orderDate || new Date().toISOString(),
         branchId: branchFilter !== 'ALL' ? branchFilter : assignedBranch.id,
         branchName:
           branchFilter !== 'ALL'
@@ -808,6 +938,7 @@ export const InvoiceManagementPage: FC = () => {
         cashierName: creatorCashier,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
+        expectedPickupDate: backendRes?.expectedPickupDate || data.expectedPickupDate,
         pickupAppointment: new Date(data.expectedPickupDate).toLocaleString('vi-VN', {
           hour: '2-digit',
           minute: '2-digit',
@@ -815,6 +946,11 @@ export const InvoiceManagementPage: FC = () => {
           month: '2-digit',
           year: 'numeric',
         }),
+        paymentMethod: (backendRes?.paymentMethod || data.paymentMethod || 'CASH') as PreOrderDTO['paymentMethod'],
+        paymentMethodLabel:
+          (backendRes?.paymentMethod || data.paymentMethod) === 'BANK' || (backendRes?.paymentMethod || data.paymentMethod) === 'VIETQR'
+            ? 'Chuyển khoản VietQR'
+            : 'Tiền mặt',
         notes: data.note?.trim() || null,
         totalMerchandiseAmount: merchandiseAmount,
         discountAmount,
@@ -856,67 +992,106 @@ export const InvoiceManagementPage: FC = () => {
   // Lọc Hóa đơn
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
-      // Khi là Chủ cửa hàng đang gõ tìm kiếm -> Cho phép tìm toàn chuỗi
-      // Nhưng nếu là Nhân viên -> BẮT BUỘC chỉ tìm trong chi nhánh của mình
-      const isSearching = isStoreOwner && searchQuery.trim().length > 0;
+      const isSearching = isStoreOwner && (searchQuery.trim().length > 0 || customerQuery.trim().length > 0);
 
       const matchBranch = !isStoreOwner
         ? isBranchMatching(branchFilter, inv.branchId)
         : (isSearching || branchFilter === 'ALL' || isBranchMatching(branchFilter, inv.branchId));
 
-      const cleanQuery = searchQuery.trim().toLowerCase();
-      const phoneQuery = cleanQuery.replace(/\D/g, '');
-      const matchSearch =
-        !searchQuery.trim() ||
-        inv.invoiceId.toLowerCase().includes(cleanQuery) ||
-        inv.customerName.toLowerCase().includes(cleanQuery) ||
-        (phoneQuery.length > 0 && inv.customerPhone && inv.customerPhone.replace(/\D/g, '').includes(phoneQuery));
+      const codeQ = searchQuery.trim().toLowerCase();
+      const matchCode = !codeQ || inv.invoiceId.toLowerCase().includes(codeQ);
+
+      const custQ = customerQuery.trim().toLowerCase();
+      const custPhoneQ = custQ.replace(/\D/g, '');
+      const matchCustomer =
+        !custQ ||
+        inv.customerName.toLowerCase().includes(custQ) ||
+        (custPhoneQ.length > 0 && inv.customerPhone && inv.customerPhone.replace(/\D/g, '').includes(custPhoneQ));
 
       const matchMethod =
         paymentMethodFilter === 'ALL' ||
         (paymentMethodFilter === 'DEBT'
           ? inv.paymentMethod === 'DEBT' || inv.paymentMethod === 'CREDIT'
-          : inv.paymentMethod === paymentMethodFilter);
+          : paymentMethodFilter === 'VIETQR'
+            ? inv.paymentMethod === 'VIETQR' || inv.paymentMethod === 'BANK'
+            : inv.paymentMethod === paymentMethodFilter);
+
+      const matchTime = matchesTimePreset(inv.createdAtIso, timePreset);
 
       const hasReturn = (returnRecordsByOrder[inv.invoiceId]?.length ?? 0) > 0;
       const matchStatus = statusFilter === 'ALL' ||
         (statusFilter === 'RETURNED' ? inv.status !== 'CANCELLED' && hasReturn :
           statusFilter === 'COMPLETED' ? inv.status === 'COMPLETED' && !hasReturn : inv.status === statusFilter);
 
-      return matchBranch && matchSearch && matchMethod && matchStatus;
+      return matchBranch && matchCode && matchCustomer && matchMethod && matchStatus && matchTime;
     });
-  }, [invoices, searchQuery, paymentMethodFilter, statusFilter, branchFilter, isStoreOwner, availableBranches, returnRecordsByOrder]);
+  }, [invoices, searchQuery, customerQuery, paymentMethodFilter, statusFilter, timePreset, branchFilter, isStoreOwner, availableBranches, returnRecordsByOrder]);
+
+  const { sort: invSort, handleSort: handleInvSort, sortedItems: sortedInvoices } = useTableSort(filteredInvoices, {
+    invoiceId: (i) => i.invoiceId,
+    branchName: (i) => i.branchName || '',
+    createdAtIso: (i) => i.createdAtIso || i.createdAt,
+    customerName: (i) => i.customerName,
+    customerPhone: (i) => i.customerPhone || '',
+    cashierName: (i) => i.cashierName || '',
+    totalMerchandiseAmount: (i) => i.totalMerchandiseAmount,
+    totalDiscount: (i) => i.totalDiscount,
+    finalPaidAmount: (i) => i.finalPaidAmount,
+    paymentMethodLabel: (i) => i.paymentMethodLabel,
+    status: (i) => i.status,
+  });
 
   // Phân trang dữ liệu Hóa đơn
   const paginatedInvoices = useMemo(() => {
     const start = (invoicePage - 1) * invoicePageSize;
-    return filteredInvoices.slice(start, start + invoicePageSize);
-  }, [filteredInvoices, invoicePage, invoicePageSize]);
+    return sortedInvoices.slice(start, start + invoicePageSize);
+  }, [sortedInvoices, invoicePage, invoicePageSize]);
 
   // Lọc Đơn đặt trước
   const filteredPreOrders = useMemo(() => {
     return preOrders.filter((p) => {
-      const isSearching = isStoreOwner && searchQuery.trim().length > 0;
+      const isSearching = isStoreOwner && (searchQuery.trim().length > 0 || customerQuery.trim().length > 0);
 
       const matchBranch = !isStoreOwner
         ? isBranchMatching(branchFilter, p.branchId)
         : (isSearching || branchFilter === 'ALL' || isBranchMatching(branchFilter, p.branchId));
 
-      const matchSearch =
-        !searchQuery.trim() ||
-        p.preOrderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.customerPhone.includes(searchQuery.trim());
+      const codeQ = searchQuery.trim().toLowerCase();
+      const matchCode = !codeQ || p.preOrderId.toLowerCase().includes(codeQ);
 
-      return matchBranch && matchSearch;
+      const custQ = customerQuery.trim().toLowerCase();
+      const custPhoneQ = custQ.replace(/\D/g, '');
+      const matchCustomer =
+        !custQ ||
+        p.customerName.toLowerCase().includes(custQ) ||
+        (custPhoneQ.length > 0 && p.customerPhone.replace(/\D/g, '').includes(custPhoneQ));
+
+      const matchPreStatus = preOrderStatusFilter === 'ALL' || p.status === preOrderStatusFilter;
+      const matchTime = matchesTimePreset(p.createdAtIso, timePreset);
+
+      return matchBranch && matchCode && matchCustomer && matchPreStatus && matchTime;
     });
-  }, [preOrders, searchQuery, branchFilter, isStoreOwner, availableBranches]);
+  }, [preOrders, searchQuery, customerQuery, preOrderStatusFilter, timePreset, branchFilter, isStoreOwner, availableBranches]);
+
+  const { sort: preSort, handleSort: handlePreSort, sortedItems: sortedPreOrders } = useTableSort(filteredPreOrders, {
+    preOrderId: (p) => p.preOrderId,
+    branchName: (p) => p.branchName || '',
+    customerName: (p) => p.customerName,
+    customerPhone: (p) => p.customerPhone,
+    cashierName: (p) => p.cashierName || '',
+    fulfilledByCashierName: (p) => p.fulfilledByCashierName || '',
+    pickupAppointment: (p) => p.expectedPickupDate || p.pickupAppointment,
+    totalOrderAmount: (p) => p.totalOrderAmount,
+    depositAmount: (p) => p.depositAmount,
+    remainingAmount: (p) => p.remainingAmount,
+    status: (p) => p.status,
+  });
 
   // Phân trang Đơn đặt trước
   const paginatedPreOrders = useMemo(() => {
     const start = (preOrderPage - 1) * preOrderPageSize;
-    return filteredPreOrders.slice(start, start + preOrderPageSize);
-  }, [filteredPreOrders, preOrderPage, preOrderPageSize]);
+    return sortedPreOrders.slice(start, start + preOrderPageSize);
+  }, [sortedPreOrders, preOrderPage, preOrderPageSize]);
 
   // Đổi mở rộng Accordion
   const toggleExpand = (invoiceId: string) => {
@@ -945,10 +1120,11 @@ export const InvoiceManagementPage: FC = () => {
     const targetPreOrder = preOrders.find((p) => p.preOrderId === preOrderId);
     try {
       await posOrderApi.fulfillPreOrder(targetPreOrder?.orderUuid || preOrderId, {
-        paymentMethod: data.paymentMethod,
+        paymentMethod: data.paymentMethod === 'VIETQR' ? 'BANK' : 'CASH',
         amountPaid: data.amountPaid,
         note: data.note,
         cashierName: fulfillingCashier,
+        shiftId: activeShiftId,
       });
     } catch (e) {
       throw e;
@@ -959,7 +1135,10 @@ export const InvoiceManagementPage: FC = () => {
         p.preOrderId === preOrderId
           ? {
             ...p,
+            depositAmount: p.totalOrderAmount,
             remainingAmount: 0,
+            paymentMethod: data.paymentMethod === 'VIETQR' ? 'BANK' : 'CASH',
+            paymentMethodLabel: data.paymentMethod === 'VIETQR' ? 'Chuyển khoản VietQR' : 'Tiền mặt',
             status: 'COMPLETED',
             statusLabel: 'Đã hoàn thành',
             fulfilledByCashierName: fulfillingCashier,
@@ -990,12 +1169,6 @@ export const InvoiceManagementPage: FC = () => {
 
           <div className="unified-header-title-box">
             <h1 className="unified-header-title">Quản Lý Hóa Đơn &amp; Đơn Đặt Hàng</h1>
-            <div className="unified-header-subtitle">
-              {branchFilter === 'ALL'
-                ? 'Toàn chuỗi cửa hàng (3 Chi nhánh)'
-                : availableBranches.find((b) => b.id === branchFilter)?.name || '—'}{' '}
-              &bull; Bán lẻ &bull; Đơn đặt trước giữ kho
-            </div>
           </div>
         </div>
 
@@ -1043,29 +1216,15 @@ export const InvoiceManagementPage: FC = () => {
         </div>
       </header>
 
-      {/* TOAST THÔNG BÁO TẠI QUẦY */}
-      {toastMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 60,
-            right: 20,
-            zIndex: 99999,
-            backgroundColor: '#0f766e',
-            color: '#ffffff',
-            padding: '8px 16px',
-            borderRadius: 9999,
-            boxShadow: '0 4px 14px rgba(15, 118, 110, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            fontSize: 12.5,
-            fontWeight: 600,
+      {/* TOAST THÔNG BÁO CHUẨN ADMINTOAST */}
+      {toast && (
+        <AdminToast
+          toast={toast}
+          onClose={() => {
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+            setToast(null);
           }}
-        >
-          <CheckCircle2 size={16} />
-          <span>{toastMessage}</span>
-        </div>
+        />
       )}
 
       {/* 2. BODY CONTAINER CUỘN CHÍNH - ĐỒNG BỘ LAYOUT SHIFT CONTENT */}
@@ -1137,63 +1296,75 @@ export const InvoiceManagementPage: FC = () => {
                 </div>
               )}
 
-              {/* Ô TÌM KIẾM TỪ KHÓA */}
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1, minWidth: 220 }}>
-                <Search size={15} style={{ position: 'absolute', left: 12, color: '#94a3b8' }} />
+              {/* Ô TÌM KIẾM TÁCH RIÊNG: MÃ ĐƠN & KHÁCH HÀNG / SĐT */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '0 1 145px', minWidth: 125 }}>
                 <input
                   type="text"
                   className="so-list-filter-input w-full"
-                  style={{ paddingLeft: 34, height: 36 }}
-                  placeholder={
-                    activeTab === 'invoices'
-                      ? 'Tìm theo mã hóa đơn, tên hoặc SĐT khách...'
-                      : 'Tìm theo mã đơn đặt trước, khách hàng...'
-                  }
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ height: 34 }}
+                  placeholder={activeTab === 'invoices' ? 'Mã hóa đơn...' : 'Mã đơn đặt trước...'}
+                  value={draftSearchQuery}
+                  onChange={(e) => setDraftSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSearchQuery(draftSearchQuery);
+                      setCustomerQuery(draftCustomerQuery);
+                      setInvoicePage(1);
+                      setPreOrderPage(1);
+                    }
+                  }}
                 />
               </div>
 
-              {/* PRESETS THỜI GIAN CHUẨN PILL CỦA POS */}
-              <div className="time-preset-buttons">
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'today' ? 'active' : ''}`}
-                  onClick={() => setTimePreset('today')}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 165px', minWidth: 150 }}>
+                <Search size={15} style={{ position: 'absolute', left: 10, color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  className="so-list-filter-input w-full"
+                  style={{ paddingLeft: 32, height: 34 }}
+                  placeholder="Tên hoặc SĐT khách hàng..."
+                  value={draftCustomerQuery}
+                  onChange={(e) => setDraftCustomerQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSearchQuery(draftSearchQuery);
+                      setCustomerQuery(draftCustomerQuery);
+                      setInvoicePage(1);
+                      setPreOrderPage(1);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* LỌC THỜI GIAN DẠNG DROPDOWN CHUẨN THIẾT KẾ */}
+              <div className="so-list-filter-field">
+                <label className="so-list-filter-label">Thời gian:</label>
+                <select
+                  className={`so-list-filter-select ${timePreset !== 'all' ? 'so-list-filter-select--active' : ''}`}
+                  style={{ height: 34 }}
+                  value={timePreset}
+                  onChange={(e) => {
+                    setTimePreset(e.target.value as 'all' | 'today' | 'yesterday' | 'week' | 'month');
+                    setInvoicePage(1);
+                    setPreOrderPage(1);
+                  }}
                 >
-                  Hôm nay
-                </button>
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'yesterday' ? 'active' : ''}`}
-                  onClick={() => setTimePreset('yesterday')}
-                >
-                  Hôm qua
-                </button>
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'week' ? 'active' : ''}`}
-                  onClick={() => setTimePreset('week')}
-                >
-                  Tuần này
-                </button>
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'month' ? 'active' : ''}`}
-                  onClick={() => setTimePreset('month')}
-                >
-                  Tháng này
-                </button>
+                  <option value="all">Tất cả thời gian</option>
+                  <option value="today">Hôm nay</option>
+                  <option value="yesterday">Hôm qua</option>
+                  <option value="week">Tuần này</option>
+                  <option value="month">Tháng này</option>
+                </select>
               </div>
 
               {/* LỌC PHƯƠNG THỨC & TRẠNG THÁI */}
-              {activeTab === 'invoices' && (
+              {activeTab === 'invoices' ? (
                 <div style={{ display: 'flex', gap: 6 }}>
                   <select
                     className="so-list-filter-select"
                     style={{ height: 34 }}
                     value={paymentMethodFilter}
-                    onChange={(e) => setPaymentMethodFilter(e.target.value as any)}
+                    onChange={(e) => { setPaymentMethodFilter(e.target.value as any); setInvoicePage(1); }}
                   >
                     <option value="ALL">Tất cả phương thức</option>
                     <option value="VIETQR">Chuyển khoản VietQR</option>
@@ -1205,7 +1376,7 @@ export const InvoiceManagementPage: FC = () => {
                     className="so-list-filter-select"
                     style={{ height: 34 }}
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    onChange={(e) => { setStatusFilter(e.target.value as any); setInvoicePage(1); }}
                   >
                     <option value="ALL">Tất cả trạng thái</option>
                     <option value="COMPLETED">Hoàn thành</option>
@@ -1214,12 +1385,40 @@ export const InvoiceManagementPage: FC = () => {
                     <option value="RETURNED">Đã đổi/trả</option>
                   </select>
                 </div>
+              ) : (
+                <select
+                  className="so-list-filter-select"
+                  style={{ height: 34 }}
+                  value={preOrderStatusFilter}
+                  onChange={(e) => { setPreOrderStatusFilter(e.target.value as any); setPreOrderPage(1); }}
+                >
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="RESERVED">Đang giữ kho</option>
+                  <option value="COMPLETED">Đã hoàn thành</option>
+                  <option value="CANCELLED">Đã hủy</option>
+                </select>
               )}
+              <button
+                type="button"
+                className="so-list-filter-search"
+                onClick={() => {
+                  setSearchQuery(draftSearchQuery);
+                  setCustomerQuery(draftCustomerQuery);
+                  setInvoicePage(1);
+                  setPreOrderPage(1);
+                }}
+              >
+                <Search size={13} /> Tìm kiếm
+              </button>
               <button type="button" className="so-list-filter-reset" onClick={() => {
+                setDraftSearchQuery('');
+                setDraftCustomerQuery('');
                 setSearchQuery('');
-                setTimePreset('today');
+                setCustomerQuery('');
+                setTimePreset('all');
                 setPaymentMethodFilter('ALL');
                 setStatusFilter('ALL');
+                setPreOrderStatusFilter('ALL');
                 if (isStoreOwner) setBranchFilter('ALL');
                 setInvoicePage(1);
                 setPreOrderPage(1);
@@ -1238,29 +1437,82 @@ export const InvoiceManagementPage: FC = () => {
                     <span>Danh Sách Hóa Đơn Bán Hàng</span>
                   </h3>
                   <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
-                    Hiển thị <b>{paginatedInvoices.length}</b> trên <b>{filteredInvoices.length}</b> hóa đơn &bull; Doanh thu: <b style={{ color: '#15803d' }}>{filteredInvoices.reduce((s, i) => s + (i.status === 'COMPLETED' ? i.finalPaidAmount + (i.debtAmount || 0) : 0), 0).toLocaleString('vi-VN')} đ</b>
+                    Hiển thị <b>{paginatedInvoices.length}</b> trên <b>{filteredInvoices.length}</b> hóa đơn &bull; Doanh thu: <b style={{ color: '#15803d' }}>{Math.round(filteredInvoices.reduce((s, i) => {
+                      if (i.status !== 'COMPLETED') return s;
+                      const returnedFromRecords = (returnRecordsByOrder[i.invoiceId] || []).reduce((rs, rec) => rs + (rec.returnedAmount || 0), 0);
+                      return s + Math.max(0, i.finalPaidAmount + (i.debtAmount || 0) - returnedFromRecords);
+                    }, 0)).toLocaleString('vi-VN')} đ</b>
                   </div>
                 </div>
 
               </div>
 
               <div className="pos-shift-table-responsive">
-                <table className="pos-shift-table so-list-table invoice-list-table">
+                <table className="pos-shift-table so-list-table invoice-list-table" style={{ minWidth: 1220 }}>
+                  <colgroup>
+                    <col style={{ width: 172 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 92 }} />
+                    <col style={{ width: 102 }} />
+                    <col style={{ width: 92 }} />
+                    <col style={{ width: 108 }} />
+                    <col style={{ width: 104 }} />
+                    <col style={{ width: 172 }} />
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'left', width: '13%' }}>Mã hóa đơn</th>
-                      <th style={{ textAlign: 'left', width: '8%' }}>Thời gian lập</th>
-                      <th style={{ textAlign: 'left', width: '8%' }}>Khách hàng</th>
-                      <th style={{ textAlign: 'left', width: '11%' }}>Người tạo</th>
-                      <th style={{ textAlign: 'left', width: '9%' }}>Tổng tiền hàng</th>
-                      <th style={{ textAlign: 'left', width: '7%' }}>Giảm giá</th>
-                      <th style={{ textAlign: 'left', width: '9%' }}>Khách đã trả</th>
-                      <th style={{ textAlign: 'left', width: '10%' }}>Phương thức TT</th>
-                      <th style={{ textAlign: 'left', width: '10%' }}>Trạng thái</th>
-                      <th style={{ textAlign: 'left', width: '15%' }}>Thao tác</th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Mã hóa đơn" active={invSort.key === 'invoiceId'} direction={invSort.direction} onClick={() => handleInvSort('invoiceId')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Chi nhánh" active={invSort.key === 'branchName'} direction={invSort.direction} onClick={() => handleInvSort('branchName')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Khách hàng" active={invSort.key === 'customerName'} direction={invSort.direction} onClick={() => handleInvSort('customerName')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Người tạo" active={invSort.key === 'cashierName'} direction={invSort.direction} onClick={() => handleInvSort('cashierName')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        <SortableHeader label="Tổng tiền" align="right" active={invSort.key === 'totalMerchandiseAmount'} direction={invSort.direction} onClick={() => handleInvSort('totalMerchandiseAmount')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        <SortableHeader label="Giảm giá" align="right" active={invSort.key === 'totalDiscount'} direction={invSort.direction} onClick={() => handleInvSort('totalDiscount')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        <SortableHeader label="Khách trả" align="right" active={invSort.key === 'finalPaidAmount'} direction={invSort.direction} onClick={() => handleInvSort('finalPaidAmount')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Phương thức" active={invSort.key === 'paymentMethodLabel'} direction={invSort.direction} onClick={() => handleInvSort('paymentMethodLabel')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Trạng thái" active={invSort.key === 'status'} direction={invSort.direction} onClick={() => handleInvSort('status')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>Thao tác</th>
                     </tr>
                   </thead>
-                  {paginatedInvoices.map((inv) => {
+                  {isLoadingOrders ? (
+                    <tbody>
+                      <tr>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                            <Loader2 size={18} className="animate-spin" color="#0f766e" />
+                            <span>Đang tải danh sách hóa đơn...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  ) : paginatedInvoices.length === 0 ? (
+                    <tbody>
+                      <tr>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                          Không tìm thấy hóa đơn nào phù hợp với bộ lọc.
+                        </td>
+                      </tr>
+                    </tbody>
+                  ) : paginatedInvoices.map((inv) => {
                     const isExpanded = expandedInvoiceId === inv.invoiceId;
                     const isDebt = inv.status !== 'CANCELLED' && ((inv.debtAmount !== undefined && inv.debtAmount > 0) || (inv.status === 'DEBT' && (!inv.debtAmount || inv.debtAmount > 0)));
                     const isDebtMethod = inv.paymentMethod === 'DEBT' || inv.paymentMethod === 'CREDIT';
@@ -1276,55 +1528,46 @@ export const InvoiceManagementPage: FC = () => {
                           onClick={() => toggleExpand(inv.invoiceId)}
                         >
                           <td>
-                            <span style={{ fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'flex-start', gap: 4, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
-                              <span>{inv.invoiceId}</span>
-                              {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                            </span>
-                            <div style={{ display: 'block', marginTop: 5 }}>
-                              <span
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <ChevronRight
+                                size={15}
                                 style={{
-                                  fontSize: 10.5,
-                                  padding: '1px 6px',
-                                  borderRadius: 4,
-                                  backgroundColor: '#f1f5f9',
-                                  color: '#475569',
-                                  fontWeight: 500,
-                                  display: 'block',
-                                  width: 'fit-content',
-                                  maxWidth: '100%',
-                                  whiteSpace: 'normal',
-                                  overflowWrap: 'anywhere',
-                                  lineHeight: 1.35,
+                                  transform: isExpanded ? 'rotate(90deg)' : 'none',
+                                  transition: 'transform 0.15s ease',
+                                  color: '#0f766e',
+                                  flexShrink: 0,
                                 }}
-                              >
-                                {inv.branchName || '—'}
-                              </span>
+                              />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <b style={{ color: '#0f766e', fontFamily: 'var(--font-mono, monospace)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{inv.invoiceId}</b>
+                                </div>
+                                <div style={{ color: '#64748b', fontSize: 11, fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
+                                  {inv.createdAt}{inv.isOutsideShift ? ' · Ngoài ca' : ''}
+                                </div>
+                              </div>
                             </div>
                           </td>
-                          <td style={{ color: '#64748b', lineHeight: 1.45 }}>
-                            {String(inv.createdAt).split(/\s+/).map((part, index) => (
-                              <div key={`${part}-${index}`}>{part}</div>
-                            ))}
+                          <td style={{ fontSize: 12, color: '#334155' }}>
+                            {inv.branchName || '—'}
                           </td>
                           <td>
-                            <b style={{ color: '#0f172a' }}>{inv.customerName}</b>
+                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 12.5 }}>{inv.customerName}</div>
                             {inv.customerPhone && (
-                              <div style={{ color: '#64748b', fontSize: 11 }}>
-                                {inv.customerPhone}
-                              </div>
+                              <div style={{ color: '#64748b', fontSize: 11, fontFamily: 'var(--font-mono, monospace)' }}>{inv.customerPhone}</div>
                             )}
                           </td>
                           <td>
-                            <span style={{ fontWeight: 600, color: '#334155', fontSize: 12, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
-                              {inv.cashierName || 'Phạm Thị Yến'}
+                            <span style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>
+                              {inv.cashierName || '—'}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'left', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                            {inv.totalMerchandiseAmount.toLocaleString('vi-VN')}
+                          <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
+                            {inv.totalMerchandiseAmount.toLocaleString('vi-VN')} đ
                           </td>
-                          <td style={{ textAlign: 'left', color: inv.totalDiscount > 0 ? '#dc2626' : '#94a3b8', fontVariantNumeric: 'tabular-nums' }}>
-                            <div>{inv.totalDiscount.toLocaleString('vi-VN')}</div>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', gap: 3, marginTop: 2 }}>
+                          <td style={{ textAlign: 'right', color: inv.totalDiscount > 0 ? '#dc2626' : '#94a3b8', fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono, monospace)' }}>
+                            <div>{inv.totalDiscount.toLocaleString('vi-VN')} đ</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 3, marginTop: 2, fontFamily: 'inherit' }}>
                               {inv.appliedVoucherCode && (
                                 <span
                                   style={{
@@ -1375,7 +1618,7 @@ export const InvoiceManagementPage: FC = () => {
                                     gap: 3,
                                   }}
                                 >
-                                  <Star size={10} color="#047857" /> {inv.pointsRedeemed}đ
+                                  <Star size={10} color="#047857" /> {inv.pointsRedeemed} điểm
                                 </span>
                               )}
                               {inv.items.some((x) => x.isGift) && !inv.appliedPromotionSummary && (
@@ -1399,17 +1642,19 @@ export const InvoiceManagementPage: FC = () => {
                           </td>
                           <td
                             style={{
-                              textAlign: 'left',
+                              textAlign: 'right',
                               fontWeight: 700,
                               color: isCompleted && !isDebt ? '#15803d' : isDebt ? '#d97706' : '#dc2626',
                               fontVariantNumeric: 'tabular-nums',
+                              fontFamily: 'var(--font-mono, monospace)',
+                              whiteSpace: 'nowrap',
                             }}
                           >
-                            {(isDebt ? (inv.paidDebtAmount || 0) : inv.finalPaidAmount).toLocaleString('vi-VN')}
+                            {(isDebt ? (inv.paidDebtAmount || 0) : inv.finalPaidAmount).toLocaleString('vi-VN')} đ
                           </td>
                           <td style={{ textAlign: 'left' }}>
                             <span
-                              className={`pos-method-pill ${inv.paymentMethod === 'VIETQR' ? 'vietqr' : isDebtMethod ? 'debt' : 'cash'
+                              className={`pos-method-pill ${inv.paymentMethod === 'VIETQR' || inv.paymentMethod === 'BANK' ? 'vietqr' : isDebtMethod ? 'debt' : 'cash'
                                 }`}
                               style={
                                 isDebtMethod
@@ -1417,7 +1662,7 @@ export const InvoiceManagementPage: FC = () => {
                                   : undefined
                               }
                             >
-                              {inv.paymentMethod === 'VIETQR' ? (
+                              {inv.paymentMethod === 'VIETQR' || inv.paymentMethod === 'BANK' ? (
                                 <QrCode size={12} />
                               ) : isDebtMethod ? (
                                 <CreditCard size={12} />
@@ -1448,7 +1693,7 @@ export const InvoiceManagementPage: FC = () => {
                             </span>
                           </td>
                           <td style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-start', maxWidth: 175 }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'flex-start' }}>
                               <button
                                 type="button"
                                 className="pos-btn-secondary-pill"
@@ -1461,7 +1706,7 @@ export const InvoiceManagementPage: FC = () => {
                                 type="button"
                                 className="pos-btn-secondary-pill"
                                 style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#0f766e', color: '#0f766e' }}
-                                title="In lại hóa đơn K80"
+                                title="In bill"
                                 onClick={(e) => handleOpenPrintModal(inv, e)}
                               >
                                 <Printer size={12} />
@@ -1554,7 +1799,9 @@ export const InvoiceManagementPage: FC = () => {
                                       {inv.appliedPromotionSummary && (
                                         <span style={{ color: '#115e59' }}>
                                           CTKM: <b>{inv.appliedPromotionSummary}</b>
-                                          {inv.promotionDiscountAmount && inv.promotionDiscountAmount > 0
+                                          {inv.promotionDiscountAmount &&
+                                          inv.promotionDiscountAmount > 0 &&
+                                          !/\(-\s*[\d.,]+\s*đ\)/i.test(inv.appliedPromotionSummary)
                                             ? ` (-${inv.promotionDiscountAmount.toLocaleString('vi-VN')} đ)`
                                             : ''}
                                         </span>
@@ -1635,7 +1882,7 @@ export const InvoiceManagementPage: FC = () => {
                                           {item.isGift ? '0 đ' : `${item.discountAmount.toLocaleString('vi-VN')} đ`}
                                         </td>
                                         <td style={{ textAlign: 'left', fontWeight: 700, color: '#15803d', fontVariantNumeric: 'tabular-nums' }}>
-                                          {item.isGift ? '0 đ' : `${item.totalAmount.toLocaleString('vi-VN')} đ`}
+                                          {item.isGift ? '0 đ' : `${Math.round(item.totalAmount).toLocaleString('vi-VN')} đ`}
                                         </td>
                                       </tr>
                                     ))}
@@ -1689,7 +1936,7 @@ export const InvoiceManagementPage: FC = () => {
                     style={{ height: 28, padding: '0 12px', fontSize: 11.5, backgroundColor: '#0f766e' }}
                     onClick={() => {
                       if (branchFilter === 'ALL' && !assignedBranch.id) {
-                        alert('Vui lòng chọn một chi nhánh cụ thể từ bộ lọc trên thanh công cụ trước khi tạo đơn đặt trước.');
+                        showToast('Vui lòng chọn một chi nhánh cụ thể từ bộ lọc trên thanh công cụ trước khi tạo đơn đặt trước.', 'warning');
                         return;
                       }
                       setIsCreatePreOrderModalOpen(true);
@@ -1701,27 +1948,69 @@ export const InvoiceManagementPage: FC = () => {
               </div>
 
               <div className="pos-shift-table-responsive">
-                <table className="pos-shift-table so-list-table invoice-list-table">
+                <table className="pos-shift-table so-list-table invoice-list-table" style={{ minWidth: 1220 }}>
+                  <colgroup>
+                    <col style={{ width: 172 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 92 }} />
+                    <col style={{ width: 84 }} />
+                    <col style={{ width: 88 }} />
+                    <col style={{ width: 104 }} />
+                    <col style={{ width: 172 }} />
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ width: 145, textAlign: 'left' }}>Mã đơn đặt trước</th>
-                      <th style={{ width: 112, textAlign: 'left' }}>Khách hàng</th>
-                      <th style={{ width: 105, textAlign: 'left' }}>Người tạo</th>
-                      <th style={{ width: 115, textAlign: 'left' }}>Thời gian hẹn nhận</th>
-                      <th style={{ width: 120, textAlign: 'left', lineHeight: 1.35 }}>
-                        Tổng sau<br />khuyến mại
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Mã đơn" active={preSort.key === 'preOrderId'} direction={preSort.direction} onClick={() => handlePreSort('preOrderId')} />
                       </th>
-                      <th style={{ width: 85, textAlign: 'left' }}>Tiền cọc</th>
-                      <th style={{ width: 95, textAlign: 'left' }}>Còn phải thu</th>
-                      <th style={{ width: 110, textAlign: 'left' }}>Giữ kho</th>
-                      <th style={{ width: 108, textAlign: 'left' }}>Trạng thái</th>
-                      <th style={{ width: 280, minWidth: 280, textAlign: 'left' }}>Thao tác</th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Chi nhánh" active={preSort.key === 'branchName'} direction={preSort.direction} onClick={() => handlePreSort('branchName')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Khách hàng" active={preSort.key === 'customerName'} direction={preSort.direction} onClick={() => handlePreSort('customerName')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Nhân viên" active={preSort.key === 'cashierName'} direction={preSort.direction} onClick={() => handlePreSort('cashierName')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Hẹn nhận" active={preSort.key === 'pickupAppointment'} direction={preSort.direction} onClick={() => handlePreSort('pickupAppointment')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        <SortableHeader label="Tổng tiền" align="right" active={preSort.key === 'totalOrderAmount'} direction={preSort.direction} onClick={() => handlePreSort('totalOrderAmount')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        <SortableHeader label="Đã cọc" align="right" active={preSort.key === 'depositAmount'} direction={preSort.direction} onClick={() => handlePreSort('depositAmount')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        <SortableHeader label="Còn lại" align="right" active={preSort.key === 'remainingAmount'} direction={preSort.direction} onClick={() => handlePreSort('remainingAmount')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Trạng thái" active={preSort.key === 'status'} direction={preSort.direction} onClick={() => handlePreSort('status')} />
+                      </th>
+                      <th style={{ textAlign: 'left' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedPreOrders.map((pre) => {
+                    {isLoadingOrders ? (
+                      <tr>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                            <Loader2 size={18} className="animate-spin" color="#0f766e" />
+                            <span>Đang tải danh sách đơn đặt trước...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : paginatedPreOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                          Không tìm thấy đơn đặt trước nào phù hợp với bộ lọc.
+                        </td>
+                      </tr>
+                    ) : paginatedPreOrders.map((pre) => {
                       const isExpanded = expandedPreOrderId === pre.preOrderId;
-                      const giftItems = pre.items.filter((item) => item.isGift);
                       const merchandiseAmount = pre.totalMerchandiseAmount ?? pre.totalOrderAmount;
                       const discountAmount = pre.discountAmount ?? 0;
                       return (
@@ -1734,7 +2023,7 @@ export const InvoiceManagementPage: FC = () => {
                             onClick={() => toggleExpandPreOrder(pre.preOrderId)}
                           >
                             <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                                 <ChevronRight
                                   size={15}
                                   style={{
@@ -1744,175 +2033,117 @@ export const InvoiceManagementPage: FC = () => {
                                     flexShrink: 0,
                                   }}
                                 />
-                                <div>
-                                  <b style={{ color: '#0f766e', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{pre.preOrderId}</b>
-                                  <div style={{ color: '#64748b', fontSize: 11 }}>Tạo: {pre.createdAt}</div>
+                                <div style={{ minWidth: 0 }}>
+                                  <b style={{ color: '#0f766e', fontFamily: 'var(--font-mono, monospace)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{pre.preOrderId}</b>
+                                  <div style={{ color: '#64748b', fontSize: 11, fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>{pre.createdAt}</div>
                                 </div>
                               </div>
-                              <div style={{ display: 'block', marginTop: 5 }}>
-                                <span
-                                  style={{
-                                    fontSize: 10.5,
-                                    padding: '1px 6px',
-                                    borderRadius: 4,
-                                    backgroundColor: '#f0fdf4',
-                                    color: '#166534',
-                                    fontWeight: 500,
-                                    display: 'block',
-                                    width: 'fit-content',
-                                    maxWidth: '100%',
-                                    whiteSpace: 'normal',
-                                    overflowWrap: 'anywhere',
-                                    lineHeight: 1.35,
-                                  }}
-                                >
-                                  {pre.branchName || '—'}
-                                </span>
-                              </div>
+                            </td>
+                            <td style={{ fontSize: 12, color: '#334155' }}>
+                              {pre.branchName || '—'}
                             </td>
                             <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <User size={13} className="text-slate-500" />
-                                <b>{pre.customerName}</b>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64748b', fontSize: 11 }}>
-                                <Phone size={11} />
-                                <span>{pre.customerPhone}</span>
-                              </div>
+                              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 12.5 }}>{pre.customerName}</div>
+                              {pre.customerPhone && (
+                                <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'var(--font-mono, monospace)' }}>{pre.customerPhone}</div>
+                              )}
                             </td>
                             <td>
-                              <span style={{ fontWeight: 600, color: '#0f766e', fontSize: 12, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>
+                              <div style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>
                                 {pre.cashierName || 'Thu ngân POS'}
-                              </span>
+                              </div>
                               {pre.fulfilledByCashierName ? (
-                                <div style={{ fontSize: 11, color: '#166534', marginTop: 3 }}>
-                                  Bàn giao: <b>{pre.fulfilledByCashierName}</b>
-                                </div>
+                                <div style={{ fontSize: 11, color: '#166534' }}>Giao: {pre.fulfilledByCashierName}</div>
                               ) : (
-                                <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', marginTop: 3 }}>
-                                  Chờ khách đến nhận
-                                </div>
+                                <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>Chưa giao</div>
                               )}
                             </td>
                             <td>
-                              <span style={{ fontWeight: 600, color: '#b45309' }}>
+                              <div style={{ fontWeight: 600, color: '#b45309', fontSize: 12, fontFamily: 'var(--font-mono, monospace)' }}>
                                 {pre.pickupAppointment}
-                              </span>
+                              </div>
                               {pre.notes && (
-                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }} title={pre.notes}>
-                                  Ghi chú: {pre.notes}
+                                <div style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={pre.notes}>
+                                  {pre.notes}
                                 </div>
                               )}
                             </td>
-                            <td style={{ textAlign: 'left', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                              <div style={{ fontSize: 14, color: '#0f172a', fontWeight: 800 }}>
-                                {pre.totalOrderAmount.toLocaleString('vi-VN')} đ
-                              </div>
-                              <div style={{ fontSize: 10.5, color: '#64748b', fontWeight: 500 }}>
-                                Số tiền phải thanh toán cho toàn đơn
-                              </div>
-                              <div style={{ fontSize: 10.5, color: '#475569', fontWeight: 500 }}>
-                                Giá trị hàng: {merchandiseAmount.toLocaleString('vi-VN')} đ
-                              </div>
+                            <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
+                              <div style={{ color: '#0f172a' }}>{pre.totalOrderAmount.toLocaleString('vi-VN')} đ</div>
                               {discountAmount > 0 && (
                                 <div style={{ fontSize: 10.5, color: '#dc2626', fontWeight: 600 }}>
-                                  Khuyến mại: -{discountAmount.toLocaleString('vi-VN')} đ
-                                </div>
-                              )}
-                              {pre.appliedPromotionSummary && (
-                                <div style={{ fontSize: 10, color: '#0f766e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 3, justifyContent: 'flex-start' }} title={pre.appliedPromotionSummary}>
-                                  <Gift size={10} color="#0f766e" /> {pre.appliedPromotionSummary}
-                                </div>
-                              )}
-                              {giftItems.length > 0 && (
-                                <div style={{ fontSize: 10, color: '#15803d', fontWeight: 600, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                    <Gift size={10} color="#15803d" /> Quà tặng 0 đ · đã giữ kho
-                                  </span>
-                                  {giftItems.map((gift, giftIndex) => (
-                                    <span key={`${gift.productId}-${giftIndex}`}>
-                                      {gift.quantity} {gift.unitName} {gift.productName}
-                                    </span>
-                                  ))}
+                                  -{discountAmount.toLocaleString('vi-VN')} đ
                                 </div>
                               )}
                             </td>
-                            <td style={{ textAlign: 'left', color: '#15803d', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                            <td style={{ textAlign: 'right', color: '#15803d', fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
                               {pre.depositAmount.toLocaleString('vi-VN')} đ
                             </td>
-                            <td style={{ textAlign: 'left', color: '#dc2626', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                            <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
                               {pre.remainingAmount.toLocaleString('vi-VN')} đ
                             </td>
-                            <td style={{ textAlign: 'left' }}>
-                              <span className="shift-status-badge on-duty">
-                                <CheckCircle2 size={12} /> Đã giữ kho Lô FEFO
-                              </span>
-                            </td>
-                            <td style={{ textAlign: 'left' }}>
-                              <span className="pos-status-pill reserved">
+                            <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
+                              <span className={`pos-status-pill ${pre.status === 'COMPLETED' ? 'completed' : pre.status === 'CANCELLED' ? 'cancelled' : 'reserved'}`}>
                                 {pre.statusLabel}
                               </span>
                             </td>
-                            <td style={{ textAlign: 'left', minWidth: 280, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 6, flexWrap: 'nowrap' }}>
+                            <td style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 5, flexWrap: 'wrap' }}>
                                 <button
                                   type="button"
                                   className="pos-btn-secondary-pill"
-                                  style={{ height: 26, padding: '0 8px', fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                  style={{ height: 26, padding: '0 8px', fontSize: 11, whiteSpace: 'nowrap' }}
                                   onClick={() => toggleExpandPreOrder(pre.preOrderId)}
                                 >
                                   {isExpanded ? 'Đóng' : 'Chi tiết'}
                                 </button>
                                 {pre.status === 'CANCELLED' ? (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                    <XCircle size={12} /> Đã hủy
+                                  <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>
+                                    Đã hủy
                                   </span>
                                 ) : pre.status === 'COMPLETED' ? (
                                   <>
-<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#ecfdf5', color: '#047857', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                    <CheckCircle2 size={12} /> Đã giao
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="pos-btn-secondary-pill"
-                                    style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#0f766e', color: '#0f766e', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0 }}
-                                    title="In lại hóa đơn giao hàng K80"
-                                    onClick={(e) => handleOpenPrintModal(mapPreOrderToInvoice(pre), e)}
-                                  >
-                                    <Printer size={12} />
-                                    <span>In bill</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="pos-btn-secondary-pill"
-                                    style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#059669', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0 }}
-                                    title="Đổi hoặc trả hàng đã giao"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setReturnExchangeModalInvoice(mapPreOrderToInvoice(pre));
-                                    }}
-                                  >
-                                    <RotateCcw size={12} />
-                                    <span>Đổi/Trả</span>
-                                  </button>
+                                    <button
+                                      type="button"
+                                      className="pos-btn-secondary-pill"
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#0f766e', color: '#0f766e', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+                                      title="In bill"
+                                      onClick={(e) => handleOpenPrintModal(mapPreOrderToInvoice(pre), e)}
+                                    >
+                                      <Printer size={12} />
+                                      <span>In bill</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="pos-btn-secondary-pill"
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#059669', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+                                      title="Đổi hoặc trả hàng đã giao"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setReturnExchangeModalInvoice(mapPreOrderToInvoice(pre));
+                                      }}
+                                    >
+                                      <RotateCcw size={12} />
+                                      <span>Đổi/Trả</span>
+                                    </button>
                                   </>
                                 ) : (
                                   <>
                                     <button
                                       type="button"
                                       className="pos-btn-primary-pill"
-                                      style={{ height: 26, padding: '0 8px', fontSize: 11, backgroundColor: '#0f766e', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, backgroundColor: '#0f766e', whiteSpace: 'nowrap' }}
                                       onClick={() => setFulfillModalPreOrder(pre)}
-                                      title="Thanh toán nốt số tiền còn lại và bàn giao hàng cho khách tại quầy"
+                                      title={`Thanh toán nốt ${pre.remainingAmount.toLocaleString('vi-VN')} đ và bàn giao hàng cho khách`}
                                     >
                                       <CreditCard size={12} />
-                                      <span>Bàn giao ({pre.remainingAmount.toLocaleString('vi-VN')} đ)</span>
+                                      <span>Bàn giao</span>
                                     </button>
                                     <button
                                       type="button"
-                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' }}
                                       onClick={() => handleCancelPreOrder(pre)}
-                                       title={pre.depositAmount > 0 ? 'Đơn có tiền cọc cần đối soát hoàn tiền trước khi hủy' : 'Hủy đơn đặt trước và hoàn lại tồn kho đã giữ'}
+                                      title={pre.depositAmount > 0 ? 'Đơn có tiền cọc cần đối soát hoàn tiền trước khi hủy' : 'Hủy đơn đặt trước và hoàn lại tồn kho đã giữ'}
                                     >
                                       <XCircle size={12} />
                                       <span>Hủy</span>
@@ -2286,6 +2517,21 @@ export const InvoiceManagementPage: FC = () => {
         preOrder={fulfillModalPreOrder}
         onClose={() => setFulfillModalPreOrder(null)}
         onConfirmFulfill={handleConfirmFulfillPreOrder}
+      />
+
+      {/* CONFIRM DIALOG HỦY ĐƠN ĐẶT TRƯỚC */}
+      <ConfirmDialog
+        isOpen={Boolean(cancelTargetPreOrder)}
+        title="Xác nhận hủy đơn đặt trước"
+        message={
+          cancelTargetPreOrder && cancelTargetPreOrder.depositAmount > 0
+            ? `Xác nhận hoàn trả tiền cọc ${cancelTargetPreOrder.depositAmount.toLocaleString('vi-VN')} đ và hủy đơn đặt trước ${cancelTargetPreOrder.preOrderId}? Tồn kho giữ FEFO sẽ được giải phóng ngay.`
+            : `Bạn có chắc chắn muốn hủy đơn đặt trước ${cancelTargetPreOrder?.preOrderId || ''}? Tồn kho đã giữ sẽ được tự động hoàn lại vào kho hàng.`
+        }
+        confirmLabel="Xác nhận hủy đơn"
+        variant="danger"
+        onConfirm={confirmCancelPreOrder}
+        onCancel={() => setCancelTargetPreOrder(null)}
       />
     </div>
   );

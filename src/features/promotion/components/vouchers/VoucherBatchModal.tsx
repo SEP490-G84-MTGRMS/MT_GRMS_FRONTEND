@@ -27,9 +27,9 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
   const [minOrderValue, setMinOrderValue] = useState(150000);
   const [maxDiscount, setMaxDiscount] = useState<number | undefined>(undefined);
   const [totalQuantity, setTotalQuantity] = useState(50);
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [endDate, setEndDate] = useState(
-    new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)
+    () => new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-CA')
   );
   const [description, setDescription] = useState('');
   const [allowWithPromotions, setAllowWithPromotions] = useState(true);
@@ -61,8 +61,8 @@ export const VoucherBatchModal: FC<VoucherBatchModalProps> = ({
       setMinOrderValue(150000);
       setMaxDiscount(undefined);
       setTotalQuantity(50);
-      setStartDate(new Date().toISOString().slice(0, 10));
-      setEndDate(new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
+      setStartDate(new Date().toLocaleDateString('en-CA'));
+      setEndDate(new Date(Date.now() + 30 * 86400000).toLocaleDateString('en-CA'));
       setDescription('');
       setAllowWithPromotions(true);
     }

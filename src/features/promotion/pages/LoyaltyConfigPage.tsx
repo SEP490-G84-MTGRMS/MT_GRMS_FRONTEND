@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FC } from 'react';
+import { useState, useRef, useEffect, useCallback, type FC } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Award, Settings, History, Save } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -35,6 +35,8 @@ export const LoyaltyConfigPage: FC = () => {
             redemptionRatePoints: data.redemptionRatePoints,
             redemptionRateAmount: data.redemptionRateAmount,
             minRedemptionPoints: data.minRedemptionPoints,
+            pointsExpiryMonths: data.pointsExpiryMonths ?? prev.pointsExpiryMonths ?? 12,
+            maxRedemptionPercent: data.maxRedemptionPercent ?? prev.maxRedemptionPercent ?? 50,
             allowPointsWithPromotions: data.allowPointsWithPromotions,
           }));
         }
@@ -44,7 +46,7 @@ export const LoyaltyConfigPage: FC = () => {
       });
   }, []);
 
-  useEffect(() => {
+  const loadLedger = useCallback(() => {
     promotionApi.getLoyaltyLedger()
       .then((items) => setLedger(items.map((item) => ({
         ...item,
@@ -55,6 +57,10 @@ export const LoyaltyConfigPage: FC = () => {
         showToast('Không thể tải sổ cái điểm từ máy chủ', 'error');
       });
   }, []);
+
+  useEffect(() => {
+    loadLedger();
+  }, [loadLedger]);
 
   // Active Tab from query param or default to 'config'
   const tabParam = searchParams.get('tab');
@@ -82,9 +88,9 @@ export const LoyaltyConfigPage: FC = () => {
     setConfig((prev) => ({ ...prev, isEnabled: nextState }));
     showToast(
       nextState
-        ? 'Đã kích hoạt hệ thống tích điểm & đổi thưởng!'
-        : 'Đã tạm ngưng tích điểm tại toàn bộ chuỗi!',
-      nextState ? 'success' : 'info'
+        ? 'Đã chọn bật tích điểm — nhấn "Lưu thiết lập" để áp dụng.'
+        : 'Đã chọn tạm ngưng tích điểm — nhấn "Lưu thiết lập" để áp dụng.',
+      'info'
     );
   };
 
@@ -95,6 +101,9 @@ export const LoyaltyConfigPage: FC = () => {
     if (!Number.isInteger(config.redemptionRatePoints) || config.redemptionRatePoints <= 0) errors.push('Điểm quy đổi phải là số nguyên dương');
     if (config.redemptionRateAmount <= 0) errors.push('Giá trị quy đổi phải lớn hơn 0');
     if (!Number.isInteger(config.minRedemptionPoints) || config.minRedemptionPoints < 0) errors.push('Điểm đổi tối thiểu phải là số nguyên không âm');
+    if (!Number.isInteger(config.pointsExpiryMonths) || config.pointsExpiryMonths < 0) errors.push('Thời hạn sử dụng điểm (tháng) phải là số nguyên không âm');
+    const maxPct = config.maxRedemptionPercent ?? 50;
+    if (!Number.isInteger(maxPct) || maxPct < 1 || maxPct > 100) errors.push('Giới hạn % hóa đơn được đổi điểm phải từ 1% đến 100%');
     if (errors.length) {
       setValidationErrors(errors);
       return;
@@ -109,11 +118,14 @@ export const LoyaltyConfigPage: FC = () => {
         redemptionRatePoints: config.redemptionRatePoints,
         redemptionRateAmount: config.redemptionRateAmount,
         minRedemptionPoints: config.minRedemptionPoints,
+        pointsExpiryMonths: config.pointsExpiryMonths,
+        maxRedemptionPercent: maxPct,
         allowPointsWithPromotions: config.allowPointsWithPromotions,
       });
       showToast('Đã lưu thành công chính sách tích điểm & đổi thưởng!');
-    } catch {
-      showToast('Lỗi khi lưu cấu hình tích điểm', 'error');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Lỗi khi lưu cấu hình tích điểm';
+      showToast(msg, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -158,17 +170,12 @@ export const LoyaltyConfigPage: FC = () => {
         />
       )}
 
-      {/* Top Header */}
-      <div className="promotion-topbar">
-        <div className="promotion-topbar-title">
-          <div className="promotion-topbar-icon">
-            <Award className="w-6 h-6" />
-          </div>
-          <div className="promotion-topbar-text">
-            <h1>Thiết Lập Tích Điểm & Đổi Thưởng</h1>
-            <p>Cấu hình tỷ lệ tích / tiêu điểm và quản lý sổ cái điểm thưởng cho toàn hệ thống</p>
-          </div>
-        </div>
+      {/* Top Header chuẩn so-list-header (DEF-UI-SC24-001) */}
+      <div className="so-list-header" style={{ marginBottom: 12 }}>
+        <h1 className="so-list-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Award className="w-5 h-5" style={{ color: '#0f766e' }} />
+          <span>Thiết Lập Tích Điểm &amp; Đổi Thưởng</span>
+        </h1>
       </div>
 
       {/* Centered Page Wrapper */}
@@ -197,7 +204,11 @@ export const LoyaltyConfigPage: FC = () => {
           {/* Quick Controls in Header (Zero Scroll Needed) */}
           {activeTab === 'config' && (
             <div className="loyalty-header-right-actions">
-              <div
+              <button
+                type="button"
+                role="switch"
+                aria-checked={config.isEnabled}
+                aria-label={config.isEnabled ? 'Tích điểm: Đang bật' : 'Tích điểm: Tắt'}
                 className={`loyalty-switch-pill ${config.isEnabled ? 'active' : 'inactive'}`}
                 onClick={handleToggleEnable}
                 title={config.isEnabled ? 'Nhấp để tạm ngưng tích điểm' : 'Nhấp để kích hoạt tích điểm'}
@@ -205,15 +216,15 @@ export const LoyaltyConfigPage: FC = () => {
                 <span className="loyalty-switch-status-text">
                   {config.isEnabled ? 'Tích điểm: Đang bật' : 'Tích điểm: Tắt'}
                 </span>
-                <div className={`switch-track switch-track-sm ${config.isEnabled ? 'switch-active' : ''}`}>
-                  <div className="switch-thumb switch-thumb-sm" />
-                </div>
-              </div>
+                <span className={`switch-track switch-track-sm ${config.isEnabled ? 'switch-active' : ''}`}>
+                  <span className="switch-thumb switch-thumb-sm" />
+                </span>
+              </button>
 
               <button
                 onClick={handleSaveConfig}
                 className="btn-primary-pill loyalty-save-btn-top"
-                disabled={!config.isEnabled || isSaving}
+                disabled={isSaving}
               >
                 <Save size={15} />
                 <span>{isSaving ? 'Đang lưu...' : 'Lưu thiết lập'}</span>
@@ -246,6 +257,7 @@ export const LoyaltyConfigPage: FC = () => {
           <LoyaltyLedgerTable
             ledger={ledger}
             onOpenAdjustModal={() => setIsAdjustModalOpen(true)}
+            onRefresh={loadLedger}
           />
         )}
       </div>

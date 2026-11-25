@@ -139,6 +139,27 @@ export const LoyaltyConfigForm: FC<LoyaltyConfigFormProps> = ({
               </div>
             </div>
 
+            {/* Field 3: Trần % giá trị hóa đơn được đổi điểm (LOC-BUG-010) */}
+            <div className="loyalty-rule-field" style={{ marginTop: 12 }}>
+              <label className="loyalty-rule-label">Giới hạn tối đa % hóa đơn được đổi điểm</label>
+              <div className="loyalty-input-wrapper">
+                <input
+                  type="number"
+                  value={config.maxRedemptionPercent ?? 50}
+                  onChange={(e) => handleUpdateField('maxRedemptionPercent', Number(e.target.value))}
+                  className="loyalty-input-field font-bold"
+                  disabled={!config.isEnabled}
+                  min={1}
+                  max={100}
+                  step={1}
+                />
+                <span className="loyalty-input-addon">% giá trị đơn</span>
+              </div>
+              <span className="loyalty-rule-hint">
+                Mặc định 50%: giá trị quy đổi điểm không được vượt quá {config.maxRedemptionPercent ?? 50}% hóa đơn
+              </span>
+            </div>
+
             {/* Checkbox Box */}
             <div className="loyalty-checkbox-box">
               <label className="loyalty-checkbox-label">
