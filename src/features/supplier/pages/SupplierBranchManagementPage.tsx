@@ -142,25 +142,16 @@ export const SupplierBranchManagementPage: FC = () => {
     setAppliedFilters((prev) => ({ ...prev, pageSize: size, pageIndex: 1 }));
   };
 
-  // Assign & Unassign Handlers
+  // Assign & Unassign Handlers (SBA-02: atomic 1-step creation & rethrow error so modal stays open)
   const handleAssignBranches = async (input: AssignSuppliersToBranchInput) => {
     try {
       await supplierBranchApi.assignSuppliersToBranch(input);
-      if (input.status === 'Inactive') {
-        for (const supplierId of input.supplierIds) {
-          await supplierBranchApi.updateAssignmentStatus(
-            supplierId,
-            input.branchId,
-            'Inactive',
-            input.inactiveReason
-          );
-        }
-      }
       showToast(`Đã phân bổ thành công ${input.supplierIds.length} nhà cung cấp cho cửa hàng.`);
       setIsAssignModalOpen(false);
       await fetchAssignments();
     } catch (err: any) {
       showToast(err.message || 'Không thể thực hiện gán nhà cung cấp cho cửa hàng.', 'error');
+      throw err;
     }
   };
 
@@ -169,7 +160,10 @@ export const SupplierBranchManagementPage: FC = () => {
     setIsUpdatingEdit(true);
     try {
       const statusChanged = payload.status !== editItem.status;
-      if (statusChanged) {
+      const reasonChanged =
+        payload.status === 'Inactive' &&
+        (payload.inactiveReason || '').trim() !== (editItem.inactiveReason || '').trim();
+      if (statusChanged || reasonChanged) {
         await supplierBranchApi.updateAssignmentStatus(
           editItem.supplierId,
           editItem.branchId,
@@ -215,7 +209,7 @@ export const SupplierBranchManagementPage: FC = () => {
         <div>
           <h1 className="so-list-title">
             <Store size={22} color="var(--blue-primary, #0f766e)" />
-            <span>Cửa Hàng với nhà cung cấp</span>
+            <span>Cửa hàng với nhà cung cấp</span>
             {isLoading && (
               <Loader2 size={16} className="animate-spin" style={{ color: 'var(--blue-primary, #0f766e)' }} />
             )}

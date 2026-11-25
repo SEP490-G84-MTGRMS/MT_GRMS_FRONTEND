@@ -45,6 +45,8 @@ export interface EmployeeBackendDetailDto {
   otSunday?: string;
   branchId: string;
   branchName: string;
+  /** Nhiều CN làm việc (nếu BE trả). */
+  branchIds?: string[];
   userId?: string;
   userName?: string;
   role?: string;
@@ -202,7 +204,12 @@ export const mapBackendDetailToEmployee = (dto: EmployeeBackendDetailDto): Emplo
     note: dto.note,
     salaryBranchId: dto.branchId,
     salaryBranchName: dto.branchName || 'Chưa gán',
-    workingBranchIds: dto.branchId ? [dto.branchId] : [],
+    workingBranchIds:
+      Array.isArray(dto.branchIds) && dto.branchIds.length > 0
+        ? dto.branchIds.filter(Boolean)
+        : dto.branchId
+          ? [dto.branchId]
+          : [],
     workingBranchNames: dto.branchName ? [dto.branchName] : ['Chưa gán'],
     userId: dto.userId,
     userName: dto.userName,

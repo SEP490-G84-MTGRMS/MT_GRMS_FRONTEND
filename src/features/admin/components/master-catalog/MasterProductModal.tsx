@@ -1,3 +1,4 @@
+import { validateMasterProduct } from '../../utils/masterProductValidation';
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { X, Plus, Trash2, Save, Layers } from 'lucide-react';
@@ -54,10 +55,10 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
       setBrand(productToEdit.brand);
       setCategoryName(productToEdit.categoryName);
       setBaseUnit(productToEdit.baseUnit);
-      setSuggestedRetailPrice(productToEdit.suggestedRetailPrice ? String(productToEdit.suggestedRetailPrice) : '');
+      setSuggestedRetailPrice(productToEdit.suggestedRetailPrice != null ? String(productToEdit.suggestedRetailPrice) : '');
       setVatRate(productToEdit.vatRate ?? 8);
       setImageUrl(productToEdit.imageUrl || '');
-      setDescription('');
+      setDescription(productToEdit.description ?? '');
       setIsActive(productToEdit.isActive);
       setUnits(
         productToEdit.units?.map((u) => ({
@@ -123,20 +124,16 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    if (!name.trim()) {
-      setError('Vui lòng nhập tên sản phẩm mẫu.');
+    const priceNum = suggestedRetailPrice.trim() ? Number(suggestedRetailPrice) : null;
+    const validation = validateMasterProduct({
+      barcode, name, brand, categoryName, baseUnit, suggestedRetailPrice: priceNum, vatRate, imageUrl, description, units,
+    });
+    if (validation) {
+      setError(validation);
       return;
     }
-
-    if (!isEdit && !barcode.trim()) {
-      setError('Vui lòng nhập mã vạch (EAN-13).');
-      return;
-    }
-
-    const priceNum = suggestedRetailPrice.trim() ? parseFloat(suggestedRetailPrice) : null;
 
     const payloadUnits = units
-      .filter((u) => u.unitName.trim().length > 0 && u.conversionRate > 1)
       .map((u) => ({
         unitName: u.unitName.trim(),
         conversionRate: u.conversionRate,
@@ -154,7 +151,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
           baseUnit: baseUnit.trim(),
           suggestedRetailPrice: priceNum,
           vatRate: vatRate,
-          taxCategory: 'STANDARD_1PCT',
+          taxCategory: productToEdit?.taxCategory ?? 'STANDARD_1PCT',
           imageUrl: imageUrl.trim() || null,
           description: description.trim() || null,
           isActive,
@@ -179,7 +176,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
       }
       onClose();
     } catch (err: any) {
-      setError(err?.message || 'Có lỗi xảy ra khi lưu sản phẩm mẫu.');
+      setError(err?.response?.data?.message || err?.message || 'Có lỗi xảy ra khi lưu sản phẩm mẫu.');
     } finally {
       setIsSubmitting(false);
     }
@@ -272,12 +269,12 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
             {/* Barcode */}
             <div>
               <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                Mã Vạch EAN-13 (*)
+                Mã vạch (*)
               </label>
               <input
                 type="text"
                 disabled={isEdit}
-                value={barcode}
+                required maxLength={50} value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="VD: 8934563138165"
                 style={{
@@ -300,7 +297,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
               </label>
               <input
                 type="text"
-                value={baseUnit}
+                required maxLength={30} value={baseUnit}
                 onChange={(e) => setBaseUnit(e.target.value)}
                 placeholder="Gói, Lon, Chai, Hộp..."
                 style={{
@@ -322,7 +319,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
             </label>
             <input
               type="text"
-              value={name}
+              required minLength={2} maxLength={250} value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="VD: Mì Hảo Hảo Tôm Chua Cay Gói 75g"
               style={{
@@ -344,7 +341,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
               </label>
               <input
                 type="text"
-                value={brand}
+                required maxLength={100} value={brand}
                 onChange={(e) => setBrand(e.target.value)}
                 placeholder="Acecook, Unilever, Masan..."
                 style={{
@@ -365,7 +362,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
               </label>
               <input
                 type="text"
-                value={categoryName}
+                required maxLength={100} value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
                 placeholder="Mì ăn liền, Nước giải khát..."
                 style={{
@@ -388,7 +385,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
               </label>
               <input
                 type="number"
-                value={suggestedRetailPrice}
+                min={0} step={0.01} value={suggestedRetailPrice}
                 onChange={(e) => setSuggestedRetailPrice(e.target.value)}
                 placeholder="4500"
                 style={{
@@ -435,7 +432,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
             </label>
             <input
               type="text"
-              value={imageUrl}
+              maxLength={1000} value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="https://images.unsplash.com/... hoặc link ảnh sản phẩm"
               style={{
@@ -502,7 +499,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
                     <input
                       type="text"
                       placeholder="Tên ĐVT (Thùng, Lốc...)"
-                      value={u.unitName}
+                      required maxLength={50} value={u.unitName}
                       onChange={(e) => handleUnitChange(idx, 'unitName', e.target.value)}
                       style={{
                         padding: '6px 10px',
@@ -517,7 +514,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
                       <input
                         type="number"
                         placeholder="Hệ số (30, 24, 6...)"
-                        value={u.conversionRate}
+                        required min={1.0001} step={0.0001} value={u.conversionRate}
                         onChange={(e) => handleUnitChange(idx, 'conversionRate', Number(e.target.value))}
                         style={{
                           width: '100%',
@@ -534,7 +531,7 @@ export const MasterProductModal: FC<MasterProductModalProps> = ({
                     <input
                       type="text"
                       placeholder="Mã vạch thùng (tùy chọn)"
-                      value={u.barcode}
+                      maxLength={50} value={u.barcode}
                       onChange={(e) => handleUnitChange(idx, 'barcode', e.target.value)}
                       style={{
                         padding: '6px 10px',

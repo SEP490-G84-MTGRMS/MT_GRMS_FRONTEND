@@ -23,6 +23,7 @@ const fmt = (n: number) => new Intl.NumberFormat('vi-VN').format(n);
 const statusBadge = (status: InventoryItem['status']) => {
   if (status === 'Out') return { label: 'Hết hàng', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' };
   if (status === 'Low') return { label: 'Sắp hết', bg: '#fffbeb', color: '#b45309', border: '#fde68a' };
+  if (status === 'NearExpiry') return { label: 'Cận hạn', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' };
   return { label: 'Đủ hàng', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' };
 };
 
@@ -299,10 +300,16 @@ export const InventoryTable: FC<Props> = ({
                       style={{
                         ...tdBase,
                         textAlign: 'right',
-                        color: item.committed > 0 ? '#dc2626' : '#64748b',
+                        color: item.committed > 0 || (item.expiredQty ?? 0) > 0 ? '#dc2626' : '#64748b',
                       }}
+                      title={`Giữ chỗ: ${fmt(item.reserved ?? 0)} | Cách ly: ${fmt(item.quarantined ?? 0)} | Hết hạn: ${fmt(item.expiredQty ?? 0)}`}
                     >
-                      {fmt(item.committed)}
+                      <div>{fmt(item.committed)}</div>
+                      {(item.expiredQty ?? 0) > 0 && (
+                        <div style={{ fontSize: 10, color: '#b91c1c', fontWeight: 600 }}>
+                          Hết hạn: {fmt(item.expiredQty ?? 0)}
+                        </div>
+                      )}
                     </td>
                     <td
                       style={{

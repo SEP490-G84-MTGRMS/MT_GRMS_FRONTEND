@@ -43,6 +43,7 @@ export interface PlanKpiBannerResponse {
 }
 
 export interface CreatePlanPayload {
+  isActive?: boolean;
   code: string;
   name: string;
   description?: string;

@@ -112,6 +112,7 @@ import { CashbookPage } from '../features/cashbook';
 import { TaxSnapshotPage } from '../features/tax-snapshot';
 import { FinanceOverviewPage } from '../features/finance/pages/FinanceOverviewPage';
 import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
+import { StaffManagementGate } from '../pages/store/components/StaffManagementGate';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { CashControlHubPage } from '../features/cash-control';
@@ -442,11 +443,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'purchase-orders/create-matrix',
-        element: <OrderMatrixPage forcedRole="STORE_OWNER" />,
+        element: <OrderMatrixPage />,
       },
       {
         path: 'purchase-orders/employee-matrix',
-        element: <OrderMatrixPage forcedRole="STAFF" />,
+        element: <OrderMatrixPage />,
       },
       {
         path: 'purchase-orders/dispatch-hub',
@@ -608,7 +609,7 @@ export const router = createBrowserRouter([
         path: 'employees',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <EmployeeListPage />
+            <StaffManagementGate><EmployeeListPage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
@@ -616,31 +617,31 @@ export const router = createBrowserRouter([
         path: 'employees/schedule',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <WorkSchedulePage />
+            <StaffManagementGate><WorkSchedulePage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
       {
         path: 'employees/shifts',
-        element: <ShiftConfigPage />,
+        element: <StaffManagementGate><ShiftConfigPage /></StaffManagementGate>,
       },
       {
         path: 'employees/attendance',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <AttendancePage />
+            <StaffManagementGate><AttendancePage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
       {
         path: 'employees/approval-requests',
-        element: <ApprovalRequestsPage />,
+        element: <StaffManagementGate><ApprovalRequestsPage /></StaffManagementGate>,
       },
       {
         path: 'employees/payroll',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <PayslipManagementPage />
+            <StaffManagementGate><PayslipManagementPage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
@@ -766,31 +767,31 @@ export const router = createBrowserRouter([
       },
       {
         path: 'employees',
-        element: <EmployeeListPage />,
+        element: <StaffManagementGate><EmployeeListPage /></StaffManagementGate>,
       },
       {
         path: 'employees/schedule',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <WorkSchedulePage />
+            <StaffManagementGate><WorkSchedulePage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
       {
         path: 'employees/shifts',
-        element: <ShiftConfigPage />,
+        element: <StaffManagementGate><ShiftConfigPage /></StaffManagementGate>,
       },
       {
         path: 'employees/attendance',
-        element: <AttendancePage />,
+        element: <StaffManagementGate><AttendancePage /></StaffManagementGate>,
       },
       {
         path: 'employees/approval-requests',
-        element: <ApprovalRequestsPage />,
+        element: <StaffManagementGate><ApprovalRequestsPage /></StaffManagementGate>,
       },
       {
         path: 'employees/payroll',
-        element: <PayslipManagementPage />,
+        element: <StaffManagementGate><PayslipManagementPage /></StaffManagementGate>,
       },
       {
         path: 'promotions',
@@ -881,27 +882,27 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <EmployeeListPage />,
+        element: <StaffManagementGate><EmployeeListPage /></StaffManagementGate>,
       },
       {
         path: 'schedule',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'ADMIN', 'StoreOwner', 'Admin']}>
-            <WorkSchedulePage />
+            <StaffManagementGate><WorkSchedulePage /></StaffManagementGate>
           </ProtectedRoute>
         ),
       },
       {
         path: 'shifts',
-        element: <ShiftConfigPage />,
+        element: <StaffManagementGate><ShiftConfigPage /></StaffManagementGate>,
       },
       {
         path: 'attendance',
-        element: <AttendancePage />,
+        element: <StaffManagementGate><AttendancePage /></StaffManagementGate>,
       },
       {
         path: 'payroll',
-        element: <PayslipManagementPage />,
+        element: <StaffManagementGate><PayslipManagementPage /></StaffManagementGate>,
       },
       {
         path: 'stocktakes',
@@ -969,11 +970,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'attendance',
-        element: <AttendancePage />,
+        element: <StaffManagementGate isOwner={false}><AttendancePage /></StaffManagementGate>,
       },
       {
         path: 'payroll',
-        element: <PayslipManagementPage />,
+        element: <StaffManagementGate isOwner={false}><PayslipManagementPage /></StaffManagementGate>,
       },
       {
         path: 'stocktakes',
@@ -1234,7 +1235,7 @@ export const router = createBrowserRouter([
           },
           {
             path: 'create-matrix',
-            element: <OrderMatrixPage forcedRole="STAFF" />,
+            element: <OrderMatrixPage />,
           },
         ],
       },
@@ -1243,7 +1244,7 @@ export const router = createBrowserRouter([
         children: [
           {
             path: 'purchase-orders/create-matrix',
-            element: <OrderMatrixPage forcedRole="STAFF" />,
+            element: <OrderMatrixPage />,
           },
         ],
       },

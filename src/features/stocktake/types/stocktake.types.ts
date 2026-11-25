@@ -86,6 +86,7 @@ export interface StocktakeListItem {
   approvedAt?: string | null;
   lineCount: number;
   abnormalLineCount: number;
+  returnEligibleLines?: number;
   totalDefectiveQty: number;
   totalDamagedAndExpiredQty: number;
   totalVarianceQty: number;

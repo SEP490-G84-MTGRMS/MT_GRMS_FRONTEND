@@ -5,7 +5,6 @@ import {
   Search,
   User,
   Check,
-  Save,
   AlertTriangle,
 } from 'lucide-react';
 import type { TransferOrder, TransferItem } from '../types';
@@ -18,6 +17,7 @@ export const ReceiveTransferPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const canViewFinancials = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
+  const currentUserName = useAuthStore((state) => state.user?.fullName || state.user?.email || 'Nhân viên');
   const transferBasePath = window.location.pathname.startsWith('/employee') ? '/employee/transfers' : '/store-owner/transfers';
 
   const [transfer, setTransfer] = useState<TransferOrder | null>(null);
@@ -28,7 +28,9 @@ export const ReceiveTransferPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'match' | 'mismatch' | 'unreceived'>('all');
   const [searchKw, setSearchKw] = useState('');
   const [receiveNote, setReceiveNote] = useState('');
-  const [receiveTime] = useState('15/10/2025 12:09');
+  const [receiveTime] = useState(() =>
+    new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  );
 
   // Toast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -197,7 +199,7 @@ export const ReceiveTransferPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 13, color: '#64748b' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#1e293b' }}>
             <User size={16} color="#0F766E" />
-            <span>Admin</span>
+            <span>{currentUserName}</span>
           </div>
           <span
             style={{
@@ -570,23 +572,14 @@ export const ReceiveTransferPage: React.FC = () => {
             </span>
           </div>
 
-          {/* Nút bấm Lưu tạm & Nhận hàng */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 4 }}>
-            <button
-              type="button"
-              className="btn-secondary-white"
-              onClick={() => showToast('Đã lưu tạm thông tin kiểm đếm nhận hàng.')}
-              style={{ justifyContent: 'center' }}
-            >
-              <Save size={15} /> Lưu tạm
-            </button>
-
+          {/* Nút bấm Nhận hàng */}
+          <div style={{ display: 'flex', marginTop: 4 }}>
             <button
               type="button"
               className="btn-primary-teal"
               onClick={handleConfirm}
               disabled={isSaving}
-              style={{ justifyContent: 'center' }}
+              style={{ flex: 1, justifyContent: 'center' }}
             >
               <Check size={15} /> Nhận hàng
             </button>

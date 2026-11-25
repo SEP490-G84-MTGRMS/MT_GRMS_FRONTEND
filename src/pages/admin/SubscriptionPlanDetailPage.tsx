@@ -180,7 +180,7 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
     const quotasValidation = validatePlanQuotas(quotas);
 
     const newErrors: Record<string, string> = {};
-    if (!name.trim()) newErrors.name = "Vui lòng nhập tên thương mại";
+    if (name.trim().length < 2 || name.trim().length > 100) newErrors.name = 'Tên gói phải có từ 2 đến 100 ký tự';
     if (!pricingValidation.isValid) {
       if (pricingValidation.error?.includes("tháng"))
         newErrors.monthlyPrice = pricingValidation.error;
@@ -300,19 +300,19 @@ export const SubscriptionPlanDetailPage: React.FC = () => {
               <div className="plan-profile-fields">
                 <label>Mã gói<input value={currentPlan.code} readOnly /></label>
                 <label>Trạng thái mở bán<select value={status} onChange={(event) => setStatus(event.target.value as PlanStatus)}><option value="Active">Đang mở bán</option><option value="Inactive">Tạm ngừng bán</option></select></label>
-                <label className="is-full">Tên gói dịch vụ<input value={name} onChange={(event) => setName(event.target.value)} required maxLength={150} aria-invalid={Boolean(errors.name)} /></label>
-                <label>Giá theo tháng (đ)<input type="number" min={0} step="any" value={monthlyPrice} onChange={(event) => setMonthlyPrice(Number(event.target.value))} required aria-invalid={Boolean(errors.monthlyPrice)} /></label>
-                <label>Giá theo năm (đ)<input type="number" min={0} step="any" value={yearlyPrice} onChange={(event) => setYearlyPrice(Number(event.target.value))} required aria-invalid={Boolean(errors.yearlyPrice)} /></label>
+                <label className="is-full">Tên gói dịch vụ<input value={name} onChange={(event) => setName(event.target.value)} required minLength={2} maxLength={100} aria-invalid={Boolean(errors.name)} /></label>
+                <label>Giá theo tháng (đ)<input type="number" min={0} step={0.01} value={Number.isNaN(monthlyPrice) ? '' : monthlyPrice} onChange={(event) => setMonthlyPrice(event.target.valueAsNumber)} required aria-invalid={Boolean(errors.monthlyPrice)} /></label>
+                <label>Giá theo năm (đ)<input type="number" min={0} step={0.01} value={Number.isNaN(yearlyPrice) ? '' : yearlyPrice} onChange={(event) => setYearlyPrice(event.target.valueAsNumber)} required aria-invalid={Boolean(errors.yearlyPrice)} /></label>
                 <label className="is-full">Mô tả gói<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} /></label>
               </div>
             </section>
             <section className="plan-profile-card">
               <h2><SlidersHorizontal size={18} />Hạn mức tài nguyên</h2>
               <div className="plan-profile-fields">
-                <label>Số chi nhánh<input type="number" min={-1} step={1} required value={quotas.maxBranches} onChange={(event) => setQuotas({ ...quotas, maxBranches: Number(event.target.value) })} aria-invalid={Boolean(errors.maxBranches)} /></label>
-                <label>Tài khoản nhân viên<input type="number" min={-1} step={1} required value={quotas.maxEmployees} onChange={(event) => setQuotas({ ...quotas, maxEmployees: Number(event.target.value) })} aria-invalid={Boolean(errors.maxEmployees)} /></label>
+                <label>Số chi nhánh<input type="number" min={-1} max={2147483647} step={1} required value={quotas.maxBranches} onChange={(event) => setQuotas({ ...quotas, maxBranches: Number(event.target.value) })} aria-invalid={Boolean(errors.maxBranches)} /></label>
+                <label>Tài khoản nhân viên<input type="number" min={-1} max={2147483647} step={1} required value={quotas.maxEmployees} onChange={(event) => setQuotas({ ...quotas, maxEmployees: Number(event.target.value) })} aria-invalid={Boolean(errors.maxEmployees)} /></label>
                 <p className="plan-profile-hint is-full">Nhập -1 cho hạn mức không giới hạn chi nhánh hoặc nhân viên.</p>
-                <label>Dung lượng lưu trữ (GB)<input type="number" min={0} step="any" required value={quotas.maxStorageGb} onChange={(event) => setQuotas({ ...quotas, maxStorageGb: Number(event.target.value) })} aria-invalid={Boolean(errors.maxStorageGb)} /></label>
+                <label>Dung lượng lưu trữ (GB)<input type="number" min={1} max={2147483647} step={1} required value={quotas.maxStorageGb} onChange={(event) => setQuotas({ ...quotas, maxStorageGb: Number(event.target.value) })} aria-invalid={Boolean(errors.maxStorageGb)} /></label>
                 <label>Chu kỳ sao lưu<select value={quotas.backupFrequency} onChange={(event) => setQuotas({ ...quotas, backupFrequency: event.target.value as PlanQuotaConfig["backupFrequency"] })}><option value="Hourly">Hàng giờ</option><option value="Daily">Hàng ngày</option><option value="Weekly">Hàng tuần</option></select></label>
               </div>
               <dl className="plan-profile-record"><div><dt>Ngày khởi tạo</dt><dd>{new Date(currentPlan.createdAt).toLocaleDateString("vi-VN")}</dd></div><div><dt>Mã định danh</dt><dd>{currentPlan.id}</dd></div></dl>

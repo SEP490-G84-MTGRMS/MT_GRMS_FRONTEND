@@ -71,9 +71,15 @@ export const storeProductApi = {
         category: x.category || '',
         // Đơn vị nhập: BE resolve DeliveryUoM → IsPurchaseUnit → BaseUnit (cùng logic màn NCC)
         unit: x.unit || x.deliveryUoM || x.baseUoM || 'Cái',
+        stockUnit: x.stockUnit || x.baseUoM || x.unit || 'Cái',
+        purchaseToStockRate: Number(x.purchaseToStockRate ?? 1) || 1,
         imageUrl: x.imageUrl || undefined,
         retailPrice: x.retailPrice,
         costPrice: x.costPrice,
+        averageCost:
+          x.averageCost != null && Number(x.averageCost) > 0
+            ? Number(x.averageCost)
+            : Number(x.costPrice ?? 0) || 0,
         minOrderQuantity: x.minOrderQuantity ?? x.minimumOrderQuantity ?? 1,
         currentStock: x.currentStock,
         minStockLevel: x.minStockLevel,
@@ -83,6 +89,25 @@ export const storeProductApi = {
         isPrimarySupplier: Boolean(x.isPrimarySupplier),
         hasActiveSupplierSource: x.hasActiveSupplierSource !== false,
         lostSupplierSource: Boolean(x.lostSupplierSource),
+        suppliers: Array.isArray(x.suppliers)
+          ? x.suppliers.map((s: any) => ({
+              supplierId: String(s.supplierId || ''),
+              supplierCode: s.supplierCode || '',
+              supplierName: s.supplierName || '',
+              costPrice: Number(s.costPrice ?? 0),
+              minOrderQuantity: Number(s.minOrderQuantity ?? 0),
+              isPrimarySupplier: Boolean(s.isPrimarySupplier),
+              deliveryUoM: s.deliveryUoM || undefined,
+            }))
+          : undefined,
+        supplierCount:
+          typeof x.supplierCount === 'number'
+            ? x.supplierCount
+            : Array.isArray(x.suppliers)
+              ? x.suppliers.length
+              : x.supplierId
+                ? 1
+                : 0,
         status: x.status,
         shelfLocation: x.shelfLocation,
         assignedDate: x.assignedDate ? x.assignedDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
@@ -115,9 +140,9 @@ export const storeProductApi = {
         id: b.id,
         code: b.code,
         name: b.name,
-        address: b.address,
-        managerName: b.managerName || 'Quản lý chi nhánh',
-        phone: b.phone || '0901 234 567',
+        address: b.address || '',
+        managerName: b.managerName || '',
+        phone: b.phone || '',
         totalProducts: b.totalProducts,
         totalStock: b.totalStock,
         lowStockCount: b.lowStockCount,
@@ -200,6 +225,7 @@ export const storeProductApi = {
   assignProducts: async (input: AssignStoreProductInput): Promise<void> => {
     await httpClient.post(`/branches/${input.storeId}/products`, {
       productIds: input.productIds,
+      items: input.items,
     });
   },
 
@@ -220,6 +246,10 @@ export const storeProductApi = {
       })),
       status: input.status,
       shelfLocation: input.shelfLocation,
+      processedSellingPricePerKg:
+        input.processedSellingPricePerKg != null && Number(input.processedSellingPricePerKg) > 0
+          ? Number(input.processedSellingPricePerKg)
+          : undefined,
     });
   },
 

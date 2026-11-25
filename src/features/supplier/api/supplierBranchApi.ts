@@ -110,6 +110,8 @@ export const supplierBranchApi = {
           branchId: input.branchId,
           supplierIds: input.supplierIds,
           items: input.items,
+          status: input.status === 'Inactive' ? 2 : 1,
+          inactiveReason: input.status === 'Inactive' ? input.inactiveReason : undefined,
         }
       );
       if (res.data?.success) {

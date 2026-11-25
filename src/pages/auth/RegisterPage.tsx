@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useRef } from "react";
 import type { FC, FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -10,14 +10,14 @@ import {
   Lock,
   Eye,
   EyeOff,
-  AlertCircle,
   Loader2,
   CheckCircle2,
   ShieldCheck,
   ArrowRight,
 } from "lucide-react";
 import { authService } from "../../features/auth/authService";
-import { validateRegistration } from "../../features/auth/authValidation";
+import { getRegistrationPasswordStrength, validateRegistration, type RegistrationValidationError } from "../../features/auth/authValidation";
+import { AdminToast, type ToastState } from "../../features/admin/components/common/AdminToast";
 import { RegistrationOtpModal } from "../../features/auth/components/RegistrationOtpModal";
 import { useAuthStore } from "../../stores/useAuthStore";
 
@@ -42,7 +42,8 @@ export const RegisterPage: FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<RegistrationValidationError | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
   // State cho bước xác thực Email OTP kích hoạt cửa hàng
@@ -55,58 +56,32 @@ export const RegisterPage: FC = () => {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isResendingOtp, setIsResendingOtp] = useState(false);
 
-  const passwordStrength = useMemo(() => {
-    if (!password)
-      return { score: 0, text: "", color: "transparent", width: "0%" };
+  const passwordStrength = getRegistrationPasswordStrength(password);
 
-    if (password.length < 8) {
-      return {
-        score: 1,
-        text: "Yếu (tối thiểu 8 ký tự)",
-        color: "var(--red-accent)",
-        width: "25%",
-      };
-    }
+  const showErrorToast = (message: string) =>
+    setToast({ id: String(Date.now()), message, type: "error" });
 
-    let score = 0;
-    if (password.length >= 6) score += 1;
-    if (password.length >= 8) score += 1;
-    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score += 1;
-    else if (/[A-Za-z]/.test(password)) score += 0.5;
-    if (/[0-9]/.test(password)) score += 1;
-    if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  const clearFieldError = (field: RegistrationValidationError["field"]) => {
+    if (fieldError?.field !== field) return;
+    setFieldError(null);
+    setToast(null);
+  };
 
-    if (score < 2.5) {
-      return {
-        score: 1,
-        text: "Yếu",
-        color: "var(--red-accent)",
-        width: "35%",
-      };
-    }
-    if (score < 4) {
-      return {
-        score: 2,
-        text: "Trung bình",
-        color: "var(--orange-accent)",
-        width: "65%",
-      };
-    }
-    return {
-      score: 3,
-      text: "Mạnh",
-      color: "var(--green-money)",
-      width: "100%",
-    };
-  }, [password]);
+  const getFieldProps = (field: RegistrationValidationError["field"]) => ({
+    name: field,
+    "aria-invalid": fieldError?.field === field || undefined,
+  });
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrorMessage(null);
+    setToast(null);
 
     const validationError = validateRegistration({ fullName, storeName, phone, email, password, confirmPassword, agreeTerms });
+    setFieldError(validationError);
     if (validationError) {
-      setErrorMessage(validationError);
+      showErrorToast(validationError.message);
+      const input = e.currentTarget.elements.namedItem(validationError.field);
+      if (input instanceof HTMLInputElement) input.focus();
       return;
     }
 
@@ -133,7 +108,7 @@ export const RegisterPage: FC = () => {
         err instanceof Error
           ? err.message
           : "Không thể gửi mã xác thực Email OTP. Vui lòng thử lại.";
-      setErrorMessage(msg);
+      showErrorToast(msg);
     } finally {
       setIsLoading(false);
     }
@@ -271,41 +246,33 @@ export const RegisterPage: FC = () => {
         </div>
       )}
 
-      {errorMessage && (
-        <div
-          className="auth-alert auth-alert-error"
-          role="alert"
-          style={{ marginBottom: "14px" }}
-        >
-          <AlertCircle
-            size={16}
-            strokeWidth={2}
-            style={{ flexShrink: 0, marginTop: "2px" }}
-          />
-          <span>{errorMessage}</span>
-        </div>
-      )}
+      <AdminToast toast={toast} onClose={() => setToast(null)} />
 
-      <form onSubmit={handleSubmit} className="auth-form-fields">
+      <form onSubmit={handleSubmit} className="auth-form-fields" noValidate>
         <div className="auth-field-block">
-          <label
-            htmlFor="reg-fullname"
-            className="auth-field-label"
-            style={{ marginBottom: "6px" }}
-          >
-            Họ và tên đại diện
-          </label>
+          <div className="auth-field-label-row">
+            <label
+              htmlFor="reg-fullname"
+              className="auth-field-label"
+            >
+              Họ và tên đại diện
+            </label>
+          </div>
           <div className="auth-input-container">
             <span className="auth-input-prefix-icon">
               <User size={18} strokeWidth={1.8} />
             </span>
             <input
               id="reg-fullname"
+              {...getFieldProps("fullName")}
               type="text"
               className="auth-styled-input"
               placeholder="Họ và tên đại diện"
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              onChange={(e) => {
+                setFullName(e.target.value);
+                clearFieldError("fullName");
+              }}
               disabled={isLoading}
               required
               maxLength={100}
@@ -314,24 +281,29 @@ export const RegisterPage: FC = () => {
         </div>
 
         <div className="auth-field-block">
-          <label
-            htmlFor="reg-storename"
-            className="auth-field-label"
-            style={{ marginBottom: "6px" }}
-          >
-            Tên cửa hàng
-          </label>
+          <div className="auth-field-label-row">
+            <label
+              htmlFor="reg-storename"
+              className="auth-field-label"
+            >
+              Tên cửa hàng
+            </label>
+          </div>
           <div className="auth-input-container">
             <span className="auth-input-prefix-icon">
               <Store size={18} strokeWidth={1.8} />
             </span>
             <input
               id="reg-storename"
+              {...getFieldProps("storeName")}
               type="text"
               className="auth-styled-input"
               placeholder="Tên cửa hàng"
               value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
+              onChange={(e) => {
+                setStoreName(e.target.value);
+                clearFieldError("storeName");
+              }}
               disabled={isLoading}
               required
               maxLength={150}
@@ -340,19 +312,21 @@ export const RegisterPage: FC = () => {
         </div>
 
         <div className="auth-field-block">
-          <label
-            htmlFor="reg-phone"
-            className="auth-field-label"
-            style={{ marginBottom: "5px" }}
-          >
-            Số điện thoại
-          </label>
+          <div className="auth-field-label-row">
+            <label
+              htmlFor="reg-phone"
+              className="auth-field-label"
+            >
+              Số điện thoại
+            </label>
+          </div>
           <div className="auth-input-container">
             <span className="auth-input-prefix-icon">
               <Phone size={18} strokeWidth={1.8} />
             </span>
             <input
               id="reg-phone"
+              {...getFieldProps("phone")}
               type="tel"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -364,7 +338,7 @@ export const RegisterPage: FC = () => {
                 // Tự động loại bỏ toàn bộ ký tự không phải chữ số (chống nhập chữ như asddda)
                 const numericOnly = e.target.value.replace(/\D/g, "").slice(0, 10);
                 setPhone(numericOnly);
-                if (errorMessage) setErrorMessage(null);
+                clearFieldError("phone");
               }}
               onKeyDown={(e) => {
                 // Chặn gõ phím chữ, chỉ cho phép số, phím xóa và điều hướng
@@ -393,24 +367,29 @@ export const RegisterPage: FC = () => {
         </div>
 
         <div className="auth-field-block">
-          <label
-            htmlFor="reg-email"
-            className="auth-field-label"
-            style={{ marginBottom: "5px" }}
-          >
-            Email nhận mã OTP kích hoạt
-          </label>
+          <div className="auth-field-label-row">
+            <label
+              htmlFor="reg-email"
+              className="auth-field-label"
+            >
+              Email nhận mã OTP kích hoạt
+            </label>
+          </div>
           <div className="auth-input-container">
             <span className="auth-input-prefix-icon">
               <Mail size={18} strokeWidth={1.8} />
             </span>
             <input
               id="reg-email"
+              {...getFieldProps("email")}
               type="email"
               className="auth-styled-input"
               placeholder="chucuahang@gmail.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearFieldError("email");
+              }}
               disabled={isLoading}
               required
               maxLength={100}
@@ -419,24 +398,30 @@ export const RegisterPage: FC = () => {
         </div>
 
         <div className="auth-field-block">
-          <label
-            htmlFor="reg-password"
-            className="auth-field-label"
-            style={{ marginBottom: "6px" }}
-          >
-            Mật khẩu
-          </label>
+          <div className="auth-field-label-row">
+            <label
+              htmlFor="reg-password"
+              className="auth-field-label"
+            >
+              Mật khẩu
+            </label>
+          </div>
           <div className="auth-input-container">
             <span className="auth-input-prefix-icon">
               <Lock size={17} strokeWidth={1.8} />
             </span>
             <input
               id="reg-password"
+              {...getFieldProps("password")}
               type={showPassword ? "text" : "password"}
               className="auth-styled-input has-eye-btn"
               placeholder="8–64 ký tự, có chữ hoa, số và ký tự đặc biệt"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearFieldError("password");
+                clearFieldError("confirmPassword");
+              }}
               autoComplete="new-password"
               disabled={isLoading}
               required
@@ -457,51 +442,45 @@ export const RegisterPage: FC = () => {
           </div>
         </div>
 
-        {password && (
-          <div
-            className="auth-strength-meter"
-            style={{ marginTop: "-4px", marginBottom: "2px" }}
-          >
-            <div className="auth-strength-bar">
-              <div
-                className="auth-strength-fill"
-                style={{
-                  width: passwordStrength.width,
-                  backgroundColor: passwordStrength.color,
-                }}
-              />
-            </div>
-            <span
-              className="auth-strength-text"
-              style={{
-                color: passwordStrength.color,
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              {passwordStrength.text}
-            </span>
-          </div>
-        )}
+        <div
+          className="auth-register-password-meter"
+          data-strength={passwordStrength}
+          role="meter"
+          aria-label="Độ mạnh mật khẩu"
+          aria-valuemin={0}
+          aria-valuemax={3}
+          aria-valuenow={passwordStrength}
+          aria-valuetext={["Chưa nhập mật khẩu", "Yếu", "Trung bình", "Mạnh"][passwordStrength]}
+        >
+          {[1, 2, 3].map((level) => (
+            <span key={level} data-filled={level <= passwordStrength} />
+          ))}
+        </div>
 
         <div className="auth-field-block">
-          <label
-            htmlFor="reg-confirm-password"
-            className="auth-field-label"
-            style={{ marginBottom: "6px" }}
-          >
-            Xác nhận lại mật khẩu
-          </label>
+          <div className="auth-field-label-row">
+            <label
+              htmlFor="reg-confirm-password"
+              className="auth-field-label"
+            >
+              Xác nhận lại mật khẩu
+            </label>
+          </div>
           <div className="auth-input-container">
             <span className="auth-input-prefix-icon">
               <Lock size={17} strokeWidth={1.8} />
             </span>
             <input
               id="reg-confirm-password"
+              {...getFieldProps("confirmPassword")}
               type={showConfirmPassword ? "text" : "password"}
               className="auth-styled-input has-eye-btn"
               placeholder="Nhập lại mật khẩu..."
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                clearFieldError("confirmPassword");
+              }}
               autoComplete="new-password"
               disabled={isLoading}
               required
@@ -522,18 +501,23 @@ export const RegisterPage: FC = () => {
           </div>
         </div>
 
-        <div className="auth-remember-row" style={{ alignItems: "flex-start" }}>
+        <div className="auth-field-block">
           <label
             className="auth-checkbox-wrap"
             style={{ alignItems: "flex-start" }}
           >
             <input
               type="checkbox"
+              {...getFieldProps("agreeTerms")}
               className="auth-native-check"
               style={{ marginTop: "2px" }}
               checked={agreeTerms}
-              onChange={(e) => setAgreeTerms(e.target.checked)}
+              onChange={(e) => {
+                setAgreeTerms(e.target.checked);
+                clearFieldError("agreeTerms");
+              }}
               disabled={isLoading}
+              required
             />
             <span style={{ fontSize: "12px", lineHeight: 1.45 }}>
               Tôi đồng ý với{" "}

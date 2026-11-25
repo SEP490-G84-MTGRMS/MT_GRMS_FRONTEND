@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FC } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FC } from 'react';
 import { AlertTriangle, ClipboardCheck, ImagePlus, Loader2, Trash2, X } from 'lucide-react';
 import type { BatchFilterState, BatchItem } from '../types/batch.types';
 import { batchApi } from '../api/batchApi';
@@ -19,7 +19,33 @@ interface AlertRow {
   hint: string;
   resolutionType?: string;
   requireEvidenceImage?: boolean;
+  canReturn: boolean;
+  discountPercent: number;
+  startDaysBeforeExpiry: number;
+  startTime: string;
 }
+
+const formatVnDateTime = (utc?: string | null) => {
+  if (!utc) return '—';
+  try {
+    return new Date(utc).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  } catch {
+    return utc;
+  }
+};
+
+const discountStatusLabel = (status?: BatchItem['fefoDiscountStatus']) => {
+  switch (status) {
+    case 'Scheduled':
+      return 'Đã lên lịch';
+    case 'Active':
+      return 'Đang giảm giá';
+    case 'Completed':
+      return 'Hết hiệu lực';
+    default:
+      return 'Chưa có lịch';
+  }
+};
 
 const GUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,6 +60,8 @@ interface BatchExpiryAlertModalProps {
   onClose: () => void;
   onCreated: (codes: string[]) => void;
   onCreateStocktake: (batches: Array<BatchItem & { confirmQty?: number }>) => void;
+  canManageDiscount: boolean;
+  onDiscountSaved: (message: string) => void | Promise<void>;
 }
 
 const emptyFilters = (branchId: string, status: BatchFilterState['status']): BatchFilterState => ({
@@ -90,7 +118,7 @@ const actionLabel = (action: LotAction): string => {
     case 'return':
       return 'Trả / đổi NCC';
     case 'markdown':
-      return 'Không trả được — đẩy bán';
+      return 'Giảm giá kích cầu';
     case 'expired':
       return 'Hết hạn — kiểm kê/hủy';
     default:
@@ -105,6 +133,8 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
   onClose,
   onCreated,
   onCreateStocktake,
+  canManageDiscount,
+  onDiscountSaved,
 }) => {
   const [rows, setRows] = useState<AlertRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -173,6 +203,10 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
               confirmQty: confirmPurchaseQty,
               action: 'expired' as const,
               hint: 'Hết hạn: tạo phiếu kiểm kê để write-off khi Store Owner duyệt.',
+              canReturn: false,
+              discountPercent: 20,
+              startDaysBeforeExpiry: 0,
+              startTime: '00:00',
             };
           }
 
@@ -182,8 +216,12 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
               batch,
               selected: false,
               confirmQty: confirmPurchaseQty,
-              action: 'no_grn' as const,
-              hint: 'Lô không gắn phiếu nhập gốc — không tạo được trả/đổi hàng.',
+              action: 'markdown' as const,
+              hint: 'Lô không gắn phiếu nhập gốc — có thể chọn giảm giá kích cầu.',
+              canReturn: false,
+              discountPercent: batch.discountPercent && batch.discountPercent >= 10 ? batch.discountPercent : 20,
+              startDaysBeforeExpiry: Math.max(0, batch.daysLeft),
+              startTime: '00:00',
             };
           }
           const policy = policies[batch.supplierId] || null;
@@ -208,6 +246,10 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                 : `Đủ điều kiện NEAR_EXPIRY · xử lý mặc định: ${resolution}`,
               resolutionType: resolution,
               requireEvidenceImage: needEvidence,
+              canReturn: true,
+              discountPercent: batch.discountPercent && batch.discountPercent >= 10 ? batch.discountPercent : 20,
+              startDaysBeforeExpiry: Math.max(0, batch.daysLeft),
+              startTime: '00:00',
             };
           }
           return {
@@ -215,7 +257,11 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
             selected: false,
             confirmQty: confirmPurchaseQty,
             action: 'markdown' as const,
-            hint: 'Policy NCC không cho trả cận hạn — giữ bán FEFO.',
+            hint: 'Policy NCC không cho trả cận hạn — có thể lập lịch giảm giá kích cầu.',
+            canReturn: false,
+            discountPercent: batch.discountPercent && batch.discountPercent >= 10 ? batch.discountPercent : 20,
+            startDaysBeforeExpiry: Math.max(0, batch.daysLeft),
+            startTime: '00:00',
           };
         });
 
@@ -253,13 +299,74 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
     [rows]
   );
 
+  const selectedMarkdownRows = useMemo(
+    () => rows.filter((r) => r.selected && r.action === 'markdown'),
+    [rows]
+  );
+
   const evidenceRequired = useMemo(
     () => selectedReturnRows.some((r) => r.requireEvidenceImage),
     [selectedReturnRows]
   );
 
   const selectable = (row: AlertRow) =>
-    isExpiredMode ? row.action === 'expired' : row.action === 'return';
+    isExpiredMode ? row.action === 'expired' : row.action === 'return' || (canManageDiscount && row.action === 'markdown');
+
+  const handleSaveDiscounts = async () => {
+    if (!canManageDiscount || selectedMarkdownRows.length === 0) return;
+    const invalid = selectedMarkdownRows.find((r) => r.discountPercent < 10 || r.discountPercent > 90);
+    if (invalid) {
+      setErrorMsg(`Lô ${invalid.batch.batchCode}: mức giảm phải từ 10% đến 90%.`);
+      return;
+    }
+    const invalidDays = selectedMarkdownRows.find((r) => r.startDaysBeforeExpiry < 0);
+    if (invalidDays) {
+      setErrorMsg(`Lô ${invalidDays.batch.batchCode}: số ngày còn lại đến HSD không hợp lệ.`);
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMsg('');
+    let saved = 0;
+    try {
+      for (const row of selectedMarkdownRows) {
+        try {
+          await batchApi.applyFefoDiscount(
+            row.batch.id,
+            row.discountPercent,
+            row.startDaysBeforeExpiry,
+            row.startTime
+          );
+          saved += 1;
+        } catch (err: unknown) {
+          const detail = err instanceof Error ? err.message : 'Lỗi không xác định';
+          throw new Error(
+            `Dừng tại lô ${row.batch.batchCode} (đã lưu ${saved}/${selectedMarkdownRows.length}): ${detail}`
+          );
+        }
+      }
+      await onDiscountSaved(`Đã lưu lịch giảm giá cho ${saved} lô cận hạn.`);
+      onClose();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Không thể lưu lịch giảm giá FEFO.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelDiscount = async (row: AlertRow) => {
+    if (!canManageDiscount) return;
+    setIsSubmitting(true);
+    setErrorMsg('');
+    try {
+      await batchApi.cancelFefoDiscount(row.batch.id);
+      await onDiscountSaved(`Đã tắt lịch giảm giá lô ${row.batch.batchCode}.`);
+      onClose();
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Không thể tắt lịch giảm giá FEFO.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleEvidenceUpload = async (file: File | null) => {
     if (!file) return;
@@ -364,14 +471,50 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
 
   if (!isOpen) return null;
 
-  const title = isExpiredMode ? 'Lô hết hạn' : 'Lô cận hạn — trả / đổi NCC';
+  const title = isExpiredMode ? 'Lô hết hạn' : 'Lô cận hạn';
   const subtitle = isExpiredMode
-    ? 'Tồn & SL xác nhận theo ĐVT nhập. Tạo phiếu kiểm kê (write-off khi Store Owner duyệt).'
-    : 'Chỉ lô cảnh báo / khẩn cấp. Tồn & SL xác nhận theo ĐVT nhập. Tạo phiếu trả/đổi nháp (Store Owner gửi NCC).';
+    ? 'Xác nhận số lượng rồi tạo phiếu kiểm kê để write-off.'
+    : 'Chọn hướng xử lý từng lô: trả/đổi NCC hoặc giảm giá kích cầu.';
   const emptyText = isExpiredMode
-    ? 'Không có lô hết hạn theo chi nhánh đang lọc.'
-    : 'Không có lô cận hạn (cảnh báo / khẩn cấp) theo chi nhánh đang lọc.';
+    ? 'Không có lô hết hạn trong phạm vi đang lọc.'
+    : 'Không có lô cận hạn trong phạm vi đang lọc.';
   const accent = isExpiredMode ? '#be123c' : '#b45309';
+  const accentSoft = isExpiredMode ? '#fff1f2' : '#fffbeb';
+
+  const daysBadge = (daysLeft: number) => {
+    const urgent = daysLeft <= 0;
+    const critical = daysLeft > 0 && daysLeft <= 7;
+    const bg = urgent ? '#ffe4e6' : critical ? '#ffedd5' : '#fef3c7';
+    const color = urgent ? '#be123c' : critical ? '#c2410c' : '#b45309';
+    const label = urgent ? 'Hết hạn' : `Còn ${daysLeft} ngày`;
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          height: 22,
+          padding: '0 8px',
+          borderRadius: 999,
+          background: bg,
+          color,
+          fontSize: 11.5,
+          fontWeight: 700,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+      </span>
+    );
+  };
+
+  const fieldLabel: CSSProperties = {
+    fontSize: 10.5,
+    fontWeight: 600,
+    color: '#94a3b8',
+    letterSpacing: '0.02em',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  };
 
   return (
     <div
@@ -379,48 +522,101 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
         position: 'fixed',
         inset: 0,
         zIndex: 80,
-        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backgroundColor: 'rgba(15, 23, 42, 0.48)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 24,
+        padding: 20,
       }}
       onClick={onClose}
     >
       <div
-        className="so-list-table-card"
         style={{
-          width: 'min(1080px, 100%)',
+          width: 'min(720px, 100%)',
           maxHeight: '88vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+          background: '#fff',
+          borderRadius: 14,
+          boxShadow: '0 24px 48px rgba(15, 23, 42, 0.18)',
+          border: '1px solid #e2e8f0',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           style={{
-            padding: '14px 18px',
-            borderBottom: '1px solid #e2e8f0',
+            padding: '16px 20px',
+            borderBottom: '1px solid #f1f5f9',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
             gap: 12,
             flexShrink: 0,
+            background: `linear-gradient(180deg, ${accentSoft} 0%, #fff 100%)`,
           }}
         >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 16 }}>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontWeight: 800,
+                fontSize: 17,
+                color: '#0f172a',
+                letterSpacing: '-0.01em',
+              }}
+            >
               {isExpiredMode ? (
                 <ClipboardCheck size={18} color={accent} />
               ) : (
                 <AlertTriangle size={18} color={accent} />
               )}
               {title}
+              {!isLoading && rows.length > 0 && (
+                <span
+                  style={{
+                    marginLeft: 2,
+                    height: 22,
+                    minWidth: 22,
+                    padding: '0 7px',
+                    borderRadius: 999,
+                    background: '#0f172a',
+                    color: '#fff',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {rows.length}
+                </span>
+              )}
             </div>
-            <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>{subtitle}</div>
+            <div style={{ fontSize: 13, color: '#64748b', marginTop: 4, lineHeight: 1.4 }}>
+              {subtitle}
+            </div>
           </div>
-          <button type="button" className="so-list-action-btn" onClick={onClose} title="Đóng">
+          <button
+            type="button"
+            onClick={onClose}
+            title="Đóng"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: '1px solid #e2e8f0',
+              background: '#fff',
+              color: '#64748b',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
             <X size={16} />
           </button>
         </div>
@@ -428,172 +624,395 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
         {errorMsg && (
           <div
             style={{
-              margin: '10px 18px 0',
-              padding: '8px 12px',
-              borderRadius: 6,
+              margin: '12px 20px 0',
+              padding: '10px 12px',
+              borderRadius: 8,
               backgroundColor: '#fef2f2',
               border: '1px solid #fecaca',
               color: '#b91c1c',
               fontSize: 12.5,
+              lineHeight: 1.4,
             }}
           >
             {errorMsg}
           </div>
         )}
 
-        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 12 }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '12px 16px 16px' }}>
           {isLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
-              <Loader2 size={18} className="animate-spin" style={{ verticalAlign: 'middle' }} /> Đang
-              tải lô...
+            <div style={{ padding: 48, textAlign: 'center', color: '#64748b', fontSize: 13.5 }}>
+              <Loader2 size={18} className="animate-spin" style={{ verticalAlign: 'middle', marginRight: 6 }} />
+              Đang tải lô...
             </div>
           ) : rows.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>{emptyText}</div>
+            <div style={{ padding: 48, textAlign: 'center', color: '#94a3b8', fontSize: 13.5 }}>
+              {emptyText}
+            </div>
           ) : (
-            <table className="so-list-table" style={{ minWidth: 980, tableLayout: 'auto' }}>
-              <thead>
-                <tr>
-                  <th className="so-list-th" style={{ width: 36 }} />
-                  <th className="so-list-th">SKU / Sản phẩm</th>
-                  <th className="so-list-th">Mã lô</th>
-                  <th className="so-list-th">Chi nhánh</th>
-                  <th className="so-list-th">HSD</th>
-                  <th className="so-list-th" style={{ textAlign: 'right' }}>
-                    Còn (ngày)
-                  </th>
-                  <th className="so-list-th">NCC</th>
-                  <th className="so-list-th" style={{ textAlign: 'right' }}>
-                    Tồn (ĐVT nhập)
-                  </th>
-                  <th className="so-list-th" style={{ textAlign: 'right' }}>
-                    SL xác nhận
-                  </th>
-                  <th className="so-list-th">Hướng xử lý</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.batch.id} className="so-list-row">
-                    <td>
-                      <input
-                        type="checkbox"
-                        disabled={!selectable(row)}
-                        checked={row.selected}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev.map((r) =>
-                              r.batch.id === row.batch.id
-                                ? { ...r, selected: e.target.checked }
-                                : r
-                            )
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <div className="so-list-name">{row.batch.productName}</div>
-                      <div style={{ fontFamily: 'monospace', fontSize: 11.5, color: '#64748b' }}>
-                        {row.batch.sku}
-                      </div>
-                    </td>
-                    <td style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f766e' }}>
-                      {row.batch.batchCode}
-                    </td>
-                    <td style={{ fontSize: 12.5 }}>{row.batch.branchName}</td>
-                    <td>{row.batch.expiryDate}</td>
-                    <td
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {rows.map((row) => {
+                const unit = purchaseUnitOf(row.batch);
+                const maxP = maxPurchaseQty(row.batch);
+                const isMarkdown = row.action === 'markdown';
+                const isReturn = row.action === 'return';
+                const canPick = selectable(row);
+                const stockTitle =
+                  getPurchaseRate(row.batch) > 1 &&
+                  unit.toLowerCase() !== stockUnitOf(row.batch).toLowerCase()
+                    ? `Tồn gốc: ${fmtQty(Number(row.batch.qtyCurrent) || 0)} ${stockUnitOf(row.batch)} · 1 ${unit} = ${getPurchaseRate(row.batch)} ${stockUnitOf(row.batch)}`
+                    : undefined;
+
+                return (
+                  <div
+                    key={row.batch.id}
+                    style={{
+                      border: row.selected ? `1px solid ${isReturn || row.action === 'expired' ? '#99f6e4' : '#fcd34d'}` : '1px solid #e2e8f0',
+                      background: row.selected ? (isReturn || row.action === 'expired' ? '#f0fdfa' : '#fffbeb') : '#fff',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      transition: 'border-color 120ms ease, background 120ms ease',
+                    }}
+                  >
+                    <div
                       style={{
-                        textAlign: 'right',
-                        fontWeight: 800,
-                        color: row.batch.daysLeft <= 0 ? '#be123c' : accent,
+                        display: 'grid',
+                        gridTemplateColumns: '28px minmax(0, 1fr) auto',
+                        gap: 10,
+                        alignItems: 'start',
                       }}
                     >
-                      {row.batch.daysLeft}
-                    </td>
-                    <td>{row.batch.supplierName}</td>
-                    <td
-                      style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}
-                      title={
-                        getPurchaseRate(row.batch) > 1 &&
-                        purchaseUnitOf(row.batch).toLowerCase() !==
-                          stockUnitOf(row.batch).toLowerCase()
-                          ? `Tồn gốc: ${fmtQty(Number(row.batch.qtyCurrent) || 0)} ${stockUnitOf(row.batch)} · 1 ${purchaseUnitOf(row.batch)} = ${getPurchaseRate(row.batch)} ${stockUnitOf(row.batch)}`
-                          : undefined
-                      }
-                    >
-                      {fmtQty(maxPurchaseQty(row.batch))}{' '}
-                      <span style={{ fontWeight: 600, color: '#64748b' }}>
-                        {purchaseUnitOf(row.batch)}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          justifyContent: 'flex-end',
-                        }}
-                      >
+                      <div style={{ paddingTop: 3 }}>
                         <input
-                          type="number"
-                          min={0}
-                          step="any"
-                          max={maxPurchaseQty(row.batch)}
-                          disabled={!selectable(row)}
-                          value={row.confirmQty}
-                          onChange={(e) => {
-                            const maxP = maxPurchaseQty(row.batch);
-                            const n = Math.max(0, Number(e.target.value) || 0);
+                          type="checkbox"
+                          disabled={!canPick}
+                          checked={row.selected}
+                          onChange={(e) =>
                             setRows((prev) =>
                               prev.map((r) =>
                                 r.batch.id === row.batch.id
-                                  ? { ...r, confirmQty: Math.min(n, maxP) }
+                                  ? { ...r, selected: e.target.checked }
                                   : r
                               )
-                            );
-                          }}
-                          style={{
-                            width: 72,
-                            height: 28,
-                            textAlign: 'right',
-                            padding: '0 6px',
-                            borderRadius: 5,
-                            border: '1px solid #cbd5e1',
-                            fontWeight: 700,
-                          }}
+                            )
+                          }
+                          style={{ width: 16, height: 16, cursor: canPick ? 'pointer' : 'not-allowed' }}
                         />
-                        <span style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b' }}>
-                          {purchaseUnitOf(row.batch)}
-                        </span>
                       </div>
-                    </td>
-                    <td>
+
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: '#0f172a',
+                            lineHeight: 1.3,
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          {row.batch.productName}
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            gap: '4px 10px',
+                            marginTop: 5,
+                            fontSize: 12,
+                            color: '#64748b',
+                          }}
+                        >
+                          <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+                            {row.batch.sku}
+                          </span>
+                          <span style={{ color: '#cbd5e1' }}>·</span>
+                          <span
+                            style={{
+                              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                              fontWeight: 700,
+                              color: '#0f766e',
+                            }}
+                          >
+                            {row.batch.batchCode}
+                          </span>
+                          <span style={{ color: '#cbd5e1' }}>·</span>
+                          <span>HSD {row.batch.expiryDate}</span>
+                        </div>
+                        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                          {daysBadge(row.batch.daysLeft)}
+                          <span
+                            title={stockTitle}
+                            style={{
+                              fontSize: 12,
+                              color: '#475569',
+                              fontWeight: 600,
+                            }}
+                          >
+                            Tồn {fmtQty(maxP)} {unit}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end', minWidth: 128 }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={fieldLabel}>SL xác nhận</div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            <input
+                              type="number"
+                              min={0}
+                              step="any"
+                              max={maxP}
+                              disabled={!canPick}
+                              value={row.confirmQty}
+                              onChange={(e) => {
+                                const n = Math.max(0, Number(e.target.value) || 0);
+                                setRows((prev) =>
+                                  prev.map((r) =>
+                                    r.batch.id === row.batch.id
+                                      ? { ...r, confirmQty: Math.min(n, maxP) }
+                                      : r
+                                  )
+                                );
+                              }}
+                              style={{
+                                width: 76,
+                                height: 32,
+                                textAlign: 'right',
+                                padding: '0 8px',
+                                borderRadius: 8,
+                                border: '1px solid #cbd5e1',
+                                fontWeight: 700,
+                                fontSize: 13.5,
+                                background: canPick ? '#fff' : '#f8fafc',
+                              }}
+                            />
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', minWidth: 28 }}>
+                              {unit}
+                            </span>
+                          </div>
+                        </div>
+
+                        {!isExpiredMode && canManageDiscount ? (
+                          <div style={{ textAlign: 'right', width: '100%' }}>
+                            <div style={fieldLabel}>Hướng xử lý</div>
+                            <select
+                              value={isReturn || isMarkdown ? row.action : 'markdown'}
+                              disabled={isSubmitting}
+                              onChange={(e) => {
+                                const action = e.target.value as LotAction;
+                                if (action === 'return' && !row.canReturn) return;
+                                setRows((prev) =>
+                                  prev.map((r) =>
+                                    r.batch.id === row.batch.id
+                                      ? { ...r, action, selected: true }
+                                      : r
+                                  )
+                                );
+                              }}
+                              style={{
+                                width: '100%',
+                                minWidth: 148,
+                                height: 32,
+                                border: '1px solid #cbd5e1',
+                                borderRadius: 8,
+                                fontSize: 12.5,
+                                fontWeight: 600,
+                                color: isReturn ? '#0f766e' : '#b45309',
+                                background: '#fff',
+                                padding: '0 8px',
+                              }}
+                            >
+                              <option value="return" disabled={!row.canReturn}>
+                                Trả / đổi NCC
+                              </option>
+                              <option value="markdown">Giảm giá kích cầu</option>
+                            </select>
+                          </div>
+                        ) : (
+                          <div style={{ textAlign: 'right' }}>
+                            <div
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: 700,
+                                color:
+                                  isReturn || row.action === 'expired' ? '#0f766e' : '#b45309',
+                              }}
+                            >
+                              {actionLabel(row.action)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: 8,
+                        marginLeft: 38,
+                        fontSize: 12,
+                        color: '#94a3b8',
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {row.hint}
+                    </div>
+
+                    {isMarkdown && (
                       <div
                         style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color:
-                            row.action === 'return' || row.action === 'expired'
-                              ? '#0f766e'
-                              : '#b45309',
+                          marginTop: 10,
+                          marginLeft: 38,
+                          padding: '10px 12px',
+                          borderRadius: 10,
+                          background: '#fff7ed',
+                          border: '1px solid #fed7aa',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
                         }}
                       >
-                        {actionLabel(row.action)}
+                        <div style={{ fontSize: 12, color: '#9a3412', fontWeight: 600 }}>
+                          {discountStatusLabel(row.batch.fefoDiscountStatus)}
+                          {row.batch.fefoDiscountStartAtUtc
+                            ? ` · từ ${formatVnDateTime(row.batch.fefoDiscountStartAtUtc)}`
+                            : ''}
+                          {row.batch.fefoDiscountEndAtUtc
+                            ? ` → ${formatVnDateTime(row.batch.fefoDiscountEndAtUtc)}`
+                            : ''}
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 8,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#78533a' }}>
+                            Giảm
+                            <input
+                              type="number"
+                              min={10}
+                              max={90}
+                              disabled={!canManageDiscount || isSubmitting}
+                              value={row.discountPercent}
+                              onChange={(e) =>
+                                setRows((prev) =>
+                                  prev.map((r) =>
+                                    r.batch.id === row.batch.id
+                                      ? { ...r, discountPercent: Number(e.target.value) }
+                                      : r
+                                  )
+                                )
+                              }
+                              style={{
+                                width: 52,
+                                height: 30,
+                                border: '1px solid #fdba74',
+                                borderRadius: 7,
+                                textAlign: 'right',
+                                padding: '0 6px',
+                                fontWeight: 700,
+                                background: '#fff',
+                              }}
+                              title="Phần trăm giảm"
+                            />
+                            %
+                          </label>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#78533a' }}>
+                            khi còn
+                            <input
+                              type="number"
+                              min={0}
+                              max={Math.max(0, row.batch.daysLeft)}
+                              disabled={!canManageDiscount || isSubmitting}
+                              value={row.startDaysBeforeExpiry}
+                              onChange={(e) =>
+                                setRows((prev) =>
+                                  prev.map((r) =>
+                                    r.batch.id === row.batch.id
+                                      ? {
+                                          ...r,
+                                          startDaysBeforeExpiry: Math.max(0, Number(e.target.value)),
+                                        }
+                                      : r
+                                  )
+                                )
+                              }
+                              style={{
+                                width: 48,
+                                height: 30,
+                                border: '1px solid #fdba74',
+                                borderRadius: 7,
+                                textAlign: 'right',
+                                padding: '0 6px',
+                                fontWeight: 700,
+                                background: '#fff',
+                              }}
+                              title="Số ngày còn lại đến HSD"
+                            />
+                            ngày,
+                          </label>
+                          <input
+                            type="time"
+                            disabled={!canManageDiscount || isSubmitting}
+                            value={row.startTime}
+                            onChange={(e) =>
+                              setRows((prev) =>
+                                prev.map((r) =>
+                                  r.batch.id === row.batch.id
+                                    ? { ...r, startTime: e.target.value }
+                                    : r
+                                )
+                              )
+                            }
+                            style={{
+                              height: 30,
+                              border: '1px solid #fdba74',
+                              borderRadius: 7,
+                              padding: '0 6px',
+                              background: '#fff',
+                            }}
+                          />
+                          {canManageDiscount && row.batch.isFefoDiscountActive && (
+                            <button
+                              type="button"
+                              disabled={isSubmitting}
+                              onClick={() => void handleCancelDiscount(row)}
+                              style={{
+                                height: 30,
+                                padding: '0 10px',
+                                border: '1px solid #fecaca',
+                                borderRadius: 7,
+                                color: '#b91c1c',
+                                background: '#fff',
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Tắt giảm giá
+                            </button>
+                          )}
+                          {!canManageDiscount && (
+                            <span style={{ fontSize: 11.5, color: '#a16207' }}>
+                              Chỉ Store Owner được chỉnh
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>{row.hint}</div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
         {!isExpiredMode && selectedReturnRows.length > 0 && (
           <div
             style={{
-              padding: '10px 18px',
+              padding: '12px 20px',
               borderTop: '1px solid #e2e8f0',
               background: evidenceRequired && !evidenceUrl ? '#fffbeb' : '#f8fafc',
               flexShrink: 0,
@@ -608,19 +1027,19 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                 flexWrap: 'wrap',
               }}
             >
-              <div style={{ minWidth: 0, flex: '1 1 240px' }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+              <div style={{ minWidth: 0, flex: '1 1 220px' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
                   Ảnh minh chứng
                   {evidenceRequired ? (
-                    <span style={{ color: '#b45309', fontWeight: 800 }}> (bắt buộc)</span>
+                    <span style={{ color: '#b45309' }}> · bắt buộc</span>
                   ) : (
-                    <span style={{ color: '#64748b', fontWeight: 500 }}> (tuỳ chọn)</span>
+                    <span style={{ color: '#94a3b8', fontWeight: 500 }}> · tuỳ chọn</span>
                   )}
                 </div>
-                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, lineHeight: 1.35 }}>
                   {evidenceRequired
-                    ? 'NCC đã chọn yêu cầu ảnh khi trả/đổi — đính kèm ảnh lô/kệ trước khi tạo phiếu.'
-                    : 'Có thể đính kèm ảnh để Store Owner gửi NCC thuận tiện hơn.'}
+                    ? 'Policy NCC yêu cầu ảnh khi trả/đổi — đính kèm ảnh lô/kệ trước khi tạo phiếu.'
+                    : 'Có thể đính kèm ảnh để gửi NCC thuận tiện hơn.'}
                 </div>
               </div>
 
@@ -636,8 +1055,8 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                         border: '1px solid #cbd5e1',
                         borderRadius: 8,
                         overflow: 'hidden',
-                        width: 48,
-                        height: 48,
+                        width: 44,
+                        height: 44,
                         background: '#fff',
                       }}
                       title="Xem ảnh minh chứng"
@@ -650,10 +1069,20 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                     </a>
                     <button
                       type="button"
-                      className="so-list-action-btn"
                       title="Xóa ảnh"
                       disabled={isUploadingEvidence || isSubmitting}
                       onClick={() => setEvidenceUrl(null)}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        border: '1px solid #fecaca',
+                        background: '#fff',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
                     >
                       <Trash2 size={14} color="#dc2626" />
                     </button>
@@ -669,16 +1098,21 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
                 />
                 <button
                   type="button"
-                  className="so-list-filter-reset"
                   disabled={isUploadingEvidence || isSubmitting}
                   onClick={() => evidenceInputRef.current?.click()}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 6,
-                    ...(evidenceRequired && !evidenceUrl
-                      ? { borderColor: '#f59e0b', color: '#b45309' }
-                      : undefined),
+                    height: 34,
+                    padding: '0 12px',
+                    borderRadius: 8,
+                    border: evidenceRequired && !evidenceUrl ? '1px solid #f59e0b' : '1px solid #cbd5e1',
+                    background: '#fff',
+                    color: evidenceRequired && !evidenceUrl ? '#b45309' : '#334155',
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: 'pointer',
                   }}
                 >
                   {isUploadingEvidence ? (
@@ -695,62 +1129,120 @@ export const BatchExpiryAlertModal: FC<BatchExpiryAlertModalProps> = ({
 
         <div
           style={{
-            padding: '12px 18px',
+            padding: '12px 20px 16px',
             borderTop: '1px solid #e2e8f0',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: 10,
             flexShrink: 0,
+            background: '#fff',
           }}
         >
-          <span style={{ fontSize: 12.5, color: '#475569' }}>
+          <span style={{ fontSize: 12.5, color: '#64748b' }}>
             {isExpiredMode
-              ? `Đã chọn ${selectedExpiredRows.length} lô hết hạn để lập phiếu kiểm kê (1 chi nhánh / phiếu).`
-              : `Đã chọn ${selectedReturnRows.length} lô cận hạn để tạo phiếu trả/đổi (tách theo GRN / NCC).`}
+              ? `Đã chọn ${selectedExpiredRows.length} lô để kiểm kê`
+              : `Trả/đổi ${selectedReturnRows.length} · Giảm giá ${selectedMarkdownRows.length}`}
           </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button type="button" className="so-list-filter-reset" onClick={onClose}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                height: 36,
+                padding: '0 14px',
+                borderRadius: 9,
+                border: '1px solid #e2e8f0',
+                background: '#fff',
+                color: '#475569',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
               Đóng
             </button>
             {isExpiredMode ? (
               <button
                 type="button"
-                className="so-list-filter-search"
                 disabled={selectedExpiredRows.length === 0}
-                style={
-                  selectedExpiredRows.length === 0
-                    ? { opacity: 0.55, cursor: 'not-allowed' }
-                    : { backgroundColor: '#be123c', borderColor: '#be123c' }
-                }
                 onClick={handleCreateStocktake}
+                style={{
+                  height: 36,
+                  padding: '0 14px',
+                  borderRadius: 9,
+                  border: 'none',
+                  background: selectedExpiredRows.length === 0 ? '#fda4af' : '#be123c',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: selectedExpiredRows.length === 0 ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  opacity: selectedExpiredRows.length === 0 ? 0.65 : 1,
+                }}
               >
                 <ClipboardCheck size={14} />
                 Tạo phiếu kiểm kê
               </button>
             ) : (
-              <button
-                type="button"
-                className="so-list-filter-search"
-                disabled={
-                  isSubmitting ||
-                  isUploadingEvidence ||
-                  selectedReturnRows.length === 0 ||
-                  (evidenceRequired && !evidenceUrl)
-                }
-                style={
-                  isSubmitting ||
-                  isUploadingEvidence ||
-                  selectedReturnRows.length === 0 ||
-                  (evidenceRequired && !evidenceUrl)
-                    ? { opacity: 0.55, cursor: 'not-allowed' }
-                    : undefined
-                }
-                onClick={() => void handleCreateReturns()}
-              >
-                {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
-                Tạo phiếu gửi Store Owner
-              </button>
+              <>
+                {canManageDiscount && selectedMarkdownRows.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => void handleSaveDiscounts()}
+                    style={{
+                      height: 36,
+                      padding: '0 14px',
+                      borderRadius: 9,
+                      border: 'none',
+                      background: '#d97706',
+                      color: '#fff',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+                    Lưu giảm giá ({selectedMarkdownRows.length})
+                  </button>
+                )}
+                {selectedReturnRows.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={isSubmitting || isUploadingEvidence || (evidenceRequired && !evidenceUrl)}
+                    onClick={() => void handleCreateReturns()}
+                    style={{
+                      height: 36,
+                      padding: '0 14px',
+                      borderRadius: 9,
+                      border: 'none',
+                      background:
+                        isSubmitting || isUploadingEvidence || (evidenceRequired && !evidenceUrl)
+                          ? '#5eead4'
+                          : '#0f766e',
+                      color: '#fff',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor:
+                        isSubmitting || isUploadingEvidence || (evidenceRequired && !evidenceUrl)
+                          ? 'not-allowed'
+                          : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+                    Tạo phiếu trả/đổi
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

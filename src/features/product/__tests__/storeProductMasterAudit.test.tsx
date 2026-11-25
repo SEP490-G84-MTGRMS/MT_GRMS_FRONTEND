@@ -185,6 +185,7 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         expect(handleAssign).toHaveBeenCalledWith({
           storeId: 'store-01',
           productIds: ['prod-01'],
+          items: [{ productId: 'prod-01', supplierId: 'sup-01' }],
         });
         expect(handleClose).toHaveBeenCalled();
       });
@@ -224,6 +225,76 @@ describe('STORE PRODUCT MANAGEMENT – MASTER AUDIT SUITE', () => {
         expect(handleAssign).toHaveBeenCalledWith({
           storeId: 'store-01',
           productIds: ['prod-01', 'prod-02', 'prod-03'],
+          items: [
+            { productId: 'prod-01', supplierId: 'sup-01' },
+            { productId: 'prod-02', supplierId: 'sup-01' },
+            { productId: 'prod-03', supplierId: 'sup-01' },
+          ],
+        });
+      });
+    });
+
+    it('TC-ASSIGN-002b: Same product from 2 suppliers renders 2 rows (1 assigned, 1 selectable) and assigns chosen supplier', async () => {
+      const handleAssign = vi.fn().mockResolvedValue(undefined);
+      (storeProductApi.getAssignableProducts as any).mockResolvedValue([
+        {
+          id: 'prod-z',
+          sku: 'IMP-DEMO-001',
+          barcode: '893000000099',
+          name: 'Nước khoáng thiên nhiên 500ml',
+          categoryName: 'Đồ uống',
+          baseUoM: 'Chai',
+          costPrice: 8600,
+          moq: 10,
+          supplierId: 'sup-b',
+          supplierCode: 'NCC-B',
+          supplierName: 'Nhà cung cấp B',
+          isAlreadyAssigned: true,
+        },
+        {
+          id: 'prod-z',
+          sku: 'IMP-DEMO-001',
+          barcode: '893000000099',
+          name: 'Nước khoáng thiên nhiên 500ml',
+          categoryName: 'Đồ uống',
+          baseUoM: 'Chai',
+          costPrice: 8500,
+          moq: 10,
+          supplierId: 'sup-c',
+          supplierCode: 'NCC-C',
+          supplierName: 'Nhà cung cấp C',
+          isAlreadyAssigned: false,
+        },
+      ]);
+
+      render(
+        <AssignStoreProductModal
+          isOpen={true}
+          onClose={vi.fn()}
+          stores={mockStores}
+          currentStore={mockStores[0]}
+          onAssign={handleAssign}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/NCC-B — Nhà cung cấp B/i)).toBeInTheDocument();
+        expect(screen.getByText(/NCC-C — Nhà cung cấp C/i)).toBeInTheDocument();
+      });
+
+      const checkboxes = screen.getAllByRole('checkbox');
+      // checkbox[0] = select-all, checkbox[1] = NCC-B (disabled), checkbox[2] = NCC-C (enabled)
+      expect(checkboxes[1]).toBeDisabled();
+      expect(checkboxes[2]).not.toBeDisabled();
+
+      fireEvent.click(checkboxes[2]);
+      fireEvent.click(document.getElementById('btnSubmitAssignProducts')!);
+
+      await waitFor(() => {
+        expect(handleAssign).toHaveBeenCalledWith({
+          storeId: 'store-01',
+          productIds: ['prod-z'],
+          items: [{ productId: 'prod-z', supplierId: 'sup-c' }],
         });
       });
     });

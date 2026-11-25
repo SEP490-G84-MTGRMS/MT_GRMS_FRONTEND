@@ -26,7 +26,7 @@ export const MaintenanceModeCard = ({ form, onChange, disabled }: MaintenanceMod
       </label>
       <div className="settings-fields">
         <label className="settings-field-wide">Thông báo bảo trì
-          <textarea rows={3} value={form.maintenanceMessage || ''} disabled={disabled}
+          <textarea maxLength={500} rows={3} value={form.maintenanceMessage || ''} disabled={disabled}
             onChange={event => onChange('maintenanceMessage', event.target.value)} placeholder="Nội dung hiển thị cho khách hàng..." />
         </label>
         <label className="settings-field-wide">Dự kiến hoàn tất (giờ Việt Nam)

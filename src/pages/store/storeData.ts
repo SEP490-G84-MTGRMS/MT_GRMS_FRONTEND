@@ -13,11 +13,15 @@ export interface StoreInfo {
   email: string;
   status: "ACTIVE" | "SUSPENDED" | "PENDING";
   currentPlan: string;
+  currentPlanCode?: string;
+  subscriptionExpiresAtUtc?: string;
   subscriptionExpiresAt: string;
   daysRemaining: number;
   branchesCount: number;
   industry: string;
   walletBalance: number;
+  staffManagementLocked?: boolean;
+  canPurchaseStaffManagementAddon?: boolean;
 }
 
 export interface UserProfile {

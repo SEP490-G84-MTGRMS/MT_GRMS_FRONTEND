@@ -92,14 +92,17 @@ export const StoreProductManagementPage: FC = () => {
     loadInitialData();
   }, []);
 
-  // Fetch products based on applied filters & pagination
+  // Fetch products based on applied filters & pagination (avoid double fetch on stores load — BP-07)
+  const storesRef = useRef(stores);
+  storesRef.current = stores;
+
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await storeProductApi.getStoreProducts(appliedFilters);
       const enriched = res.items.map((item) => ({
         ...item,
-        storeCode: item.storeCode || stores.find((s) => s.id === item.storeId)?.code || '---',
+        storeCode: item.storeCode || storesRef.current.find((s) => s.id === item.storeId)?.code || '---',
       }));
       setProducts(enriched);
       setTotalCount(res.total);
@@ -108,7 +111,7 @@ export const StoreProductManagementPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters, stores]);
+  }, [appliedFilters]);
 
   useEffect(() => {
     fetchProducts();
@@ -147,13 +150,15 @@ export const StoreProductManagementPage: FC = () => {
   const handleAssignProducts = async (input: AssignStoreProductInput) => {
     try {
       await storeProductApi.assignProducts(input);
-      showToast(`Đã gán thành công ${input.productIds.length} sản phẩm vào cửa hàng.`);
+      const count = input.items?.length ?? input.productIds.length;
+      showToast(`Đã gán thành công ${count} sản phẩm vào cửa hàng.`);
       await fetchProducts();
       // Refresh summaries
       const summaries = await storeProductApi.getStoreSummaries();
       setStores(summaries);
     } catch (err: any) {
       showToast(err.message || 'Không thể gán sản phẩm.', 'error');
+      throw err;
     }
   };
 
@@ -173,15 +178,15 @@ export const StoreProductManagementPage: FC = () => {
     }
   };
 
-  // Actions: Toggle status
+  // Actions: Toggle status (confirmed via custom modal — BP-06)
+  const [confirmToggleItem, setConfirmToggleItem] = useState<StoreProductItem | null>(null);
+
   const handleToggleStatus = async (item: StoreProductItem): Promise<void> => {
+    setConfirmToggleItem(item);
+  };
+
+  const executeToggleStatus = async (item: StoreProductItem): Promise<void> => {
     const newStatus = item.status === 'Active' ? 'Inactive' : 'Active';
-    const confirmed = window.confirm(
-      newStatus === 'Inactive'
-        ? `Tạm ngừng kinh doanh "${item.name}" tại chi nhánh này? Các chi nhánh khác không bị ảnh hưởng.`
-        : `Kích hoạt lại "${item.name}" tại chi nhánh này?`
-    );
-    if (!confirmed) return;
     try {
       await storeProductApi.toggleStatus(item.storeId, item.productId, newStatus);
       showToast(
@@ -189,6 +194,7 @@ export const StoreProductManagementPage: FC = () => {
           ? `Đã kích hoạt kinh doanh sản phẩm "${item.name}" tại chi nhánh.`
           : `Đã tạm ngừng kinh doanh sản phẩm "${item.name}" tại chi nhánh.`
       );
+      setConfirmToggleItem(null);
       await fetchProducts();
     } catch (err: any) {
       showToast(err.message || 'Không thể đổi trạng thái sản phẩm.', 'error');
@@ -317,9 +323,9 @@ export const StoreProductManagementPage: FC = () => {
           <Link
             to="/store-owner/suppliers/branches"
             className="po-btn po-btn-secondary"
-            title="Xem danh sách các cửa hàng chi nhánh"
+            title="Quản lý gán nhà cung cấp với cửa hàng"
           >
-            <span>Danh sách Cửa hàng</span>
+            <span>Gán NCC với Cửa hàng</span>
           </Link>
           <Link
             to="/store-owner/suppliers/products"
@@ -415,6 +421,43 @@ export const StoreProductManagementPage: FC = () => {
           setPendingImport(null);
         }}
       />
+      {confirmToggleItem && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            zIndex: 10050,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div style={{ background: '#fff', borderRadius: 12, padding: 20, maxWidth: 440, width: '100%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+              Xác nhận đổi trạng thái
+            </h3>
+            <p style={{ margin: '0 0 18px', fontSize: 14, color: '#475569', lineHeight: 1.5 }}>
+              {confirmToggleItem.status === 'Active'
+                ? `Tạm ngừng kinh doanh "${confirmToggleItem.name}" tại chi nhánh này? Các chi nhánh khác không bị ảnh hưởng.`
+                : `Kích hoạt lại "${confirmToggleItem.name}" tại chi nhánh này?`}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button type="button" className="po-btn po-btn-secondary" onClick={() => setConfirmToggleItem(null)}>
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="po-btn po-btn-primary"
+                onClick={() => void executeToggleStatus(confirmToggleItem)}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

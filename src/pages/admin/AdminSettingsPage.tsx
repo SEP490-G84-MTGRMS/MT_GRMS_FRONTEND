@@ -1,3 +1,4 @@
+import { fitsDecimal, validHotline } from '../../features/admin/utils/adminInputValidation';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Save, RotateCcw, Clock } from 'lucide-react';
 import { settingsApi } from '../../features/admin/api';
@@ -90,6 +91,18 @@ export const AdminSettingsPage = () => {
     if ([payload.masterBankCode, payload.masterBankName, payload.masterAccountNumber, payload.masterAccountName,
       payload.supportHotline, payload.supportEmail, payload.supportZalo].some(value => !value)) {
       setSaveError('Vui lòng nhập đầy đủ thông tin ngân hàng và liên hệ hỗ trợ.');
+      return;
+    }
+    if (payload.masterBankName.length < 2 || payload.masterAccountName.length < 2) {
+      setSaveError('Tên ngân hàng và tên chủ tài khoản phải có ít nhất 2 ký tự.');
+      return;
+    }
+    if (!validHotline(payload.supportHotline)) {
+      setSaveError('Hotline phải có từ 8 đến 15 chữ số.');
+      return;
+    }
+    if (!fitsDecimal(payload.branchAddonPriceMonthly, 2) || !fitsDecimal(payload.storageAddonPricePerGbMonthly, 2)) {
+      setSaveError('Đơn giá tối đa 16 chữ số nguyên và 2 chữ số thập phân.');
       return;
     }
     setIsSaving(true);

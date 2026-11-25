@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import type {
   SupplierSummary,
-  APLedgerEntry,
+  SupplierApSummary,
   SupplierDeliveryConfig,
   SupplierReturnPolicy,
   PurchaseOrderItem,
@@ -74,6 +74,15 @@ function mapApiToDeliveryConfig(data: any, fallback: SupplierDeliveryConfig): Su
     cutoffDayOffset,
     cutoffTime: data.orderCutoffTime || data.cutoffTime || fallback.cutoffTime,
     activeDeliveryDays: mapDeliveryDaysToJs(data.deliveryDays),
+    allowStoreEdit:
+      typeof data.allowStoreEdit === 'boolean' ? data.allowStoreEdit : fallback.allowStoreEdit,
+    editWindowType: data.editWindowType || fallback.editWindowType,
+    hoursBeforeDelivery:
+      typeof data.hoursBeforeDelivery === 'number'
+        ? data.hoursBeforeDelivery
+        : fallback.hoursBeforeDelivery,
+    hoursAfterOrder:
+      typeof data.hoursAfterOrder === 'number' ? data.hoursAfterOrder : fallback.hoursAfterOrder,
     holidays: Array.isArray(data.blackoutDates)
       ? data.blackoutDates.map((item: any) => ({
           id: String(item.id || `hol-${item.startDate}`),
@@ -92,6 +101,10 @@ function mapDeliveryConfigToApi(cfg: SupplierDeliveryConfig) {
     orderCutoffTime: cfg.cutoffTime,
     deliveryDays: mapJsDaysToNames(cfg.activeDeliveryDays),
     minOrderQuantity: cfg.minOrderQuantity,
+    allowStoreEdit: cfg.allowStoreEdit,
+    editWindowType: cfg.editWindowType,
+    hoursBeforeDelivery: Math.max(0, Number(cfg.hoursBeforeDelivery) || 0),
+    hoursAfterOrder: Math.max(0, Number(cfg.hoursAfterOrder) || 0),
     blackoutDates: cfg.holidays.map((holiday) => ({
       startDate: holiday.fromDate,
       endDate: holiday.toDate,
@@ -112,7 +125,9 @@ export const SupplierDetailPage: FC<Props> = ({
 }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const role = useAuthStore((s) => s.user?.role);
+  const user = useAuthStore((s) => s.user);
+  const role = user?.role;
+  const actorName = user?.fullName || user?.email || 'Chủ cửa hàng';
   const isStoreOwner = role === 'STORE_OWNER' || role === 'ADMIN' || !role;
   const tabs = isStoreOwner ? ALL_TABS : ALL_TABS.filter((t) => t.key !== 'payables');
 
@@ -156,7 +171,6 @@ export const SupplierDetailPage: FC<Props> = ({
     holidays: [],
   });
 
-  const [apLedgers] = useState<APLedgerEntry[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderItem[]>([]);
   const [returnPolicy, setReturnPolicy] = useState<SupplierReturnPolicy | null>(null);
 
@@ -199,13 +213,23 @@ export const SupplierDetailPage: FC<Props> = ({
       });
 
     if (targetId) {
-      // Also load transactions
+      // Also load transactions (SUP-03: map BE SupplierTransactionDto -> SupplierHistoryTab shape)
       supplierApi
         .getSupplierTransactions(targetId)
         .then((res: any) => {
           if (!isMounted) return;
-          if (res?.items) {
-            setPurchaseOrders(res.items);
+          if (Array.isArray(res?.items)) {
+            setPurchaseOrders(
+              res.items.map((tx: any) => ({
+                id: tx.id,
+                code: tx.code || tx.transactionCode || '',
+                orderDate: tx.orderDate || (tx.transactionDate ? String(tx.transactionDate).slice(0, 10) : ''),
+                deliveryDate: tx.deliveryDate ? String(tx.deliveryDate).slice(0, 10) : '',
+                branchName: tx.branchName || '—',
+                totalAmount: Number(tx.totalAmount ?? tx.amount ?? 0),
+                status: tx.status || 'PENDING_APPROVAL',
+              }))
+            );
           }
         })
         .catch(() => {
@@ -333,6 +357,30 @@ export const SupplierDetailPage: FC<Props> = ({
     const saved = await supplierApi.upsertReturnPolicy(supplierId, policy);
     setReturnPolicy(saved);
     showToast('Đã lưu chính sách trả/đổi hàng thành công!', 'success');
+  };
+
+  const handleApDebtChanged = async (summary: SupplierApSummary) => {
+    setCurrentSupplier((prev) => {
+      if (!prev) return prev;
+      const next = {
+        ...prev,
+        currentDebt: summary.currentDebt,
+        overdueDebt: summary.overdueDebt,
+      };
+      onSupplierUpdated?.(next);
+      return next;
+    });
+    if (currentSupplier?.id) {
+      try {
+        const refreshed = await supplierApi.getSupplierById(currentSupplier.id);
+        if (refreshed) {
+          setCurrentSupplier(refreshed);
+          onSupplierUpdated?.(refreshed);
+        }
+      } catch {
+        // Keep optimistic summary values already synced above
+      }
+    }
   };
 
   const handleLinkCustomer = (_supplierId: string, customerId: string) => {
@@ -476,7 +524,9 @@ export const SupplierDetailPage: FC<Props> = ({
           {activeTab === 'payables' && isStoreOwner && (
             <SupplierPayablesTab
               supplier={currentSupplier}
-              apLedgers={apLedgers}
+              actorName={actorName}
+              onDebtChanged={handleApDebtChanged}
+              onNotify={showToast}
             />
           )}
 

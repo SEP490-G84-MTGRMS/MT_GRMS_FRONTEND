@@ -59,13 +59,20 @@ export const CreateUrgentTransferRequestPage = () => {
       && `${item.productCode} ${item.productName}`.toLowerCase().includes(keyword)).slice(0, 8);
   }, [catalog, rows, search]);
 
-  const payload = () => ({
-    toBranchId: destinationBranchId,
-    requiredAt: requiredAt || undefined,
-    relatedOrderId: relatedOrderId.trim() || undefined,
-    note: note.trim() || undefined,
-    items: rows.map((row) => ({ productId: row.productId, quantity: row.requestedQty, unit: row.unitName })),
-  });
+  const payload = () => {
+    const rawRel = relatedOrderId.trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawRel);
+    const mergedNote = !rawRel || isUuid
+      ? note.trim() || undefined
+      : [note.trim(), `Đơn liên quan: ${rawRel}`].filter(Boolean).join(' | ');
+    return {
+      toBranchId: destinationBranchId,
+      requiredAt: requiredAt || undefined,
+      relatedOrderId: isUuid ? rawRel : undefined,
+      note: mergedNote,
+      items: rows.map((row) => ({ productId: row.productId, quantity: row.requestedQty, unit: row.unitName })),
+    };
+  };
 
   const handlePreview = async () => {
     if (!rows.length || rows.some((row) => row.requestedQty <= 0)) {

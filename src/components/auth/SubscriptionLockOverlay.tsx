@@ -6,7 +6,7 @@ interface SubscriptionLockOverlayProps {
   onGoToBilling: () => void;
   onLogout?: () => void;
   reasonMessage?: string | null;
-  lockReason?: 'NO_PLAN' | 'EXPIRED';
+  lockReason?: 'NO_PLAN' | 'EXPIRED' | 'STAFF_ADDON_REQUIRED';
 }
 
 export const SubscriptionLockOverlay: FC<SubscriptionLockOverlayProps> = ({
@@ -17,17 +17,22 @@ export const SubscriptionLockOverlay: FC<SubscriptionLockOverlayProps> = ({
   lockReason = 'EXPIRED',
 }) => {
   const isNoPlan = lockReason === 'NO_PLAN';
-  const title = isNoPlan ? 'Cần mua gói để sử dụng dịch vụ' : 'Gói dịch vụ đã hết hạn';
+  const isStaffAddonRequired = lockReason === 'STAFF_ADDON_REQUIRED';
+  const title = isStaffAddonRequired
+    ? 'Quản lý nhân viên đang khóa'
+    : isNoPlan ? 'Cần mua gói để sử dụng dịch vụ' : 'Gói dịch vụ đã hết hạn';
   const description =
     reasonMessage ||
-    (isNoPlan
+    (isStaffAddonRequired
+      ? 'Mua thêm tiện ích Quản lý nhân viên để quản lý và phân quyền nhân viên trên Gói Thường.'
+      : isNoPlan
       ? isOwner
         ? 'Cửa hàng chưa kích hoạt hoặc mua gói dịch vụ nào. Dữ liệu và thao tác nghiệp vụ tạm thời được khóa cho đến khi bạn chọn dùng thử hoặc mua gói.'
         : 'Cửa hàng chưa mua gói dịch vụ. Vui lòng liên hệ Chủ cửa hàng mua gói để sử dụng dịch vụ.'
       : isOwner
         ? 'Thời hạn sử dụng gói dịch vụ của cửa hàng đã kết thúc. Dữ liệu và thao tác nghiệp vụ tạm thời được khóa cho đến khi bạn thanh toán gia hạn gói.'
         : 'Gói dịch vụ của cửa hàng đã hết hạn. Vui lòng liên hệ Chủ cửa hàng thanh toán hoặc gia hạn gói để tiếp tục sử dụng.');
-  const ctaLabel = isNoPlan ? 'Mua gói dịch vụ' : 'Thanh toán / Gia hạn gói';
+  const ctaLabel = isStaffAddonRequired ? 'Nâng cấp' : isNoPlan ? 'Mua gói dịch vụ' : 'Thanh toán / Gia hạn gói';
 
   return (
     <div
@@ -39,7 +44,7 @@ export const SubscriptionLockOverlay: FC<SubscriptionLockOverlayProps> = ({
         position: 'fixed',
         inset: 0,
         zIndex: 150,
-        backgroundColor: 'rgba(15, 23, 42, 0.80)',
+        backgroundColor: isStaffAddonRequired ? 'rgba(15, 23, 42, 0.96)' : 'rgba(15, 23, 42, 0.80)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
@@ -113,6 +118,7 @@ export const SubscriptionLockOverlay: FC<SubscriptionLockOverlayProps> = ({
           {isOwner && (
             <button
               type="button"
+              autoFocus={isStaffAddonRequired}
               onClick={onGoToBilling}
               style={{
                 width: '100%',

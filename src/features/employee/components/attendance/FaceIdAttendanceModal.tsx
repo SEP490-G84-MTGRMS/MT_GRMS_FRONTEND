@@ -11,9 +11,37 @@ import {
   type StaffFaceData,
   type MatchResult,
 } from '../../lib/faceIdService';
-import { scheduleApi } from '../../api/scheduleApi';
+import { scheduleApi, type ScheduleResponse } from '../../api/scheduleApi';
 import { employeeApi } from '../../api/employeeApi';
+import { formatLocalDateIso, getVietnamToday } from '../../lib/vietnamTime';
 import { useAuthStore } from '../../../../stores/useAuthStore';
+
+const formatShortTime = (timeStr?: string | null) =>
+  timeStr ? timeStr.substring(0, 5) : '--:--';
+
+const isShiftDisabled = (s: ScheduleResponse) =>
+  s.status === 'Completed' || s.status === 'OnLeave' || s.status === 'Cancelled';
+
+const getShiftStatusLabel = (s: ScheduleResponse) => {
+  if (s.status === 'Completed') return 'Đã hoàn thành';
+  if (s.status === 'OnLeave') return 'Nghỉ phép';
+  if (s.status === 'Cancelled') return 'Đã hủy';
+  if (s.status === 'InProgress' || (Boolean(s.checkInTime) && !s.checkOutTime)) return 'Đang trong ca';
+  return 'Chưa chấm công';
+};
+
+const pickBestScheduleId = (shifts: ScheduleResponse[]): string => {
+  if (shifts.length === 0) return '';
+  const inProgress = shifts.find(
+    (s) => !isShiftDisabled(s) && (s.status === 'InProgress' || (Boolean(s.checkInTime) && !s.checkOutTime))
+  );
+  if (inProgress) return inProgress.id;
+
+  const nextAvailable = shifts.find((s) => !isShiftDisabled(s));
+  if (nextAvailable) return nextAvailable.id;
+
+  return shifts[0].id;
+};
 
 interface FaceIdAttendanceModalProps {
   isOpen: boolean;
@@ -40,6 +68,8 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [isLoadingStaff, setIsLoadingStaff] = useState(true);
   const [currentUserData, setCurrentUserData] = useState<StaffFaceData | null>(null);
+  const [todaySchedules, setTodaySchedules] = useState<ScheduleResponse[]>([]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
   const [faceMatcher, setFaceMatcher] = useState<any | null>(null);
 
   const [currentMatch, setCurrentMatch] = useState<MatchResult | null>(null);
@@ -94,6 +124,9 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
       stopCamera();
       setCurrentMatch(null);
       setCurrentUserData(null);
+      setTodaySchedules([]);
+      setSelectedScheduleId('');
+      setHasCheckedInForPos(false);
       setActionSuccessMsg(null);
       setActionErrorMsg(null);
       setInitError(null);
@@ -121,15 +154,45 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
         if (!isMounted) return;
         setIsLoadingModels(false);
 
-        // Lấy thông tin hồ sơ nhân viên của tài khoản đang đăng nhập
-        const [profile, branchStaffList] = await Promise.all([
+        const vnToday = getVietnamToday();
+        const todayIso = formatLocalDateIso(vnToday);
+        const yesterdayIso = formatLocalDateIso(
+          new Date(vnToday.getFullYear(), vnToday.getMonth(), vnToday.getDate() - 1)
+        );
+
+        // Lấy thông tin hồ sơ nhân viên + các ca trong ngày (hỗ trợ nhiều ca/ngày & ca qua đêm)
+        const [profile, branchStaffList, rawMySchedules] = await Promise.all([
           employeeApi.getMyProfile().catch(() => null),
           branchId ? scheduleApi.getTodayStaffDescriptors(branchId).catch(() => []) : Promise.resolve([]),
+          scheduleApi.getRawMySchedules(yesterdayIso, todayIso).catch(() => []),
         ]);
 
         if (!isMounted) return;
 
-        // Tìm ca trực hôm nay của nhân viên này
+        // Lọc các ca trong ngày hôm nay (hoặc ca qua đêm hôm qua đang InProgress) thuộc chi nhánh
+        const relevantSchedules = (rawMySchedules || [])
+          .filter((s) => {
+            if (s.status === 'Cancelled') return false;
+            if (branchId && s.branchId !== branchId) return false;
+            const workIso = (s.workDate || '').slice(0, 10);
+            if (workIso === todayIso) return true;
+            if (workIso === yesterdayIso) {
+              return s.status === 'InProgress' || (Boolean(s.checkInTime) && !s.checkOutTime);
+            }
+            return false;
+          })
+          .sort((a, b) => {
+            const dCmp = (a.workDate || '').localeCompare(b.workDate || '');
+            if (dCmp !== 0) return dCmp;
+            return (a.plannedStartTime || '').localeCompare(b.plannedStartTime || '');
+          });
+
+        const bestId = pickBestScheduleId(relevantSchedules);
+        const bestSchedule = relevantSchedules.find((s) => s.id === bestId) || null;
+        setTodaySchedules(relevantSchedules);
+        setSelectedScheduleId(bestId);
+
+        // Tìm ca trực hôm nay của nhân viên này (fallback từ today-descriptors)
         const myScheduleInfo = branchStaffList.find(
           (s: any) =>
             (profile && s.employeeId === profile.id) ||
@@ -137,7 +200,7 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
             s.fullName === user?.fullName
         );
 
-        const employeeId = profile?.id || myScheduleInfo?.employeeId;
+        const employeeId = profile?.id || bestSchedule?.employeeId || myScheduleInfo?.employeeId;
         const employeeCode = profile?.employeeCode || myScheduleInfo?.employeeCode || 'NV';
         const fullName = profile?.fullName || myScheduleInfo?.fullName || user?.fullName || 'Nhân viên';
         const faceDescriptor = profile?.faceDescriptor || myScheduleInfo?.faceDescriptor;
@@ -156,14 +219,14 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
           fullName,
           faceDescriptor,
           faceImageUrls: profile?.faceImageUrls || myScheduleInfo?.faceImageUrls,
-          scheduleId: myScheduleInfo?.scheduleId,
-          shiftCode: myScheduleInfo?.shiftCode,
-          shiftName: myScheduleInfo?.shiftName,
-          plannedStartTime: myScheduleInfo?.plannedStartTime,
-          plannedEndTime: myScheduleInfo?.plannedEndTime,
-          checkInTime: myScheduleInfo?.checkInTime,
-          checkOutTime: myScheduleInfo?.checkOutTime,
-          status: myScheduleInfo?.status,
+          scheduleId: bestSchedule?.id || myScheduleInfo?.scheduleId,
+          shiftCode: bestSchedule?.shiftCode || myScheduleInfo?.shiftCode,
+          shiftName: bestSchedule?.shiftName || myScheduleInfo?.shiftName,
+          plannedStartTime: bestSchedule?.plannedStartTime || myScheduleInfo?.plannedStartTime,
+          plannedEndTime: bestSchedule?.plannedEndTime || myScheduleInfo?.plannedEndTime,
+          checkInTime: bestSchedule?.checkInTime ?? myScheduleInfo?.checkInTime,
+          checkOutTime: bestSchedule?.checkOutTime ?? myScheduleInfo?.checkOutTime,
+          status: bestSchedule?.status || myScheduleInfo?.status,
         };
 
         setCurrentUserData(staffData);
@@ -241,6 +304,16 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
     };
   }, [isOpen, isLoadingModels, isLoadingStaff, faceMatcher, currentUserData]);
 
+  const selectedSchedule = todaySchedules.find((s) => s.id === selectedScheduleId) || null;
+  const activeScheduleId = selectedSchedule?.id || currentUserData?.scheduleId || '';
+  const activeShiftName = selectedSchedule?.shiftName || currentUserData?.shiftName;
+  const isSelectedShiftInProgress = Boolean(
+    selectedSchedule
+      ? selectedSchedule.status === 'InProgress' || (Boolean(selectedSchedule.checkInTime) && !selectedSchedule.checkOutTime)
+      : Boolean(currentUserData?.checkInTime) && !currentUserData?.checkOutTime
+  );
+  const isSelectedShiftDisabled = selectedSchedule ? isShiftDisabled(selectedSchedule) : false;
+
   // 3. Xử lý Chấm công Vào ca / Ra ca khi bấm nút
   const handleAttendance = async (type: 'in' | 'out') => {
     setActionErrorMsg(null);
@@ -266,10 +339,15 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
     }
 
     // Kiểm tra ca làm việc hôm nay
-    if (!currentUserData.scheduleId) {
+    if (!activeScheduleId) {
       setActionErrorMsg(
         `Nhân viên ${currentUserData.fullName} không có ca làm việc nào được phân công hôm nay tại chi nhánh này.`
       );
+      return;
+    }
+
+    if (isSelectedShiftDisabled) {
+      setActionErrorMsg('Ca làm việc đã chọn đã hoàn thành hoặc đang nghỉ phép. Vui lòng chọn ca khác.');
       return;
     }
 
@@ -280,27 +358,41 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
       const faceDistance = Number(currentMatch.distance.toFixed(4));
 
       if (type === 'in') {
-        await scheduleApi.checkInFaceId({
-          scheduleId: currentUserData.scheduleId,
+        const updated = await scheduleApi.checkInFaceId({
+          scheduleId: activeScheduleId,
           employeeId: currentUserData.employeeId,
           faceMatchScore: faceDistance,
           snapshotBase64: snapshot,
         });
 
-        const successText = `Điểm danh VÀO CA thành công: ${currentUserData.fullName} (Khoảng cách: ${currentMatch.distance.toFixed(2)})`;
+        setTodaySchedules((prev) =>
+          prev.map((s) =>
+            s.id === activeScheduleId
+              ? { ...s, status: updated.status || 'InProgress', checkInTime: updated.checkInTime || new Date().toISOString() }
+              : s
+          )
+        );
+        const successText = `Điểm danh VÀO CA thành công: ${currentUserData.fullName}${activeShiftName ? ` - ${activeShiftName}` : ''} (Khoảng cách: ${currentMatch.distance.toFixed(2)})`;
         setActionSuccessMsg(successText);
         setHasCheckedInForPos(true);
         window.dispatchEvent(new CustomEvent('pos-attendance-updated'));
         if (onSuccess) onSuccess('in', currentUserData.fullName);
       } else {
-        await scheduleApi.checkOutFaceId({
-          scheduleId: currentUserData.scheduleId,
+        const updated = await scheduleApi.checkOutFaceId({
+          scheduleId: activeScheduleId,
           employeeId: currentUserData.employeeId,
           faceMatchScore: faceDistance,
           snapshotBase64: snapshot,
         });
 
-        const successText = `Điểm danh RA CA thành công: ${currentUserData.fullName} (Khoảng cách: ${currentMatch.distance.toFixed(2)})`;
+        setTodaySchedules((prev) =>
+          prev.map((s) =>
+            s.id === activeScheduleId
+              ? { ...s, status: updated.status || 'Completed', checkOutTime: updated.checkOutTime || new Date().toISOString() }
+              : s
+          )
+        );
+        const successText = `Điểm danh RA CA thành công: ${currentUserData.fullName}${activeShiftName ? ` - ${activeShiftName}` : ''} (Khoảng cách: ${currentMatch.distance.toFixed(2)})`;
         setActionSuccessMsg(successText);
         setHasCheckedInForPos(false);
         window.dispatchEvent(new CustomEvent('pos-attendance-updated'));
@@ -339,6 +431,7 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
           borderRadius: 16,
           width: '100%',
           maxWidth: 680,
+          maxHeight: 'calc(100dvh - 32px)',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           overflow: 'hidden',
           display: 'flex',
@@ -398,7 +491,103 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
         </div>
 
         {/* Video Camera Container */}
-        <div style={{ padding: 20, backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div
+          style={{
+            padding: 20,
+            backgroundColor: '#F8FAFC',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            overflowY: 'auto',
+            flex: '1 1 auto',
+            minHeight: 0,
+          }}
+        >
+          {/* Chọn ca làm việc nếu có nhiều ca trong ngày */}
+          {!isLoadingStaff && todaySchedules.length >= 2 && (
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 560,
+                marginBottom: 12,
+                padding: '10px 14px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #CBD5E1',
+                borderRadius: 10,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 6,
+                boxSizing: 'border-box',
+              }}
+            >
+              <label
+                htmlFor="faceid-shift-select"
+                style={{ fontSize: 12.5, fontWeight: 700, color: '#0F172A' }}
+              >
+                Chọn ca chấm công ({todaySchedules.length} ca trong ngày)
+              </label>
+              <select
+                id="faceid-shift-select"
+                aria-label="Chọn ca làm việc"
+                value={selectedScheduleId}
+                onChange={(e) => {
+                  setSelectedScheduleId(e.target.value);
+                  setActionErrorMsg(null);
+                  setActionSuccessMsg(null);
+                  setHasCheckedInForPos(false);
+                }}
+                disabled={isSubmitting}
+                style={{
+                  width: '100%',
+                  height: 36,
+                  padding: '0 10px',
+                  borderRadius: 8,
+                  border: '1px solid #CBD5E1',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#0F172A',
+                  backgroundColor: '#FFFFFF',
+                  outline: 'none',
+                }}
+              >
+                {todaySchedules.map((s) => {
+                  const disabled = isShiftDisabled(s);
+                  const statusLabel = getShiftStatusLabel(s);
+                  return (
+                    <option key={s.id} value={s.id} disabled={disabled}>
+                      {s.shiftName || s.shiftCode || 'Ca làm việc'} ({formatShortTime(s.plannedStartTime)} - {formatShortTime(s.plannedEndTime)}) • {statusLabel}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+
+          {!isLoadingStaff && todaySchedules.length === 1 && (
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 560,
+                marginBottom: 12,
+                padding: '8px 14px',
+                backgroundColor: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: 10,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                fontSize: 12.5,
+                color: '#334155',
+                boxSizing: 'border-box',
+              }}
+            >
+              <span>
+                Ca làm việc: <b>{todaySchedules[0].shiftName || todaySchedules[0].shiftCode || 'Ca làm việc'}</b> ({formatShortTime(todaySchedules[0].plannedStartTime)} - {formatShortTime(todaySchedules[0].plannedEndTime)})
+              </span>
+              <span style={{ fontWeight: 700, color: '#0F766E' }}>{getShiftStatusLabel(todaySchedules[0])}</span>
+            </div>
+          )}
           <div
             style={{
               position: 'relative',
@@ -556,7 +745,7 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
                       </span>
                     </div>
                     <div style={{ fontSize: 11, color: '#D1FAE5' }}>
-                      {currentUserData.shiftName ? `Ca: ${currentUserData.shiftName}` : 'Đã xác thực danh tính'}
+                      {activeShiftName ? `Ca: ${activeShiftName}` : 'Đã xác thực danh tính'}
                     </div>
                   </div>
                 </div>
@@ -698,7 +887,7 @@ export const FaceIdAttendanceModal: React.FC<FaceIdAttendanceModalProps> = ({
           </button>
 
           {/* NÚT VÀO MÀN HÌNH BÁN HÀNG POS SAU KHI CHẤM CÔNG VÀO CA */}
-          {(hasCheckedInForPos || (Boolean(currentUserData?.checkInTime) && !currentUserData?.checkOutTime)) && (
+          {(hasCheckedInForPos || isSelectedShiftInProgress) && (
             <button
               type="button"
               onClick={() => {

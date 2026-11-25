@@ -6,6 +6,7 @@ import { employeeApi } from '../../api/employeeApi';
 import { cashbookService } from '../../../cashbook/services/cashbookService';
 import type { CashAccount } from '../../../cashbook/types/cashbook.types';
 import { VIETNAM_BANKS } from '../../../supplier/lib/vietQrHelper';
+import { ConfirmModal } from '../../../../components/common';
 import { EmployeeVietQrCard } from './EmployeeVietQrCard';
 
 const isBankMatchedInVietnamBanks = (bankNameInput?: string): boolean => {
@@ -90,6 +91,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
   } | null>(null);
   const [isLoadingBankInfo, setIsLoadingBankInfo] = useState<boolean>(false);
   const [manualBankCode, setManualBankCode] = useState<string>('');
+  const [showPayConfirmModal, setShowPayConfirmModal] = useState<boolean>(false);
 
   const isBatchMode = !isAdvanceMode && Array.isArray(batchPayslips) && batchPayslips.length > 0;
 
@@ -119,6 +121,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
     setSubmitError(null);
     setSelectedAccountId('');
     setManualBankCode('');
+    setShowPayConfirmModal(false);
 
     let cancelled = false;
     setIsLoadingAccounts(true);
@@ -221,32 +224,7 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
 
   const formatAmount = (num?: number) => Math.round(num || 0).toLocaleString('en-US');
 
-  const handleSubmit = async () => {
-    if (parsedAmount <= 0) {
-      setSubmitError(
-        isAdvanceMode ? 'Vui lòng nhập số tiền tạm ứng lớn hơn 0.' : 'Vui lòng nhập số tiền chi lớn hơn 0.'
-      );
-      return;
-    }
-
-    if (isAdvanceMode) {
-      if (currentPayable <= 0) {
-        setSubmitError('Nhân viên chưa có tiền lương đã làm được khả dụng để tạm ứng.');
-        return;
-      }
-      if (parsedAmount > currentPayable) {
-        setSubmitError(
-          `Số tiền tạm ứng (${formatAmount(parsedAmount)}đ) không được vượt quá tiền lương đã làm được còn lại (${formatAmount(currentPayable)}đ).`
-        );
-        return;
-      }
-    } else if (!isBatchMode && parsedAmount > currentPayable) {
-      setSubmitError(
-        `Số tiền chi (${formatAmount(parsedAmount)}đ) không được vượt quá số tiền trong phiếu lương (${formatAmount(currentPayable)}đ).`
-      );
-      return;
-    }
-
+  const executePayment = async () => {
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -282,12 +260,14 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
         }
       }
 
+      setShowPayConfirmModal(false);
       if (onPaymentSuccess) {
         onPaymentSuccess(mode);
       } else {
         onClose();
       }
     } catch (err: any) {
+      setShowPayConfirmModal(false);
       const msg = extractErrorMessage(
         err,
         isAdvanceMode ? 'Lỗi khi tạo phiếu chi tạm ứng lương.' : 'Lỗi khi tạo phiếu chi thanh toán lương.'
@@ -296,6 +276,40 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (parsedAmount <= 0) {
+      setSubmitError(
+        isAdvanceMode ? 'Vui lòng nhập số tiền tạm ứng lớn hơn 0.' : 'Vui lòng nhập số tiền chi lớn hơn 0.'
+      );
+      return;
+    }
+
+    if (isAdvanceMode) {
+      if (currentPayable <= 0) {
+        setSubmitError('Nhân viên chưa có tiền lương đã làm được khả dụng để tạm ứng.');
+        return;
+      }
+      if (parsedAmount > currentPayable) {
+        setSubmitError(
+          `Số tiền tạm ứng (${formatAmount(parsedAmount)}đ) không được vượt quá tiền lương đã làm được còn lại (${formatAmount(currentPayable)}đ).`
+        );
+        return;
+      }
+      await executePayment();
+      return;
+    }
+
+    if (!isBatchMode && parsedAmount > currentPayable) {
+      setSubmitError(
+        `Số tiền chi (${formatAmount(parsedAmount)}đ) không được vượt quá số tiền trong phiếu lương (${formatAmount(currentPayable)}đ).`
+      );
+      return;
+    }
+
+    // Yêu cầu Chủ cửa hàng xác nhận rõ hệ quả khóa kỳ lương trước khi thanh toán (cả lẻ & hàng loạt)
+    setShowPayConfirmModal(true);
   };
 
   const modalTitle = isAdvanceMode && payslip
@@ -766,6 +780,60 @@ export const PayslipPaymentModal: React.FC<PayslipPaymentModalProps> = ({
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        isOpen={showPayConfirmModal}
+        onClose={() => {
+          if (!isSubmitting) setShowPayConfirmModal(false);
+        }}
+        onConfirm={executePayment}
+        variant="warning"
+        title={
+          isBatchMode && batchPayslips
+            ? `Xác nhận thanh toán lương (${batchPayslips.length} nhân viên)`
+            : 'Xác nhận thanh toán lương'
+        }
+        confirmText="Xác nhận thanh toán"
+        cancelText="Quay lại"
+        loadingText="Đang thanh toán..."
+        isLoading={isSubmitting}
+        message={
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left' }}>
+            <p style={{ margin: 0 }}>
+              {isBatchMode && batchPayslips ? (
+                <>
+                  Bạn sắp thanh toán lương cho <strong>{batchPayslips.length} nhân viên</strong> với tổng số tiền{' '}
+                  <strong>{formatAmount(totalAmount)}đ</strong>.
+                </>
+              ) : (
+                <>
+                  Bạn sắp thanh toán lương cho nhân viên <strong>{payslip?.employeeName}</strong> (kỳ{' '}
+                  <strong>{payslip?.periodMonth}</strong>) với số tiền <strong>{formatAmount(totalAmount)}đ</strong>.
+                </>
+              )}
+            </p>
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: 8,
+                background: '#FFFBEB',
+                border: '1px solid #FDE68A',
+                color: '#92400E',
+                fontSize: 13,
+                lineHeight: 1.5,
+              }}
+            >
+              <strong>Lưu ý quan trọng:</strong> Sau khi thanh toán, hệ thống sẽ{' '}
+              <strong>khóa toàn bộ</strong> các thao tác trong tháng lương đó của nhân viên:
+              <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
+                <li>Chấm công (FaceID, tự chấm công, chấm công thủ công)</li>
+                <li>Gửi và duyệt phiếu yêu cầu (nghỉ phép, bổ sung công, đổi ca...)</li>
+                <li>Tạo mới và chỉnh sửa lịch làm việc trong tháng</li>
+              </ul>
+            </div>
+          </div>
+        }
+      />
     </div>
   );
 };

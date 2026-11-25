@@ -21,8 +21,8 @@ import { TermsOfServiceTab } from "./components/TermsOfServiceTab";
 import { WalletLedgerTab } from "./components/WalletLedgerTab";
 import { BranchManagementTab } from "./components/BranchManagementTab";
 import { storeApi, mapBackendStoreToFrontend, type TrialStatus } from "./api/storeApi";
-import { StorageAddonCard } from "./components/StorageAddonCard";
 import { BranchAddonModal } from "./components/BranchAddonModal";
+import { StaffAddonModal } from "./components/StaffAddonModal";
 import { TrialStatusBanner } from "./components/TrialStatusBanner";
 import { FinanceAccountsSettingsPage } from "../../features/finance-accounts/pages/FinanceAccountsSettingsPage";
 
@@ -64,6 +64,7 @@ export const StoreSettingsHubPage: FC = () => {
     useState<SubscriptionPlanItem | null>(null);
   const [showTopupModal, setShowTopupModal] = useState<boolean>(false);
   const [showBranchAddonModal, setShowBranchAddonModal] = useState<boolean>(false);
+  const [showStaffAddonModal, setShowStaffAddonModal] = useState(false);
   const isEligibleNoPlan = trialStatus?.state === "ELIGIBLE";
   const effectiveStoreInfo: StoreInfo = isEligibleNoPlan
     ? {
@@ -239,12 +240,6 @@ export const StoreSettingsHubPage: FC = () => {
               onStartTrial={() => setSelectedPlanForCheckout(trialPlanItem)}
               onOpenWallet={() => handleSelectTab("wallet")}
             />
-            {isStandardPlan && <StorageAddonCard
-              onPurchased={(amount) => {
-                setStoreInfo((prev) => ({ ...prev, walletBalance: Math.max(0, prev.walletBalance - amount) }));
-                setWalletRefreshKey((key) => key + 1);
-              }}
-            />}
             {isProPlan && <section style={{ marginBottom: 18, padding: 20, border: "1px solid #DDE7F3", borderRadius: 24, background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
               <div><strong style={{ color: "#0F172A" }}>Mở rộng chuỗi cửa hàng</strong><div style={{ marginTop: 4, color: "#64748B", fontSize: 13 }}>Gói Pro có thể mua thêm chi nhánh: 80.000 đ/chi nhánh/tháng.</div></div>
               <button type="button" onClick={() => setShowBranchAddonModal(true)} style={{ padding: "10px 18px", border: 0, borderRadius: 9999, background: "#0066FF", color: "#FFF", fontWeight: 700 }}>Mua thêm chi nhánh</button>
@@ -253,6 +248,8 @@ export const StoreSettingsHubPage: FC = () => {
               onSelectPlan={(plan) => setSelectedPlanForCheckout(plan)}
               currentPlanName={effectiveStoreInfo.currentPlan}
               trialState={trialStatus?.state ?? null}
+              onBuyStaffAddon={effectiveStoreInfo.canPurchaseStaffManagementAddon ? () => setShowStaffAddonModal(true) : undefined}
+              hasStaffAddon={isStandardPlan && effectiveStoreInfo.staffManagementLocked === false}
             />
           </div>
         )}
@@ -329,6 +326,19 @@ export const StoreSettingsHubPage: FC = () => {
           onPurchased={(amount) => {
             setStoreInfo((prev) => ({ ...prev, walletBalance: Math.max(0, prev.walletBalance - amount) }));
             setWalletRefreshKey((key) => key + 1);
+          }}
+        />
+      )}
+
+      {showStaffAddonModal && (
+        <StaffAddonModal
+          onClose={() => setShowStaffAddonModal(false)}
+          onPurchased={(walletBalance) => {
+            setStoreInfo((prev) => ({
+              ...prev, walletBalance, staffManagementLocked: false, canPurchaseStaffManagementAddon: false,
+            }));
+            setWalletRefreshKey((key) => key + 1);
+            setShowStaffAddonModal(false);
           }}
         />
       )}
