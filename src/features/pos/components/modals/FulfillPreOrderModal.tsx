@@ -164,7 +164,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
               <span>SĐT: <b>{preOrder.customerPhone || 'N/A'}</b></span>
             </div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
-              Thời gian hẹn: <span style={{ color: '#b45309', fontWeight: 600 }}>{preOrder.pickupAppointment}</span> &bull; Trạng thái: <span style={{ color: '#16a34a', fontWeight: 600 }}>✓ Đang giữ kho</span>
+              Thời gian hẹn: <span style={{ color: '#b45309', fontWeight: 600 }}>{preOrder.pickupAppointment}</span> &bull; Trạng thái: <span style={{ color: '#16a34a', fontWeight: 600 }}>Đang giữ kho</span>
             </div>
           </div>
 
@@ -384,7 +384,7 @@ export const FulfillPreOrderModal: FC<Props> = ({
               style={{ padding: '8px 18px', fontSize: 13.5, backgroundColor: '#0f766e' }}
             >
               <CheckCircle2 size={15} />
-              <span>{isSubmitting ? 'Đang xử lý...' : `✓ Xác Nhận Thu ${remaining.toLocaleString('vi-VN')} đ & Bàn Giao Hàng`}</span>
+              <span>{isSubmitting ? 'Đang xử lý...' : `Xác Nhận Thu ${remaining.toLocaleString('vi-VN')} đ & Bàn Giao Hàng`}</span>
             </button>
           </div>
         </div>

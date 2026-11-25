@@ -400,12 +400,35 @@ export const PosCheckoutPage: FC = () => {
   // Modals state
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isVietQrOpen, setIsVietQrOpen] = useState(false);
-  const [pendingPaymentOrder, setPendingPaymentOrder] = useState<Awaited<ReturnType<typeof posOrderApi.createOrder>> | null>(null);
+  type PendingOrderRecord = Awaited<ReturnType<typeof posOrderApi.createOrder>> & { qrExpiresAtMs?: number };
+  const [pendingPaymentOrdersByTab, setPendingPaymentOrdersByTab] = useState<Record<number, PendingOrderRecord | null>>(() => {
+    try {
+      const saved = localStorage.getItem(`mtgrms_pos_pending_qr_${getPosStorageScope(currentTenantId, currentUserId)}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return {};
+  });
   const [belowCostWarningItem, setBelowCostWarningItem] = useState<CartItem | null>(null);
   const [isOrderDiscountOpen, setIsOrderDiscountOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const autoPrint = typeof window !== 'undefined' && localStorage.getItem('mtgrms_pos_auto_print') === 'true';
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        `mtgrms_pos_pending_qr_${getPosStorageScope(currentTenantId, currentUserId)}`,
+        JSON.stringify(pendingPaymentOrdersByTab)
+      );
+    } catch {
+      // ignore
+    }
+  }, [pendingPaymentOrdersByTab, currentTenantId, currentUserId]);
 
   // Khuyến mãi, Voucher & Tích điểm state
   const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfigDto | null>(null);
@@ -417,8 +440,16 @@ export const PosCheckoutPage: FC = () => {
   const [couponStatusText, setCouponStatusText] = useState<string>('');
   const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
 
-  // Tab hiện tại
+  // Tab hiện tại & đơn chờ thanh toán VietQR riêng theo từng tab (cho phép ẩn tạm QR để bán đơn khác)
   const currentTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+  const pendingPaymentOrder = pendingPaymentOrdersByTab[currentTab.id] ?? null;
+  const setPendingPaymentOrder = (order: PendingOrderRecord | null, clearAll = false) => {
+    if (clearAll) {
+      setPendingPaymentOrdersByTab({});
+      return;
+    }
+    setPendingPaymentOrdersByTab((prev) => ({ ...prev, [currentTab.id]: order }));
+  };
 
   // Danh mục lọc được lấy từ sản phẩm kinh doanh tại chi nhánh đang chọn.
   const branchCategories = useMemo(() => {
@@ -1092,10 +1123,10 @@ export const PosCheckoutPage: FC = () => {
           if (res.voucherResult) {
             if (res.voucherResult.isValid) {
               setVoucherDiscount(effectiveVoucher);
-              setCouponStatusText(`✓ ${res.voucherResult.message || 'Mã hợp lệ'}`);
+              setCouponStatusText(res.voucherResult.message || 'Mã hợp lệ');
             } else {
               setVoucherDiscount(0);
-              setCouponStatusText(res.voucherResult.message ? `✗ ${res.voucherResult.message}` : '');
+              setCouponStatusText(res.voucherResult.message || '');
             }
           }
         })
@@ -1121,12 +1152,12 @@ export const PosCheckoutPage: FC = () => {
       );
       if (res?.isValid) {
         setVoucherDiscount(res.discountAmount);
-        setCouponStatusText(`✓ ${res.message || 'Mã hợp lệ'}`);
+        setCouponStatusText(res.message || 'Mã hợp lệ');
         showToast(`Áp dụng voucher ${res.code} thành công (-${res.discountAmount.toLocaleString('vi-VN')} đ)`);
       } else {
         const msg = res?.message || 'Mã voucher không tồn tại hoặc không hợp lệ';
         setVoucherDiscount(0);
-        setCouponStatusText(`✗ ${msg}`);
+        setCouponStatusText(msg);
         showToast(msg, 'error');
       }
     } catch (err: unknown) {
@@ -1145,7 +1176,7 @@ export const PosCheckoutPage: FC = () => {
         (axiosErr?.response?.status === 404 ? 'Mã voucher không tồn tại' : undefined);
       const displayMsg = serverMsg || 'Không thể kiểm tra mã voucher lúc này, vui lòng thử lại';
       setVoucherDiscount(0);
-      setCouponStatusText(`✗ ${displayMsg}`);
+      setCouponStatusText(displayMsg);
       showToast(displayMsg, 'error');
     } finally {
       setIsValidatingCoupon(false);
@@ -1400,7 +1431,7 @@ export const PosCheckoutPage: FC = () => {
     try {
       const payload = buildCreateOrderPayload(undefined, false, true, 'vietqr');
       const heldOrder = await posOrderApi.createOrder(payload);
-      setPendingPaymentOrder(heldOrder);
+      setPendingPaymentOrder({ ...heldOrder, qrExpiresAtMs: Date.now() + 5 * 60 * 1000 });
       setIsVietQrOpen(true);
       showToast(`Đã giữ hàng cho đơn ${heldOrder.orderCode} chờ xác nhận thanh toán VietQR!`, 'info');
     } catch (apiErr: any) {
@@ -1409,18 +1440,29 @@ export const PosCheckoutPage: FC = () => {
     }
   };
 
-  // Hủy đơn chờ thanh toán khi khách đóng QR hoặc lỗi thanh toán -> hoàn trả 100% tồn kho về BranchStocks
+  // Ẩn tạm modal QR để thu ngân có thể sang tab khác quét bán cho khách tiếp theo trong lúc đợi tiền về
+  const handleDismissVietQrModal = () => {
+    setIsVietQrOpen(false);
+    if (pendingPaymentOrder) {
+      showToast(
+        `Đã ẩn mã QR — đơn ${pendingPaymentOrder.orderCode} vẫn giữ trạng thái chờ chuyển khoản. Bấm "+ [F1]" để bán đơn khác hoặc bấm "THANH TOÁN" ở tab này để mở lại mã QR.`,
+        'info'
+      );
+    }
+  };
+
+  // Hủy đơn chờ thanh toán khi khách chủ động hủy / đổi ý -> hoàn trả 100% tồn kho về BranchStocks
   const handleCancelPendingVietQrPayment = async () => {
     setIsVietQrOpen(false);
     if (!pendingPaymentOrder) return;
     const orderToCancel = pendingPaymentOrder;
-    setPendingPaymentOrder(null);
     try {
       await posOrderApi.cancelOrder(orderToCancel.id, {
         reason: 'Chưa xác nhận thanh toán / Khách hủy chuyển khoản VietQR',
         note: 'Tự động hoàn trả tồn kho giữ tạm (PendingPayment)',
         userRole: user?.role,
       });
+      setPendingPaymentOrder(null);
       showToast(`Đã hủy đơn chờ ${orderToCancel.orderCode} và hoàn trả tồn kho về quầy!`, 'info');
       if (isValidGuid(activeBranch.id)) {
         posOrderApi.getAllProducts(activeBranch.id).then((fresh) => {
@@ -1428,6 +1470,8 @@ export const PosCheckoutPage: FC = () => {
         }).catch(() => {});
       }
     } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Không thể hủy đơn chờ thanh toán. Vui lòng kiểm tra quyền hoặc thử lại.';
+      showToast(msg, 'error');
       console.warn('Cancel pending order error:', err);
     }
   };
@@ -1893,7 +1937,9 @@ export const PosCheckoutPage: FC = () => {
         branchId={activeBranch.id}
         orderCode={pendingPaymentOrder?.orderCode || `HD${Math.floor(100000 + Math.random() * 900000)}`}
         amount={pendingPaymentOrder?.finalAmount ?? finalAmount}
-        onClose={handleCancelPendingVietQrPayment}
+        expiresAtMs={pendingPaymentOrder?.qrExpiresAtMs}
+        onClose={handleDismissVietQrModal}
+        onCancelOrder={pendingPaymentOrder ? handleCancelPendingVietQrPayment : undefined}
         onConfirmAndPrint={() => {
           setIsVietQrOpen(false);
           executeCompleteCheckout();

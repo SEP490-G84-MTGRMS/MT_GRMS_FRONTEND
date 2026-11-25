@@ -277,28 +277,29 @@ export const CashControlHubPage: FC = () => {
           }
         }
         if (shiftsToday && shiftsToday.length > 0) {
-            const resolvedItems: ShiftCashMovementDto[] = [];
-            for (const s of shiftsToday) {
-              if (s.cashMovements && s.cashMovements.length > 0) {
-                for (const m of s.cashMovements) {
-                  const isApproved = m.status === 'Recorded' || m.status === 1;
-                  const isRejected = m.status === 'Rejected' || m.status === 3;
-                  const isDropConfirmed = (m.category === 'CASH_DRAW' || m.category === 2) && m.isConfirmedByOwner;
-                  if (isApproved || isRejected || isDropConfirmed) {
-                    resolvedItems.push({ ...m, shiftId: s.id });
-                  }
+          const resolvedItems: ShiftCashMovementDto[] = [];
+          for (const s of shiftsToday) {
+            if (s.cashMovements && s.cashMovements.length > 0) {
+              for (const m of s.cashMovements) {
+                const isDrop = m.category === 'CASH_DRAW' || m.category === 2;
+                const isApproved = !isDrop && (m.status === 'Recorded' || m.status === 1);
+                const isRejected = m.status === 'Rejected' || m.status === 3;
+                const isDropConfirmed = isDrop && Boolean(m.isConfirmedByOwner);
+                if (isApproved || isRejected || isDropConfirmed) {
+                  resolvedItems.push({ ...m, shiftId: s.id });
                 }
               }
             }
-            setResolvedMovements((prev) => {
-              const map = new Map<string, ShiftCashMovementDto>();
-              resolvedItems.forEach((item) => map.set(item.id, item));
-              prev.forEach((item) => map.set(item.id, item));
-              return Array.from(map.values()).sort(
-                (a, b) => new Date(b.occurredAtUtc).getTime() - new Date(a.occurredAtUtc).getTime()
-              );
-            });
           }
+          setResolvedMovements((prev) => {
+            const map = new Map<string, ShiftCashMovementDto>();
+            resolvedItems.forEach((item) => map.set(item.id, item));
+            prev.forEach((item) => map.set(item.id, item));
+            return Array.from(map.values()).sort(
+              (a, b) => new Date(b.occurredAtUtc).getTime() - new Date(a.occurredAtUtc).getTime()
+            );
+          });
+        }
       } catch (errHistory) {
         console.warn('Lỗi lấy lịch sử ca để đồng bộ phiếu đã duyệt hôm nay:', errHistory);
       }
@@ -1617,6 +1618,11 @@ export const CashControlHubPage: FC = () => {
                   ) : (
                     sortedResolvedMovements.map((r) => {
                       const isDrop = r.category === 'CASH_DRAW' || r.category === 2;
+                      const isDeposit =
+                        r.category === 'CASH_DEPOSIT' ||
+                        r.category === 3 ||
+                        r.movementType === 'IN' ||
+                        r.movementType === 1;
                       const isRejected = r.status === 'Rejected' || r.status === 3;
 
                       return (
@@ -1629,6 +1635,10 @@ export const CashControlHubPage: FC = () => {
                               <span style={{ backgroundColor: '#ccfbf1', color: '#0f766e', border: '1px solid #99f6e4', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11.5 }}>
                                 Nộp két sắt
                               </span>
+                            ) : isDeposit ? (
+                              <span style={{ backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #86efac', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11.5 }}>
+                                Nạp tiền vào két
+                              </span>
                             ) : (
                               <span style={{ backgroundColor: '#ffedd5', color: '#ea580c', border: '1px solid #fed7aa', padding: '2px 8px', borderRadius: 4, fontWeight: 700, fontSize: 11.5 }}>
                                 Chi tại quầy POS
@@ -1636,7 +1646,7 @@ export const CashControlHubPage: FC = () => {
                             )}
                           </td>
                           <td style={{ padding: '12px 16px', color: '#1e293b' }}>
-                            <div>{r.reason || (isDrop ? 'Rút tiền nộp két sắt' : 'Chi tiền tại quầy')}</div>
+                            <div>{r.reason || (isDrop ? 'Rút tiền nộp két sắt' : isDeposit ? 'Nạp tiền vào két' : 'Chi tiền tại quầy')}</div>
                             {r.rejectionReason && (
                               <div style={{ fontSize: 11.5, color: '#b91c1c', marginTop: 2 }}>
                                 <b>Lý do từ chối:</b> {r.rejectionReason}
@@ -1652,10 +1662,10 @@ export const CashControlHubPage: FC = () => {
                               textAlign: 'right',
                               fontWeight: 700,
                               fontVariantNumeric: 'tabular-nums',
-                              color: isDrop ? '#0f766e' : '#ea580c',
+                              color: isDrop ? '#0f766e' : isDeposit ? '#15803d' : '#ea580c',
                             }}
                           >
-                            {isDrop ? `+${formatVND(r.amount)}` : `-${formatVND(r.amount)}`}
+                            {isDrop || isDeposit ? `+${formatVND(r.amount)}` : `-${formatVND(r.amount)}`}
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                             {isRejected ? (
@@ -3120,8 +3130,8 @@ export const CashControlHubPage: FC = () => {
                   const diff = zReportData.discrepancy !== null && zReportData.discrepancy !== undefined
                     ? zReportData.discrepancy
                     : (zReportData.actualCashCounted !== null && zReportData.actualCashCounted !== undefined
-                        ? zReportData.actualCashCounted - zReportData.expectedCashInTill
-                        : 0);
+                      ? zReportData.actualCashCounted - zReportData.expectedCashInTill
+                      : 0);
                   const diffColor = diff === 0 ? '#059669' : diff > 0 ? '#059669' : '#DC2626';
                   return (
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: 13.5, color: diffColor, marginTop: 2 }}>

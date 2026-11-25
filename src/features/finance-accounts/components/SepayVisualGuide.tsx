@@ -376,7 +376,7 @@ export const SepayVisualGuide: FC<Props> = ({ compact }) => {
           <span>⑤ Kích hoạt VietQR và phân bổ két / chi nhánh</span>
         </div>
         <div style={{ fontSize: 12.5, color: '#475569', marginTop: 6, lineHeight: 1.5 }}>
-          Sau khi kết nối SePay thành công, trạng thái tài khoản sẽ chuyển sang <b>● SePay đã kết nối</b>. Bạn có thể
+          Sau khi kết nối SePay thành công, trạng thái tài khoản sẽ chuyển sang <b>SePay đã kết nối</b>. Bạn có thể
           kích hoạt nhận VietQR tự động cho từng chi nhánh hoặc toàn hệ thống tại quầy thu ngân POS.
         </div>
       </div>

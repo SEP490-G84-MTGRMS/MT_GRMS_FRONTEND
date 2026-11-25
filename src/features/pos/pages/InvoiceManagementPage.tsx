@@ -9,8 +9,6 @@ import {
   Banknote,
   PackageCheck,
   Printer,
-  ChevronDown,
-  ChevronUp,
   ChevronRight,
   X,
   XCircle,
@@ -89,12 +87,12 @@ const matchesTimePreset = (
 const parsePreOrderPickupAndNotes = (rawNote?: string | null, expectedPickupDate?: string | null) => {
   const formattedPickup = expectedPickupDate
     ? (parseOrderDateToLocal(expectedPickupDate)?.toLocaleString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }) ?? '')
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) ?? '')
     : '';
 
   if (!rawNote || !rawNote.trim()) {
@@ -177,6 +175,8 @@ export const InvoiceManagementPage: FC = () => {
   );
 
   // Bộ lọc (tách Mã đơn & Khách hàng/SĐT + Trạng thái đặt trước)
+  const [draftSearchQuery, setDraftSearchQuery] = useState('');
+  const [draftCustomerQuery, setDraftCustomerQuery] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [customerQuery, setCustomerQuery] = useState('');
   const [timePreset, setTimePreset] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month'>('all');
@@ -330,7 +330,14 @@ export const InvoiceManagementPage: FC = () => {
       orderOrigin: isPreOrderFlag ? 'PRE_ORDER' : 'RETAIL',
       items: (o.items || []).map((it: any) => ({
         itemId: it.id,
-        batchId: it.batchId || it.BatchId || '',
+        batchId:
+          it.batchCode ||
+          it.BatchCode ||
+          it.stockAllocations?.[0]?.batchCode ||
+          it.StockAllocations?.[0]?.BatchCode ||
+          it.batchId ||
+          it.BatchId ||
+          '',
         stockAllocations: it.stockAllocations || it.StockAllocations || [],
         productId: it.productId,
         productName: it.productName,
@@ -388,6 +395,7 @@ export const InvoiceManagementPage: FC = () => {
     const targetBranchId = branchFilter !== 'ALL' ? branchFilter : assignedBranch.id;
     setActiveShiftCash(undefined);
     setActiveShiftId(undefined);
+    if (!targetBranchId || targetBranchId === 'ALL') return;
     posShiftApi.getCurrentShift(targetBranchId).then((s) => {
       setActiveShiftCash(s?.expectedCash);
       setActiveShiftId(s?.id);
@@ -404,7 +412,11 @@ export const InvoiceManagementPage: FC = () => {
     setPreOrders([]);
     setReturnRecordsByOrder({});
     posOrderApi
-      .getOrders(showPendingPayments ? { status: 'PendingPayment', branchId: pendingBranchId || undefined, pageSize: 100 } : undefined)
+      .getOrders(
+        showPendingPayments
+          ? { status: 'PendingPayment', branchId: pendingBranchId || undefined, pageSize: 100 }
+          : { pageSize: 500 }
+      )
       .then((res) => {
         if (!isMounted) return;
         if (!res || !res.items || res.items.length === 0) {
@@ -480,7 +492,14 @@ export const InvoiceManagementPage: FC = () => {
                     : 'Đang giữ kho',
               items: (o.items || []).map((it: any) => ({
                 itemId: it.id,
-                batchId: it.batchId || '',
+                batchId:
+                  it.batchCode ||
+                  it.BatchCode ||
+                  it.stockAllocations?.[0]?.batchCode ||
+                  it.StockAllocations?.[0]?.BatchCode ||
+                  it.batchId ||
+                  it.BatchId ||
+                  '',
                 stockAllocations: it.stockAllocations || [],
                 productId: it.productId,
                 productName: it.productName,
@@ -611,14 +630,24 @@ export const InvoiceManagementPage: FC = () => {
         stt: idx + 1,
         name: it.productName,
         quantity: it.quantity,
-        unitPrice: it.isGift ? 0 : it.unitPrice,
-        totalPrice: it.isGift ? 0 : it.totalAmount,
-        totalAmount: it.isGift ? 0 : it.totalAmount,
+        unitPrice: it.isGift ? 0 : Math.round(it.unitPrice),
+        totalPrice: it.isGift ? 0 : Math.round(it.totalAmount),
+        totalAmount: it.isGift ? 0 : Math.round(it.totalAmount),
         isGift: Boolean(it.isGift),
       })),
-      totalItemAmount: printingInvoice.totalMerchandiseAmount,
+      totalItemAmount: Math.round(printingInvoice.totalMerchandiseAmount),
       itemDiscountAmount: 0,
-      orderDiscountAmount: printingInvoice.totalDiscount,
+      orderDiscountAmount:
+        printingInvoice.promotionDiscountAmount && printingInvoice.promotionDiscountAmount > 0
+          ? Math.round(printingInvoice.promotionDiscountAmount)
+          : Math.max(
+              0,
+              Math.round(
+                printingInvoice.totalDiscount -
+                  (printingInvoice.voucherDiscountAmount || 0) -
+                  (printingInvoice.pointsDiscountAmount || 0)
+              )
+            ),
       voucherDiscountAmount: printingInvoice.voucherDiscountAmount || undefined,
       appliedVoucherCode: printingInvoice.appliedVoucherCode || undefined,
       appliedPromotionSummary: printingInvoice.appliedPromotionSummary || undefined,
@@ -656,6 +685,7 @@ export const InvoiceManagementPage: FC = () => {
   // Đồng bộ tham số tìm kiếm từ URL (khi điều hướng từ trang Khách nợ CRM hoặc Sổ quỹ sang)
   useEffect(() => {
     if (urlSearch) {
+      setDraftSearchQuery(urlSearch);
       setSearchQuery(urlSearch);
       if (urlSearch.startsWith('PO') || urlSearch.startsWith('PRE-')) {
         setActiveTab('preorders');
@@ -790,7 +820,7 @@ export const InvoiceManagementPage: FC = () => {
       showToast(`Đã ghi nhận đổi/trả cho hóa đơn ${returnExchangeModalInvoice.invoiceId}. Mã phiếu đổi/trả: ${res?.orderCode || 'Đã ghi nhận'}`);
 
       // Nạp lại danh sách từ API (chỉ lấy hóa đơn bán lẻ)
-      posOrderApi.getOrders().then((orderRes) => {
+      posOrderApi.getOrders({ pageSize: 500 }).then((orderRes) => {
         if (orderRes && orderRes.items) {
           setReturnRecordsByOrder(collectReturnRecords(orderRes.items));
           const invoiceOrders = orderRes.items.filter(
@@ -807,9 +837,11 @@ export const InvoiceManagementPage: FC = () => {
 
       // Tự động đồng bộ lại tiền mặt trong két quầy của ca hiện tại
       const targetBranchId = branchFilter !== 'ALL' ? branchFilter : assignedBranch.id;
-      posShiftApi.getCurrentShift(targetBranchId).then((s) => {
-        if (s) setActiveShiftCash(s.expectedCash);
-      }).catch(() => { });
+      if (targetBranchId && targetBranchId !== 'ALL') {
+        posShiftApi.getCurrentShift(targetBranchId).then((s) => {
+          if (s) setActiveShiftCash(s.expectedCash);
+        }).catch(() => { });
+      }
     } catch (e: any) {
       throw e;
     }
@@ -1103,6 +1135,7 @@ export const InvoiceManagementPage: FC = () => {
         p.preOrderId === preOrderId
           ? {
             ...p,
+            depositAmount: p.totalOrderAmount,
             remainingAmount: 0,
             paymentMethod: data.paymentMethod === 'VIETQR' ? 'BANK' : 'CASH',
             paymentMethodLabel: data.paymentMethod === 'VIETQR' ? 'Chuyển khoản VietQR' : 'Tiền mặt',
@@ -1264,66 +1297,64 @@ export const InvoiceManagementPage: FC = () => {
               )}
 
               {/* Ô TÌM KIẾM TÁCH RIÊNG: MÃ ĐƠN & KHÁCH HÀNG / SĐT */}
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '0 1 180px', minWidth: 155 }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '0 1 145px', minWidth: 125 }}>
                 <input
                   type="text"
                   className="so-list-filter-input w-full"
-                  style={{ height: 36 }}
+                  style={{ height: 34 }}
                   placeholder={activeTab === 'invoices' ? 'Mã hóa đơn...' : 'Mã đơn đặt trước...'}
-                  value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setInvoicePage(1); setPreOrderPage(1); }}
+                  value={draftSearchQuery}
+                  onChange={(e) => setDraftSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSearchQuery(draftSearchQuery);
+                      setCustomerQuery(draftCustomerQuery);
+                      setInvoicePage(1);
+                      setPreOrderPage(1);
+                    }
+                  }}
                 />
               </div>
 
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 200px', minWidth: 185 }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 165px', minWidth: 150 }}>
                 <Search size={15} style={{ position: 'absolute', left: 10, color: '#94a3b8' }} />
                 <input
                   type="text"
                   className="so-list-filter-input w-full"
-                  style={{ paddingLeft: 32, height: 36 }}
+                  style={{ paddingLeft: 32, height: 34 }}
                   placeholder="Tên hoặc SĐT khách hàng..."
-                  value={customerQuery}
-                  onChange={(e) => { setCustomerQuery(e.target.value); setInvoicePage(1); setPreOrderPage(1); }}
+                  value={draftCustomerQuery}
+                  onChange={(e) => setDraftCustomerQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setSearchQuery(draftSearchQuery);
+                      setCustomerQuery(draftCustomerQuery);
+                      setInvoicePage(1);
+                      setPreOrderPage(1);
+                    }
+                  }}
                 />
               </div>
 
-              {/* PRESETS THỜI GIAN CHUẨN PILL CỦA POS */}
-              <div className="time-preset-buttons">
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'all' ? 'active' : ''}`}
-                  onClick={() => { setTimePreset('all'); setInvoicePage(1); setPreOrderPage(1); }}
+              {/* LỌC THỜI GIAN DẠNG DROPDOWN CHUẨN THIẾT KẾ */}
+              <div className="so-list-filter-field">
+                <label className="so-list-filter-label">Thời gian:</label>
+                <select
+                  className={`so-list-filter-select ${timePreset !== 'all' ? 'so-list-filter-select--active' : ''}`}
+                  style={{ height: 34 }}
+                  value={timePreset}
+                  onChange={(e) => {
+                    setTimePreset(e.target.value as 'all' | 'today' | 'yesterday' | 'week' | 'month');
+                    setInvoicePage(1);
+                    setPreOrderPage(1);
+                  }}
                 >
-                  Tất cả
-                </button>
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'today' ? 'active' : ''}`}
-                  onClick={() => { setTimePreset('today'); setInvoicePage(1); setPreOrderPage(1); }}
-                >
-                  Hôm nay
-                </button>
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'yesterday' ? 'active' : ''}`}
-                  onClick={() => { setTimePreset('yesterday'); setInvoicePage(1); setPreOrderPage(1); }}
-                >
-                  Hôm qua
-                </button>
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'week' ? 'active' : ''}`}
-                  onClick={() => { setTimePreset('week'); setInvoicePage(1); setPreOrderPage(1); }}
-                >
-                  Tuần này
-                </button>
-                <button
-                  type="button"
-                  className={`preset-btn ${timePreset === 'month' ? 'active' : ''}`}
-                  onClick={() => { setTimePreset('month'); setInvoicePage(1); setPreOrderPage(1); }}
-                >
-                  Tháng này
-                </button>
+                  <option value="all">Tất cả thời gian</option>
+                  <option value="today">Hôm nay</option>
+                  <option value="yesterday">Hôm qua</option>
+                  <option value="week">Tuần này</option>
+                  <option value="month">Tháng này</option>
+                </select>
               </div>
 
               {/* LỌC PHƯƠNG THỨC & TRẠNG THÁI */}
@@ -1367,10 +1398,21 @@ export const InvoiceManagementPage: FC = () => {
                   <option value="CANCELLED">Đã hủy</option>
                 </select>
               )}
-              <button type="button" className="so-list-filter-search" onClick={() => { setInvoicePage(1); setPreOrderPage(1); }}>
+              <button
+                type="button"
+                className="so-list-filter-search"
+                onClick={() => {
+                  setSearchQuery(draftSearchQuery);
+                  setCustomerQuery(draftCustomerQuery);
+                  setInvoicePage(1);
+                  setPreOrderPage(1);
+                }}
+              >
                 <Search size={13} /> Tìm kiếm
               </button>
               <button type="button" className="so-list-filter-reset" onClick={() => {
+                setDraftSearchQuery('');
+                setDraftCustomerQuery('');
                 setSearchQuery('');
                 setCustomerQuery('');
                 setTimePreset('all');
@@ -1395,56 +1437,66 @@ export const InvoiceManagementPage: FC = () => {
                     <span>Danh Sách Hóa Đơn Bán Hàng</span>
                   </h3>
                   <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
-                    Hiển thị <b>{paginatedInvoices.length}</b> trên <b>{filteredInvoices.length}</b> hóa đơn &bull; Doanh thu: <b style={{ color: '#15803d' }}>{filteredInvoices.reduce((s, i) => s + (i.status === 'COMPLETED' ? i.finalPaidAmount + (i.debtAmount || 0) : 0), 0).toLocaleString('vi-VN')} đ</b>
+                    Hiển thị <b>{paginatedInvoices.length}</b> trên <b>{filteredInvoices.length}</b> hóa đơn &bull; Doanh thu: <b style={{ color: '#15803d' }}>{Math.round(filteredInvoices.reduce((s, i) => {
+                      if (i.status !== 'COMPLETED') return s;
+                      const returnedFromRecords = (returnRecordsByOrder[i.invoiceId] || []).reduce((rs, rec) => rs + (rec.returnedAmount || 0), 0);
+                      return s + Math.max(0, i.finalPaidAmount + (i.debtAmount || 0) - returnedFromRecords);
+                    }, 0)).toLocaleString('vi-VN')} đ</b>
                   </div>
                 </div>
 
               </div>
 
               <div className="pos-shift-table-responsive">
-                <table className="pos-shift-table so-list-table invoice-list-table">
+                <table className="pos-shift-table so-list-table invoice-list-table" style={{ minWidth: 1220 }}>
+                  <colgroup>
+                    <col style={{ width: 172 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 92 }} />
+                    <col style={{ width: 102 }} />
+                    <col style={{ width: 92 }} />
+                    <col style={{ width: 108 }} />
+                    <col style={{ width: 104 }} />
+                    <col style={{ width: 172 }} />
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'left', minWidth: 135 }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Mã hóa đơn" active={invSort.key === 'invoiceId'} direction={invSort.direction} onClick={() => handleInvSort('invoiceId')} />
                       </th>
-                      <th style={{ textAlign: 'left', minWidth: 130 }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Chi nhánh" active={invSort.key === 'branchName'} direction={invSort.direction} onClick={() => handleInvSort('branchName')} />
                       </th>
-                      <th style={{ textAlign: 'left', minWidth: 115 }}>
-                        <SortableHeader label="Thời gian lập" active={invSort.key === 'createdAtIso'} direction={invSort.direction} onClick={() => handleInvSort('createdAtIso')} />
-                      </th>
-                      <th style={{ textAlign: 'left', minWidth: 120 }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Khách hàng" active={invSort.key === 'customerName'} direction={invSort.direction} onClick={() => handleInvSort('customerName')} />
                       </th>
-                      <th style={{ textAlign: 'left', minWidth: 105 }}>
-                        <SortableHeader label="SĐT" active={invSort.key === 'customerPhone'} direction={invSort.direction} onClick={() => handleInvSort('customerPhone')} />
-                      </th>
-                      <th style={{ textAlign: 'left', minWidth: 115 }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Người tạo" active={invSort.key === 'cashierName'} direction={invSort.direction} onClick={() => handleInvSort('cashierName')} />
                       </th>
-                      <th style={{ textAlign: 'right', minWidth: 110 }}>
+                      <th style={{ textAlign: 'right' }}>
                         <SortableHeader label="Tổng tiền" align="right" active={invSort.key === 'totalMerchandiseAmount'} direction={invSort.direction} onClick={() => handleInvSort('totalMerchandiseAmount')} />
                       </th>
-                      <th style={{ textAlign: 'right', minWidth: 105 }}>
+                      <th style={{ textAlign: 'right' }}>
                         <SortableHeader label="Giảm giá" align="right" active={invSort.key === 'totalDiscount'} direction={invSort.direction} onClick={() => handleInvSort('totalDiscount')} />
                       </th>
-                      <th style={{ textAlign: 'right', minWidth: 110 }}>
+                      <th style={{ textAlign: 'right' }}>
                         <SortableHeader label="Khách trả" align="right" active={invSort.key === 'finalPaidAmount'} direction={invSort.direction} onClick={() => handleInvSort('finalPaidAmount')} />
                       </th>
-                      <th style={{ textAlign: 'left', minWidth: 115 }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Phương thức" active={invSort.key === 'paymentMethodLabel'} direction={invSort.direction} onClick={() => handleInvSort('paymentMethodLabel')} />
                       </th>
-                      <th style={{ textAlign: 'left', minWidth: 110 }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Trạng thái" active={invSort.key === 'status'} direction={invSort.direction} onClick={() => handleInvSort('status')} />
                       </th>
-                      <th style={{ textAlign: 'left', minWidth: 175 }}>Thao tác</th>
+                      <th style={{ textAlign: 'left' }}>Thao tác</th>
                     </tr>
                   </thead>
                   {isLoadingOrders ? (
                     <tbody>
                       <tr>
-                        <td colSpan={12} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                             <Loader2 size={18} className="animate-spin" color="#0f766e" />
                             <span>Đang tải danh sách hóa đơn...</span>
@@ -1455,7 +1507,7 @@ export const InvoiceManagementPage: FC = () => {
                   ) : paginatedInvoices.length === 0 ? (
                     <tbody>
                       <tr>
-                        <td colSpan={12} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
                           Không tìm thấy hóa đơn nào phù hợp với bộ lọc.
                         </td>
                       </tr>
@@ -1476,23 +1528,34 @@ export const InvoiceManagementPage: FC = () => {
                           onClick={() => toggleExpand(inv.invoiceId)}
                         >
                           <td>
-                            <span style={{ fontWeight: 700, color: '#0f766e', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', fontFamily: 'var(--font-mono, monospace)' }}>
-                              <span>{inv.invoiceId}</span>
-                              {inv.isOutsideShift && <small style={{ color: '#475569', fontFamily: 'inherit' }}>Ngoài ca</small>}
-                              {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                              <ChevronRight
+                                size={15}
+                                style={{
+                                  transform: isExpanded ? 'rotate(90deg)' : 'none',
+                                  transition: 'transform 0.15s ease',
+                                  color: '#0f766e',
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <b style={{ color: '#0f766e', fontFamily: 'var(--font-mono, monospace)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{inv.invoiceId}</b>
+                                </div>
+                                <div style={{ color: '#64748b', fontSize: 11, fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
+                                  {inv.createdAt}{inv.isOutsideShift ? ' · Ngoài ca' : ''}
+                                </div>
+                              </div>
+                            </div>
                           </td>
-                          <td style={{ fontSize: 12, color: '#475569' }}>
+                          <td style={{ fontSize: 12, color: '#334155' }}>
                             {inv.branchName || '—'}
                           </td>
-                          <td style={{ color: '#64748b', lineHeight: 1.4, fontSize: 12, fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
-                            {inv.createdAt}
-                          </td>
                           <td>
-                            <b style={{ color: '#0f172a' }}>{inv.customerName}</b>
-                          </td>
-                          <td style={{ color: '#475569', fontSize: 12, fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
-                            {inv.customerPhone || '—'}
+                            <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 12.5 }}>{inv.customerName}</div>
+                            {inv.customerPhone && (
+                              <div style={{ color: '#64748b', fontSize: 11, fontFamily: 'var(--font-mono, monospace)' }}>{inv.customerPhone}</div>
+                            )}
                           </td>
                           <td>
                             <span style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>
@@ -1555,7 +1618,7 @@ export const InvoiceManagementPage: FC = () => {
                                     gap: 3,
                                   }}
                                 >
-                                  <Star size={10} color="#047857" /> {inv.pointsRedeemed}đ
+                                  <Star size={10} color="#047857" /> {inv.pointsRedeemed} điểm
                                 </span>
                               )}
                               {inv.items.some((x) => x.isGift) && !inv.appliedPromotionSummary && (
@@ -1630,7 +1693,7 @@ export const InvoiceManagementPage: FC = () => {
                             </span>
                           </td>
                           <td style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-start', maxWidth: 175 }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'flex-start' }}>
                               <button
                                 type="button"
                                 className="pos-btn-secondary-pill"
@@ -1643,7 +1706,7 @@ export const InvoiceManagementPage: FC = () => {
                                 type="button"
                                 className="pos-btn-secondary-pill"
                                 style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#0f766e', color: '#0f766e' }}
-                                title="In lại hóa đơn K80"
+                                title="In bill"
                                 onClick={(e) => handleOpenPrintModal(inv, e)}
                               >
                                 <Printer size={12} />
@@ -1678,7 +1741,7 @@ export const InvoiceManagementPage: FC = () => {
                         {/* ACCORDION CHI TIẾT */}
                         {isExpanded && (
                           <tr>
-                            <td colSpan={12} style={{ padding: 12, backgroundColor: '#f8fafc' }}>
+                            <td colSpan={10} style={{ padding: 12, backgroundColor: '#f8fafc' }}>
                               <div
                                 style={{
                                   backgroundColor: '#ffffff',
@@ -1736,7 +1799,9 @@ export const InvoiceManagementPage: FC = () => {
                                       {inv.appliedPromotionSummary && (
                                         <span style={{ color: '#115e59' }}>
                                           CTKM: <b>{inv.appliedPromotionSummary}</b>
-                                          {inv.promotionDiscountAmount && inv.promotionDiscountAmount > 0
+                                          {inv.promotionDiscountAmount &&
+                                          inv.promotionDiscountAmount > 0 &&
+                                          !/\(-\s*[\d.,]+\s*đ\)/i.test(inv.appliedPromotionSummary)
                                             ? ` (-${inv.promotionDiscountAmount.toLocaleString('vi-VN')} đ)`
                                             : ''}
                                         </span>
@@ -1817,7 +1882,7 @@ export const InvoiceManagementPage: FC = () => {
                                           {item.isGift ? '0 đ' : `${item.discountAmount.toLocaleString('vi-VN')} đ`}
                                         </td>
                                         <td style={{ textAlign: 'left', fontWeight: 700, color: '#15803d', fontVariantNumeric: 'tabular-nums' }}>
-                                          {item.isGift ? '0 đ' : `${item.totalAmount.toLocaleString('vi-VN')} đ`}
+                                          {item.isGift ? '0 đ' : `${Math.round(item.totalAmount).toLocaleString('vi-VN')} đ`}
                                         </td>
                                       </tr>
                                     ))}
@@ -1883,50 +1948,55 @@ export const InvoiceManagementPage: FC = () => {
               </div>
 
               <div className="pos-shift-table-responsive">
-                <table className="pos-shift-table so-list-table invoice-list-table">
+                <table className="pos-shift-table so-list-table invoice-list-table" style={{ minWidth: 1220 }}>
+                  <colgroup>
+                    <col style={{ width: 172 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 124 }} />
+                    <col style={{ width: 130 }} />
+                    <col style={{ width: 92 }} />
+                    <col style={{ width: 84 }} />
+                    <col style={{ width: 88 }} />
+                    <col style={{ width: 104 }} />
+                    <col style={{ width: 172 }} />
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 140, textAlign: 'left' }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Mã đơn" active={preSort.key === 'preOrderId'} direction={preSort.direction} onClick={() => handlePreSort('preOrderId')} />
                       </th>
-                      <th style={{ minWidth: 130, textAlign: 'left' }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Chi nhánh" active={preSort.key === 'branchName'} direction={preSort.direction} onClick={() => handlePreSort('branchName')} />
                       </th>
-                      <th style={{ minWidth: 120, textAlign: 'left' }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Khách hàng" active={preSort.key === 'customerName'} direction={preSort.direction} onClick={() => handlePreSort('customerName')} />
                       </th>
-                      <th style={{ minWidth: 105, textAlign: 'left' }}>
-                        <SortableHeader label="SĐT" active={preSort.key === 'customerPhone'} direction={preSort.direction} onClick={() => handlePreSort('customerPhone')} />
+                      <th style={{ textAlign: 'left' }}>
+                        <SortableHeader label="Nhân viên" active={preSort.key === 'cashierName'} direction={preSort.direction} onClick={() => handlePreSort('cashierName')} />
                       </th>
-                      <th style={{ minWidth: 115, textAlign: 'left' }}>
-                        <SortableHeader label="Người tạo" active={preSort.key === 'cashierName'} direction={preSort.direction} onClick={() => handlePreSort('cashierName')} />
-                      </th>
-                      <th style={{ minWidth: 120, textAlign: 'left' }}>
-                        <SortableHeader label="Người bàn giao" active={preSort.key === 'fulfilledByCashierName'} direction={preSort.direction} onClick={() => handlePreSort('fulfilledByCashierName')} />
-                      </th>
-                      <th style={{ minWidth: 125, textAlign: 'left' }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Hẹn nhận" active={preSort.key === 'pickupAppointment'} direction={preSort.direction} onClick={() => handlePreSort('pickupAppointment')} />
                       </th>
-                      <th style={{ minWidth: 125, textAlign: 'left' }}>Ghi chú</th>
-                      <th style={{ minWidth: 120, textAlign: 'right' }}>
+                      <th style={{ textAlign: 'right' }}>
                         <SortableHeader label="Tổng tiền" align="right" active={preSort.key === 'totalOrderAmount'} direction={preSort.direction} onClick={() => handlePreSort('totalOrderAmount')} />
                       </th>
-                      <th style={{ minWidth: 105, textAlign: 'right' }}>
+                      <th style={{ textAlign: 'right' }}>
                         <SortableHeader label="Đã cọc" align="right" active={preSort.key === 'depositAmount'} direction={preSort.direction} onClick={() => handlePreSort('depositAmount')} />
                       </th>
-                      <th style={{ minWidth: 110, textAlign: 'right' }}>
+                      <th style={{ textAlign: 'right' }}>
                         <SortableHeader label="Còn lại" align="right" active={preSort.key === 'remainingAmount'} direction={preSort.direction} onClick={() => handlePreSort('remainingAmount')} />
                       </th>
-                      <th style={{ minWidth: 115, textAlign: 'left' }}>
+                      <th style={{ textAlign: 'left' }}>
                         <SortableHeader label="Trạng thái" active={preSort.key === 'status'} direction={preSort.direction} onClick={() => handlePreSort('status')} />
                       </th>
-                      <th style={{ minWidth: 260, textAlign: 'left' }}>Thao tác</th>
+                      <th style={{ textAlign: 'left' }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoadingOrders ? (
                       <tr>
-                        <td colSpan={13} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                             <Loader2 size={18} className="animate-spin" color="#0f766e" />
                             <span>Đang tải danh sách đơn đặt trước...</span>
@@ -1935,7 +2005,7 @@ export const InvoiceManagementPage: FC = () => {
                       </tr>
                     ) : paginatedPreOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={13} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                        <td colSpan={10} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
                           Không tìm thấy đơn đặt trước nào phù hợp với bộ lọc.
                         </td>
                       </tr>
@@ -1963,9 +2033,9 @@ export const InvoiceManagementPage: FC = () => {
                                     flexShrink: 0,
                                   }}
                                 />
-                                <div>
-                                  <b style={{ color: '#0f766e', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>{pre.preOrderId}</b>
-                                  <div style={{ color: '#64748b', fontSize: 11, whiteSpace: 'nowrap' }}>{pre.createdAt}</div>
+                                <div style={{ minWidth: 0 }}>
+                                  <b style={{ color: '#0f766e', fontFamily: 'var(--font-mono, monospace)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{pre.preOrderId}</b>
+                                  <div style={{ color: '#64748b', fontSize: 11, fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>{pre.createdAt}</div>
                                 </div>
                               </div>
                             </td>
@@ -1973,32 +2043,30 @@ export const InvoiceManagementPage: FC = () => {
                               {pre.branchName || '—'}
                             </td>
                             <td>
-                              <b style={{ color: '#0f172a' }}>{pre.customerName}</b>
-                            </td>
-                            <td style={{ fontSize: 12, color: '#475569', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
-                              {pre.customerPhone || '—'}
-                            </td>
-                            <td>
-                              <span style={{ fontWeight: 600, color: '#0f766e', fontSize: 12 }}>
-                                {pre.cashierName || 'Thu ngân POS'}
-                              </span>
-                            </td>
-                            <td>
-                              {pre.fulfilledByCashierName ? (
-                                <span style={{ fontSize: 12, color: '#166534', fontWeight: 600 }}>
-                                  {pre.fulfilledByCashierName}
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: 11.5, color: '#94a3b8', fontStyle: 'italic' }}>Chưa giao</span>
+                              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 12.5 }}>{pre.customerName}</div>
+                              {pre.customerPhone && (
+                                <div style={{ fontSize: 11, color: '#64748b', fontFamily: 'var(--font-mono, monospace)' }}>{pre.customerPhone}</div>
                               )}
                             </td>
-                            <td style={{ whiteSpace: 'nowrap' }}>
-                              <span style={{ fontWeight: 600, color: '#b45309', fontSize: 12, fontFamily: 'var(--font-mono, monospace)' }}>
-                                {pre.pickupAppointment}
-                              </span>
+                            <td>
+                              <div style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>
+                                {pre.cashierName || 'Thu ngân POS'}
+                              </div>
+                              {pre.fulfilledByCashierName ? (
+                                <div style={{ fontSize: 11, color: '#166534' }}>Giao: {pre.fulfilledByCashierName}</div>
+                              ) : (
+                                <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>Chưa giao</div>
+                              )}
                             </td>
-                            <td style={{ fontSize: 12, color: '#64748b', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={pre.notes || ''}>
-                              {pre.notes || '—'}
+                            <td>
+                              <div style={{ fontWeight: 600, color: '#b45309', fontSize: 12, fontFamily: 'var(--font-mono, monospace)' }}>
+                                {pre.pickupAppointment}
+                              </div>
+                              {pre.notes && (
+                                <div style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={pre.notes}>
+                                  {pre.notes}
+                                </div>
+                              )}
                             </td>
                             <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono, monospace)', whiteSpace: 'nowrap' }}>
                               <div style={{ color: '#0f172a' }}>{pre.totalOrderAmount.toLocaleString('vi-VN')} đ</div>
@@ -2015,70 +2083,67 @@ export const InvoiceManagementPage: FC = () => {
                               {pre.remainingAmount.toLocaleString('vi-VN')} đ
                             </td>
                             <td style={{ textAlign: 'left', whiteSpace: 'nowrap' }}>
-                              <span className="pos-status-pill reserved">
+                              <span className={`pos-status-pill ${pre.status === 'COMPLETED' ? 'completed' : pre.status === 'CANCELLED' ? 'cancelled' : 'reserved'}`}>
                                 {pre.statusLabel}
                               </span>
                             </td>
-                            <td style={{ textAlign: 'left', minWidth: 280, whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 6, flexWrap: 'nowrap' }}>
+                            <td style={{ textAlign: 'left' }} onClick={(e) => e.stopPropagation()}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 5, flexWrap: 'wrap' }}>
                                 <button
                                   type="button"
                                   className="pos-btn-secondary-pill"
-                                  style={{ height: 26, padding: '0 8px', fontSize: 11, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                  style={{ height: 26, padding: '0 8px', fontSize: 11, whiteSpace: 'nowrap' }}
                                   onClick={() => toggleExpandPreOrder(pre.preOrderId)}
                                 >
                                   {isExpanded ? 'Đóng' : 'Chi tiết'}
                                 </button>
                                 {pre.status === 'CANCELLED' ? (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                    <XCircle size={12} /> Đã hủy
+                                  <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>
+                                    Đã hủy
                                   </span>
                                 ) : pre.status === 'COMPLETED' ? (
                                   <>
-<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, backgroundColor: '#ecfdf5', color: '#047857', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                    <CheckCircle2 size={12} /> Đã giao
-                                  </span>
-                                  <button
-                                    type="button"
-                                    className="pos-btn-secondary-pill"
-                                    style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#0f766e', color: '#0f766e', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0 }}
-                                    title="In lại hóa đơn giao hàng K80"
-                                    onClick={(e) => handleOpenPrintModal(mapPreOrderToInvoice(pre), e)}
-                                  >
-                                    <Printer size={12} />
-                                    <span>In bill</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="pos-btn-secondary-pill"
-                                    style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#059669', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0 }}
-                                    title="Đổi hoặc trả hàng đã giao"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setReturnExchangeModalInvoice(mapPreOrderToInvoice(pre));
-                                    }}
-                                  >
-                                    <RotateCcw size={12} />
-                                    <span>Đổi/Trả</span>
-                                  </button>
+                                    <button
+                                      type="button"
+                                      className="pos-btn-secondary-pill"
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#0f766e', color: '#0f766e', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+                                      title="In bill"
+                                      onClick={(e) => handleOpenPrintModal(mapPreOrderToInvoice(pre), e)}
+                                    >
+                                      <Printer size={12} />
+                                      <span>In bill</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="pos-btn-secondary-pill"
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderColor: '#059669', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+                                      title="Đổi hoặc trả hàng đã giao"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setReturnExchangeModalInvoice(mapPreOrderToInvoice(pre));
+                                      }}
+                                    >
+                                      <RotateCcw size={12} />
+                                      <span>Đổi/Trả</span>
+                                    </button>
                                   </>
                                 ) : (
                                   <>
                                     <button
                                       type="button"
                                       className="pos-btn-primary-pill"
-                                      style={{ height: 26, padding: '0 8px', fontSize: 11, backgroundColor: '#0f766e', whiteSpace: 'nowrap', flexShrink: 0 }}
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, backgroundColor: '#0f766e', whiteSpace: 'nowrap' }}
                                       onClick={() => setFulfillModalPreOrder(pre)}
-                                      title="Thanh toán nốt số tiền còn lại và bàn giao hàng cho khách tại quầy"
+                                      title={`Thanh toán nốt ${pre.remainingAmount.toLocaleString('vi-VN')} đ và bàn giao hàng cho khách`}
                                     >
                                       <CreditCard size={12} />
-                                      <span>Bàn giao ({pre.remainingAmount.toLocaleString('vi-VN')} đ)</span>
+                                      <span>Bàn giao</span>
                                     </button>
                                     <button
                                       type="button"
-                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0 }}
+                                      style={{ height: 26, padding: '0 8px', fontSize: 11, borderRadius: 6, display: 'inline-flex', alignItems: 'center', gap: 3, border: '1px solid #fecaca', backgroundColor: '#fef2f2', color: '#b91c1c', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' }}
                                       onClick={() => handleCancelPreOrder(pre)}
-                                       title={pre.depositAmount > 0 ? 'Đơn có tiền cọc cần đối soát hoàn tiền trước khi hủy' : 'Hủy đơn đặt trước và hoàn lại tồn kho đã giữ'}
+                                      title={pre.depositAmount > 0 ? 'Đơn có tiền cọc cần đối soát hoàn tiền trước khi hủy' : 'Hủy đơn đặt trước và hoàn lại tồn kho đã giữ'}
                                     >
                                       <XCircle size={12} />
                                       <span>Hủy</span>
@@ -2092,7 +2157,7 @@ export const InvoiceManagementPage: FC = () => {
                           {/* ACCORDION CHI TIẾT ĐƠN ĐẶT TRƯỚC VÀ GIỮ KHO */}
                           {isExpanded && (
                             <tr>
-                              <td colSpan={13} style={{ padding: 12, backgroundColor: '#f8fafc' }}>
+                              <td colSpan={10} style={{ padding: 12, backgroundColor: '#f8fafc' }}>
                                 <div
                                   style={{
                                     backgroundColor: '#ffffff',

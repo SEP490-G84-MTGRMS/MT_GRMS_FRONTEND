@@ -24,8 +24,8 @@ export const CashMovementModal: FC<Props> = ({
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
   const [movementType, setMovementType] = useState<'IN' | 'OUT'>('OUT');
   const [category, setCategory] = useState<number>(MANUAL_CASH_MOVEMENT_CATEGORY.EXPENSE);
-  const [amount, setAmount] = useState<number>(100000);
-  const [reason, setReason] = useState<string>('Mua giấy in nhiệt k80');
+  const [amount, setAmount] = useState<number>(0);
+  const [reason, setReason] = useState<string>('');
   const [threshold, setThreshold] = useState<number>(200000);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export const CashMovementModal: FC<Props> = ({
     // Refresh danh sách phiếu
     posShiftApi.getShiftById(shift.id).then((refreshed) => {
       if (refreshed) setMovementsList(refreshed.cashMovements || []);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [isOpen, shift.id]);
 
   if (!isOpen) return null;
@@ -82,6 +82,8 @@ export const CashMovementModal: FC<Props> = ({
       });
 
       onMovementAdded();
+      setAmount(0);
+      setReason('');
       // Reload danh sách
       const refreshed = await posShiftApi.getShiftById(shift.id);
       if (refreshed) setMovementsList(refreshed.cashMovements || []);
@@ -323,10 +325,10 @@ export const CashMovementModal: FC<Props> = ({
                 {isLoading
                   ? 'Đang xử lý...'
                   : isExceedThreshold
-                  ? 'Gửi Yêu Cầu Phê Duyệt'
-                  : movementType === 'IN'
-                  ? 'Xác Nhận Nạp Két'
-                  : 'Xác Nhận Xuất Quỹ'}
+                    ? 'Gửi Yêu Cầu Phê Duyệt'
+                    : movementType === 'IN'
+                      ? 'Xác Nhận Nạp Két'
+                      : 'Xác Nhận Xuất Quỹ'}
               </button>
             </div>
           </form>

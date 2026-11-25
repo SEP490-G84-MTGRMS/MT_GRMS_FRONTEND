@@ -168,7 +168,7 @@ export const PosPaymentPanel: FC<Props> = ({
         <div>
           <b>Quầy #01</b>
         </div>
-        <div style={{ fontSize: 12, color: '#64748b' }}>
+        <div style={{ fontSize: 13, color: '#64748b' }}>
           {new Date().toLocaleDateString('vi-VN')} {new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
@@ -260,7 +260,7 @@ export const PosPaymentPanel: FC<Props> = ({
               <span className="pos-loyalty-text">
                 Điểm tích lũy: <b>{customer.loyaltyPoints} điểm</b>
               </span>
-              <div style={{ marginTop: 4, fontSize: 11, color: '#334155', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ marginTop: 4, fontSize: 12, color: '#334155', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span>Đã nợ: <b style={{ color: '#0f766e' }}>{customer.debtCount || 0} lần</b></span>
                 <span>&bull;</span>
                 <span>Đang nợ: <b style={{ color: customer.currentDebt > 0 ? '#dc2626' : '#16a34a' }}>{customer.currentDebt.toLocaleString('vi-VN')} đ</b></span>
@@ -279,14 +279,14 @@ export const PosPaymentPanel: FC<Props> = ({
                 onSelectCustomer(null);
                 setCustomerSearchInput('');
               }}
-              style={{ fontSize: 11.5, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              style={{ fontSize: 12, padding: '3px 9px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
             >
-              <X size={12} />
+              <X size={13} />
               <span>Bỏ chọn</span>
             </button>
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6, fontStyle: 'italic' }}>
+          <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 6, fontStyle: 'italic' }}>
             Khách vãng lai (không tích điểm, không bán nợ)
           </div>
         )}
@@ -320,10 +320,10 @@ export const PosPaymentPanel: FC<Props> = ({
                     : 'Giảm giá (0%) [KM]:'}
                 </span>
                 {appliedPromotions && appliedPromotions.length > 0 && (
-                  <div style={{ fontSize: 11, color: '#0d9488', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: '#0d9488', marginTop: 2 }}>
                     {appliedPromotions.map((p, idx) => (
                       <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <Gift size={11} color="#0d9488" /> {p}
+                        <Gift size={12} color="#0d9488" /> {p}
                       </div>
                     ))}
                   </div>
@@ -335,14 +335,14 @@ export const PosPaymentPanel: FC<Props> = ({
             </tr>
             {giftItems && giftItems.length > 0 && (
               <tr>
-                <td colSpan={2} style={{ background: '#f0fdf4', padding: '4px 8px', borderRadius: 4 }}>
-                  <div style={{ fontSize: 11.5, color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <td colSpan={2} style={{ background: '#f0fdf4', padding: '5px 8px', borderRadius: 4 }}>
+                  <div style={{ fontSize: 12.5, color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                     <Gift size={13} color="#15803d" /> Quà tặng khuyến mãi xuất kho kèm đơn:
                   </div>
                   {giftItems.map((g, idx) => (
-                    <div key={idx} style={{ fontSize: 11, color: '#166534', display: 'flex', justifyContent: 'space-between' }}>
+                    <div key={idx} style={{ fontSize: 12, color: '#166534', display: 'flex', justifyContent: 'space-between' }}>
                       <span>
-                        ✦ {g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})
+                        {g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})
                       </span>
                       <span style={{ fontWeight: 600 }}>
                         0 đ{g.equivalentValue && g.equivalentValue > 0 ? ` (~${g.equivalentValue.toLocaleString('vi-VN')} đ)` : ''}
@@ -355,13 +355,13 @@ export const PosPaymentPanel: FC<Props> = ({
             <tr>
               <td>Mã Voucher:</td>
               <td style={{ textAlign: 'right' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                   <input
                     type="text"
                     value={couponCode}
                     onChange={(e) => onCouponCodeChange(e.target.value)}
                     placeholder="Mã voucher..."
-                    style={{ width: 95, fontSize: 12, padding: '2px 4px', textAlign: 'center' }}
+                    style={{ width: 112, fontSize: 13, padding: '3px 8px', textAlign: 'center' }}
                     className="pos-input"
                   />
                   {onValidateCoupon && (
@@ -370,19 +370,19 @@ export const PosPaymentPanel: FC<Props> = ({
                       className="pos-btn-secondary"
                       onClick={onValidateCoupon}
                       disabled={!couponCode.trim() || isValidatingCoupon}
-                      style={{ fontSize: 11, padding: '2px 6px', height: 26 }}
+                      style={{ fontSize: 12, padding: '3px 10px', height: 28, whiteSpace: 'nowrap', flexShrink: 0 }}
                     >
                       {isValidatingCoupon ? '...' : 'Áp dụng'}
                     </button>
                   )}
                 </div>
                 {couponStatusText && (
-                  <div style={{ fontSize: 11, color: couponDiscountAmount > 0 ? '#16a34a' : '#dc2626', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: couponDiscountAmount > 0 ? '#16a34a' : '#dc2626', marginTop: 2 }}>
                     {couponStatusText}
                   </div>
                 )}
                 {couponDiscountAmount > 0 && (
-                  <div style={{ color: '#16a34a', fontWeight: 600, fontSize: 12, marginTop: 2 }}>
+                  <div style={{ color: '#16a34a', fontWeight: 600, fontSize: 13, marginTop: 2 }}>
                     -{couponDiscountAmount.toLocaleString('vi-VN')} đ
                   </div>
                 )}
@@ -411,25 +411,25 @@ export const PosPaymentPanel: FC<Props> = ({
                     onChange={(e) => onToggleUsePoints(e.target.checked)}
                   />
                   <span>
-                    Dùng điểm (tối đa {externalMaxPointsCanUse ?? pointsToRedeem} đ. / trần {maxRedemptionPercent}%):
+                    Dùng điểm (tối đa {externalMaxPointsCanUse ?? pointsToRedeem} điểm / trần {maxRedemptionPercent}%):
                     {isLoyaltyEnabled === false ? (
-                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                      <span style={{ display: 'block', fontSize: 11.5, color: '#94a3b8' }}>
                         (Cấu hình tích/tiêu điểm đang tắt)
                       </span>
                     ) : isWalkIn ? (
-                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                      <span style={{ display: 'block', fontSize: 11.5, color: '#94a3b8' }}>
                         (Khách lẻ không tích/tiêu điểm)
                       </span>
                     ) : isPointsBlockedByPromo ? (
-                      <span style={{ display: 'block', fontSize: 10.5, color: '#d97706' }}>
+                      <span style={{ display: 'block', fontSize: 11.5, color: '#d97706' }}>
                         (Không áp dụng cùng khuyến mãi)
                       </span>
                     ) : customer && customer.loyaltyPoints < minPointsRequired ? (
-                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                      <span style={{ display: 'block', fontSize: 11.5, color: '#94a3b8' }}>
                         (Tối thiểu {minPointsRequired} điểm)
                       </span>
                     ) : externalMaxPointsCanUse !== undefined && externalMaxPointsCanUse < minPointsRequired && customer ? (
-                      <span style={{ display: 'block', fontSize: 10.5, color: '#94a3b8' }}>
+                      <span style={{ display: 'block', fontSize: 11.5, color: '#94a3b8' }}>
                         (Trần {maxRedemptionPercent}% hóa đơn chưa đạt mức tối thiểu {minPointsRequired} điểm)
                       </span>
                     ) : null}
@@ -450,17 +450,17 @@ export const PosPaymentPanel: FC<Props> = ({
                         onPointsToRedeemChange(Math.max(0, Math.min(raw, cap)));
                       }}
                       className="pos-input"
-                      style={{ width: 84, textAlign: 'right', padding: '2px 6px', fontSize: 12, fontWeight: 700 }}
+                      style={{ width: 92, textAlign: 'right', padding: '3px 8px', fontSize: 13, fontWeight: 700 }}
                     />
                     <button
                       type="button"
                       onClick={() => onPointsToRedeemChange(externalMaxPointsCanUse ?? pointsToRedeem)}
-                      style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer' }}
+                      style={{ fontSize: 12, padding: '3px 8px', borderRadius: 4, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer' }}
                     >
                       Tối đa
                     </button>
                     {isCustomPointsBelowMin && (
-                      <span style={{ fontSize: 10.5, color: '#dc2626' }}>
+                      <span style={{ fontSize: 11.5, color: '#dc2626' }}>
                         Tối thiểu {minPointsRequired} điểm
                       </span>
                     )}
@@ -473,10 +473,10 @@ export const PosPaymentPanel: FC<Props> = ({
             </tr>
             <tr className="pos-total-row">
               <td>
-                <b style={{ fontSize: 14 }}>KHÁCH CẦN TRẢ:</b>
+                <b style={{ fontSize: 15 }}>KHÁCH CẦN TRẢ:</b>
               </td>
               <td style={{ textAlign: 'right' }}>
-                <b style={{ fontSize: 18, color: 'var(--blue-primary)' }}>
+                <b style={{ fontSize: 20, color: 'var(--blue-primary)' }}>
                   {finalAmount.toLocaleString('vi-VN')} đ
                 </b>
               </td>
@@ -491,7 +491,7 @@ export const PosPaymentPanel: FC<Props> = ({
           <b>Hình thức thanh toán</b>
         </legend>
 
-        <div style={{ display: 'flex', gap: 10, marginBottom: 6, fontSize: 12.5, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 6, fontSize: 13.5, flexWrap: 'wrap' }}>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
             <input
               type="radio"
@@ -542,11 +542,11 @@ export const PosPaymentPanel: FC<Props> = ({
                     onChange={(e) => onCashTenderedChange(Number(e.target.value) || 0)}
                     className="pos-input"
                     style={{
-                      width: 120,
+                      width: 136,
                       textAlign: 'right',
                       fontWeight: 800,
-                      fontSize: 14,
-                      padding: '3px 8px',
+                      fontSize: 15,
+                      padding: '4px 10px',
                     }}
                   />{' '}
                   đ
@@ -554,7 +554,7 @@ export const PosPaymentPanel: FC<Props> = ({
               </tr>
               <tr style={{ backgroundColor: '#f8fafc' }}>
                 <td><b>Tiền thừa trả khách:</b></td>
-                <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 14, color: '#16a34a' }}>
+                <td style={{ textAlign: 'right', fontWeight: 800, fontSize: 15, color: '#16a34a' }}>
                   {changeAmount.toLocaleString('vi-VN')} đ
                 </td>
               </tr>
@@ -564,7 +564,7 @@ export const PosPaymentPanel: FC<Props> = ({
 
         {/* Hiển thị thông tin sổ nợ khi chọn Ghi nợ (chỉ cho Chủ cửa hàng - không giới hạn hạn mức) */}
         {isStoreOwner && paymentMethod === 'debt' && (
-          <div style={{ marginTop: 8, padding: 10, borderRadius: 6, backgroundColor: '#fffbeb', border: '1px solid #fde68a', fontSize: 12 }}>
+          <div style={{ marginTop: 8, padding: 10, borderRadius: 6, backgroundColor: '#fffbeb', border: '1px solid #fde68a', fontSize: 13 }}>
             {!customer ? (
               <div style={{ color: '#b45309', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <AlertTriangle size={15} color="#b45309" style={{ flexShrink: 0 }} />
@@ -601,7 +601,7 @@ export const PosPaymentPanel: FC<Props> = ({
                   </strong>
                 </div>
                 <div style={{ marginTop: 4, padding: '4px 8px', borderRadius: 4, backgroundColor: '#ecfdf5', color: '#047857', fontSize: 11.5 }}>
-                  {finalAmount > 0 ? <>✓ Đơn hàng <b>{finalAmount.toLocaleString('vi-VN')} đ</b> sẽ được cộng dồn vào sổ nợ của khách.</> : 'Đơn 0 đ không làm tăng công nợ.'}
+                  {finalAmount > 0 ? <>Đơn hàng <b>{finalAmount.toLocaleString('vi-VN')} đ</b> sẽ được cộng dồn vào sổ nợ của khách.</> : 'Đơn 0 đ không làm tăng công nợ.'}
                 </div>
               </div>
             )}

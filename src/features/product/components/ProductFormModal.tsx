@@ -12,12 +12,14 @@ import {
   Plus,
   Loader2,
   Tag,
+  History,
 } from 'lucide-react';
 import type { ProductItem, Category, UomConversion } from '../types';
 import { readFileAsDataUrl } from '../../../utils/imageFile';
 import { productApi } from '../api/productApi';
 import { masterCatalogApi } from '../../admin/api/masterCatalogApi';
 import type { MasterProductSuggestion } from '../../admin/types/masterCatalog.types';
+import { PriceHistoryModal } from './PriceHistoryModal';
 
 /** ĐVT "Khay/Tray" không dùng làm quy đổi cố định — giá khay = kg × PROCESSED lúc đóng khay. */
 const isTrayUnitName = (name?: string | null): boolean => {
@@ -382,6 +384,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Alerts & Validation Popup
   const [warningMsg, setWarningMsg] = useState('');
   const [validationPopupMsg, setValidationPopupMsg] = useState<string>('');
+  const [showPriceHistory, setShowPriceHistory] = useState(false);
   const [touched, setTouched] = useState<{
     productCode?: boolean;
     barcode?: boolean;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
-import { ArrowUpFromLine, Info, X } from 'lucide-react';
+import { AlertTriangle, ArrowUpFromLine, Ban, Info, X } from 'lucide-react';
 import type { CashAccount, CashbookTaxTreatment, CreatePaymentDTO, CounterpartyType } from '../types/cashbook.types';
 
 interface CreatePaymentModalProps {
@@ -185,13 +185,13 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
           <div className="cb-modal-body">
             {errorMsg && (
               <div className="cb-overdraft-alert">
-                <span>⚠️</span> {errorMsg}
+                <AlertTriangle size={15} className="shrink-0" /> <span>{errorMsg}</span>
               </div>
             )}
 
             {isOverdraftViolation && (
               <div className="cb-overdraft-alert">
-                <span>🚫</span>
+                <Ban size={15} className="shrink-0" />
                 <div>
                   Số tiền chi vượt số dư khả dụng {selectedAccount.currentBalance.toLocaleString('vi-VN')} đ.
                 </div>

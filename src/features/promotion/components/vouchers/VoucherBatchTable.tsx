@@ -218,33 +218,33 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   return (
     <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
       <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1620, width: '100%', tableLayout: 'fixed' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1410, width: '100%', tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: 44 }} />
-            <col style={{ width: 115 }} />
-            <col style={{ width: 215 }} />
-            <col style={{ width: 130 }} />
-            <col style={{ width: 165 }} />
-            <col style={{ width: 95 }} />
-            <col style={{ width: 115 }} />
-            <col style={{ width: 115 }} />
-            <col style={{ width: 115 }} />
-            <col style={{ width: 175 }} />
-            <col style={{ width: 250 }} />
+            <col style={{ width: 36 }} />
+            <col style={{ width: 116 }} />
+            <col />
+            <col style={{ width: 145 }} />
+            <col style={{ width: 168 }} />
+            <col style={{ width: 82 }} />
+            <col style={{ width: 94 }} />
+            <col style={{ width: 108 }} />
+            <col style={{ width: 108 }} />
+            <col style={{ width: 166 }} />
+            <col style={{ width: 208 }} />
           </colgroup>
           <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
-              <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
-              <th style={{ ...thStyle, width: 115 }}><SortableHeader label="Mã đợt" active={sort.key === 'batchCode'} direction={sort.direction} onClick={() => handleSort('batchCode')} /></th>
-              <th style={{ ...thStyle, width: 215 }}><SortableHeader label="Tên đợt Voucher" active={sort.key === 'name'} direction={sort.direction} onClick={() => handleSort('name')} /></th>
-              <th style={{ ...thStyle, width: 130 }}><SortableHeader label="Loại ưu đãi" active={sort.key === 'discountValue'} direction={sort.direction} onClick={() => handleSort('discountValue')} /></th>
-              <th style={{ ...thStyle, width: 165 }}>Điều kiện áp dụng</th>
-              <th style={{ ...thStyle, width: 95, textAlign: 'right' }}><SortableHeader label="Đã dùng" align="right" active={sort.key === 'usedQuantity'} direction={sort.direction} onClick={() => handleSort('usedQuantity')} /></th>
-              <th style={{ ...thStyle, width: 115, textAlign: 'right' }}><SortableHeader label="Tổng phát hành" align="right" active={sort.key === 'totalQuantity'} direction={sort.direction} onClick={() => handleSort('totalQuantity')} /></th>
-              <th style={{ ...thStyle, width: 115 }}><SortableHeader label="Ngày bắt đầu" active={sort.key === 'startDate'} direction={sort.direction} onClick={() => handleSort('startDate')} /></th>
-              <th style={{ ...thStyle, width: 115 }}><SortableHeader label="Ngày hết hạn" active={sort.key === 'endDate'} direction={sort.direction} onClick={() => handleSort('endDate')} /></th>
-              <th style={{ ...thStyle, width: 175 }}><SortableHeader label="Trạng thái" active={sort.key === 'status'} direction={sort.direction} onClick={() => handleSort('status')} /></th>
-              <th style={{ ...thStyle, width: 250, textAlign: 'right', paddingRight: 16 }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 36, padding: '8px 6px', textAlign: 'center' }}></th>
+              <th style={{ ...thStyle, width: 116 }}><SortableHeader label="Mã đợt" active={sort.key === 'batchCode'} direction={sort.direction} onClick={() => handleSort('batchCode')} /></th>
+              <th style={{ ...thStyle }}><SortableHeader label="Tên đợt Voucher" active={sort.key === 'name'} direction={sort.direction} onClick={() => handleSort('name')} /></th>
+              <th style={{ ...thStyle, width: 145 }}><SortableHeader label="Loại ưu đãi" active={sort.key === 'discountValue'} direction={sort.direction} onClick={() => handleSort('discountValue')} /></th>
+              <th style={{ ...thStyle, width: 168 }}>Điều kiện áp dụng</th>
+              <th style={{ ...thStyle, width: 82, textAlign: 'right' }}><SortableHeader label="Đã dùng" align="right" active={sort.key === 'usedQuantity'} direction={sort.direction} onClick={() => handleSort('usedQuantity')} /></th>
+              <th style={{ ...thStyle, width: 94, textAlign: 'right' }}><SortableHeader label="Phát hành" align="right" active={sort.key === 'totalQuantity'} direction={sort.direction} onClick={() => handleSort('totalQuantity')} /></th>
+              <th style={{ ...thStyle, width: 108, whiteSpace: 'nowrap' }}><SortableHeader label="Bắt đầu" active={sort.key === 'startDate'} direction={sort.direction} onClick={() => handleSort('startDate')} /></th>
+              <th style={{ ...thStyle, width: 108, whiteSpace: 'nowrap' }}><SortableHeader label="Hết hạn" active={sort.key === 'endDate'} direction={sort.direction} onClick={() => handleSort('endDate')} /></th>
+              <th style={{ ...thStyle, width: 166 }}><SortableHeader label="Trạng thái" active={sort.key === 'status'} direction={sort.direction} onClick={() => handleSort('status')} /></th>
+              <th style={{ ...thStyle, width: 208, textAlign: 'right', paddingRight: 14 }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -341,11 +341,11 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                       <td className="so-list-td">
                         <div className="voucher-conditions" style={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
                           <div>
-                            Đơn tối thiểu: <strong>{batch.minOrderValue.toLocaleString('vi-VN')} đ</strong>
+                            Đơn tối thiểu: <strong style={{ whiteSpace: 'nowrap' }}>{batch.minOrderValue.toLocaleString('vi-VN')} đ</strong>
                           </div>
                           {batch.maxDiscount && (
                             <div style={{ color: '#64748b' }}>
-                              Giảm tối đa: {batch.maxDiscount.toLocaleString('vi-VN')} đ
+                              Giảm tối đa: <span style={{ whiteSpace: 'nowrap' }}>{batch.maxDiscount.toLocaleString('vi-VN')} đ</span>
                             </div>
                           )}
                         </div>
@@ -357,33 +357,37 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                       <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#334155' }}>
                         {batch.totalQuantity}
                       </td>
-                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 600, color: '#334155' }}>
-                        {batch.startDate || '—'}
+                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
+                        {batch.startDate ? batch.startDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1') : '—'}
                       </td>
-                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 600, color: '#334155' }}>
-                        {batch.endDate || '—'}
+                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
+                        {batch.endDate ? batch.endDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1') : '—'}
                       </td>
-                      <td className="so-list-td" style={{ overflow: 'hidden', padding: '8px 10px', boxSizing: 'border-box' }}>
+                      <td className="so-list-td" style={{ overflow: 'hidden', padding: '8px 12px 8px 10px', boxSizing: 'border-box' }}>
                         <div className="promo-status-cell" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
-                          <div
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={batch.status === 'ACTIVE'}
+                            aria-label={batch.status === 'ACTIVE' ? `Tạm dừng đợt ${batch.batchCode}` : `Kích hoạt đợt ${batch.batchCode}`}
                             className="switch-container"
                             onClick={() => onToggleBatchStatus(batch.id)}
                             title={batch.status === 'ACTIVE' ? 'Tạm dừng đợt phát hành' : 'Kích hoạt đợt'}
-                            style={{ flexShrink: 0 }}
+                            style={{ flexShrink: 0, border: 'none', background: 'transparent', padding: 0 }}
                           >
-                            <div className={`switch-track ${batch.status === 'ACTIVE' ? 'switch-active' : ''}`}>
-                              <div className="switch-thumb" />
-                            </div>
-                          </div>
+                            <span className={`switch-track ${batch.status === 'ACTIVE' ? 'switch-active' : ''}`}>
+                              <span className="switch-thumb" />
+                            </span>
+                          </button>
                           {renderBatchStatus(batch.status)}
                         </div>
                       </td>
-                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden', padding: '8px 14px', boxSizing: 'border-box' }}>
-                        <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap', maxWidth: '100%' }}>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden', padding: '8px 14px 8px 12px', boxSizing: 'border-box' }}>
+                        <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end', flexWrap: 'nowrap', maxWidth: '100%' }}>
                           <button
                             onClick={() => onOpenGenerateCodes(batch)}
                             className="btn-secondary-pill"
-                            style={{ padding: '3px 8px', fontSize: '11.5px', height: 28, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            style={{ padding: '3px 7px', fontSize: '11.5px', height: 28, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
                             title="Phát hành thêm mã cho đợt này"
                           >
                             <PlusCircle size={13} color="#0F766E" />
@@ -417,7 +421,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
 
                       return (
                         <tr>
-                          <td colSpan={9} style={{ padding: 0 }}>
+                          <td colSpan={11} style={{ padding: 0 }}>
                             <div className="accordion-wrapper">
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                 <div className="accordion-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>

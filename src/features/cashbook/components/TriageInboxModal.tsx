@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { FC } from 'react';
-import { X, Inbox, AlertTriangle, CheckCircle, ShieldCheck } from 'lucide-react';
+import { X, Inbox, AlertTriangle, CheckCircle, ShieldCheck, Building2, User, Zap } from 'lucide-react';
 import type { TriageItem } from '../types/cashbook.types';
 import { cashbookService } from '../services/cashbookService';
 import { formatMoney } from '../../finance/utils/formatters';
@@ -181,7 +181,10 @@ export const TriageInboxModal: FC<TriageInboxModalProps> = ({
                           : 'border-gray-200 bg-white text-gray-700'
                       }`}
                     >
-                      🏢 Chi phí vận hành (OPEX)
+                      <span className="inline-flex items-center gap-1.5">
+                        <Building2 size={14} className="shrink-0" />
+                        <span>Chi phí vận hành (OPEX)</span>
+                      </span>
                       <span className="block text-[10px] text-gray-500 mt-0.5">
                         Tính vào chi phí trừ thuế P&L
                       </span>
@@ -199,7 +202,10 @@ export const TriageInboxModal: FC<TriageInboxModalProps> = ({
                           : 'border-gray-200 bg-white text-gray-700'
                       }`}
                     >
-                      👤 Vốn chủ sở hữu (Rút vốn)
+                      <span className="inline-flex items-center gap-1.5">
+                        <User size={14} className="shrink-0" />
+                        <span>Vốn chủ sở hữu (Rút vốn)</span>
+                      </span>
                       <span className="block text-[10px] text-gray-500 mt-0.5">
                         0% thuế & 0% chi phí P&L
                       </span>
@@ -239,7 +245,7 @@ export const TriageInboxModal: FC<TriageInboxModalProps> = ({
                   className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm shadow transition-all flex items-center justify-center gap-2"
                 >
                   <CheckCircle size={18} />
-                  {isSubmitting ? 'Đang duyệt...' : '✅ Phê duyệt & Phân loại chính thức'}
+                  {isSubmitting ? 'Đang duyệt...' : 'Phê duyệt & Phân loại chính thức'}
                 </button>
               </div>
             </div>
@@ -283,9 +289,10 @@ export const TriageInboxModal: FC<TriageInboxModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleSelectItem(item)}
-                        className="mt-2 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors"
+                        className="mt-2 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors inline-flex items-center gap-1"
                       >
-                        ⚡ Xử lý ngay
+                        <Zap size={13} />
+                        <span>Xử lý ngay</span>
                       </button>
                     </div>
                   </div>

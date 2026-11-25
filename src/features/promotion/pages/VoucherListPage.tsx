@@ -41,6 +41,8 @@ export const VoucherListPage: FC = () => {
   const [generateTargetBatch, setGenerateTargetBatch] = useState<VoucherBatchItem | null>(null);
   const [codesRefreshSignal, setCodesRefreshSignal] = useState<{ batchId: string; version: number } | null>(null);
   const [codeFilter, setCodeFilter] = useState('');
+  const [draftCodeFilter, setDraftCodeFilter] = useState('');
+  const [draftSearchTerm, setDraftSearchTerm] = useState('');
   const [deleteTargetBatch, setDeleteTargetBatch] = useState<VoucherBatchItem | null>(null);
 
   const mapDtoToBatch = useCallback((dto: VoucherBatchDto): VoucherBatchItem => {
@@ -66,8 +68,8 @@ export const VoucherListPage: FC = () => {
         dto.allowWithPromotions !== undefined
           ? dto.allowWithPromotions
           : rawDesc
-          ? !rawDesc.includes('"allowWithPromotions":false')
-          : true,
+            ? !rawDesc.includes('"allowWithPromotions":false')
+            : true,
       codes: [],
     };
   }, []);
@@ -131,22 +133,22 @@ export const VoucherListPage: FC = () => {
     try {
       await promotionApi.toggleVoucherBatchStatus(batchId);
       setBatches((prev) =>
-      prev.map((b) => {
-        if (b.id === batchId) {
-          const nextStatus = b.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-          showToast(
-            nextStatus === 'ACTIVE'
-              ? `Đã kích hoạt lưu hành đợt "${b.name}"!`
-              : `Đã tạm dừng đợt "${b.name}"!`,
-            'info'
-          );
-          return {
-            ...b,
-            status: nextStatus,
-          };
-        }
-        return b;
-      })
+        prev.map((b) => {
+          if (b.id === batchId) {
+            const nextStatus = b.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
+            showToast(
+              nextStatus === 'ACTIVE'
+                ? `Đã kích hoạt lưu hành đợt "${b.name}"!`
+                : `Đã tạm dừng đợt "${b.name}"!`,
+              'info'
+            );
+            return {
+              ...b,
+              status: nextStatus,
+            };
+          }
+          return b;
+        })
       );
     } catch {
       showToast('Không thể cập nhật trạng thái đợt voucher.', 'error');
@@ -254,6 +256,11 @@ export const VoucherListPage: FC = () => {
     }
   };
 
+  const handleApplySearch = () => {
+    setCodeFilter(draftCodeFilter);
+    setFilter((prev) => ({ ...prev, searchTerm: draftSearchTerm }));
+  };
+
   return (
     <div
       className="promotion-page"
@@ -297,16 +304,17 @@ export const VoucherListPage: FC = () => {
               <div style={{ position: 'relative', width: '100%' }}>
                 <input
                   type="text"
-                  value={codeFilter}
-                  onChange={(e) => setCodeFilter(e.target.value)}
+                  value={draftCodeFilter}
+                  onChange={(e) => setDraftCodeFilter(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleApplySearch()}
                   placeholder="Nhập mã đợt, tiền tố..."
                   className="so-list-filter-input"
-                  style={{ width: '100%', paddingRight: codeFilter ? 26 : 10 }}
+                  style={{ width: '100%', paddingRight: draftCodeFilter ? 26 : 10 }}
                 />
-                {codeFilter && (
+                {draftCodeFilter && (
                   <button
                     type="button"
-                    onClick={() => setCodeFilter('')}
+                    onClick={() => setDraftCodeFilter('')}
                     style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
                     title="Xóa mã đợt"
                   >
@@ -321,20 +329,21 @@ export const VoucherListPage: FC = () => {
               <div style={{ position: 'relative', width: '100%' }}>
                 <input
                   type="text"
-                  value={filter.searchTerm}
-                  onChange={(e) => setFilter({ ...filter, searchTerm: e.target.value })}
+                  value={draftSearchTerm}
+                  onChange={(e) => setDraftSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleApplySearch()}
                   placeholder="Nhập tên đợt phát hành..."
                   className="so-list-filter-input"
-                  style={{ width: '100%', paddingLeft: 28, paddingRight: filter.searchTerm ? 26 : 10 }}
+                  style={{ width: '100%', paddingLeft: 28, paddingRight: draftSearchTerm ? 26 : 10 }}
                 />
                 <Search
                   size={14}
                   style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }}
                 />
-                {filter.searchTerm && (
+                {draftSearchTerm && (
                   <button
                     type="button"
-                    onClick={() => setFilter({ ...filter, searchTerm: '' })}
+                    onClick={() => setDraftSearchTerm('')}
                     style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
                     title="Xóa tìm kiếm"
                   >
@@ -374,7 +383,7 @@ export const VoucherListPage: FC = () => {
             <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
               <button
                 type="button"
-                onClick={loadBatches}
+                onClick={handleApplySearch}
                 className="so-list-filter-search"
                 title="Tìm kiếm"
               >
@@ -383,8 +392,10 @@ export const VoucherListPage: FC = () => {
               </button>
               <button
                 type="button"
-                disabled={!codeFilter && !filter.searchTerm && filter.discountType === 'ALL' && filter.status === 'ALL'}
+                disabled={!draftCodeFilter && !draftSearchTerm && !codeFilter && !filter.searchTerm && filter.discountType === 'ALL' && filter.status === 'ALL'}
                 onClick={() => {
+                  setDraftCodeFilter('');
+                  setDraftSearchTerm('');
                   setCodeFilter('');
                   setFilter({ searchTerm: '', discountType: 'ALL', status: 'ALL' });
                 }}
@@ -403,10 +414,10 @@ export const VoucherListPage: FC = () => {
                 <RotateCw size={13} />
                 <span>Làm mới</span>
               </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
       {/* Batch Table with Codes Accordion */}
       <VoucherBatchTable

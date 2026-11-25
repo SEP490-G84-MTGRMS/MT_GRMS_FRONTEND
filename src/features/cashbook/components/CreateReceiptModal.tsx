@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownToLine, Info, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownToLine, Info, X } from 'lucide-react';
 import type { CashAccount, CashbookTaxTreatment, CreateReceiptDTO, CounterpartyType } from '../types/cashbook.types';
 
 interface CreateReceiptModalProps {
@@ -148,7 +148,7 @@ export const CreateReceiptModal: FC<CreateReceiptModalProps> = ({
           <div className="cb-modal-body">
             {errorMsg && (
               <div className="cb-overdraft-alert">
-                <span>⚠️</span> {errorMsg}
+                <AlertTriangle size={15} className="shrink-0" /> <span>{errorMsg}</span>
               </div>
             )}
 

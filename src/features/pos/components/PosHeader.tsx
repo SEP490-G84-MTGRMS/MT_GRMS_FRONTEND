@@ -361,14 +361,39 @@ export const PosHeader: FC<Props> = ({
                 }
               }}
               onKeyDown={handleSearchKeyDown}
-              placeholder="[F2] Quét Barcode, SKU, tên sản phẩm..."
+              placeholder="Quét Barcode hoặc nhập tên mặt hàng, mã SKU [F2]..."
               className="pos-barcode-input"
               autoComplete="off"
             />
             <button
               type="button"
               className="pos-barcode-submit-btn"
+              title="Tìm kiếm sản phẩm theo tên, mã SKU hoặc mã vạch"
               onClick={() => {
+                const trimmed = searchQuery.trim();
+                if (!trimmed) {
+                  const inputEl = document.getElementById('product_search') as HTMLInputElement | null;
+                  inputEl?.focus();
+                  inputEl?.select();
+                  return;
+                }
+                const q = trimmed.toLowerCase();
+                const exactMatch = products.find(
+                  (p) => p.barcode.toLowerCase() === q || p.sku.toLowerCase() === q
+                );
+                if (exactMatch) {
+                  handleSelectProductItem(exactMatch);
+                  return;
+                }
+                const exactPackage = packageHits.find(
+                  (h) =>
+                    h.package.internalCode.toLowerCase() === q ||
+                    (h.package.barcode || '').toLowerCase() === q
+                );
+                if (exactPackage) {
+                  handleSelectPackageItem(exactPackage);
+                  return;
+                }
                 if (totalHitCount === 1) {
                   handleSelectHit(searchHits[0]);
                 } else if (totalHitCount > 1) {
@@ -484,7 +509,7 @@ export const PosHeader: FC<Props> = ({
                 onClick={() => onToggleSalesMode('fast')}
                 title="Chế độ quét barcode nhanh"
               >
-                ● Bán nhanh
+                Bán nhanh
               </button>
               <button
                 type="button"
@@ -492,7 +517,7 @@ export const PosHeader: FC<Props> = ({
                 onClick={() => onToggleSalesMode('normal')}
                 title="Chế độ chọn danh mục cảm ứng (F3)"
               >
-                ○ Bán thường
+                Bán thường
               </button>
             </div>
           )}

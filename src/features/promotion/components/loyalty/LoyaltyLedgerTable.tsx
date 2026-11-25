@@ -14,6 +14,9 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
   onOpenAdjustModal,
   onRefresh,
 }) => {
+  const [draftTxFilter, setDraftTxFilter] = useState('');
+  const [draftCustomerFilter, setDraftCustomerFilter] = useState('');
+  const [draftPhoneFilter, setDraftPhoneFilter] = useState('');
   const [txFilter, setTxFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [phoneFilter, setPhoneFilter] = useState('');
@@ -57,8 +60,27 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
     );
   }, [sortedItems, currentPage, pageSize]);
 
-  const isFiltered = Boolean(txFilter.trim() || customerFilter.trim() || phoneFilter.trim() || typeFilter !== 'ALL');
+  const isFiltered = Boolean(
+    draftTxFilter.trim() ||
+    draftCustomerFilter.trim() ||
+    draftPhoneFilter.trim() ||
+    txFilter.trim() ||
+    customerFilter.trim() ||
+    phoneFilter.trim() ||
+    typeFilter !== 'ALL'
+  );
+
+  const handleApplySearch = () => {
+    setTxFilter(draftTxFilter);
+    setCustomerFilter(draftCustomerFilter);
+    setPhoneFilter(draftPhoneFilter);
+    setCurrentPage(1);
+  };
+
   const handleReset = () => {
+    setDraftTxFilter('');
+    setDraftCustomerFilter('');
+    setDraftPhoneFilter('');
     setTxFilter('');
     setCustomerFilter('');
     setPhoneFilter('');
@@ -138,8 +160,9 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
             <label className="so-list-filter-label">Mã GD:</label>
             <input
               type="text"
-              value={txFilter}
-              onChange={(e) => { setTxFilter(e.target.value); setCurrentPage(1); }}
+              value={draftTxFilter}
+              onChange={(e) => setDraftTxFilter(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplySearch()}
               placeholder="Nhập mã GD..."
               className="so-list-filter-input"
               style={{ width: '100%' }}
@@ -150,8 +173,9 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
             <label className="so-list-filter-label">Khách hàng:</label>
             <input
               type="text"
-              value={customerFilter}
-              onChange={(e) => { setCustomerFilter(e.target.value); setCurrentPage(1); }}
+              value={draftCustomerFilter}
+              onChange={(e) => setDraftCustomerFilter(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplySearch()}
               placeholder="Nhập tên khách..."
               className="so-list-filter-input"
               style={{ width: '100%' }}
@@ -162,8 +186,9 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
             <label className="so-list-filter-label">SĐT:</label>
             <input
               type="text"
-              value={phoneFilter}
-              onChange={(e) => { setPhoneFilter(e.target.value); setCurrentPage(1); }}
+              value={draftPhoneFilter}
+              onChange={(e) => setDraftPhoneFilter(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplySearch()}
               placeholder="Số điện thoại..."
               className="so-list-filter-input"
               style={{ width: '100%' }}
@@ -182,12 +207,11 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
               <option value="REDEEM_PURCHASE">Tiêu điểm đơn hàng</option>
               <option value="MANUAL_ADJUST_ADD">Điều chỉnh (Cộng)</option>
               <option value="MANUAL_ADJUST_SUB">Điều chỉnh (Trừ)</option>
-              <option value="EXPIRED">Điểm hết hạn</option>
             </select>
           </div>
 
           <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            <button type="button" onClick={() => setCurrentPage(1)} className="so-list-filter-search">
+            <button type="button" onClick={handleApplySearch} className="so-list-filter-search">
               <Search size={13} />
               <span>Tìm kiếm</span>
             </button>
@@ -266,9 +290,8 @@ export const LoyaltyLedgerTable: FC<LoyaltyLedgerTableProps> = ({
                   <td className="so-list-td">{renderTypeBadge(row.type)}</td>
                   <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
                     <span
-                      className={`ledger-points-val ${
-                        row.pointsChanged > 0 ? 'ledger-points-plus' : 'ledger-points-minus'
-                      }`}
+                      className={`ledger-points-val ${row.pointsChanged > 0 ? 'ledger-points-plus' : 'ledger-points-minus'
+                        }`}
                     >
                       {row.pointsChanged > 0 ? `+${row.pointsChanged}` : row.pointsChanged}
                     </span>

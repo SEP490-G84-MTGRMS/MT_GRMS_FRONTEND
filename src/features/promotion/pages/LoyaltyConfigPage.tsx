@@ -204,7 +204,11 @@ export const LoyaltyConfigPage: FC = () => {
           {/* Quick Controls in Header (Zero Scroll Needed) */}
           {activeTab === 'config' && (
             <div className="loyalty-header-right-actions">
-              <div
+              <button
+                type="button"
+                role="switch"
+                aria-checked={config.isEnabled}
+                aria-label={config.isEnabled ? 'Tích điểm: Đang bật' : 'Tích điểm: Tắt'}
                 className={`loyalty-switch-pill ${config.isEnabled ? 'active' : 'inactive'}`}
                 onClick={handleToggleEnable}
                 title={config.isEnabled ? 'Nhấp để tạm ngưng tích điểm' : 'Nhấp để kích hoạt tích điểm'}
@@ -212,10 +216,10 @@ export const LoyaltyConfigPage: FC = () => {
                 <span className="loyalty-switch-status-text">
                   {config.isEnabled ? 'Tích điểm: Đang bật' : 'Tích điểm: Tắt'}
                 </span>
-                <div className={`switch-track switch-track-sm ${config.isEnabled ? 'switch-active' : ''}`}>
-                  <div className="switch-thumb switch-thumb-sm" />
-                </div>
-              </div>
+                <span className={`switch-track switch-track-sm ${config.isEnabled ? 'switch-active' : ''}`}>
+                  <span className="switch-thumb switch-thumb-sm" />
+                </span>
+              </button>
 
               <button
                 onClick={handleSaveConfig}

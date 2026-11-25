@@ -159,8 +159,8 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
       <div
         className="modal-box"
         style={{
-          maxWidth: 880,
-          width: '95%',
+          maxWidth: 1100,
+          width: '96%',
           maxHeight: '86vh',
           display: 'flex',
           flexDirection: 'column',
@@ -440,7 +440,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                         <td style={{ ...tdStyle, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
                           {formatDate(item.createdAt)}
                         </td>
-                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                        <td style={{ ...tdStyle, maxWidth: 210, whiteSpace: 'normal' }}>
                           {item.priceScope === 'MASTER' ? (
                             <span
                               style={{
@@ -480,7 +480,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                             <div style={{ marginTop: 5, fontSize: 11, color: '#64748b' }}>ĐVT: {item.productUnitName}</div>
                           )}
                         </td>
-                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                        <td style={{ ...tdStyle, maxWidth: 210, whiteSpace: 'normal' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ color: '#94a3b8', textDecoration: 'line-through', fontSize: 12 }}>
                               {formatCurrency(item.oldPrice)}
@@ -572,10 +572,10 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                             ...tdStyle,
                             fontSize: 12.5,
                             color: '#475569',
-                            maxWidth: 220,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
+                            minWidth: 160,
+                            maxWidth: 260,
+                            whiteSpace: 'normal',
+                            wordBreak: 'break-word',
                           }}
                           title={item.reason}
                         >

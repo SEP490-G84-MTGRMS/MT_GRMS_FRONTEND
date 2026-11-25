@@ -35,9 +35,9 @@ export const GenerateCodesModal: FC<GenerateCodesModalProps> = ({
     } catch (err: any) {
       setErrorMsg(
         err?.response?.data?.message ||
-          err?.response?.data?.detail ||
-          err?.message ||
-          'Không thể sinh thêm mã voucher.'
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Không thể sinh thêm mã voucher.'
       );
     } finally {
       setIsSubmitting(false);

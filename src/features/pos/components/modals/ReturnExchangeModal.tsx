@@ -1043,7 +1043,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                   : 'pointer',
             }}
           >
-            {isSubmitting ? 'Đang xử lý...' : '✓ Xác Nhận Đổi / Trả Hàng'}
+            {isSubmitting ? 'Đang xử lý...' : 'Xác Nhận Đổi / Trả Hàng'}
           </button>
         </div>
       </div>

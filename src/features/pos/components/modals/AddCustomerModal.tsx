@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { FC } from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import type { FC, FormEvent } from 'react';
+import { Loader2, AlertCircle, X } from 'lucide-react';
 import type { Customer } from '../../types/pos.types';
 import { customerApi } from '../../../customer-crm/api/customerApi';
 
@@ -124,328 +124,221 @@ export const AddCustomerModal: FC<Props> = ({ isOpen, onClose, onSave }) => {
     }
   };
 
+  const handleFormSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    void handleSubmit();
+  };
+
   return (
     <div className="pos-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="pos-modal-dialog" style={{ maxWidth: 660, padding: 0 }}>
-        {/* Header với tiêu đề và nút đóng (1) */}
-        <div className="pos-modal-header" style={{ padding: '10px 18px', backgroundColor: '#ffffff', borderBottom: '1px solid #cbd5e1' }}>
-          <b style={{ fontSize: 14, color: '#0f172a' }}>Thêm khách hàng mới</b>
+      <div className="pos-modal-dialog pos-add-customer-dialog">
+        {/* Header giữ đúng cấu trúc mẫu thiết kế (tiêu đề + nút đóng) */}
+        <div className="pos-modal-header pos-add-customer-header">
+          <b className="pos-add-customer-title">Thêm khách hàng mới</b>
           <button
             type="button"
-            className="pos-modal-close-btn"
+            className="pos-add-customer-close"
             onClick={onClose}
-            style={{
-              width: 28,
-              height: 28,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#f8fafc',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: 14,
-            }}
+            aria-label="Đóng"
+            title="Đóng"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
-        {/* Body chuẩn khung bảng lưới 100% giống Ảnh 2 */}
-        <div className="pos-modal-body" style={{ padding: '16px' }}>
-          {errorMessage && (
-            <div
-              style={{
-                marginBottom: 12,
-                padding: '8px 12px',
-                backgroundColor: '#fef2f2',
-                border: '1px solid #f87171',
-                borderRadius: 4,
-                color: '#b91c1c',
-                fontSize: 12,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-          <div
-            style={{
-              border: '2px solid #cbd5e1',
-              padding: '6px',
-              backgroundColor: '#ffffff',
-            }}
-          >
-            <table
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                border: '1px solid #94a3b8',
-                fontSize: 13,
-                color: '#1e293b',
-              }}
-            >
-              <tbody>
-                {/* Hàng 1: Tên KH & Ngày sinh + Giới tính */}
-                <tr>
-                  <td style={{ width: '18%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Tên KH (*):
-                  </td>
-                  <td style={{ width: '32%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      maxLength={100}
-                      placeholder="Nhập họ và tên..."
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontWeight: 700,
-                        fontSize: 13,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </td>
-                  <td style={{ width: '18%', padding: '6px 8px', border: '1px solid #94a3b8', verticalAlign: 'top' }}>
-                    Ngày sinh:
-                  </td>
-                  <td style={{ width: '32%', padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="date"
-                      value={dob}
-                      onChange={(e) => setDob(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '3px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: 12,
-                        marginBottom: 4,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    <div style={{ display: 'flex', gap: 12, fontSize: 12.5 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name="gender_select"
-                          checked={gender === 'Nam'}
-                          onChange={() => setGender('Nam')}
-                        />
-                        Nam
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-                        <input
-                          type="radio"
-                          name="gender_select"
-                          checked={gender === 'Nữ'}
-                          onChange={() => setGender('Nữ')}
-                        />
-                        Nữ
-                      </label>
-                    </div>
-                  </td>
-                </tr>
-
-                {/* Hàng 3: Điện thoại & Email */}
-                <tr>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Điện thoại (*):
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      maxLength={20}
-                      autoComplete="tel"
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: 12.5,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Email:
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      maxLength={254}
-                      placeholder="email@gmail.com"
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: 12.5,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </td>
-                </tr>
-
-                {/* Hàng 4: Địa chỉ & Khu vực (ô nhập text tự do + datalist gợi ý hợp lý) */}
-                <tr>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Địa chỉ:
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="text"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      maxLength={250}
-                      placeholder="Số nhà, đường..."
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: 12.5,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Khu vực:
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="text"
-                      list="area-suggestions"
-                      value={area}
-                      onChange={(e) => setArea(e.target.value)}
-                      maxLength={120}
-                      placeholder="Tỉnh/Thành - Quận/Huyện"
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: 12.5,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                    <datalist id="area-suggestions">
-                      <option value="Hà Nội - Hoàn Kiếm" />
-                      <option value="Hà Nội - Cầu Giấy" />
-                      <option value="Hà Nội - Đống Đa" />
-                      <option value="Hà Nội - Thanh Xuân" />
-                      <option value="TP. Hồ Chí Minh - Quận 1" />
-                      <option value="TP. Hồ Chí Minh - Bình Thạnh" />
-                      <option value="Đà Nẵng - Hải Châu" />
-                    </datalist>
-                  </td>
-                </tr>
-
-                {/* Hàng 5: Phường xã & Ghi chú */}
-                <tr>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Phường xã:
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="text"
-                      value={ward}
-                      onChange={(e) => setWard(e.target.value)}
-                      maxLength={120}
-                      placeholder="Phường/Xã"
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: 12.5,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    Ghi chú:
-                  </td>
-                  <td style={{ padding: '6px 8px', border: '1px solid #94a3b8' }}>
-                    <input
-                      type="text"
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      maxLength={500}
-                      placeholder="Ghi chú thêm..."
-                      style={{
-                        width: '100%',
-                        padding: '4px 6px',
-                        border: '1px solid #cbd5e1',
-                        fontSize: 12.5,
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Footer chứa nút (3) Bỏ qua và (4) Lưu khách hàng đúng như Ảnh 2 */}
-        <div
-          className="pos-modal-footer"
-          style={{
-            padding: '10px 18px',
-            backgroundColor: '#f8fafc',
-            borderTop: '1px solid #cbd5e1',
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 8,
-          }}
-        >
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              padding: '6px 16px',
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#e2e8f0',
-              color: '#1e293b',
-              fontWeight: 500,
-              fontSize: 13,
-              cursor: 'pointer',
-              borderRadius: 0,
-            }}
-          >
-            Bỏ qua
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            style={{
-              padding: '6px 16px',
-              border: '1px solid #1e293b',
-              backgroundColor: isSubmitting ? '#64748b' : '#334155',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: isSubmitting ? 'not-allowed' : 'pointer',
-              borderRadius: 0,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                <span>Đang lưu vào CSDL...</span>
-              </>
-            ) : (
-              <span>✓ Lưu khách hàng</span>
+        <form onSubmit={handleFormSubmit}>
+          {/* Body giữ đúng bố cục bảng 4 hàng x 2 cặp trường của mẫu thiết kế, đồng bộ CSS POS */}
+          <div className="pos-modal-body pos-add-customer-body">
+            {errorMessage && (
+              <div role="alert" className="pos-add-customer-error">
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>{errorMessage}</span>
+              </div>
             )}
-          </button>
-        </div>
+
+            <div className="pos-add-customer-table-wrap">
+              <table className="pos-add-customer-table">
+                <tbody>
+                  {/* Hàng 1: Tên KH & Ngày sinh + Giới tính */}
+                  <tr>
+                    <td className="pos-add-customer-label-cell">
+                      Tên KH (<span className="pos-add-customer-required">*</span>):
+                    </td>
+                    <td className="pos-add-customer-input-cell">
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        maxLength={100}
+                        placeholder="Nhập họ và tên..."
+                        className="pos-add-customer-input is-emphasis"
+                        autoFocus
+                      />
+                    </td>
+                    <td className="pos-add-customer-label-cell is-top">
+                      Ngày sinh:
+                    </td>
+                    <td className="pos-add-customer-input-cell">
+                      <input
+                        type="date"
+                        value={dob}
+                        onChange={(e) => setDob(e.target.value)}
+                        className="pos-add-customer-input"
+                      />
+                      <div className="pos-add-customer-gender-row">
+                        <label className="pos-add-customer-radio">
+                          <input
+                            type="radio"
+                            name="gender_select"
+                            checked={gender === 'Nam'}
+                            onChange={() => setGender('Nam')}
+                          />
+                          <span>Nam</span>
+                        </label>
+                        <label className="pos-add-customer-radio">
+                          <input
+                            type="radio"
+                            name="gender_select"
+                            checked={gender === 'Nữ'}
+                            onChange={() => setGender('Nữ')}
+                          />
+                          <span>Nữ</span>
+                        </label>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* Hàng 2: Điện thoại & Email */}
+                  <tr>
+                    <td className="pos-add-customer-label-cell">
+                      Điện thoại (<span className="pos-add-customer-required">*</span>):
+                    </td>
+                    <td className="pos-add-customer-input-cell">
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        maxLength={20}
+                        autoComplete="tel"
+                        placeholder="Nhập số điện thoại..."
+                        className="pos-add-customer-input"
+                      />
+                    </td>
+                    <td className="pos-add-customer-label-cell">
+                      Email:
+                    </td>
+                    <td className="pos-add-customer-input-cell">
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        maxLength={254}
+                        placeholder="email@gmail.com"
+                        className="pos-add-customer-input"
+                      />
+                    </td>
+                  </tr>
+
+                  {/* Hàng 3: Địa chỉ & Khu vực */}
+                  <tr>
+                    <td className="pos-add-customer-label-cell">
+                      Địa chỉ:
+                    </td>
+                    <td className="pos-add-customer-input-cell">
+                      <input
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        maxLength={250}
+                        placeholder="Số nhà, đường..."
+                        className="pos-add-customer-input"
+                      />
+                    </td>
+                    <td className="pos-add-customer-label-cell">
+                      Khu vực:
+                    </td>
+                    <td className="pos-add-customer-input-cell">
+                      <input
+                        type="text"
+                        list="area-suggestions"
+                        value={area}
+                        onChange={(e) => setArea(e.target.value)}
+                        maxLength={120}
+                        placeholder="Tỉnh/Thành - Quận/Huyện"
+                        className="pos-add-customer-input"
+                      />
+                      <datalist id="area-suggestions">
+                        <option value="Hà Nội - Hoàn Kiếm" />
+                        <option value="Hà Nội - Cầu Giấy" />
+                        <option value="Hà Nội - Đống Đa" />
+                        <option value="Hà Nội - Thanh Xuân" />
+                        <option value="TP. Hồ Chí Minh - Quận 1" />
+                        <option value="TP. Hồ Chí Minh - Bình Thạnh" />
+                        <option value="Đà Nẵng - Hải Châu" />
+                      </datalist>
+                    </td>
+                  </tr>
+
+                  {/* Hàng 4: Phường xã & Ghi chú */}
+                  <tr>
+                    <td className="pos-add-customer-label-cell">
+                      Phường xã:
+                    </td>
+                    <td className="pos-add-customer-input-cell">
+                      <input
+                        type="text"
+                        value={ward}
+                        onChange={(e) => setWard(e.target.value)}
+                        maxLength={120}
+                        placeholder="Phường/Xã"
+                        className="pos-add-customer-input"
+                      />
+                    </td>
+                    <td className="pos-add-customer-label-cell">
+                      Ghi chú:
+                    </td>
+                    <td className="pos-add-customer-input-cell">
+                      <input
+                        type="text"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        maxLength={500}
+                        placeholder="Ghi chú thêm..."
+                        className="pos-add-customer-input"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Footer giữ đúng 2 nút Bỏ qua & Lưu khách hàng, đồng bộ nút POS */}
+          <div className="pos-modal-footer pos-add-customer-footer">
+            <button
+              type="button"
+              className="pos-btn-secondary-pill"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Bỏ qua
+            </button>
+            <button
+              type="submit"
+              className="pos-btn-primary-pill"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Đang lưu vào CSDL...</span>
+                </>
+              ) : (
+                <span>Lưu khách hàng</span>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

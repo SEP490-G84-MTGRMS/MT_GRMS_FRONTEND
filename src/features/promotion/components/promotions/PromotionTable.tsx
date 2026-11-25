@@ -218,10 +218,10 @@ export const PromotionTable: FC<PromotionTableProps> = ({
                       </td>
                       <td className="so-list-td">{renderTypeBadge(item.type)}</td>
                       <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#334155', whiteSpace: 'nowrap' }}>
-                        {item.startDate || '—'}
+                        {item.startDate ? item.startDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1') : '—'}
                       </td>
                       <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600, fontSize: 12.5, color: '#334155', whiteSpace: 'nowrap' }}>
-                        {item.endDate || '—'}
+                        {item.endDate ? item.endDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1') : '—'}
                       </td>
                       <td className="so-list-td" style={{ overflow: 'hidden' }}>
                         {(() => {

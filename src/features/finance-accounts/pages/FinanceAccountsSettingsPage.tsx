@@ -54,6 +54,7 @@ export function FinanceAccountsSettingsPage() {
   });
 
   const [historyAccountId, setHistoryAccountId] = useState('');
+  const [draftHistorySearchTerm, setDraftHistorySearchTerm] = useState('');
   const [historySearchTerm, setHistorySearchTerm] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(9);
@@ -238,13 +239,13 @@ export function FinanceAccountsSettingsPage() {
       setFormOpen(false); await load();
       if (created.accountType === 'Bank') { setConnecting(created); notify('Đã lưu tài khoản. Hãy kết nối SePay để kích hoạt VietQR.'); }
       else notify(`Đã thêm két "${created.accountName}". Két cũ cùng loại của chi nhánh đã tự động tắt.`);
-    } catch (caught) { notify((caught as { vietnameseMessage?: string }).vietnameseMessage || 'Không thể lưu tài khoản/két quỹ.'); }
+    } catch (caught) { notify((caught as { vietnameseMessage?: string }).vietnameseMessage || 'Không thể lưu tài khoản/két quỹ.', 'error'); }
     finally { setSaving(false); }
   };
   const connect = async (event: FormEvent) => {
     event.preventDefault(); if (!connecting) return; setSaving(true);
     try { const result = await financeAccountsApi.connectSepay(connecting.id, apiToken); setWebhookKey(result.webhookAuthenticationKey ?? ''); setWebhookUrl(result.webhookUrl ?? ''); setApiToken(''); await load(); notify('Kết nối SePay thành công.'); }
-    catch (caught) { notify((caught as { vietnameseMessage?: string }).vietnameseMessage || 'Không thể xác minh SePay.'); }
+    catch (caught) { notify((caught as { vietnameseMessage?: string }).vietnameseMessage || 'Không thể xác minh SePay.', 'error'); }
     finally { setSaving(false); }
   };
   const toggle = async (item: FinanceAccountItem) => {
@@ -258,7 +259,7 @@ export function FinanceAccountsSettingsPage() {
         notify(willActivate ? 'Đã kích hoạt tài khoản.' : 'Đã tạm ngưng hoạt động.');
       }
     } catch (caught) {
-      notify((caught as { vietnameseMessage?: string }).vietnameseMessage || 'Không thể đổi trạng thái.');
+      notify((caught as { vietnameseMessage?: string }).vietnameseMessage || 'Không thể đổi trạng thái.', 'error');
     }
   };
 
@@ -291,17 +292,23 @@ export function FinanceAccountsSettingsPage() {
               <div style={{ position: 'relative', width: '100%' }}>
                 <input
                   type="text"
-                  value={historySearchTerm}
-                  onChange={(e) => setHistorySearchTerm(e.target.value)}
+                  value={draftHistorySearchTerm}
+                  onChange={(e) => setDraftHistorySearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      setHistorySearchTerm(draftHistorySearchTerm);
+                      setHistoryPage(1);
+                    }
+                  }}
                   placeholder="Tìm mã GD ngân hàng, mã đơn, nội dung CK..."
                   className="so-list-filter-input"
-                  style={{ width: '100%', paddingLeft: 28, paddingRight: historySearchTerm ? 26 : 10 }}
+                  style={{ width: '100%', paddingLeft: 28, paddingRight: draftHistorySearchTerm ? 26 : 10 }}
                 />
                 <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                {historySearchTerm && (
+                {draftHistorySearchTerm && (
                   <button
                     type="button"
-                    onClick={() => setHistorySearchTerm('')}
+                    onClick={() => setDraftHistorySearchTerm('')}
                     style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
                     title="Xóa tìm kiếm"
                   >
@@ -342,16 +349,21 @@ export function FinanceAccountsSettingsPage() {
               <button
                 type="button"
                 className="so-list-filter-search"
-                onClick={() => void fetchHistory()}
+                onClick={() => {
+                  setHistorySearchTerm(draftHistorySearchTerm);
+                  setHistoryPage(1);
+                  void fetchHistory();
+                }}
               >
                 <Search size={13} /> Tìm kiếm
               </button>
               <button
                 type="button"
                 className="so-list-filter-reset"
-                disabled={!historyAccountId && !historySearchTerm}
+                disabled={!historyAccountId && !historySearchTerm && !draftHistorySearchTerm}
                 onClick={() => {
                   setHistoryAccountId('');
+                  setDraftHistorySearchTerm('');
                   setHistorySearchTerm('');
                   setHistoryPage(1);
                 }}
@@ -473,7 +485,7 @@ export function FinanceAccountsSettingsPage() {
         <TablePagination
           currentPage={historyPage}
           pageSize={historyPageSize}
-          totalItems={transactionPage?.totalCount ?? 0}
+          totalItems={historySearchTerm.trim() ? filteredHistoryItems.length : (transactionPage?.totalCount ?? 0)}
           pageSizeOptions={[9, 18, 27, 45]}
           onPageChange={(page) => setHistoryPage(page)}
           onPageSizeChange={(size) => {
@@ -485,7 +497,7 @@ export function FinanceAccountsSettingsPage() {
         />
       </section>
     )}
-    {tab === 'accounts' && <><div className="fa-warning"><AlertTriangle size={18} /><div><b>SePay là bắt buộc khi dùng tài khoản ngân hàng để nhận VietQR.</b><span>Tài khoản chưa kiểm tra SePay thành công không thể kích hoạt, tạo QR hoặc nhận thanh toán tự động.</span></div></div><div className="fa-metrics"><Metric label="Tài khoản ngân hàng" value={String(banks.length).padStart(2, '0')} detail={`${banks.filter(x => x.isActive).length} đang hoạt động`} /><Metric good label="Đã kết nối SePay" value={`${connected.length}/${banks.length}`} detail="Sẵn sàng nhận VietQR" /><Metric label="Két quầy & két sắt" value={String(drawers.length).padStart(2, '0')} detail={`Thuộc ${new Set(drawers.map(x => x.branchId)).size} chi nhánh`} /><Metric warn label="Cần hoàn tất" value={String(pending).padStart(2, '0')} detail="Tài khoản chưa kết nối SePay" /></div></>}
+    {tab === 'accounts' && <><div className="fa-warning"><AlertTriangle size={18} /><div><b>SePay là bắt buộc khi dùng tài khoản ngân hàng để nhận VietQR.</b><span>Tài khoản chưa kiểm tra SePay thành công không thể kích hoạt, tạo QR hoặc nhận thanh toán tự động.</span></div></div><div className="fa-metrics"><Metric label="Tài khoản ngân hàng" value={String(banks.length).padStart(2, '0')} detail={`${banks.filter(x => x.isActive).length} đang hoạt động`} /><Metric good label="Đã kết nối SePay" value={`${connected.length}/${banks.length}`} detail="Sẵn sàng nhận VietQR" /><Metric label="Két quầy & két sắt" value={String(drawers.length).padStart(2, '0')} detail={`Thuộc ${new Set(drawers.map(x => x.branchId).filter(Boolean)).size} chi nhánh`} /><Metric warn label="Cần hoàn tất" value={String(pending).padStart(2, '0')} detail="Tài khoản chưa kết nối SePay" /></div></>}
     {loading ? <div className="fa-state"><Loader2 className="spin" /> Đang tải cấu hình...</div> : error ? <div className="fa-state error"><AlertTriangle /> <span>{error}</span><button onClick={() => void load()}>Thử lại</button></div> : tab === 'guide' ? <section className="fa-card" style={{ padding: '20px 24px' }}><SepayVisualGuide /></section> : tab === 'history' ? null : <div className="fa-layout"><section className="fa-card"><header><div><h2>{tab === 'accounts' ? 'Ngân hàng & kết nối SePay' : 'Két quỹ theo chi nhánh'}</h2><p>{tab === 'accounts' ? 'Chỉ tài khoản kết nối thành công mới được bật nhận VietQR tại POS.' : 'Chuẩn quản lý: Mỗi chi nhánh duy trì 01 Két quầy thu ngân (bán hàng trong ca) và 01 Két sắt chi nhánh (cất giữ tiền nộp ca & chốt doanh thu của Chủ).'}</p></div><button onClick={() => openCreate(tab === 'accounts' ? 'Bank' : 'Till')}><Plus size={15} /> Thêm</button></header>{visibleAccounts.length === 0 ? <div className="fa-empty"><WalletCards /><b>Chưa có cấu hình</b><span>Thêm {tab === 'accounts' ? 'tài khoản ngân hàng' : 'két quỹ'} đầu tiên để bắt đầu.</span></div> : tab === 'accounts' ? <div className="fa-list fa-list--scrollable">{banks.map((item) => <AccountRow key={item.id} item={item} onConnect={() => { setConnecting(item); setWebhookKey('') }} onToggle={() => void toggle(item)} />)}</div> : <div>{groupedDrawers.map(({ branch, safes, tills, others, activeSafes, activeTills }) => <div className="fa-branch" key={branch.id} style={{ marginBottom: 20 }}><h3><Building2 size={14} />{branch.name}<span style={{ fontSize: 11, fontWeight: 600 }}>{activeSafes.length > 0 ? '01 Két sắt' : 'Chưa có két sắt'} · {activeTills.length > 0 ? '01 Két quầy' : 'Chưa có két quầy'} đang bật</span></h3>{(activeSafes.length > 1 || activeTills.length > 1) && <div style={{ padding: '6px 14px', backgroundColor: '#fffbeb', borderBottom: '1px solid #fef3c7', fontSize: 11.5, color: '#92400e', display: 'flex', alignItems: 'center', gap: 6 }}><AlertTriangle size={13} className="shrink-0 text-amber-600" /><span>Chi nhánh đang có nhiều hơn 01 két cùng loại hoạt động. Hãy bấm "Đổi sang két này" tại két bạn muốn chọn để hệ thống tự động tắt các két còn lại.</span></div>}<div className="fa-list">{safes.length > 0 && <><div className="fa-drawer-section-title safe"><ShieldCheck size={13} /><span>Két sắt chi nhánh (Duy trì 01 két sắt hoạt động · Bảo mật & Chốt doanh thu)</span></div>{safes.map((item) => <AccountRow key={item.id} item={item} onConnect={() => { }} onToggle={() => void toggle(item)} onDeposit={() => navigate('/cashbook')} />)}</>}{tills.length > 0 && <><div className="fa-drawer-section-title till"><Banknote size={13} /><span>Két quầy bán hàng (Duy trì 01 két quầy hoạt động · Mở ca & Bán tại POS)</span></div>{tills.map((item) => <AccountRow key={item.id} item={item} onConnect={() => { }} onToggle={() => void toggle(item)} />)}</>}{others.length > 0 && others.map((item) => <AccountRow key={item.id} item={item} onConnect={() => { }} onToggle={() => void toggle(item)} />)}</div></div>)}</div>}</section><aside className="fa-card fa-guide"><h2>{tab === 'accounts' ? 'Luồng kích hoạt nhận tiền' : 'Quy tắc vận hành'}</h2>{tab === 'accounts' ? <><ol><li><b>Thêm thông tin tài khoản</b><span>Ngân hàng, số tài khoản, chủ tài khoản và chi nhánh áp dụng.</span></li><li><b>Kết nối SePay</b><span>Nhập API Token và cấu hình webhook.</span></li><li><b>Kiểm tra kết nối</b><span>Đối chiếu token và tài khoản trên SePay.</span></li><li><b>Kích hoạt VietQR</b><span>Kích hoạt nhận thanh toán VietQR tự động cho chi nhánh.</span></li></ol><button type="button" onClick={() => setGuideModalOpen(true)} style={{ marginTop: 14, width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #087e78', backgroundColor: '#f0fdfa', color: '#087e78', fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><BookOpen size={14} /><span>Xem cẩm nang hình ảnh SePay</span></button></> : <p>Két đã phát sinh giao dịch chỉ được ngừng hoạt động. Không thể tắt két đang có ca POS mở.</p>}</aside></div>}
     {formOpen && <Modal title={form.accountType === 'Bank' ? 'Thêm tài khoản ngân hàng' : 'Thêm két quỹ'} onClose={() => setFormOpen(false)}><form onSubmit={submit} className="fa-form"><label>Tên nhận diện<input required value={form.accountName} onChange={e => setForm({ ...form, accountName: e.target.value })} /></label><label>Loại<select value={form.accountType} onChange={e => setForm({ ...form, accountType: e.target.value as FinanceAccountType, branchId: form.branchId ?? branches[0]?.id ?? null })}><option value="Bank">Tài khoản ngân hàng</option><option value="Till">Két quầy (Bán hàng POS)</option><option value="Safe">Két sắt (Bảo mật chi nhánh)</option></select></label>{form.accountType === 'Bank' ? <><label>Ngân hàng<select value={form.bankCode} onChange={e => { const b = BANKS.find(x => x.code === e.target.value); setForm({ ...form, bankCode: b?.code, bankName: b?.name }) }}>{BANKS.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}</select></label><label>Số tài khoản<input required value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} /></label><label className="wide">Chủ tài khoản<input required value={form.accountHolderName} onChange={e => setForm({ ...form, accountHolderName: e.target.value.toUpperCase() })} /></label><label className="wide">Chi nhánh áp dụng<select required value={form.branchId ?? ''} onChange={e => setForm({ ...form, branchId: e.target.value || null })}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label></> : <label>Chi nhánh<select required value={form.branchId ?? ''} onChange={e => setForm({ ...form, branchId: e.target.value })}>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}{form.accountType === 'Bank' ? <div className="fa-form-note wide"><ShieldCheck size={17} /> Tài khoản ngân hàng chỉ được kích hoạt sau khi xác minh SePay.</div> : form.accountType === 'Safe' ? <div className="fa-form-note wide"><ShieldCheck size={17} /> <b>Mục đích Két sắt:</b> Cất giữ tiền nộp kết ca của thu ngân, chốt doanh thu bán của Chủ & chi tiền đổi trả/nhập hàng. Khuyên dùng: 01 Két sắt / chi nhánh.</div> : <div className="fa-form-note wide"><Banknote size={17} /> <b>Mục đích Két quầy:</b> Dùng cho nhân viên mở ca, thu tiền bán hàng và thối tiền lẻ cho khách tại quầy POS. Khuyên dùng: 01 Két quầy / chi nhánh.</div>}<footer className="wide"><button type="button" onClick={() => setFormOpen(false)}>Hủy</button><button className="fa-primary" disabled={saving}>{saving ? <Loader2 className="spin" size={16} /> : null} Lưu {form.accountType === 'Bank' ? '& kết nối SePay →' : ''}</button></footer></form></Modal>}
     {connecting && <Modal title="Kết nối SePay" onClose={() => { setConnecting(null); setWebhookKey(''); setWebhookUrl('') }}>{webhookKey ? <div className="fa-success"><CheckCircle2 /><h3>Kết nối thành công</h3><p>Tạo Webhook kiểu “Có tiền vào”, xác thực API Key bằng thông tin dưới đây. Khóa chỉ hiển thị trong lần kết nối này.</p><small>Webhook URL</small><code>{webhookUrl}</code><small>Authentication API Key</small><code>{webhookKey}</code><button className="fa-primary" onClick={() => { void navigator.clipboard.writeText(`${webhookUrl}\n${webhookKey}`); notify('Đã sao chép cấu hình webhook.') }}>Sao chép cấu hình</button></div> : <form className="fa-connect" onSubmit={connect}><p>Tài khoản: <b>{connecting.accountName}</b> · {connecting.maskedAccountNumber}</p><div><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}><label style={{ margin: 0 }}>API Token SePay</label><button type="button" onClick={() => setGuideModalOpen(true)} style={{ border: 0, background: 'none', color: '#087e78', fontSize: 10, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}>Xem ảnh hướng dẫn lấy token →</button></div><input type="password" required autoFocus value={apiToken} onChange={e => setApiToken(e.target.value)} placeholder="Nhập API Token từ SePay" /></div><div className="fa-form-note"><ShieldCheck size={17} /> Token được gửi tới backend để kiểm tra. Webhook nhận tiền: <b>https://thviet.store/api/payments/sepay-webhook</b></div><footer><button type="button" onClick={() => setConnecting(null)}>Hủy</button><button className="fa-primary" disabled={saving}>{saving ? <Loader2 className="spin" size={16} /> : null} Kiểm tra & kết nối</button></footer></form>}</Modal>}
@@ -527,7 +539,8 @@ function AccountRow({ item, onConnect, onToggle, onDeposit }: { item: FinanceAcc
           {!isBank && (
             item.isActive ? (
               <span className="fa-status-pill-active">
-                ● Đang hoạt động (Két chính)
+                <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: 'currentColor', marginRight: 5, verticalAlign: 'middle' }} />
+                Đang hoạt động (Két chính)
               </span>
             ) : (
               <span className="fa-status-pill-inactive">
@@ -549,7 +562,12 @@ function AccountRow({ item, onConnect, onToggle, onDeposit }: { item: FinanceAcc
       <div className="fa-row-actions">
         {isBank && (
           <span className={`fa-status ${item.sepayConnectionStatus === 'Connected' ? 'ok' : 'wait'}`}>
-            {item.sepayConnectionStatus === 'Connected' ? '● SePay đã kết nối' : 'Cần kết nối SePay'}
+            {item.sepayConnectionStatus === 'Connected' ? (
+              <>
+                <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', backgroundColor: 'currentColor', marginRight: 5, verticalAlign: 'middle' }} />
+                SePay đã kết nối
+              </>
+            ) : 'Cần kết nối SePay'}
           </span>
         )}
         {isBank && item.sepayConnectionStatus !== 'Connected' && (

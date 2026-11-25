@@ -30,7 +30,7 @@ export const PromotionListPage: FC = () => {
       if (Array.isArray(list)) {
         setDbBranches(list.map((b) => ({ id: b.id, name: b.name })));
       }
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Đồng bộ chi nhánh đang chọn từ TopNav (mtgrms_active_branch & event mtgrms:branch-changed)
     const handleGlobalBranchChange = (e: Event) => {
@@ -143,8 +143,8 @@ export const PromotionListPage: FC = () => {
     const tiers = parsedTiers && parsedTiers.length > 0
       ? parsedTiers
       : fallbackTiers.length > 0
-      ? fallbackTiers
-      : [
+        ? fallbackTiers
+        : [
           {
             id: `tier-1`,
             tierLevel: 1,

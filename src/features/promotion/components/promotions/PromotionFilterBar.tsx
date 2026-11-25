@@ -1,4 +1,4 @@
-import { useState, type FC } from 'react';
+import { useState, useEffect, type FC } from 'react';
 import { Search, RotateCw, RotateCcw, X } from 'lucide-react';
 import type { PromotionFilterState } from '../../types/promotion.types';
 
@@ -19,6 +19,15 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
 }) => {
   const [draftCode, setDraftCode] = useState(codeTerm);
   const [draftName, setDraftName] = useState(filter.searchTerm);
+
+  useEffect(() => {
+    setDraftCode(codeTerm);
+  }, [codeTerm]);
+
+  useEffect(() => {
+    setDraftName(filter.searchTerm);
+  }, [filter.searchTerm]);
+
   const isFiltered = Boolean(
     filter.searchTerm || codeTerm || draftCode || draftName || filter.type !== 'ALL' || filter.status !== 'ALL'
   );
@@ -45,10 +54,7 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
             <input
               type="text"
               value={draftCode}
-              onChange={(e) => {
-                setDraftCode(e.target.value);
-                onCodeTermChange?.(e.target.value);
-              }}
+              onChange={(e) => setDraftCode(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && applySearch()}
               placeholder="Nhập mã CTKM..."
               className="so-list-filter-input"
@@ -57,10 +63,7 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
             {draftCode && (
               <button
                 type="button"
-                onClick={() => {
-                  setDraftCode('');
-                  onCodeTermChange?.('');
-                }}
+                onClick={() => setDraftCode('')}
                 style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
                 title="Xóa mã CTKM"
               >
@@ -77,10 +80,7 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
             <input
               type="text"
               value={draftName}
-              onChange={(e) => {
-                setDraftName(e.target.value);
-                onFilterChange({ ...filter, searchTerm: e.target.value });
-              }}
+              onChange={(e) => setDraftName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && applySearch()}
               placeholder="Nhập tên chương trình..."
               className="so-list-filter-input"
@@ -93,10 +93,7 @@ export const PromotionFilterBar: FC<PromotionFilterBarProps> = ({
             {draftName && (
               <button
                 type="button"
-                onClick={() => {
-                  setDraftName('');
-                  onFilterChange({ ...filter, searchTerm: '' });
-                }}
+                onClick={() => setDraftName('')}
                 style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
                 title="Xóa tìm kiếm"
               >

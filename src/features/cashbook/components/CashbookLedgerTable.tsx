@@ -509,15 +509,19 @@ export const CashbookLedgerTable: FC<CashbookLedgerTableProps> = ({
                           textDecoration: isVoided ? 'line-through' : 'none',
                         }}
                       >
-                        {tx.counterpartyName && tx.counterpartyName !== tx.referenceDocId
-                          ? tx.counterpartyName
-                          : tx.sourceModuleName === 'SERVICE_OPEX'
-                          ? 'Chi phí vận hành'
-                          : tx.sourceModuleName === 'POS_RETAIL'
-                          ? 'Khách mua lẻ'
-                          : tx.sourceModuleName === 'CRM_DEBT'
-                          ? 'Khách nợ'
-                          : (tx.counterpartyName || 'Nội bộ')}
+                        {(() => {
+                          const rawCp = tx.counterpartyName || '';
+                          if (/^(HANDOVER|DROP)-[0-9a-f]{16,}$/i.test(rawCp)) {
+                            const shiftCode = tx.description?.match(/CA-\d{8}-\d+/i)?.[0];
+                            if (shiftCode) return `Ca ${shiftCode}`;
+                            return rawCp.toUpperCase().startsWith('HANDOVER-') ? 'Bàn giao cuối ca POS' : 'Rút tiền két quầy POS';
+                          }
+                          if (rawCp && rawCp !== tx.referenceDocId) return rawCp;
+                          if (tx.sourceModuleName === 'SERVICE_OPEX') return 'Chi phí vận hành';
+                          if (tx.sourceModuleName === 'POS_RETAIL') return 'Khách mua lẻ';
+                          if (tx.sourceModuleName === 'CRM_DEBT') return 'Khách nợ';
+                          return rawCp || 'Nội bộ';
+                        })()}
                       </div>
                       <div className="cb-ledger-description" title={tx.description || undefined}>
                         {tx.description}

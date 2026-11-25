@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
 import type { CashAccount, FundTransferDTO } from '../types/cashbook.types';
-import { ArrowRightLeft, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, ShieldCheck, X } from 'lucide-react';
 
 interface InternalTransferModalProps {
   isOpen: boolean;
@@ -120,9 +120,13 @@ export const InternalTransferModal: FC<InternalTransferModalProps> = ({
               borderRadius: '8px',
               fontSize: '13px',
               border: '1px solid #FEE2E2',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
             }}
           >
-            ⚠️ {errorMessage}
+            <AlertTriangle size={15} className="shrink-0" />
+            <span>{errorMessage}</span>
           </div>
         )}
 

@@ -610,8 +610,9 @@ export const CashReconciliationModal: FC<CashReconciliationModalProps> = ({
                   Lý do chênh lệch tiền (Bắt buộc chọn):
                 </label>
                 {submitError && (
-                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">
-                    ⚠️ {submitError}
+                  <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
+                    <AlertTriangle size={14} className="shrink-0" />
+                    <span>{submitError}</span>
                   </div>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">

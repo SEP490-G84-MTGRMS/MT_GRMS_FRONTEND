@@ -682,27 +682,6 @@ export const AttendancePage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {isEmployeeRole && activeCheckedInToday && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-primary"
-              onClick={() => navigate('/employee/pos')}
-              title="Chuyển sang giao diện Bán hàng POS"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                backgroundColor: '#D97706',
-                borderColor: '#D97706',
-                color: '#FFFFFF',
-                fontWeight: 700,
-                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.35)',
-              }}
-            >
-              <Store size={16} />
-              <span>Vào màn hình Bán hàng POS</span>
-            </button>
-          )}
           {!isStoreOwnerOrAdmin && (
             <button
               type="button"

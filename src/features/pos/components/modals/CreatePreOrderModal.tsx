@@ -894,7 +894,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                 </div>
                 {giftItems.map((g, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#166534' }}>
-                    <span>✦ {g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})</span>
+                    <span>{g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})</span>
                     <b>0 đ</b>
                   </div>
                 ))}
@@ -992,7 +992,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
             disabled={isSubmitting || orderItems.length === 0}
             style={{ padding: '8px 18px', fontSize: 13.5 }}
           >
-            {isSubmitting ? 'Đang tạo đơn...' : '✓ Xác Nhận Tạo Đơn'}
+            {isSubmitting ? 'Đang tạo đơn...' : 'Xác Nhận Tạo Đơn'}
           </button>
         </div>
       </div>
