@@ -857,7 +857,7 @@ export const ReturnExchangeModal: React.FC<Props> = ({
                     />
                     VietQR / Chuyển khoản
                   </label>
-                  {invoice.customerName && invoice.customerName !== 'Khách lẻ' && (
+                  {isStoreOwner && invoice.customerName && invoice.customerName !== 'Khách lẻ' && (
                     <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}>
                       <input
                         type="radio"
