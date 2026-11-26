@@ -799,22 +799,27 @@ export const PosCheckoutPage: FC = () => {
   };
 
   // Cart operations
-  const handleAddToCart = (product: Product, batchId?: string, batchCode?: string, expiryDate?: string, discountPercent = 0, packageItem?: { id: string; netWeight: number; sellingPrice: number }, availableQty?: number) => {
+  const handleAddToCart = (product: Product, batchId?: string, batchCode?: string, expiryDate?: string, discountPercent = 0, packageItem?: { id: string; netWeight: number; sellingPrice: number }, availableQty?: number): boolean => {
     if (packageItem && currentTab.cart.some((item) => item.packageId === packageItem.id)) {
       showToast(`Khay của sản phẩm "${product.name}" đã có trong đơn.`, 'warning');
-      return;
+      return false;
     }
     if ((batchId && availableQty !== undefined && availableQty <= 0) || (!batchId && !packageItem && product.quantityOnHand <= 0)) {
       showToast(`Sản phẩm "${product.name}" đã hết tồn khả dụng tại chi nhánh, không thể thêm vào đơn.`, 'warning');
-      return;
+      return false;
     }
     if (!isStoreOwner && !currentShift) {
       showToast('Quầy bán hàng hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc và kiểm đếm tiền đầu ca trước khi bán hàng!', 'warning');
       setIsOpenShiftModalOpen(true);
-      return;
+      return false;
     }
     // Chỉ coi là đã chọn lô khi có batchId thật. Hàng thêm trực tiếp từ
-    // danh mục sẽ để backend tự phân bổ FEFO lúc thanh toán.
+    // danh mục sẽ để backend tự phân bổ FEFO lúc thanh toán, nhưng vẫn xem trước giảm giá cận date của lô FEFO ưu tiên.
+    const effectiveDiscountPercent = packageItem
+      ? 0
+      : discountPercent > 0
+        ? discountPercent
+        : (!batchId ? (product.fefoDiscountPercent || 0) : 0);
     const targetBatch = batchId ? (batchCode || product.batchCode) : undefined;
     const existingIndex = packageItem ? -1 : currentTab.cart.findIndex(
       (item) => item.product.id === product.id && (item.batchId || null) === (batchId || null)
@@ -847,19 +852,20 @@ export const PosCheckoutPage: FC = () => {
         batchCode: targetBatch,
         expiryDate: expiryDate || product.expiryDate,
         availableQty: availableQty ?? (packageItem ? packageItem.netWeight : undefined),
-        fefoDiscountPercent: discountPercent,
+        fefoDiscountPercent: effectiveDiscountPercent,
         discountType: 'percent' as const,
-        discountPerItem: discountPercent,
+        discountPerItem: effectiveDiscountPercent,
         // Khay: ĐVT riêng, không gắn unitId KG để tránh BE quy đổi nhầm khi thiếu packageId
         unit: packageItem ? 'Khay' : baseLine.unit,
         unitId: packageItem ? undefined : baseLine.unitId,
         quantity: 1,
         unitPrice: packageItem?.sellingPrice ?? product.basePrice,
-        actualPrice: packageItem?.sellingPrice ?? product.basePrice * (1 - discountPercent / 100),
-        totalAmount: packageItem?.sellingPrice ?? product.basePrice * (1 - discountPercent / 100),
+        actualPrice: packageItem?.sellingPrice ?? product.basePrice * (1 - effectiveDiscountPercent / 100),
+        totalAmount: packageItem?.sellingPrice ?? product.basePrice * (1 - effectiveDiscountPercent / 100),
       };
       updateCurrentTab({ cart: [...currentTab.cart, newItem] });
     }
+    return true;
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
@@ -1310,7 +1316,16 @@ export const PosCheckoutPage: FC = () => {
 
     const paidItems = currentTab.cart.map((c) => {
       const isPackage = Boolean(c.packageId);
-      const manualDiscount = Math.max(0, (c.unitPrice - c.actualPrice) * (isPackage ? 1 : c.quantity));
+      const isAutoFefoOnlyDiscount =
+        !c.batchId &&
+        !isPackage &&
+        (c.fefoDiscountPercent || 0) > 0 &&
+        c.discountType === 'percent' &&
+        c.discountPerItem === c.fefoDiscountPercent;
+      // Với hàng phân bổ FEFO tự động không chọn lô tay, để BE tự tính chính xác giảm giá theo từng lô thực xuất
+      const manualDiscount = isAutoFefoOnlyDiscount
+        ? 0
+        : Math.max(0, (c.unitPrice - c.actualPrice) * (isPackage ? 1 : c.quantity));
 
       return {
         productId: c.product.id || 'aaaaaaaa-1111-1111-1111-111111111111',
@@ -1976,12 +1991,16 @@ export const PosCheckoutPage: FC = () => {
         currentBranchName={activeBranch.name}
         products={products}
         onSelectBatchToCart={(prod, batchId, batchCode, expDate, discountPercent, packageItem, availableQty) => {
-          handleAddToCart(prod, batchId, batchCode, expDate, discountPercent, packageItem, availableQty);
+          const added = handleAddToCart(prod, batchId, batchCode, expDate, discountPercent, packageItem, availableQty);
+          if (!added) return;
           setIsInventoryLookupOpen(false);
+          const appliedDiscount = packageItem
+            ? 0
+            : (discountPercent && discountPercent > 0 ? discountPercent : (!batchId ? (prod.fefoDiscountPercent || 0) : 0));
           showToast(
             batchCode
-              ? `Đã thêm "${prod.name}" từ lô ${batchCode}${discountPercent ? `, giảm ${discountPercent}%` : ''}`
-              : `Đã thêm "${prod.name}" theo FEFO tự động`,
+              ? `Đã thêm "${prod.name}" từ lô ${batchCode}${appliedDiscount ? `, giảm ${appliedDiscount}%` : ''}`
+              : `Đã thêm "${prod.name}" theo FEFO tự động${appliedDiscount ? ` (-${appliedDiscount}%)` : ''}`,
             'success'
           );
         }}

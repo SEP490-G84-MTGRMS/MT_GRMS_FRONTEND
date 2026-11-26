@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { FC } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Clock,
@@ -38,28 +38,14 @@ type PosShiftPageProps = {
 
 export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthStore();
   const isStoreOwner = user?.role === 'STORE_OWNER';
 
-  useEffect(() => {
-    if (dailyClosing || !isStoreOwner || !location.pathname.startsWith('/pos/')) return;
-    const params = new URLSearchParams(searchParams);
-    if (!params.get('branchId')) params.set('branchId', 'ALL');
-    navigate(`/store-owner/shifts?${params.toString()}`, { replace: true });
-  }, [dailyClosing, isStoreOwner, location.pathname, searchParams, navigate]);
-
-  // Quay về trang gọi (Work schedule hoặc POS checkout)
+  // Quay về trang Lịch Làm Việc của chủ cửa hàng
   const branchFromUrl = searchParams.get('branchId');
   const linkedShiftId = dailyClosing ? null : searchParams.get('shiftId');
-  const returnPath = location.pathname.startsWith('/employee/pos')
-    ? '/employee/pos'
-    : location.pathname.startsWith('/pos')
-      ? '/pos'
-      : isStoreOwner
-        ? '/store-owner/employees/schedule'
-        : '/pos';
+  const returnPath = '/store-owner/employees/schedule';
 
   // Chi nhánh đang chọn (GUID hợp lệ)
   const [selectedBranchId, setSelectedBranchId] = useState<string>(

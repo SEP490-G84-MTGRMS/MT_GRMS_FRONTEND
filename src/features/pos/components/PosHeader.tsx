@@ -743,24 +743,22 @@ export const PosHeader: FC<Props> = ({
                   </>
                 )}
 
-                <button
-                  type="button"
-                  className="pos-dropdown-item"
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    if (onOpenInventoryLookup) {
+                {onOpenInventoryLookup && (
+                  <button
+                    type="button"
+                    className="pos-dropdown-item"
+                    onClick={() => {
+                      setIsMenuOpen(false);
                       onOpenInventoryLookup();
-                    } else {
-                      navigate(location.pathname.startsWith('/employee') ? '/employee/inventory-lookup' : '/pos/inventory-lookup');
-                    }
-                  }}
-                >
-                  <Layers size={16} className="text-teal-700" />
-                  <div className="item-content">
-                    <div className="item-title">Tra cứu tồn kho & Lô FEFO</div>
-                    <div className="item-desc">Tồn đa chi nhánh, hạn dùng & chọn bán lô</div>
-                  </div>
-                </button>
+                    }}
+                  >
+                    <Layers size={16} className="text-teal-700" />
+                    <div className="item-content">
+                      <div className="item-title">Tra cứu tồn kho & Lô FEFO</div>
+                      <div className="item-desc">Tồn kho tại quầy, hạn dùng & chọn bán lô</div>
+                    </div>
+                  </button>
+                )}
 
                 <button
                   type="button"

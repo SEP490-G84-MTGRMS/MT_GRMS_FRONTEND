@@ -76,6 +76,19 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
     setPrintModalState((prev) => ({ ...prev, isOpen: false }));
   };
 
+  const formatUsedAtLocal = (raw?: string): string | undefined => {
+    if (!raw) return undefined;
+    const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw) ? raw : `${raw}Z`;
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) return raw.slice(0, 16).replace('T', ' ');
+    const dd = String(parsed.getDate()).padStart(2, '0');
+    const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+    const yyyy = parsed.getFullYear();
+    const hh = String(parsed.getHours()).padStart(2, '0');
+    const min = String(parsed.getMinutes()).padStart(2, '0');
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+  };
+
   const fetchCodesForBatch = async (batchId: string) => {
     setLoadingCodesMap((prev) => ({ ...prev, [batchId]: true }));
     try {
@@ -88,7 +101,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
           customerName: dto.customerName,
           customerPhone: dto.customerPhone,
           orderCode: dto.orderCode,
-          usedAt: dto.usedAt?.slice(0, 16).replace('T', ' '),
+          usedAt: formatUsedAtLocal(dto.usedAt),
           createdAt: dto.createdAt?.slice(0, 10),
         }));
         setBatchCodesMap((prev) => ({ ...prev, [batchId]: mapped }));

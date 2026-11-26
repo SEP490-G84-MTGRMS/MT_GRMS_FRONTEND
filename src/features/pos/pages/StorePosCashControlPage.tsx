@@ -6,7 +6,6 @@ import {
   RefreshCw,
   ArrowDownCircle,
   ArrowUpCircle,
-  Wallet,
   Clock,
   User,
   Check,
@@ -35,6 +34,8 @@ export const StorePosCashControlPage: FC = () => {
   // Cấu hình hạn mức
   const [threshold, setThreshold] = useState<number>(200000);
   const [shiftTotalLimit, setShiftTotalLimit] = useState<number>(0);
+  const [savedThreshold, setSavedThreshold] = useState<number>(200000);
+  const [savedShiftTotalLimit, setSavedShiftTotalLimit] = useState<number>(0);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   // Toast chuẩn AdminToast
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -100,8 +101,12 @@ export const StorePosCashControlPage: FC = () => {
       // 1. Tải cấu hình hạn mức
       const cfg = await posShiftApi.getCashMovementSettings();
       if (cfg) {
-        setThreshold(cfg.cashOutApprovalThreshold ?? 200000);
-        setShiftTotalLimit(cfg.cashOutShiftTotalLimit ?? 0);
+        const nextThreshold = cfg.cashOutApprovalThreshold ?? 200000;
+        const nextLimit = cfg.cashOutShiftTotalLimit ?? 0;
+        setThreshold(nextThreshold);
+        setShiftTotalLimit(nextLimit);
+        setSavedThreshold(nextThreshold);
+        setSavedShiftTotalLimit(nextLimit);
       }
 
       // 2. Tải danh sách chờ duyệt theo chi nhánh (ALL => không truyền branchId để lấy toàn bộ tenant)
@@ -137,10 +142,14 @@ export const StorePosCashControlPage: FC = () => {
     e.preventDefault();
     setIsSavingSettings(true);
     try {
+      const nextThreshold = Number(threshold) || 0;
+      const nextLimit = Number(shiftTotalLimit) || 0;
       await posShiftApi.updateCashMovementSettings({
-        cashOutApprovalThreshold: Number(threshold) || 0,
-        cashOutShiftTotalLimit: Number(shiftTotalLimit) || 0,
+        cashOutApprovalThreshold: nextThreshold,
+        cashOutShiftTotalLimit: nextLimit,
       });
+      setSavedThreshold(nextThreshold);
+      setSavedShiftTotalLimit(nextLimit);
 
       // Cập nhật lưu local dự phòng offline
       if (currentTenantId) {
@@ -356,173 +365,12 @@ export const StorePosCashControlPage: FC = () => {
         </div>
       </div>
 
-      {/* 2. Quick KPI Stats */}
+      {/* 2. Main Grid: Cấu hình hạn mức (Trái) & Danh sách duyệt (Phải) */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 16,
-        }}
-      >
-        {/* KPI 1: Chờ duyệt chi */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 12,
-            border: pendingMovements.length > 0 ? '1.5px solid #fecdd3' : '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Phiếu chi chờ phê duyệt</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: pendingMovements.length > 0 ? '#e11d48' : '#0f172a', marginTop: 4 }}>
-              {pendingMovements.length}
-            </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              {pendingMovements.length > 0 ? 'Cần chủ xem xét chấp thuận' : 'Không có yêu cầu tồn đọng'}
-            </div>
-          </div>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              backgroundColor: pendingMovements.length > 0 ? '#ffe4e6' : '#f1f5f9',
-              color: pendingMovements.length > 0 ? '#e11d48' : '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ArrowUpCircle size={22} />
-          </div>
-        </div>
-
-        {/* KPI 2: Chờ nhận rút két */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 12,
-            border: unconfirmedDrops.length > 0 ? '1.5px solid #bae6fd' : '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Khoản nộp rút két chờ nhận</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: unconfirmedDrops.length > 0 ? '#0284c7' : '#0f172a', marginTop: 4 }}>
-              {unconfirmedDrops.length}
-            </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              {unconfirmedDrops.length > 0 ? 'Thu ngân đã trích két nộp tiền' : 'Đã xác nhận đầy đủ'}
-            </div>
-          </div>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              backgroundColor: unconfirmedDrops.length > 0 ? '#e0f2fe' : '#f1f5f9',
-              color: unconfirmedDrops.length > 0 ? '#0284c7' : '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ArrowDownCircle size={22} />
-          </div>
-        </div>
-
-        {/* KPI 3: Hạn mức tự duyệt */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 12,
-            border: '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Hạn mức tự duyệt chi</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#0f766e', marginTop: 4 }}>
-              {threshold === 0 ? '0 đ (Duyệt tất cả)' : `${threshold.toLocaleString('vi-VN')} đ`}
-            </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              Áp dụng cho tất cả chi nhánh
-            </div>
-          </div>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              backgroundColor: '#ccfbf1',
-              color: '#0f766e',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Sliders size={20} />
-          </div>
-        </div>
-
-        {/* KPI 5: Trần tổng chi / ca */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 12,
-            border: '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Trần tổng chi / ca (chưa áp dụng)</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginTop: 4 }}>
-              {shiftTotalLimit === 0 ? 'Không giới hạn' : `${shiftTotalLimit.toLocaleString('vi-VN')} đ`}
-            </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              Hệ thống chưa kiểm tra trần này
-            </div>
-          </div>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              backgroundColor: '#f1f5f9',
-              color: '#475569',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Wallet size={20} />
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Main Grid: Cấu hình hạn mức (Trái) & Danh sách duyệt (Phải) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(360px, 460px) 1fr',
-          gap: 20,
+          gridTemplateColumns: 'minmax(350px, 430px) 1fr',
+          gap: 18,
           alignItems: 'start',
         }}
       >
@@ -533,24 +381,47 @@ export const StorePosCashControlPage: FC = () => {
             backgroundColor: '#ffffff',
             borderRadius: 12,
             border: '1px solid #e2e8f0',
-            padding: 24,
+            padding: 20,
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 20,
+            gap: 16,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 14, borderBottom: '1px solid #f1f5f9' }}>
-            <Sliders size={20} className="text-teal-700" />
-            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
+            <Sliders size={18} className="text-teal-700" />
+            <h2 style={{ fontSize: 15.5, fontWeight: 800, color: '#0f172a', margin: 0 }}>
               Cấu Hình Hạn Mức Duyệt Chi
             </h2>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, backgroundColor: '#f0fdfa', borderRadius: 8, border: '1px solid #ccfbf1' }}>
-            <Info size={18} className="text-teal-700 flex-shrink-0" style={{ marginTop: 2 }} />
-            <span style={{ fontSize: 12.5, color: '#0f766e', lineHeight: 1.5 }}>
-              Hạn mức áp dụng cho tất cả chi nhánh. Danh sách phiếu bên phải theo chi nhánh đang chọn.
+          {/* Tóm tắt hạn mức đang áp dụng */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: '#f0fdfa', border: '1px solid #ccfbf1' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: '#475569' }}>Hạn mức tự duyệt chi</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f766e', marginTop: 3 }}>
+                {savedThreshold === 0 ? '0 đ (Duyệt tất cả)' : `${savedThreshold.toLocaleString('vi-VN')} đ`}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                Áp dụng cho tất cả chi nhánh
+              </div>
+            </div>
+
+            <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: '#475569' }}>Trần tổng chi / ca (chưa áp dụng)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', marginTop: 3 }}>
+                {savedShiftTotalLimit === 0 ? 'Không giới hạn' : `${savedShiftTotalLimit.toLocaleString('vi-VN')} đ`}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                Hệ thống chưa kiểm tra trần này
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', backgroundColor: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <Info size={15} className="text-teal-700 flex-shrink-0" style={{ marginTop: 2 }} />
+            <span style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+              Danh sách phiếu bên phải lọc theo chi nhánh đang chọn.
             </span>
           </div>
 
@@ -740,7 +611,7 @@ export const StorePosCashControlPage: FC = () => {
                 </div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 460, overflowY: 'auto' }}>
                     {paginatedPendingMovements.map((item) => (
                       <div
                         key={item.id}
@@ -926,7 +797,7 @@ export const StorePosCashControlPage: FC = () => {
                 </div>
               ) : (
                 <>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 460, overflowY: 'auto' }}>
                     {paginatedUnconfirmedDrops.map((item) => (
                       <div
                         key={item.id}

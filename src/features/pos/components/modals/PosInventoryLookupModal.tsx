@@ -34,6 +34,18 @@ const formatDate = (value?: string | null) => value
   ? new Date(value).toLocaleDateString('vi-VN')
   : 'Không giới hạn';
 
+const formatMfgDate = (value?: string | null) => value
+  ? new Date(value).toLocaleDateString('vi-VN')
+  : '—';
+
+const getLocalTodayYmd = (): string => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 export const PosInventoryLookupModal: FC<Props> = ({
   isOpen, onClose, currentBranchId, currentBranchName, products, onSelectBatchToCart,
 }) => {
@@ -44,7 +56,7 @@ export const PosInventoryLookupModal: FC<Props> = ({
   type SellablePackage = { id: string; internalCode: string; barcode?: string | null; netWeight: number; sellingPrice: number; status: string; expiryDate?: string | null };
 
   const isSellablePackage = (item: { status: string; expiryDate?: string | null }) =>
-    item.status === 'AVAILABLE' && (!item.expiryDate || item.expiryDate.slice(0, 10) >= new Date().toISOString().slice(0, 10));
+    item.status === 'AVAILABLE' && (!item.expiryDate || item.expiryDate.slice(0, 10) >= getLocalTodayYmd());
 
   useEffect(() => {
     if (!isOpen) {
@@ -127,7 +139,7 @@ export const PosInventoryLookupModal: FC<Props> = ({
                   <tbody>{batches.map((batch, index) => <tr key={batch.batchId}>
                     <td>#{index + 1}</td>
                     <td><b>{batch.batchCode}</b></td>
-                    <td>{formatDate(batch.mfgDate)}</td>
+                    <td>{formatMfgDate(batch.mfgDate)}</td>
                     <td>{formatDate(batch.expiryDate)}</td>
                     <td>{batch.daysLeft == null ? 'Không giới hạn' : batch.daysLeft < 0 ? 'Đã hết hạn' : batch.daysLeft === 0 ? 'Hết hạn hôm nay' : `${batch.daysLeft} ngày`}</td>
                     <td>{batch.isFefoDiscountActive ? `-${batch.fefoDiscountPercent || 0}%` : '—'}</td>
@@ -178,7 +190,12 @@ export const PosInventoryLookupModal: FC<Props> = ({
           <button type="button" className="pos-btn-secondary" onClick={onClose}>Đóng</button>
           {selectedProduct && onSelectBatchToCart && <button type="button" className="pos-btn-primary"
             disabled={loading || Boolean(error) || !batches.some(batch => batch.availableQty > 0 && (batch.daysLeft == null || batch.daysLeft >= 0))}
-            onClick={() => { onSelectBatchToCart(selectedProduct); onClose(); }}>Thêm vào đơn · tự động FEFO</button>}
+            onClick={() => {
+              const firstSellable = batches.find(batch => batch.availableQty > 0 && (batch.daysLeft == null || batch.daysLeft >= 0));
+              const autoDiscount = firstSellable?.isFefoDiscountActive ? (firstSellable.fefoDiscountPercent || 0) : 0;
+              onSelectBatchToCart(selectedProduct, undefined, undefined, undefined, autoDiscount);
+              onClose();
+            }}>Thêm vào đơn · tự động FEFO</button>}
         </div>
       </div>
     </div>

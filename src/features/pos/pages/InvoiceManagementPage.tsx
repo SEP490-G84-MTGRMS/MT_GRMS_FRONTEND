@@ -22,6 +22,7 @@ import {
   Star,
   Gift,
   Loader2,
+  Eye,
 } from 'lucide-react';
 import { TablePagination, ConfirmDialog, SortableHeader, useTableSort } from '../../../components/common';
 import { AdminToast, type ToastState } from '../../admin/components';
@@ -136,20 +137,265 @@ const parsePreOrderPickupAndNotes = (rawNote?: string | null, expectedPickupDate
   };
 };
 
-type ReturnRecord = { code: string; createdAt: string; returnedAmount: number; newGoodsAmount: number };
+type ReturnReturnedItem = {
+  productName: string;
+  qtyText: string;
+  conditionLabel: string;
+  amountText: string;
+};
+
+type ReturnNewItem = {
+  itemId: string;
+  productName: string;
+  sku: string;
+  unitName: string;
+  quantity: number;
+  returnedQty: number;
+  unitPrice: number;
+  totalAmount: number;
+  batchCode: string;
+};
+
+type ReturnRecord = {
+  code: string;
+  orderId: string;
+  sourceOrderCode: string;
+  rootOrderCode: string;
+  createdAt: string;
+  createdAtMs: number;
+  cashierName: string;
+  paymentMethod: string;
+  paymentMethodLabel: string;
+  returnedAmount: number;
+  newGoodsAmount: number;
+  netAmount: number;
+  returnedItems: ReturnReturnedItem[];
+  reasonLabel: string | null;
+  extraNote: string | null;
+  newItems: ReturnNewItem[];
+  canExchangeAgain: boolean;
+  rawOrder: any;
+};
+
+const RETURN_REASON_LABELS: Record<string, string> = {
+  DEFECTIVE: 'Sản phẩm lỗi / hỏng',
+  WRONG_ITEM: 'Nhầm sản phẩm / quy cách',
+  CHANGE_MIND: 'Khách đổi ý',
+  CUSTOMER_CHANGE_MIND: 'Khách đổi ý',
+  EXPIRED_NEAR_DATE: 'Cận hạn / quá hạn sử dụng',
+  EXPIRED: 'Gần hết hạn / hết hạn',
+  OTHER: 'Lý do khác',
+};
+
+const formatReturnPaymentMethod = (method?: string): string => {
+  const upper = (method || 'CASH').toUpperCase();
+  if (upper === 'VIETQR' || upper === 'BANK' || upper === 'TRANSFER') return 'Chuyển khoản VietQR';
+  if (upper === 'REDUCE_DEBT' || upper === 'DEBT') return 'Cấn trừ / Ghi công nợ';
+  return 'Tiền mặt';
+};
+
+const parseReturnedItemLine = (line: string): ReturnReturnedItem => {
+  // Format BE: "<Tên SP> x <SL> <ĐVT> (<Tình trạng>) - <Số tiền> đ"
+  const m = line.match(/^(.+?)\s+x\s+([^\(]+?)\s*\(([^)]+)\)\s*-\s*(.+)$/i);
+  if (m) {
+    return {
+      productName: m[1].trim(),
+      qtyText: m[2].trim(),
+      conditionLabel: m[3].trim(),
+      amountText: m[4].trim(),
+    };
+  }
+  return {
+    productName: line,
+    qtyText: '—',
+    conditionLabel: '—',
+    amountText: '—',
+  };
+};
+
+const parseReturnOrderNote = (note?: string | null) => {
+  const raw = (note || '').trim();
+  const returnedMatch = raw.match(/\[HÀNG TRẢ:\s*([^\]]+)\]/i);
+  const returnedItems = returnedMatch
+    ? returnedMatch[1].split(';').map((s) => s.trim()).filter(Boolean).map(parseReturnedItemLine)
+    : [];
+  const reasonMatch = raw.match(/\[LÝ DO:\s*([^\]]+)\]/i);
+  const rawReason = reasonMatch?.[1]?.trim() || null;
+  const reasonLabel = rawReason ? (RETURN_REASON_LABELS[rawReason.toUpperCase()] || rawReason) : null;
+  const returnedAmtMatch = raw.match(/Tiền hàng trả:\s*([\d.,]+)\s*đ/i);
+  const noteReturnedAmount = returnedAmtMatch
+    ? Number(returnedAmtMatch[1].replace(/[.,]/g, ''))
+    : null;
+
+  const extraNote = raw
+    .replace(/Đổi\/Trả từ đơn '[^']+'\.\s*/i, '')
+    .replace(/Tiền hàng trả:\s*[^.]+\.\s*/i, '')
+    .replace(/Tiền hàng mới:\s*[^.]+\.\s*/i, '')
+    .replace(/Chênh lệch:\s*[^.]+\.\s*/i, '')
+    .replace(/\[HÀNG TRẢ:[^\]]+\]/gi, '')
+    .replace(/\[LÝ DO:[^\]]+\]/gi, '')
+    .replace(/\[ĐÃ VÀO KÉT SẮT\]/gi, '')
+    .replace(/\[CHỐT CUỐI NGÀY:[^\]]+\]/gi, '')
+    .trim();
+
+  return {
+    returnedItems,
+    reasonLabel,
+    noteReturnedAmount: noteReturnedAmount !== null && Number.isFinite(noteReturnedAmount) ? noteReturnedAmount : null,
+    extraNote: extraNote.length > 0 ? extraNote : null,
+  };
+};
+
+const resolveItemConversionRate = (allocations?: any[], orderQty?: number, explicitRate?: number): number => {
+  const rate = Number(explicitRate || 0);
+  if (rate > 0) return rate;
+  if (Array.isArray(allocations) && allocations.length > 0 && Number(orderQty || 0) > 0) {
+    const totalAllocatedBase = allocations.reduce(
+      (sum, a) => sum + Number(a?.quantityBase ?? a?.QuantityBase ?? 0),
+      0
+    );
+    if (totalAllocatedBase > 0) {
+      const inferred = totalAllocatedBase / Number(orderQty);
+      if (inferred > 0) return inferred;
+    }
+  }
+  return 1;
+};
+
+const getAllocationsReturnedQty = (allocations?: any[], orderQty?: number, explicitRate?: number): number => {
+  if (!Array.isArray(allocations) || allocations.length === 0) return 0;
+  const totalReturnedBase = allocations.reduce((sum, a) => sum + Number(a?.returnedBase ?? a?.ReturnedBase ?? 0), 0);
+  if (totalReturnedBase <= 0) return 0;
+  const rate = resolveItemConversionRate(allocations, orderQty, explicitRate);
+  return totalReturnedBase / rate;
+};
 
 const collectReturnRecords = (orders: any[]): Record<string, ReturnRecord[]> => {
   const records: Record<string, ReturnRecord[]> = {};
-  orders.filter((order) => order.orderCode?.startsWith('DT')).forEach((order) => {
-    const originalCode = order.note?.match(/Đổi\/Trả từ đơn '([^']+)'/)?.[1];
-    if (!originalCode) return;
-    (records[originalCode] ??= []).push({
+  const ordersByCode = new Map<string, any>();
+  orders.forEach((o) => {
+    if (o.orderCode) ordersByCode.set(o.orderCode, o);
+  });
+
+  const dtOrders = orders.filter((order) => order.orderCode?.startsWith('DT'));
+
+  // Map mã phiếu DT -> mã đơn nguồn trực tiếp (hỗ trợ nối chuỗi HD -> DT1 -> DT2)
+  const parentByDtCode = new Map<string, string>();
+  const dtCountBySource = new Map<string, number>();
+  dtOrders.forEach((order) => {
+    const src = order.note?.match(/Đổi\/Trả từ đơn '([^']+)'/)?.[1];
+    if (order.orderCode && src) {
+      parentByDtCode.set(order.orderCode, src);
+      dtCountBySource.set(src, (dtCountBySource.get(src) || 0) + 1);
+    }
+  });
+
+  const resolveRootOrderCode = (directSource: string): string => {
+    let curr = directSource;
+    const visited = new Set<string>([curr]);
+    while (parentByDtCode.has(curr)) {
+      const next = parentByDtCode.get(curr)!;
+      if (visited.has(next)) break;
+      visited.add(next);
+      curr = next;
+    }
+    return curr;
+  };
+
+  dtOrders.forEach((order) => {
+    const sourceOrderCode = order.note?.match(/Đổi\/Trả từ đơn '([^']+)'/)?.[1];
+    if (!sourceOrderCode) return;
+    const rootOrderCode = resolveRootOrderCode(sourceOrderCode);
+    const parsedNote = parseReturnOrderNote(order.note);
+    const parsedDate = order.orderDate
+      ? new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(order.orderDate) ? order.orderDate : `${order.orderDate}Z`)
+      : null;
+    const createdAtMs = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.getTime() : 0;
+
+    // Ưu tiên Tiền hàng trả ghi tại thời điểm lập phiếu trong Note để không bị sai lệch nếu phiếu DT cũ từng bị cộng dồn
+    const returnedAmount =
+      parsedNote.noteReturnedAmount !== null
+        ? parsedNote.noteReturnedAmount
+        : Number(order.returnedAmount || 0);
+
+    // Fallback cho phiếu cũ chưa có [HÀNG TRẢ: ...]: chỉ lấy từ đơn nguồn khi duy nhất 1 phiếu DT hoặc tổng khớp tiền hàng trả của phiếu
+    let returnedItems = parsedNote.returnedItems;
+    if (returnedItems.length === 0) {
+      const sourceOrder = ordersByCode.get(sourceOrderCode);
+      const siblingCount = dtCountBySource.get(sourceOrderCode) || 0;
+      if (sourceOrder?.items?.length) {
+        let fallbackTotal = 0;
+        const candidateItems = sourceOrder.items
+          .map((it: any) => {
+            const retQty = getAllocationsReturnedQty(
+              it.stockAllocations || it.StockAllocations,
+              Number(it.quantity || 0),
+              Number(it.conversionRate || 0)
+            );
+            if (retQty <= 0) return null;
+            const unitPrice = it.isGift ? 0 : Number(it.actualPrice ?? it.unitPrice ?? 0);
+            const lineTotal = Math.round(retQty * unitPrice);
+            fallbackTotal += lineTotal;
+            return {
+              productName: it.productName || 'Sản phẩm',
+              qtyText: `${Number(retQty.toFixed(3))} ${it.unitName || 'Cái'}`,
+              conditionLabel: 'Đã trả',
+              amountText: `${lineTotal.toLocaleString('vi-VN')} đ`,
+            } as ReturnReturnedItem;
+          })
+          .filter(Boolean) as ReturnReturnedItem[];
+
+        if (siblingCount <= 1 || Math.abs(fallbackTotal - returnedAmount) <= 1) {
+          returnedItems = candidateItems;
+        }
+      }
+    }
+
+    const newItems: ReturnNewItem[] = (order.items || []).map((it: any) => {
+      const allocs = it.stockAllocations || it.StockAllocations || [];
+      const orderQty = Number(it.quantity || 0);
+      return {
+        itemId: it.id,
+        productName: it.productName || 'Sản phẩm',
+        sku: it.barcode || '',
+        unitName: it.unitName || 'Cái',
+        quantity: orderQty,
+        returnedQty: getAllocationsReturnedQty(allocs, orderQty, Number(it.conversionRate || 0)),
+        unitPrice: it.isGift ? 0 : Number(it.actualPrice ?? it.unitPrice ?? 0),
+        totalAmount: it.isGift ? 0 : Number(it.totalLineAmount ?? (it.quantity || 0) * (it.unitPrice || 0)),
+        batchCode: it.batchCode || it.BatchCode || allocs?.[0]?.batchCode || allocs?.[0]?.BatchCode || '',
+      };
+    });
+
+    const newGoodsAmount = Number(order.totalAmount || 0);
+    const canExchangeAgain = newItems.some((it) => it.quantity - it.returnedQty > 0.0001);
+
+    (records[rootOrderCode] ??= []).push({
       code: order.orderCode,
-      createdAt: order.orderDate ? new Date(order.orderDate).toLocaleString('vi-VN') : '',
-      returnedAmount: order.returnedAmount || 0,
-      newGoodsAmount: order.totalAmount || 0,
+      orderId: order.id,
+      sourceOrderCode,
+      rootOrderCode,
+      createdAt: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate.toLocaleString('vi-VN') : '',
+      createdAtMs,
+      cashierName: order.cashierName || 'Thu ngân POS',
+      paymentMethod: order.paymentMethod || 'CASH',
+      paymentMethodLabel: formatReturnPaymentMethod(order.paymentMethod),
+      returnedAmount,
+      newGoodsAmount,
+      netAmount: newGoodsAmount - returnedAmount,
+      returnedItems,
+      reasonLabel: parsedNote.reasonLabel,
+      extraNote: parsedNote.extraNote,
+      newItems,
+      canExchangeAgain,
+      rawOrder: order,
     });
   });
+
+  Object.keys(records).forEach((key) => {
+    records[key].sort((a, b) => a.createdAtMs - b.createdAtMs);
+  });
+
   return records;
 };
 
@@ -186,6 +432,7 @@ export const InvoiceManagementPage: FC = () => {
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [cancelTargetPreOrder, setCancelTargetPreOrder] = useState<PreOrderDTO | null>(null);
   const [returnRecordsByOrder, setReturnRecordsByOrder] = useState<Record<string, ReturnRecord[]>>({});
+  const [detailReturnRecord, setDetailReturnRecord] = useState<ReturnRecord | null>(null);
 
   // Danh sách hóa đơn có thể hủy / cập nhật trạng thái (Phân lập theo Cửa Hàng / Tenant)
   const { user } = useAuthStore();
@@ -339,6 +586,7 @@ export const InvoiceManagementPage: FC = () => {
           it.BatchId ||
           '',
         stockAllocations: it.stockAllocations || it.StockAllocations || [],
+        conversionRate: Number(it.conversionRate || 0) || undefined,
         productId: it.productId,
         productName: it.productName,
         sku: it.barcode || '',
@@ -1764,12 +2012,93 @@ export const InvoiceManagementPage: FC = () => {
 
                                 {(returnRecordsByOrder[inv.invoiceId] || []).length > 0 && (
                                   <div style={{ marginBottom: 10, padding: '8px 12px', border: '1px solid #bfdbfe', borderRadius: 6, background: '#eff6ff', fontSize: 12 }}>
-                                    <b>Lịch sử đổi/trả:</b>
-                                    {returnRecordsByOrder[inv.invoiceId].map((record) => (
-                                      <div key={record.code} style={{ marginTop: 4 }}>
-                                        Phiếu {record.code} · {record.createdAt} · Hàng trả {record.returnedAmount.toLocaleString('vi-VN')} đ · Hàng đổi mới {record.newGoodsAmount.toLocaleString('vi-VN')} đ
-                                      </div>
-                                    ))}
+                                    <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 4 }}>
+                                      Lịch sử đổi/trả ({returnRecordsByOrder[inv.invoiceId].length} lần):
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                      {returnRecordsByOrder[inv.invoiceId].map((record, idx) => (
+                                        <div
+                                          key={record.code}
+                                          style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            gap: 10,
+                                            flexWrap: 'wrap',
+                                            padding: '6px 8px',
+                                            borderRadius: 6,
+                                            backgroundColor: '#ffffff',
+                                            border: '1px solid #dbeafe',
+                                          }}
+                                        >
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', color: '#1e293b' }}>
+                                            <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 6px', borderRadius: 4, backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
+                                              Lần {idx + 1}
+                                            </span>
+                                            <b>Phiếu {record.code}</b>
+                                            {record.sourceOrderCode !== inv.invoiceId && (
+                                              <span style={{ fontSize: 11, color: '#6366f1', fontWeight: 600 }}>
+                                                (đổi từ {record.sourceOrderCode})
+                                              </span>
+                                            )}
+                                            <span style={{ color: '#64748b' }}>· {record.createdAt}</span>
+                                            <span>· Hàng trả <b style={{ color: '#b91c1c' }}>{record.returnedAmount.toLocaleString('vi-VN')} đ</b></span>
+                                            <span>· Hàng đổi mới <b style={{ color: '#0f766e' }}>{record.newGoodsAmount.toLocaleString('vi-VN')} đ</b></span>
+                                          </div>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDetailReturnRecord(record);
+                                              }}
+                                              style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                                padding: '3px 9px',
+                                                borderRadius: 5,
+                                                border: '1px solid #93c5fd',
+                                                backgroundColor: '#eff6ff',
+                                                color: '#1d4ed8',
+                                                fontSize: 11.5,
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                              }}
+                                            >
+                                              <Eye size={12} />
+                                              <span>Xem chi tiết</span>
+                                            </button>
+                                            {record.canExchangeAgain && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setReturnExchangeModalInvoice(mapBackendOrderToInvoice(record.rawOrder));
+                                                }}
+                                                style={{
+                                                  display: 'inline-flex',
+                                                  alignItems: 'center',
+                                                  gap: 4,
+                                                  padding: '3px 9px',
+                                                  borderRadius: 5,
+                                                  border: '1px solid #fcd34d',
+                                                  backgroundColor: '#fffbeb',
+                                                  color: '#b45309',
+                                                  fontSize: 11.5,
+                                                  fontWeight: 700,
+                                                  cursor: 'pointer',
+                                                }}
+                                                title="Đổi/trả tiếp các sản phẩm đổi mới trên phiếu này"
+                                              >
+                                                <RotateCcw size={12} />
+                                                <span>Đổi/Trả tiếp</span>
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
 
@@ -1843,7 +2172,13 @@ export const InvoiceManagementPage: FC = () => {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {inv.items.map((item) => (
+                                    {inv.items.map((item) => {
+                                      const returnedQty = getAllocationsReturnedQty(
+                                        item.stockAllocations,
+                                        item.quantity,
+                                        (item as any).conversionRate
+                                      );
+                                      return (
                                       <tr key={item.itemId} style={{ backgroundColor: item.isGift ? '#f0fdf4' : undefined }}>
                                         <td style={{ color: '#0f766e', fontWeight: 600, textAlign: 'left' }}>{item.sku}</td>
                                         <td style={{ textAlign: 'left' }}>
@@ -1874,7 +2209,26 @@ export const InvoiceManagementPage: FC = () => {
                                           </span>
                                         </td>
                                         <td style={{ textAlign: 'left' }}>{item.unitName}</td>
-                                        <td style={{ textAlign: 'left', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{item.quantity}</td>
+                                        <td style={{ textAlign: 'left', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                                          <span>{item.quantity}</span>
+                                          {returnedQty > 0 && (
+                                            <span
+                                              style={{
+                                                display: 'inline-block',
+                                                marginLeft: 6,
+                                                padding: '1px 6px',
+                                                borderRadius: 4,
+                                                backgroundColor: '#fef2f2',
+                                                color: '#b91c1c',
+                                                border: '1px solid #fecaca',
+                                                fontSize: 10.5,
+                                                fontWeight: 700,
+                                              }}
+                                            >
+                                              Đã trả {Number(returnedQty.toFixed(3))}
+                                            </span>
+                                          )}
+                                        </td>
                                         <td style={{ textAlign: 'left', fontVariantNumeric: 'tabular-nums' }}>
                                           {item.isGift ? '0 đ' : `${item.unitPrice.toLocaleString('vi-VN')} đ`}
                                         </td>
@@ -1885,7 +2239,8 @@ export const InvoiceManagementPage: FC = () => {
                                           {item.isGift ? '0 đ' : `${Math.round(item.totalAmount).toLocaleString('vi-VN')} đ`}
                                         </td>
                                       </tr>
-                                    ))}
+                                      );
+                                    })}
                                   </tbody>
                                 </table>
                               </div>
@@ -2477,6 +2832,223 @@ export const InvoiceManagementPage: FC = () => {
               >
                 <XCircle size={14} />
                 <span>Xác Nhận Hủy &amp; Hoàn Tiền</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CHI TIẾT PHIẾU ĐỔI / TRẢ */}
+      {detailReturnRecord && (
+        <div
+          className="pos-modal-overlay"
+          onClick={() => setDetailReturnRecord(null)}
+        >
+          <div
+            className="pos-modal-dialog"
+            style={{ maxWidth: 640, width: '94%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="pos-modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 800, color: '#0f172a' }}>
+                    {detailReturnRecord.newItems.length > 0 ? 'Phiếu Đổi Hàng' : 'Phiếu Trả Hàng'}
+                  </h3>
+                  <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 8px', borderRadius: 6, backgroundColor: '#f1f5f9', color: '#334155' }}>
+                    {detailReturnRecord.code}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                  Từ đơn <b>{detailReturnRecord.sourceOrderCode}</b> · {detailReturnRecord.createdAt || '—'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailReturnRecord(null)}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#64748b', display: 'flex', padding: 4 }}
+                aria-label="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="pos-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '72vh', overflowY: 'auto' }}>
+              {/* Thông tin ngắn gọn 2 cột */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '8px 16px',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  fontSize: 12.5,
+                }}
+              >
+                <div>
+                  <span style={{ color: '#64748b' }}>Người lập: </span>
+                  <b style={{ color: '#0f172a' }}>{detailReturnRecord.cashierName}</b>
+                </div>
+                <div>
+                  <span style={{ color: '#64748b' }}>Thanh toán: </span>
+                  <b style={{ color: '#0f766e' }}>{detailReturnRecord.paymentMethodLabel}</b>
+                </div>
+                {(detailReturnRecord.reasonLabel || detailReturnRecord.extraNote) && (
+                  <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #e2e8f0', paddingTop: 6, color: '#334155' }}>
+                    {detailReturnRecord.reasonLabel && (
+                      <span><b style={{ color: '#64748b' }}>Lý do:</b> {detailReturnRecord.reasonLabel}</span>
+                    )}
+                    {detailReturnRecord.reasonLabel && detailReturnRecord.extraNote && <span> · </span>}
+                    {detailReturnRecord.extraNote && (
+                      <span><b style={{ color: '#64748b' }}>Ghi chú:</b> {detailReturnRecord.extraNote}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Bảng 1: Sản phẩm trả lại */}
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
+                  Sản phẩm khách trả
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                  <table className="pos-shift-table" style={{ margin: 0 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left' }}>Sản phẩm</th>
+                        <th style={{ textAlign: 'left', width: 115 }}>Tình trạng</th>
+                        <th style={{ textAlign: 'left', width: 90 }}>SL trả</th>
+                        <th style={{ textAlign: 'right', width: 110 }}>Thành tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detailReturnRecord.returnedItems.length > 0 ? (
+                        detailReturnRecord.returnedItems.map((it, idx) => (
+                          <tr key={idx}>
+                            <td style={{ textAlign: 'left', fontWeight: 600, color: '#0f172a' }}>{it.productName}</td>
+                            <td style={{ textAlign: 'left' }}>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  padding: '2px 7px',
+                                  borderRadius: 4,
+                                  backgroundColor: it.conditionLabel.includes('lỗi') ? '#fef2f2' : '#f1f5f9',
+                                  color: it.conditionLabel.includes('lỗi') ? '#b91c1c' : '#475569',
+                                }}
+                              >
+                                {it.conditionLabel}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'left', fontWeight: 600 }}>{it.qtyText}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a', fontVariantNumeric: 'tabular-nums' }}>
+                              {it.amountText}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} style={{ textAlign: 'center', color: '#64748b', padding: 12 }}>
+                            Tổng giá trị hàng trả: <b>{detailReturnRecord.returnedAmount.toLocaleString('vi-VN')} đ</b>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Bảng 2: Sản phẩm đổi mới (chỉ hiển thị khi có hàng đổi) */}
+              {detailReturnRecord.newItems.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
+                    Sản phẩm đổi mới
+                  </div>
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+                    <table className="pos-shift-table" style={{ margin: 0 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: 'left' }}>Sản phẩm</th>
+                          <th style={{ textAlign: 'left', width: 95 }}>Mã Lô</th>
+                          <th style={{ textAlign: 'left', width: 95 }}>SL</th>
+                          <th style={{ textAlign: 'right', width: 95 }}>Đơn giá</th>
+                          <th style={{ textAlign: 'right', width: 105 }}>Thành tiền</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detailReturnRecord.newItems.map((it) => (
+                          <tr key={it.itemId}>
+                            <td style={{ textAlign: 'left', fontWeight: 600, color: '#0f172a' }}>{it.productName}</td>
+                            <td style={{ textAlign: 'left', fontSize: 11.5, color: '#475569' }}>{it.batchCode || '—'}</td>
+                            <td style={{ textAlign: 'left', fontWeight: 600 }}>
+                              {it.quantity} {it.unitName}
+                              {it.returnedQty > 0 && (
+                                <span style={{ display: 'inline-block', marginLeft: 4, padding: '1px 5px', borderRadius: 4, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 10, fontWeight: 700 }}>
+                                  Đã trả {Number(it.returnedQty.toFixed(3))}
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{it.unitPrice.toLocaleString('vi-VN')} đ</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f766e', fontVariantNumeric: 'tabular-nums' }}>{Math.round(it.totalAmount).toLocaleString('vi-VN')} đ</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Tóm tắt tiền gọn như hóa đơn */}
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                  <span>Tiền hàng trả</span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{detailReturnRecord.returnedAmount.toLocaleString('vi-VN')} đ</span>
+                </div>
+                {detailReturnRecord.newGoodsAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#475569' }}>
+                    <span>Tiền hàng đổi mới</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{detailReturnRecord.newGoodsAmount.toLocaleString('vi-VN')} đ</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 6, borderTop: '1px dashed #e2e8f0', fontSize: 14 }}>
+                  <b style={{ color: '#0f172a' }}>
+                    {detailReturnRecord.netAmount < 0
+                      ? `Hoàn lại khách (${detailReturnRecord.paymentMethodLabel})`
+                      : detailReturnRecord.netAmount > 0
+                        ? `Khách trả thêm (${detailReturnRecord.paymentMethodLabel})`
+                        : 'Chênh lệch'}
+                  </b>
+                  <b style={{ fontSize: 16, color: detailReturnRecord.netAmount < 0 ? '#dc2626' : '#0f766e', fontVariantNumeric: 'tabular-nums' }}>
+                    {Math.abs(detailReturnRecord.netAmount).toLocaleString('vi-VN')} đ
+                  </b>
+                </div>
+              </div>
+            </div>
+
+            <div className="pos-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              {detailReturnRecord.canExchangeAgain && (
+                <button
+                  type="button"
+                  className="pos-btn-primary"
+                  style={{ height: 34, fontSize: 12.5, backgroundColor: '#b45309' }}
+                  onClick={() => {
+                    const target = detailReturnRecord.rawOrder;
+                    setDetailReturnRecord(null);
+                    setReturnExchangeModalInvoice(mapBackendOrderToInvoice(target));
+                  }}
+                >
+                  <RotateCcw size={13} />
+                  <span>Đổi/Trả hàng đổi này</span>
+                </button>
+              )}
+              <button
+                type="button"
+                className="pos-btn-secondary-pill"
+                onClick={() => setDetailReturnRecord(null)}
+              >
+                Đóng
               </button>
             </div>
           </div>
