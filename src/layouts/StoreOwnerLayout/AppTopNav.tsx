@@ -19,7 +19,6 @@ import {
   ChevronRight,
   Wallet,
   FileText,
-  Boxes,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { authService } from "../../features/auth/authService";
@@ -1612,66 +1611,6 @@ export const AppTopNav: FC = () => {
                             }}
                           >
                             Hạn mức chi quầy &amp; duyệt phiếu két thu ngân
-                          </div>
-                        </div>
-                      </Link>
-
-                      <div style={{ height: 1, backgroundColor: "#f1f5f9", margin: "6px 16px" }} />
-
-                      {/* Mục 3: Gói dịch vụ MT-GRMS */}
-                      <Link
-                        to="/store-owner/subscriptions"
-                        onClick={() => setSettingsMenuOpen(false)}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 12,
-                          padding: "10px 16px",
-                          textDecoration: "none",
-                          color: "inherit",
-                          transition: "background-color 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#eff6ff";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 8,
-                            backgroundColor: "#dbeafe",
-                            color: "#1d4ed8",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            marginTop: 1,
-                          }}
-                        >
-                          <Boxes size={18} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: 13.5,
-                              fontWeight: 700,
-                              color: "#1e3a8a",
-                            }}
-                          >
-                            Gói dịch vụ MT-GRMS
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "#64748b",
-                              marginTop: 2,
-                            }}
-                          >
-                            Gói dịch vụ & Gia hạn phần mềm
                           </div>
                         </div>
                       </Link>

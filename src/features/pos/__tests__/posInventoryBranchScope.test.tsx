@@ -112,4 +112,29 @@ describe('POS inventory branch scope', () => {
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(screen.queryByText(/BATCH-AN|LÔ-FEFO/)).toBeNull();
   });
+
+  it('passes active FEFO discount on auto-FEFO add and shows em-dash for null mfgDate', async () => {
+    vi.mocked(httpClient.get).mockImplementation((url) => Promise.resolve(url.includes('/packages')
+      ? { data: { data: { packages: [] } } }
+      : { data: { data: [{
+        batchId: 'b-fefo',
+        batchCode: 'BATCH-FEFO-50',
+        mfgDate: null,
+        expiryDate: '2030-01-01',
+        daysLeft: 3,
+        quantityOnHand: 10,
+        reservedQty: 0,
+        availableQty: 10,
+        status: 'Critical',
+        fefoDiscountPercent: 50,
+        isFefoDiscountActive: true,
+      }] } }));
+    const onSelectBatchToCart = vi.fn();
+    render(<PosInventoryLookupModal {...props} onSelectBatchToCart={onSelectBatchToCart} />);
+    scanProductBarcode('123');
+    await screen.findByText('BATCH-FEFO-50');
+    expect(screen.queryByText('Không giới hạn')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Thêm vào đơn · tự động FEFO' }));
+    expect(onSelectBatchToCart).toHaveBeenCalledWith(product, undefined, undefined, undefined, 50);
+  });
 });

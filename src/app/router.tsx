@@ -93,7 +93,6 @@ import {
 import {
   PosCheckoutPage,
   PosShiftPage,
-  InventoryLookupPage,
   InvoiceManagementPage,
 } from '../features/pos';
 
@@ -115,7 +114,7 @@ import { StoreSettingsHubPage } from '../pages/store/StoreSettingsHubPage';
 import { StaffManagementGate } from '../pages/store/components/StaffManagementGate';
 import { AccountManagementPage } from '../pages/store/AccountManagementPage';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
-import { CashControlHubPage } from '../features/cash-control';
+import { StorePosCashControlPage } from '../features/pos/pages/StorePosCashControlPage';
 
 /**
  * Application client-side router configuration across public, store-owner, POS, and admin portals.
@@ -297,10 +296,6 @@ export const router = createBrowserRouter([
         element: <Navigate to="/store-owner/loyalty-config" replace />,
       },
       {
-        path: 'inventory-lookup',
-        element: <Navigate to="/store-owner/inventory-lookup" replace />,
-      },
-      {
         path: 'orders',
         element: <Navigate to="/store-owner/invoices" replace />,
       },
@@ -376,17 +371,21 @@ export const router = createBrowserRouter([
         path: 'pos-cash-control',
         element: (
           <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}>
-            <CashControlHubPage />
+            <StorePosCashControlPage />
           </ProtectedRoute>
         ),
       },
       {
         path: 'cash-control',
-        element: <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}><CashControlHubPage /></ProtectedRoute>,
+        element: (
+          <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner']}>
+            <StorePosCashControlPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'cash-control/*',
-        element: <Navigate to="/store-owner/cash-control" replace />,
+        element: <Navigate to="/store-owner/pos-cash-control" replace />,
       },
       {
         path: 'account',
@@ -645,10 +644,6 @@ export const router = createBrowserRouter([
         element: <LoyaltyConfigPage />,
       },
       {
-        path: 'inventory-lookup',
-        element: <ProtectedRoute><InventoryLookupPage /></ProtectedRoute>,
-      },
-      {
         path: 'orders',
         element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
@@ -662,7 +657,11 @@ export const router = createBrowserRouter([
           },
           {
             path: 'shifts',
-            element: <PosShiftPage />,
+            element: (
+              <ProtectedRoute allowedRoles={['STORE_OWNER', 'StoreOwner', 'ADMIN', 'Admin']}>
+                <PosShiftPage />
+              </ProtectedRoute>
+            ),
           },
     ],
   },
@@ -791,10 +790,6 @@ export const router = createBrowserRouter([
       {
         path: 'loyalty-config',
         element: <LoyaltyConfigPage />,
-      },
-      {
-        path: 'inventory-lookup',
-        element: <ProtectedRoute><InventoryLookupPage /></ProtectedRoute>,
       },
       {
         path: 'orders',
@@ -1124,18 +1119,6 @@ export const router = createBrowserRouter([
         element: <PosCheckoutPage />,
       },
       {
-        path: 'shift',
-        element: <PosShiftPage />,
-      },
-      {
-        path: 'cashier-shift',
-        element: <Navigate to="/pos/shift" replace />,
-      },
-      {
-        path: 'inventory-lookup',
-        element: <ProtectedRoute><InventoryLookupPage /></ProtectedRoute>,
-      },
-      {
         path: 'orders',
         element: <ProtectedRoute><InvoiceManagementPage /></ProtectedRoute>,
       },
@@ -1163,18 +1146,6 @@ export const router = createBrowserRouter([
             element: <PosCheckoutPage />,
           },
           {
-            path: 'shift',
-            element: <PosShiftPage />,
-          },
-          {
-            path: 'cashier-shift',
-            element: <Navigate to="/employee/pos/shift" replace />,
-          },
-          {
-            path: 'inventory-lookup',
-            element: <InventoryLookupPage />,
-          },
-          {
             path: 'orders',
             element: <InvoiceManagementPage />,
           },
@@ -1183,10 +1154,6 @@ export const router = createBrowserRouter([
             element: <InvoiceManagementPage />,
           },
         ],
-      },
-      {
-        path: 'inventory-lookup',
-        element: <ProtectedRoute><InventoryLookupPage /></ProtectedRoute>,
       },
       {
         path: 'orders',
