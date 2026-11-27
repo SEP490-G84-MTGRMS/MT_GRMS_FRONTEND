@@ -13,6 +13,7 @@ interface Props {
 }
 
 const DENOMINATIONS = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000];
+const DISCREPANCY_REASON_THRESHOLD = 1000;
 
 export const CloseShiftModal: FC<Props> = ({
   isOpen,
@@ -256,6 +257,8 @@ export const CloseShiftModal: FC<Props> = ({
   if (!isOpen) return null;
 
   const discrepancy = actualCashCounted - expectedCash;
+  const requiresDiscrepancyReason = Math.abs(discrepancy) >= DISCREPANCY_REASON_THRESHOLD;
+  const isMinorDiscrepancy = discrepancy !== 0 && !requiresDiscrepancyReason;
 
   // Kiểm tra phiếu pending
   const pendingMovements = movements.filter((m) => m.status === 'PendingApproval' || m.status === 2);
@@ -376,8 +379,8 @@ export const CloseShiftModal: FC<Props> = ({
       return;
     }
 
-    if (discrepancy !== 0 && !discrepancyReason.trim()) {
-      setErrorMsg('Vui lòng nhập lý do chênh lệch tiền trong két.');
+    if (requiresDiscrepancyReason && !discrepancyReason.trim()) {
+      setErrorMsg('Vui lòng nhập lý do chênh lệch tiền trong két (từ 1.000đ trở lên).');
       return;
     }
 
@@ -710,7 +713,7 @@ export const CloseShiftModal: FC<Props> = ({
                           type="number"
                           min={0}
                           max={Number.MAX_SAFE_INTEGER}
-                          step={1000}
+                          step={1}
                           value={quickCashAmount === 0 ? '' : quickCashAmount}
                           onChange={(e) => setQuickCashAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
                           placeholder="Nhập tổng số tiền thực đếm..."
@@ -865,21 +868,27 @@ export const CloseShiftModal: FC<Props> = ({
                         padding: '3px 8px',
                         borderRadius: 6,
                         fontSize: 12.5,
-                        backgroundColor: discrepancy === 0 ? '#ecfdf5' : discrepancy > 0 ? '#eff6ff' : '#fef2f2',
-                        color: discrepancy === 0 ? '#059669' : discrepancy > 0 ? '#2563eb' : '#dc2626',
-                        border: discrepancy === 0 ? '1px solid #a7f3d0' : discrepancy > 0 ? '1px solid #bfdbfe' : '1px solid #fecaca',
+                        backgroundColor: !requiresDiscrepancyReason ? '#ecfdf5' : discrepancy > 0 ? '#eff6ff' : '#fef2f2',
+                        color: !requiresDiscrepancyReason ? '#059669' : discrepancy > 0 ? '#2563eb' : '#dc2626',
+                        border: !requiresDiscrepancyReason ? '1px solid #a7f3d0' : discrepancy > 0 ? '1px solid #bfdbfe' : '1px solid #fecaca',
                       }}
                     >
                       {discrepancy > 0 ? `+${discrepancy.toLocaleString('vi-VN')}` : discrepancy.toLocaleString('vi-VN')} đ
-                      {discrepancy === 0 ? ' (Khớp 100%)' : discrepancy > 0 ? ' (Thừa)' : ' (Thiếu)'}
+                      {discrepancy === 0
+                        ? ' (Khớp 100%)'
+                        : isMinorDiscrepancy
+                          ? ' (Lệch nhỏ < 1.000đ)'
+                          : discrepancy > 0
+                            ? ' (Thừa)'
+                            : ' (Thiếu)'}
                     </span>
                   </div>
 
-                  {discrepancy !== 0 && (
+                  {requiresDiscrepancyReason && (
                     <div style={{ marginTop: 4 }}>
                       <label className="modal-label" style={{ fontSize: 12, color: '#dc2626' }}>
                         Lý do chênh lệch (*)
-                        {!discrepancyReason.trim() && <span style={{ fontSize: 11, fontWeight: 500, color: '#dc2626' }}> — Bắt buộc nhập giải trình</span>}
+                        {!discrepancyReason.trim() && <span style={{ fontSize: 11, fontWeight: 500, color: '#dc2626' }}> — Bắt buộc nhập giải trình (lệch ≥ 1.000đ)</span>}
                       </label>
                       <textarea
                         value={discrepancyReason}
@@ -908,7 +917,7 @@ export const CloseShiftModal: FC<Props> = ({
                         type="number"
                         min={0}
                         max={Number.MAX_SAFE_INTEGER}
-                        step={1000}
+                        step={1}
                         value={retainedFloat}
                         onChange={(e) => setRetainedFloat(Math.max(0, parseInt(e.target.value, 10) || 0))}
                         className="modal-input font-bold"
@@ -922,7 +931,7 @@ export const CloseShiftModal: FC<Props> = ({
                         type="number"
                         min={0}
                         max={Number.MAX_SAFE_INTEGER}
-                        step={1000}
+                        step={1}
                         value={droppedToSafe}
                         onChange={(e) => setDroppedToSafe(Math.max(0, parseInt(e.target.value, 10) || 0))}
                         className="modal-input font-bold"
@@ -1093,18 +1102,18 @@ export const CloseShiftModal: FC<Props> = ({
 
             <button
               type="submit"
-              disabled={!isShiftClosing || isLoading || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim())}
+              disabled={!isShiftClosing || isLoading || hasPending || !isAllocationValid || (requiresDiscrepancyReason && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim())}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
                 padding: '8px 22px',
                 borderRadius: 6,
-                backgroundColor: !isShiftClosing || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) ? '#94a3b8' : '#0f766e',
+                backgroundColor: !isShiftClosing || hasPending || !isAllocationValid || (requiresDiscrepancyReason && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) ? '#94a3b8' : '#0f766e',
                 color: '#ffffff',
                 border: 'none',
                 fontWeight: 600,
-                cursor: !isShiftClosing || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) || isLoading ? 'not-allowed' : 'pointer',
+                cursor: !isShiftClosing || hasPending || !isAllocationValid || (requiresDiscrepancyReason && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) || isLoading ? 'not-allowed' : 'pointer',
               }}
             >
               <CheckCircle size={16} />
