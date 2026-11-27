@@ -1,13 +1,16 @@
+import { isAxiosError } from 'axios';
+import { mapProblemDetailsToVietnamese } from '../../../api/problemDetailsMapper';
+import { useCashbookSubmissionKey } from '../hooks/useCashbookSubmissionKey';
 import { useState, useEffect } from 'react';
 import type { FC, FormEvent } from 'react';
-import { ArrowUpFromLine, Info, X } from 'lucide-react';
+import { AlertTriangle, ArrowUpFromLine, Ban, Info, X } from 'lucide-react';
 import type { CashAccount, CashbookTaxTreatment, CreatePaymentDTO, CounterpartyType } from '../types/cashbook.types';
 
 interface CreatePaymentModalProps {
   isOpen: boolean;
   accounts: CashAccount[];
   onClose: () => void;
-  onSubmit: (dto: CreatePaymentDTO) => Promise<void>;
+  onSubmit: (dto: CreatePaymentDTO, idempotencyKey: string) => Promise<void>;
   initialCategory?: string;
 }
 
@@ -33,11 +36,15 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
   const [taxTreatmentReason, setTaxTreatmentReason] = useState('');
   const [counterpartyType, setCounterpartyType] = useState<CounterpartyType>('OTHER');
   const [counterpartyName, setCounterpartyName] = useState('Chủ hộ kinh doanh');
+  const currentYear = new Date().getFullYear();
+  const currentQuarter = Math.floor(new Date().getMonth() / 3) + 1;
+  const defaultTaxPeriod = `Quý ${currentQuarter}/${currentYear}`;
   const [description, setDescription] = useState('');
-  const [taxPeriod, setTaxPeriod] = useState('Quý 3/2026');
+  const [taxPeriod, setTaxPeriod] = useState(defaultTaxPeriod);
   const [taxReferenceDocId, setTaxReferenceDocId] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const getSubmissionKey = useCashbookSubmissionKey(isOpen);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,9 +66,10 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
       } else if (option.code === 'TAX_PAYMENT') {
         setCounterpartyType('TAX_AUTHORITY');
         setCounterpartyName('Kho bạc Nhà nước / Cơ quan Thuế');
-        setDescription('Nộp thuế GTGT & TNCN Quý 3/2026');
-        const bankAcc = accounts.find((a) => a.accountType === 'BANK') || accounts[0];
-        if (bankAcc) setAccountId(bankAcc.id);
+        setTaxPeriod(defaultTaxPeriod);
+        setDescription(`Nộp thuế GTGT & TNCN ${defaultTaxPeriod}`);
+        const bankOrSafe = accounts.find((a) => a.accountType === 'BANK') || accounts.find((a) => a.isSafeDeposit) || accounts[0];
+        if (bankOrSafe) setAccountId(bankOrSafe.id);
       } else {
         setCounterpartyType('SUPPLIER');
         setCounterpartyName('');
@@ -89,6 +97,8 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
       setCounterpartyType('TAX_AUTHORITY');
       setCounterpartyName('Kho bạc Nhà nước / Cơ quan Thuế');
       setDescription(`Nộp thuế GTGT & TNCN ${taxPeriod}`);
+      const eligible = accounts.find((a) => a.accountType === 'BANK') || accounts.find((a) => a.isSafeDeposit);
+      if (eligible) setAccountId(eligible.id);
     } else {
       setCounterpartyType('SUPPLIER');
       setCounterpartyName('');
@@ -107,6 +117,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setErrorMsg('');
 
     if (parsedAmount <= 0) {
@@ -136,9 +147,15 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
       setErrorMsg('Chi phí được trừ bắt buộc có số hoặc mã chứng từ');
       return;
     }
-    if (selectedCategory.code === 'TAX_PAYMENT' && !taxReferenceDocId.trim()) {
-      setErrorMsg('Nộp thuế bắt buộc có số giấy nộp tiền hoặc mã giao dịch ngân hàng');
-      return;
+    if (selectedCategory.code === 'TAX_PAYMENT') {
+      if (!taxReferenceDocId.trim()) {
+        setErrorMsg('Nộp thuế bắt buộc có số giấy nộp tiền hoặc mã giao dịch ngân hàng');
+        return;
+      }
+      if (selectedAccount && selectedAccount.accountType === 'CASH' && !selectedAccount.isSafeDeposit) {
+        setErrorMsg('Chứng từ nộp thuế chỉ được chi từ Tài khoản Ngân hàng hoặc Két sắt chủ, không chi từ két thu ngân.');
+        return;
+      }
     }
 
     try {
@@ -148,7 +165,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
         ? (description.trim() || `Nộp thuế ${taxPeriod}${taxReferenceDocId ? ` (GNT: ${taxReferenceDocId})` : ''}`)
         : (description.trim() || 'Chi tiền từ quỹ');
 
-      await onSubmit({
+      const dto: CreatePaymentDTO = {
         accountId,
         amount: parsedAmount,
         category,
@@ -159,10 +176,11 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
         categoryCode: selectedCategory.code,
         taxTreatment,
         taxTreatmentReason: taxTreatmentReason.trim() || undefined,
-      });
+      };
+      await onSubmit(dto, getSubmissionKey(dto));
       onClose();
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Lỗi khi lưu phiếu chi');
+      setErrorMsg(isAxiosError(err) ? mapProblemDetailsToVietnamese(err) : err instanceof Error ? err.message : 'Lỗi khi lưu phiếu chi');
     } finally {
       setIsSubmitting(false);
     }
@@ -184,14 +202,14 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
         <form onSubmit={handleSubmit}>
           <div className="cb-modal-body">
             {errorMsg && (
-              <div className="cb-overdraft-alert">
-                <span>⚠️</span> {errorMsg}
+              <div className="cb-overdraft-alert" role="alert">
+                <AlertTriangle size={15} className="shrink-0" /> <span>{errorMsg}</span>
               </div>
             )}
 
             {isOverdraftViolation && (
               <div className="cb-overdraft-alert">
-                <span>🚫</span>
+                <Ban size={15} className="shrink-0" />
                 <div>
                   Số tiền chi vượt số dư khả dụng {selectedAccount.currentBalance.toLocaleString('vi-VN')} đ.
                 </div>
@@ -206,9 +224,12 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
                 onChange={(e) => setAccountId(e.target.value)}
                 required
               >
-                {accounts.map((acc) => (
+                {(selectedCategory.code === 'TAX_PAYMENT'
+                  ? accounts.filter((a) => a.accountType === 'BANK' || a.isSafeDeposit)
+                  : accounts
+                ).map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.accountName} (Hiện có: {acc.currentBalance.toLocaleString('vi-VN')} đ)
+                    {acc.accountName}{acc.branchName ? ` — ${acc.branchName}` : ''} (Hiện có: {acc.currentBalance.toLocaleString('vi-VN')} đ)
                   </option>
                 ))}
               </select>
@@ -219,7 +240,7 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
               <input
                 type="text"
                 className="cb-form-input"
-                placeholder="Ví dụ: 500,000"
+                placeholder="Ví dụ: 500.000"
                 value={amountStr ? Number(amountStr.replace(/\D/g, '')).toLocaleString('vi-VN') : ''}
                 onChange={(e) => setAmountStr(e.target.value)}
                 required
@@ -260,11 +281,11 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
                     value={taxPeriod}
                     onChange={(e) => setTaxPeriod(e.target.value)}
                   >
-                    <option value="Quý 3/2026">Thuế Quý 3/2026 (Kê khai theo quý)</option>
-                    <option value="Quý 4/2026">Thuế Quý 4/2026 (Kê khai theo quý)</option>
-                    <option value="Quý 1/2026">Thuế Quý 1/2026 (Kê khai theo quý)</option>
-                    <option value="Quý 2/2026">Thuế Quý 2/2026 (Kê khai theo quý)</option>
-                    <option value="Năm 2026">Lệ phí Môn bài năm 2026</option>
+                    <option value={`Quý 1/${currentYear}`}>Thuế Quý 1/{currentYear} (Kê khai theo quý)</option>
+                    <option value={`Quý 2/${currentYear}`}>Thuế Quý 2/{currentYear} (Kê khai theo quý)</option>
+                    <option value={`Quý 3/${currentYear}`}>Thuế Quý 3/{currentYear} (Kê khai theo quý)</option>
+                    <option value={`Quý 4/${currentYear}`}>Thuế Quý 4/{currentYear} (Kê khai theo quý)</option>
+                    <option value={`Năm ${currentYear}`}>Lệ phí Môn bài năm {currentYear}</option>
                     <option value="Thuế khoán / Khác">Thuế khoán / Truy thu khác</option>
                   </select>
                 </div>

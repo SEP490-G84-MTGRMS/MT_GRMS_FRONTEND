@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { Lightbulb, Clock, QrCode, ChevronRight } from 'lucide-react';
 
 interface HeroSectionProps {
   onOpenTrial: () => void;
@@ -44,13 +45,16 @@ export const HeroSection: FC<HeroSectionProps> = ({ onOpenTrial }) => {
           </div>
 
           <div className="hero-subnote-link" onClick={scrollToSolutions}>
-            <span className="bulb-icon">💡</span>
+            <span className="bulb-icon" style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--blue-primary)' }}>
+              <Lightbulb size={16} strokeWidth={1.9} />
+            </span>
             <span className="bulb-text">Bán hàng chỉ 3 giây — Làm quen sau 5 phút</span>
-            <span className="bulb-arrow">›</span>
+            <span className="bulb-arrow" style={{ display: 'inline-flex', alignItems: 'center' }}>
+              <ChevronRight size={15} strokeWidth={2} />
+            </span>
           </div>
         </div>
 
-        {/* Hero Right: Hero Mockup chuẩn KiotViet với hình ảnh chủ tiệm tạp hóa & thẻ nổi */}
         <div className="hero-right">
           <div className="hero-visual-frame">
             <div className="hero-img-wrapper">
@@ -61,10 +65,12 @@ export const HeroSection: FC<HeroSectionProps> = ({ onOpenTrial }) => {
               />
             </div>
 
-            {/* Floating Badges phong cách KiotViet (Tĩnh, đổ bóng tự nhiên, không nhún nhảy) */}
             <div className="floating-badge badge-top-fefo">
-              <div className="badge-icon-bubble bg-pink-soft">
-                <span className="icon-emoji">⚡</span>
+              <div
+                className="badge-icon-bubble"
+                style={{ backgroundColor: '#F1F5F9', color: 'var(--blue-primary)' }}
+              >
+                <Clock size={18} strokeWidth={1.9} />
               </div>
               <div className="badge-text-col">
                 <strong>Cảnh báo cận date</strong>
@@ -73,10 +79,11 @@ export const HeroSection: FC<HeroSectionProps> = ({ onOpenTrial }) => {
             </div>
 
             <div className="floating-badge badge-bottom-vietqr">
-              <div className="badge-icon-bubble bg-green-soft">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="#00C853">
-                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                </svg>
+              <div
+                className="badge-icon-bubble"
+                style={{ backgroundColor: '#F1F5F9', color: 'var(--blue-primary)' }}
+              >
+                <QrCode size={18} strokeWidth={1.9} />
               </div>
               <div className="badge-text-col">
                 <strong>Thanh toán mã QR</strong>

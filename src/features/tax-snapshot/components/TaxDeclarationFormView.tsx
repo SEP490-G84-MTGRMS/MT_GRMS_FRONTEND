@@ -42,12 +42,15 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
   isLoading,
   isRefreshing,
 }) => {
-  if (isLoading || !summary) {
+  if (isLoading) {
     return (
       <div className="tax-declaration-card" style={{ padding: 48, textAlign: 'center' }}>
         <p style={{ color: '#0F766E', fontWeight: 600 }}>Đang tổng hợp số liệu tờ khai...</p>
       </div>
     );
+  }
+  if (!summary) {
+    return <div className="tax-declaration-card" style={{ padding: 48, textAlign: 'center' }}>Chưa tải được dữ liệu tờ khai.</div>;
   }
 
   const isDeclaration = calculationMethod === TaxCalculationMethod.DeclarationBased;
@@ -74,7 +77,9 @@ export const TaxDeclarationFormView: React.FC<TaxDeclarationFormViewProps> = ({
       : `Cả năm ${summary.year}`;
 
   const baseVatAmount = Math.round(summary.taxableRevenueInPeriod * (baseVatRate / 100));
-  const vatDiscount = applyVatReduction ? Math.round(baseVatAmount * (reductionPct / 100)) : 0;
+  const vatDiscount = applyVatReduction
+    ? Math.max(0, baseVatAmount - summary.vatAmount)
+    : 0;
 
   return (
     <div className="tax-declaration-card">

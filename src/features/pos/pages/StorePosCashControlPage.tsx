@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import {
-  ShieldCheck,
   CheckCircle2,
   Save,
   RefreshCw,
   ArrowDownCircle,
   ArrowUpCircle,
-  Wallet,
   Clock,
   User,
   Check,
@@ -16,14 +14,18 @@ import {
   AlertTriangle,
   Info,
   Building2,
+  Search,
+  RotateCcw,
 } from 'lucide-react';
 import { posShiftApi } from '../api/posShiftApi';
 import type { ShiftCashMovementDto } from '../types/posShift.types';
+import { TablePagination } from '../../../components/common';
+import { AdminToast, type ToastState } from '../../admin/components';
 import { useAuthStore } from '../../../stores/useAuthStore';
 
 export const StorePosCashControlPage: FC = () => {
   const { user } = useAuthStore();
-  const currentTenantId = user?.tenantId || 'tenant_an_nhien_02';
+  const currentTenantId = user?.tenantId || '';
 
   // Chi nhánh đang chọn đồng bộ từ TopNav
   const [selectedBranchId, setSelectedBranchId] = useState<string>('ALL');
@@ -32,8 +34,26 @@ export const StorePosCashControlPage: FC = () => {
   // Cấu hình hạn mức
   const [threshold, setThreshold] = useState<number>(200000);
   const [shiftTotalLimit, setShiftTotalLimit] = useState<number>(0);
+  const [savedThreshold, setSavedThreshold] = useState<number>(200000);
+  const [savedShiftTotalLimit, setSavedShiftTotalLimit] = useState<number>(0);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  // Toast chuẩn AdminToast
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((message: string, type: ToastState['type'] = 'success') => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ id: String(Date.now()), message, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  // Bộ lọc & phân trang
+  const [draftSearchTerm, setDraftSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'PENDING_EXPENSE' | 'UNCONFIRMED_DROP'>('ALL');
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingPageSize, setPendingPageSize] = useState(10);
+  const [dropPage, setDropPage] = useState(1);
+  const [dropPageSize, setDropPageSize] = useState(10);
 
   // Dữ liệu duyệt
   const [isLoading, setIsLoading] = useState(false);
@@ -81,8 +101,12 @@ export const StorePosCashControlPage: FC = () => {
       // 1. Tải cấu hình hạn mức
       const cfg = await posShiftApi.getCashMovementSettings();
       if (cfg) {
-        setThreshold(cfg.cashOutApprovalThreshold ?? 200000);
-        setShiftTotalLimit(cfg.cashOutShiftTotalLimit ?? 0);
+        const nextThreshold = cfg.cashOutApprovalThreshold ?? 200000;
+        const nextLimit = cfg.cashOutShiftTotalLimit ?? 0;
+        setThreshold(nextThreshold);
+        setShiftTotalLimit(nextLimit);
+        setSavedThreshold(nextThreshold);
+        setSavedShiftTotalLimit(nextLimit);
       }
 
       // 2. Tải danh sách chờ duyệt theo chi nhánh (ALL => không truyền branchId để lấy toàn bộ tenant)
@@ -117,29 +141,35 @@ export const StorePosCashControlPage: FC = () => {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingSettings(true);
-    setSaveMessage(null);
     try {
+      const nextThreshold = Number(threshold) || 0;
+      const nextLimit = Number(shiftTotalLimit) || 0;
       await posShiftApi.updateCashMovementSettings({
-        cashOutApprovalThreshold: Number(threshold) || 0,
-        cashOutShiftTotalLimit: Number(shiftTotalLimit) || 0,
+        cashOutApprovalThreshold: nextThreshold,
+        cashOutShiftTotalLimit: nextLimit,
       });
+      setSavedThreshold(nextThreshold);
+      setSavedShiftTotalLimit(nextLimit);
 
       // Cập nhật lưu local dự phòng offline
-      const storageKey = `pos_payment_config_${currentTenantId}`;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          parsed.cashOutApprovalThreshold = threshold;
-          parsed.cashOutShiftTotalLimit = shiftTotalLimit;
-          localStorage.setItem(storageKey, JSON.stringify(parsed));
-        } catch { }
+      if (currentTenantId) {
+        const storageKey = `pos_payment_config_${currentTenantId}`;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            parsed.cashOutApprovalThreshold = threshold;
+            parsed.cashOutShiftTotalLimit = shiftTotalLimit;
+            localStorage.setItem(storageKey, JSON.stringify(parsed));
+          } catch {
+            // ignore malformed local cache
+          }
+        }
       }
 
-      setSaveMessage('Đã lưu cấu hình hạn mức duyệt chi két thành công!');
-      setTimeout(() => setSaveMessage(null), 3000);
+      showToast('Đã lưu cấu hình hạn mức duyệt chi két thành công!', 'success');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể lưu cấu hình hạn mức');
+      showToast(err.response?.data?.message || 'Không thể lưu cấu hình hạn mức', 'error');
     } finally {
       setIsSavingSettings(false);
     }
@@ -150,9 +180,10 @@ export const StorePosCashControlPage: FC = () => {
     setActionLoadingId(id);
     try {
       await posShiftApi.approveCashMovement(id);
+      showToast('Đã duyệt xuất tiền phiếu chi két thành công!', 'success');
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể duyệt phiếu chi');
+      showToast(err.response?.data?.message || 'Không thể duyệt phiếu chi', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -162,7 +193,7 @@ export const StorePosCashControlPage: FC = () => {
   const handleRejectConfirm = async () => {
     if (!rejectingId) return;
     if (!rejectionReason.trim()) {
-      alert('Vui lòng nhập lý do từ chối phiếu chi!');
+      showToast('Vui lòng nhập lý do từ chối phiếu chi!', 'warning');
       return;
     }
     setActionLoadingId(rejectingId);
@@ -170,9 +201,10 @@ export const StorePosCashControlPage: FC = () => {
       await posShiftApi.rejectCashMovement(rejectingId, rejectionReason.trim());
       setRejectingId(null);
       setRejectionReason('');
+      showToast('Đã từ chối phiếu chi két.', 'info');
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể từ chối phiếu chi');
+      showToast(err.response?.data?.message || 'Không thể từ chối phiếu chi', 'error');
     } finally {
       setActionLoadingId(null);
     }
@@ -183,54 +215,53 @@ export const StorePosCashControlPage: FC = () => {
     setActionLoadingId(id);
     try {
       await posShiftApi.confirmCashDrop(id);
+      showToast('Đã xác nhận nhận đủ tiền rút két!', 'success');
       await loadData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két');
+      showToast(err.response?.data?.message || 'Không thể xác nhận nhận tiền rút két', 'error');
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 20, padding: '4px 0 24px' }}>
-      {/* 1. Header Bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: 16,
-        }}
-      >
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                backgroundColor: '#ccfbf1',
-                color: '#0f766e',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Hạn Mức &amp; Duyệt Chi Két POS
-              </h1>
-              <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>
-                Cấu hình hạn mức, duyệt phiếu chi và xác nhận tiền rút két.
-              </p>
-            </div>
-          </div>
-        </div>
+  const filteredPendingMovements = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return pendingMovements;
+    return pendingMovements.filter(
+      (m) =>
+        m.id.toLowerCase().includes(q) ||
+        (m.createdByName || '').toLowerCase().includes(q) ||
+        (m.reason || '').toLowerCase().includes(q)
+    );
+  }, [pendingMovements, searchTerm]);
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+  const filteredUnconfirmedDrops = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return unconfirmedDrops;
+    return unconfirmedDrops.filter(
+      (m) =>
+        m.id.toLowerCase().includes(q) ||
+        (m.createdByName || '').toLowerCase().includes(q) ||
+        (m.reason || '').toLowerCase().includes(q)
+    );
+  }, [unconfirmedDrops, searchTerm]);
+
+  const paginatedPendingMovements = useMemo(() => {
+    const start = (pendingPage - 1) * pendingPageSize;
+    return filteredPendingMovements.slice(start, start + pendingPageSize);
+  }, [filteredPendingMovements, pendingPage, pendingPageSize]);
+
+  const paginatedUnconfirmedDrops = useMemo(() => {
+    const start = (dropPage - 1) * dropPageSize;
+    return filteredUnconfirmedDrops.slice(start, start + dropPageSize);
+  }, [filteredUnconfirmedDrops, dropPage, dropPageSize]);
+
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16, padding: '4px 0 24px' }}>
+      {/* 1. Compact Standard Header */}
+      <div className="so-list-header">
+        <h1 className="so-list-title">Hạn Mức &amp; Duyệt Chi Két POS</h1>
+        <div className="so-list-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div
             style={{
               display: 'inline-flex',
@@ -254,216 +285,92 @@ export const StorePosCashControlPage: FC = () => {
             type="button"
             onClick={loadData}
             disabled={isLoading}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              height: 36,
-              padding: '0 14px',
-              borderRadius: 8,
-              border: '1px solid #cbd5e1',
-              backgroundColor: '#ffffff',
-              color: '#334155',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            }}
+            className="so-list-filter-reset"
           >
-            <RefreshCw size={15} className={isLoading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             <span>Làm mới</span>
           </button>
         </div>
       </div>
 
-      {/* Thông báo thành công */}
-      {saveMessage && (
-        <div
-          style={{
-            padding: '12px 18px',
-            backgroundColor: '#ecfdf5',
-            border: '1px solid #a7f3d0',
-            borderRadius: 8,
-            color: '#065f46',
-            fontSize: 14,
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <CheckCircle2 size={18} className="text-emerald-600" />
-          <span>{saveMessage}</span>
-        </div>
-      )}
+      {/* Bộ lọc chuẩn so-list-filter */}
+      <div className="so-list-filter">
+        <div className="so-list-filter-row" style={{ alignItems: 'center', gap: '10px 14px', flexWrap: 'wrap' }}>
+          <div className="so-list-filter-field" style={{ flex: '1 1 260px', minWidth: 220 }}>
+            <label className="so-list-filter-label">Tìm phiếu:</label>
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                type="text"
+                value={draftSearchTerm}
+                onChange={(e) => setDraftSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSearchTerm(draftSearchTerm);
+                    setPendingPage(1);
+                    setDropPage(1);
+                  }
+                }}
+                placeholder="Tìm mã phiếu, tên thu ngân, lý do chi..."
+                className="so-list-filter-input"
+                style={{ width: '100%', paddingLeft: 28, paddingRight: draftSearchTerm ? 26 : 10 }}
+              />
+              <Search size={14} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              {draftSearchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setDraftSearchTerm('')}
+                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}
+                  title="Xóa tìm kiếm"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
 
-      {/* 2. Quick KPI Stats */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 16,
-        }}
-      >
-        {/* KPI 1: Chờ duyệt chi */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 12,
-            border: pendingMovements.length > 0 ? '1.5px solid #fecdd3' : '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Phiếu chi chờ phê duyệt</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: pendingMovements.length > 0 ? '#e11d48' : '#0f172a', marginTop: 4 }}>
-              {pendingMovements.length}
-            </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              {pendingMovements.length > 0 ? 'Cần chủ xem xét chấp thuận' : 'Không có yêu cầu tồn đọng'}
-            </div>
+          <div className="so-list-filter-field">
+            <label className="so-list-filter-label">Loại phiếu:</label>
+            <select
+              value={typeFilter}
+              onChange={(e) => { setTypeFilter(e.target.value as any); setPendingPage(1); setDropPage(1); }}
+              className={`so-list-filter-select ${typeFilter !== 'ALL' ? 'so-list-filter-select--active' : ''}`}
+            >
+              <option value="ALL">Tất cả loại phiếu</option>
+              <option value="PENDING_EXPENSE">Phiếu chi chờ duyệt ({pendingMovements.length})</option>
+              <option value="UNCONFIRMED_DROP">Rút két chờ nhận ({unconfirmedDrops.length})</option>
+            </select>
           </div>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              backgroundColor: pendingMovements.length > 0 ? '#ffe4e6' : '#f1f5f9',
-              color: pendingMovements.length > 0 ? '#e11d48' : '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ArrowUpCircle size={22} />
-          </div>
-        </div>
 
-        {/* KPI 2: Chờ nhận rút két */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 12,
-            border: unconfirmedDrops.length > 0 ? '1.5px solid #bae6fd' : '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Khoản nộp rút két chờ nhận</div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: unconfirmedDrops.length > 0 ? '#0284c7' : '#0f172a', marginTop: 4 }}>
-              {unconfirmedDrops.length}
-            </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              {unconfirmedDrops.length > 0 ? 'Thu ngân đã trích két nộp tiền' : 'Đã xác nhận đầy đủ'}
-            </div>
-          </div>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              backgroundColor: unconfirmedDrops.length > 0 ? '#e0f2fe' : '#f1f5f9',
-              color: unconfirmedDrops.length > 0 ? '#0284c7' : '#64748b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ArrowDownCircle size={22} />
-          </div>
-        </div>
-
-        {/* KPI 3: Hạn mức tự duyệt */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 12,
-            border: '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Hạn mức tự duyệt chi</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#0f766e', marginTop: 4 }}>
-              {threshold === 0 ? '0 đ (Duyệt tất cả)' : `${threshold.toLocaleString('vi-VN')} đ`}
-            </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              Áp dụng cho tất cả chi nhánh
-            </div>
-          </div>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              backgroundColor: '#ccfbf1',
-              color: '#0f766e',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Sliders size={20} />
-          </div>
-        </div>
-
-        {/* KPI 5: Trần tổng chi / ca */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: 12,
-            border: '1px solid #e2e8f0',
-            padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#64748b' }}>Trần tổng chi / ca (chưa áp dụng)</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: '#1e293b', marginTop: 4 }}>
-              {shiftTotalLimit === 0 ? 'Không giới hạn' : `${shiftTotalLimit.toLocaleString('vi-VN')} đ`}
-            </div>
-            <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
-              Hệ thống chưa kiểm tra trần này
-            </div>
-          </div>
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 10,
-              backgroundColor: '#f1f5f9',
-              color: '#475569',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Wallet size={20} />
+          <div className="so-list-filter-actions" style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm(draftSearchTerm);
+                setPendingPage(1);
+                setDropPage(1);
+              }}
+              className="so-list-filter-search"
+            >
+              <Search size={13} /> Tìm kiếm
+            </button>
+            <button
+              type="button"
+              disabled={!draftSearchTerm && !searchTerm && typeFilter === 'ALL'}
+              onClick={() => { setDraftSearchTerm(''); setSearchTerm(''); setTypeFilter('ALL'); setPendingPage(1); setDropPage(1); }}
+              className="so-list-filter-reset"
+            >
+              <RotateCcw size={13} /> Đặt lại
+            </button>
           </div>
         </div>
       </div>
 
-      {/* 3. Main Grid: Cấu hình hạn mức (Trái) & Danh sách duyệt (Phải) */}
+      {/* 2. Main Grid: Cấu hình hạn mức (Trái) & Danh sách duyệt (Phải) */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(360px, 460px) 1fr',
-          gap: 20,
+          gridTemplateColumns: 'minmax(350px, 430px) 1fr',
+          gap: 18,
           alignItems: 'start',
         }}
       >
@@ -474,24 +381,47 @@ export const StorePosCashControlPage: FC = () => {
             backgroundColor: '#ffffff',
             borderRadius: 12,
             border: '1px solid #e2e8f0',
-            padding: 24,
+            padding: 20,
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             display: 'flex',
             flexDirection: 'column',
-            gap: 20,
+            gap: 16,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 14, borderBottom: '1px solid #f1f5f9' }}>
-            <Sliders size={20} className="text-teal-700" />
-            <h2 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
+            <Sliders size={18} className="text-teal-700" />
+            <h2 style={{ fontSize: 15.5, fontWeight: 800, color: '#0f172a', margin: 0 }}>
               Cấu Hình Hạn Mức Duyệt Chi
             </h2>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, backgroundColor: '#f0fdfa', borderRadius: 8, border: '1px solid #ccfbf1' }}>
-            <Info size={18} className="text-teal-700 flex-shrink-0" style={{ marginTop: 2 }} />
-            <span style={{ fontSize: 12.5, color: '#0f766e', lineHeight: 1.5 }}>
-              Hạn mức áp dụng cho tất cả chi nhánh. Danh sách phiếu bên phải theo chi nhánh đang chọn.
+          {/* Tóm tắt hạn mức đang áp dụng */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: '#f0fdfa', border: '1px solid #ccfbf1' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: '#475569' }}>Hạn mức tự duyệt chi</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f766e', marginTop: 3 }}>
+                {savedThreshold === 0 ? '0 đ (Duyệt tất cả)' : `${savedThreshold.toLocaleString('vi-VN')} đ`}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                Áp dụng cho tất cả chi nhánh
+              </div>
+            </div>
+
+            <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: '#475569' }}>Trần tổng chi / ca (chưa áp dụng)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#1e293b', marginTop: 3 }}>
+                {savedShiftTotalLimit === 0 ? 'Không giới hạn' : `${savedShiftTotalLimit.toLocaleString('vi-VN')} đ`}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                Hệ thống chưa kiểm tra trần này
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', backgroundColor: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <Info size={15} className="text-teal-700 flex-shrink-0" style={{ marginTop: 2 }} />
+            <span style={{ fontSize: 12, color: '#475569', lineHeight: 1.45 }}>
+              Danh sách phiếu bên phải lọc theo chi nhánh đang chọn.
             </span>
           </div>
 
@@ -629,321 +559,351 @@ export const StorePosCashControlPage: FC = () => {
         {/* CỘT PHẢI: Danh sách chờ xử lý */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* PHẦN 1: Danh sách phiếu chi két chờ phê duyệt */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: 12,
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-              overflow: 'hidden',
-            }}
-          >
+          {(typeFilter === 'ALL' || typeFilter === 'PENDING_EXPENSE') && (
             <div
               style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#f8fafc',
+                backgroundColor: '#ffffff',
+                borderRadius: 12,
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                overflow: 'hidden',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ArrowUpCircle size={20} className="text-rose-600" />
-                <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Phiếu Chi Két Chờ Phê Duyệt ({pendingMovements.length})
-                </h3>
-              </div>
-              <span
+              <div
                 style={{
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  padding: '3px 8px',
-                  borderRadius: 20,
-                  backgroundColor: pendingMovements.length > 0 ? '#ffe4e6' : '#f1f5f9',
-                  color: pendingMovements.length > 0 ? '#b91c1c' : '#64748b',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#f8fafc',
                 }}
               >
-                {pendingMovements.length > 0 ? 'Có yêu cầu chi vặt cần duyệt' : 'Đã duyệt hết'}
-              </span>
-            </div>
-
-            {pendingMovements.length === 0 ? (
-              <div style={{ padding: '36px 20px', textAlign: 'center' }}>
-                <CheckCircle2 size={40} className="text-emerald-500" style={{ margin: '0 auto 10px' }} />
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
-                  Không có phiếu chi nào đang chờ phê duyệt
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ArrowUpCircle size={20} className="text-rose-600" />
+                  <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Phiếu Chi Két Chờ Phê Duyệt ({filteredPendingMovements.length})
+                  </h3>
                 </div>
-                <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
-                  Mọi khoản chi vặt tại quầy hiện tại đều tuân thủ hạn mức duyệt tự động.
-                </div>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: 20,
+                    backgroundColor: filteredPendingMovements.length > 0 ? '#ffe4e6' : '#f1f5f9',
+                    color: filteredPendingMovements.length > 0 ? '#b91c1c' : '#64748b',
+                  }}
+                >
+                  {filteredPendingMovements.length > 0 ? 'Có yêu cầu chi vặt cần duyệt' : 'Đã duyệt hết'}
+                </span>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {pendingMovements.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      padding: 16,
-                      borderBottom: '1px solid #f1f5f9',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
-                            Phiếu chi: #{item.id.slice(0, 8)}
-                          </span>
-                          <span
+
+              {filteredPendingMovements.length === 0 ? (
+                <div style={{ padding: '36px 20px', textAlign: 'center' }}>
+                  <CheckCircle2 size={40} className="text-emerald-500" style={{ margin: '0 auto 10px' }} />
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                    Không có phiếu chi nào đang chờ phê duyệt
+                  </div>
+                  <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
+                    Mọi khoản chi vặt tại quầy hiện tại đều tuân thủ hạn mức duyệt tự động.
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 460, overflowY: 'auto' }}>
+                    {paginatedPendingMovements.map((item) => (
+                      <div
+                        key={item.id}
+                        style={{
+                          padding: 16,
+                          borderBottom: '1px solid #f1f5f9',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 10,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+                                Phiếu chi: #{item.id.slice(0, 8)}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  backgroundColor: '#fee2e2',
+                                  color: '#991b1b',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                }}
+                              >
+                                Chờ Chủ duyệt
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4, fontSize: 12, color: '#64748b' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <User size={13} />
+                                {item.createdByName || 'Thu ngân'}
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Clock size={13} />
+                                {item.occurredAtUtc
+                                  ? new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.occurredAtUtc) ? item.occurredAtUtc : `${item.occurredAtUtc}Z`).toLocaleString('vi-VN')
+                                  : 'Vừa tạo'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: '#e11d48' }}>
+                              -{item.amount.toLocaleString('vi-VN')} đ
+                            </div>
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>Vượt hạn mức tự duyệt</span>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            padding: '8px 12px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: 6,
+                            border: '1px solid #e2e8f0',
+                            fontSize: 13,
+                            color: '#334155',
+                          }}
+                        >
+                          <b>Lý do chi:</b> {item.reason || 'Chi vặt phát sinh tại quầy thu ngân'}
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectingId(item.id);
+                              setRejectionReason('');
+                            }}
+                            disabled={actionLoadingId === item.id}
                             style={{
-                              fontSize: 11,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '6px 14px',
+                              borderRadius: 6,
+                              border: '1px solid #fecdd3',
+                              backgroundColor: '#ffffff',
+                              color: '#e11d48',
+                              fontSize: 12.5,
                               fontWeight: 700,
-                              backgroundColor: '#fee2e2',
-                              color: '#991b1b',
-                              padding: '2px 6px',
-                              borderRadius: 4,
+                              cursor: 'pointer',
                             }}
                           >
-                            Chờ Chủ duyệt
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4, fontSize: 12, color: '#64748b' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <User size={13} />
-                            {item.createdByName || 'Thu ngân'}
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <Clock size={13} />
-                            {item.occurredAtUtc ? new Date(item.occurredAtUtc).toLocaleString('vi-VN') : 'Vừa tạo'}
-                          </span>
+                            <X size={14} />
+                            <span>Từ chối</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleApprove(item.id)}
+                            disabled={actionLoadingId === item.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '6px 16px',
+                              borderRadius: 6,
+                              border: 'none',
+                              backgroundColor: '#0f766e',
+                              color: '#ffffff',
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(15, 118, 110, 0.2)',
+                            }}
+                          >
+                            <Check size={14} />
+                            <span>{actionLoadingId === item.id ? 'Đang duyệt...' : 'Duyệt xuất tiền'}</span>
+                          </button>
                         </div>
                       </div>
-
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: '#e11d48' }}>
-                          -{item.amount.toLocaleString('vi-VN')} đ
-                        </div>
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>Vượt hạn mức tự duyệt</span>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: 6,
-                        border: '1px solid #e2e8f0',
-                        fontSize: 13,
-                        color: '#334155',
-                      }}
-                    >
-                      <b>Lý do chi:</b> {item.reason || 'Chi vặt phát sinh tại quầy thu ngân'}
-                    </div>
-
-                    {/* Actions */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRejectingId(item.id);
-                          setRejectionReason('');
-                        }}
-                        disabled={actionLoadingId === item.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '6px 14px',
-                          borderRadius: 6,
-                          border: '1px solid #fecdd3',
-                          backgroundColor: '#ffffff',
-                          color: '#e11d48',
-                          fontSize: 12.5,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <X size={14} />
-                        <span>Từ chối</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleApprove(item.id)}
-                        disabled={actionLoadingId === item.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '6px 16px',
-                          borderRadius: 6,
-                          border: 'none',
-                          backgroundColor: '#0f766e',
-                          color: '#ffffff',
-                          fontSize: 12.5,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(15, 118, 110, 0.2)',
-                        }}
-                      >
-                        <Check size={14} />
-                        <span>{actionLoadingId === item.id ? 'Đang duyệt...' : 'Duyệt xuất tiền'}</span>
-                      </button>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <TablePagination
+                    currentPage={pendingPage}
+                    pageSize={pendingPageSize}
+                    totalItems={filteredPendingMovements.length}
+                    pageSizeOptions={[10, 20, 30]}
+                    itemLabel="phiếu chi"
+                    onPageChange={setPendingPage}
+                    onPageSizeChange={(s) => { setPendingPageSize(s); setPendingPage(1); }}
+                  />
+                </>
+              )}
+            </div>
+          )}
 
           {/* PHẦN 2: Danh sách tiền rút két chờ xác nhận (Cash Drops) */}
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: 12,
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-              overflow: 'hidden',
-            }}
-          >
+          {(typeFilter === 'ALL' || typeFilter === 'UNCONFIRMED_DROP') && (
             <div
               style={{
-                padding: '16px 20px',
-                borderBottom: '1px solid #e2e8f0',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#f8fafc',
+                backgroundColor: '#ffffff',
+                borderRadius: 12,
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                overflow: 'hidden',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ArrowDownCircle size={20} className="text-sky-600" />
-                <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                  Khoản Rút Két Nộp Quỹ Chờ Xác Nhận ({unconfirmedDrops.length})
-                </h3>
-              </div>
-              <span
+              <div
                 style={{
-                  fontSize: 11.5,
-                  fontWeight: 700,
-                  padding: '3px 8px',
-                  borderRadius: 20,
-                  backgroundColor: unconfirmedDrops.length > 0 ? '#e0f2fe' : '#f1f5f9',
-                  color: unconfirmedDrops.length > 0 ? '#0284c7' : '#64748b',
+                  padding: '16px 20px',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: '#f8fafc',
                 }}
               >
-                {unconfirmedDrops.length > 0 ? 'Chờ Chủ xác nhận đã nhận tiền' : 'Đã nhận đủ'}
-              </span>
-            </div>
-
-            {unconfirmedDrops.length === 0 ? (
-              <div style={{ padding: '36px 20px', textAlign: 'center' }}>
-                <CheckCircle2 size={40} className="text-sky-500" style={{ margin: '0 auto 10px' }} />
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
-                  Không có khoản nộp tiền rút két nào đang chờ xác nhận
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ArrowDownCircle size={20} className="text-sky-600" />
+                  <h3 style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Khoản Rút Két Nộp Quỹ Chờ Xác Nhận ({filteredUnconfirmedDrops.length})
+                  </h3>
                 </div>
-                <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
-                  Mọi khoản rút két giảm tải tiền mặt trong ca đã được Chủ cửa hàng xác nhận đầy đủ.
-                </div>
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    padding: '3px 8px',
+                    borderRadius: 20,
+                    backgroundColor: filteredUnconfirmedDrops.length > 0 ? '#e0f2fe' : '#f1f5f9',
+                    color: filteredUnconfirmedDrops.length > 0 ? '#0284c7' : '#64748b',
+                  }}
+                >
+                  {filteredUnconfirmedDrops.length > 0 ? 'Chờ Chủ xác nhận đã nhận tiền' : 'Đã nhận đủ'}
+                </span>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {unconfirmedDrops.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      padding: 16,
-                      borderBottom: '1px solid #f1f5f9',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
-                            Rút két nộp tiền: #{item.id.slice(0, 8)}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 700,
-                              backgroundColor: '#e0f2fe',
-                              color: '#0369a1',
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                            }}
-                          >
-                            Chờ Chủ nhận tiền
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4, fontSize: 12, color: '#64748b' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <User size={13} />
-                            {item.createdByName || 'Thu ngân'}
-                          </span>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <Clock size={13} />
-                            {item.occurredAtUtc ? new Date(item.occurredAtUtc).toLocaleString('vi-VN') : 'Vừa tạo'}
-                          </span>
-                        </div>
-                      </div>
 
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: '#0284c7' }}>
-                          +{item.amount.toLocaleString('vi-VN')} đ
-                        </div>
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>Tiền mặt giao nộp</span>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#f8fafc',
-                        borderRadius: 6,
-                        border: '1px solid #e2e8f0',
-                        fontSize: 13,
-                        color: '#334155',
-                      }}
-                    >
-                      <b>Ghi chú:</b> {item.reason || 'Rút tiền mặt khỏi két nộp về chủ cửa hàng để giảm tồn quỹ'}
-                    </div>
-
-                    {/* Action */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                      <button
-                        type="button"
-                        onClick={() => handleConfirmDrop(item.id)}
-                        disabled={actionLoadingId === item.id}
+              {filteredUnconfirmedDrops.length === 0 ? (
+                <div style={{ padding: '36px 20px', textAlign: 'center' }}>
+                  <CheckCircle2 size={40} className="text-sky-500" style={{ margin: '0 auto 10px' }} />
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>
+                    Không có khoản nộp tiền rút két nào đang chờ xác nhận
+                  </div>
+                  <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
+                    Mọi khoản rút két giảm tải tiền mặt trong ca đã được Chủ cửa hàng xác nhận đầy đủ.
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 460, overflowY: 'auto' }}>
+                    {paginatedUnconfirmedDrops.map((item) => (
+                      <div
+                        key={item.id}
                         style={{
+                          padding: 16,
+                          borderBottom: '1px solid #f1f5f9',
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '7px 18px',
-                          borderRadius: 6,
-                          border: 'none',
-                          backgroundColor: '#0284c7',
-                          color: '#ffffff',
-                          fontSize: 12.5,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
+                          flexDirection: 'column',
+                          gap: 10,
                         }}
                       >
-                        <Check size={14} />
-                        <span>{actionLoadingId === item.id ? 'Đang xử lý...' : 'Xác nhận đã nhận đủ tiền'}</span>
-                      </button>
-                    </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+                                Rút két nộp tiền: #{item.id.slice(0, 8)}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  backgroundColor: '#e0f2fe',
+                                  color: '#0369a1',
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                }}
+                              >
+                                Chờ Chủ nhận tiền
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 4, fontSize: 12, color: '#64748b' }}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <User size={13} />
+                                {item.createdByName || 'Thu ngân'}
+                              </span>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <Clock size={13} />
+                                {item.occurredAtUtc
+                                  ? new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(item.occurredAtUtc) ? item.occurredAtUtc : `${item.occurredAtUtc}Z`).toLocaleString('vi-VN')
+                                  : 'Vừa tạo'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 18, fontWeight: 800, color: '#0284c7' }}>
+                              +{item.amount.toLocaleString('vi-VN')} đ
+                            </div>
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>Tiền mặt giao nộp</span>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            padding: '8px 12px',
+                            backgroundColor: '#f8fafc',
+                            borderRadius: 6,
+                            border: '1px solid #e2e8f0',
+                            fontSize: 13,
+                            color: '#334155',
+                          }}
+                        >
+                          <b>Ghi chú:</b> {item.reason || 'Rút tiền mặt khỏi két nộp về chủ cửa hàng để giảm tồn quỹ'}
+                        </div>
+
+                        {/* Action */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmDrop(item.id)}
+                            disabled={actionLoadingId === item.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '7px 18px',
+                              borderRadius: 6,
+                              border: 'none',
+                              backgroundColor: '#0284c7',
+                              color: '#ffffff',
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)',
+                            }}
+                          >
+                            <Check size={14} />
+                            <span>{actionLoadingId === item.id ? 'Đang xử lý...' : 'Xác nhận đã nhận đủ tiền'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <TablePagination
+                    currentPage={dropPage}
+                    pageSize={dropPageSize}
+                    totalItems={filteredUnconfirmedDrops.length}
+                    pageSizeOptions={[10, 20, 30]}
+                    itemLabel="khoản rút két"
+                    onPageChange={setDropPage}
+                    onPageSizeChange={(s) => { setDropPageSize(s); setDropPage(1); }}
+                  />
+                </>
+              )}
+            </div>
+          )}
 
 
         </div>
@@ -1040,6 +1000,15 @@ export const StorePosCashControlPage: FC = () => {
       )}
 
 
+      {toast && (
+        <AdminToast
+          toast={toast}
+          onClose={() => {
+            if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+            setToast(null);
+          }}
+        />
+      )}
     </div>
   );
 };

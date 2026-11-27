@@ -128,6 +128,11 @@ export interface SupplierReturnKpiSummary {
 
 export interface SupplierReturnFilterState {
   keyword: string;
+  returnCodes?: string[];
+  grnCodes?: string[];
+  supplierCodes?: string[];
+  supplierNames?: string[];
+  branchNames?: string[];
   branchId: string;
   supplierId: string;
   status: '' | SupplierReturnStatus;
@@ -159,9 +164,10 @@ export interface CreateSupplierReturnPayload {
 export interface RecordSupplierResponsePayload {
   resultType: 'APPROVED_FULL' | 'APPROVED_PARTIAL' | 'REJECTED';
   supplierResponseNote?: string;
-  lines: {
+  lineResponses: {
     lineId: string;
     approvedQty: number;
+    rejectedQty: number;
     rejectionReason?: string;
   }[];
 }

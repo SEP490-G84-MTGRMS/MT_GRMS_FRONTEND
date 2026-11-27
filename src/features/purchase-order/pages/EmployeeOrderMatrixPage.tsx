@@ -2,11 +2,10 @@ import type { FC } from 'react';
 import { OrderMatrixPage } from './OrderMatrixPage';
 
 /**
- * Trang Lập đề xuất đặt hàng theo Ma trận (Dành cho Nhân viên Chi nhánh)
- * Kết nối 100% với Backend API qua OrderMatrixPage (forcedRole="EMPLOYEE")
+ * Trang đặt hàng ma trận cho nhân viên — role/CN lấy từ user đăng nhập.
  */
 export const EmployeeOrderMatrixPage: FC = () => {
-  return <OrderMatrixPage forcedRole="EMPLOYEE" />;
+  return <OrderMatrixPage />;
 };
 
 export default EmployeeOrderMatrixPage;

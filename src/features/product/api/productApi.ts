@@ -36,6 +36,30 @@ export const productApi = {
     if (filter.searchTerm && filter.searchTerm.trim() !== '') {
       params.SearchTerm = filter.searchTerm.trim();
     }
+    if (filter.skus && filter.skus.length > 0) {
+      params.Skus = filter.skus;
+    }
+    if (filter.names && filter.names.length > 0) {
+      params.Names = filter.names;
+    }
+    if (filter.barcodes && filter.barcodes.length > 0) {
+      params.Barcodes = filter.barcodes;
+    }
+
+    const skus = filter.skus?.map((s) => s.trim()).filter(Boolean);
+    if (skus && skus.length > 0) {
+      params.Skus = skus;
+    }
+
+    const names = filter.names?.map((s) => s.trim()).filter(Boolean);
+    if (names && names.length > 0) {
+      params.Names = names;
+    }
+
+    const barcodes = filter.barcodes?.map((s) => s.trim()).filter(Boolean);
+    if (barcodes && barcodes.length > 0) {
+      params.Barcodes = barcodes;
+    }
 
     if (filter.categoryIds && filter.categoryIds.length > 0) {
       params.CategoryIds = filter.categoryIds;
@@ -43,7 +67,7 @@ export const productApi = {
       params.CategoryId = filter.categoryId;
     }
 
-    if (filter.status && filter.status.trim() !== '' && filter.status !== 'all') {
+    if (filter.status && filter.status.trim() !== '' && filter.status.toUpperCase() !== 'ALL') {
       params.Status = toBackendProductStatus(filter.status) ?? filter.status;
     }
 
@@ -208,6 +232,7 @@ export const productApi = {
     if (query.priceScope) params.priceScope = query.priceScope;
     if (query.fromDate) params.fromDate = query.fromDate;
     if (query.toDate) params.toDate = query.toDate;
+    if (query.searchTerm) params.searchTerm = query.searchTerm;
 
     const res = await httpClient.get<ApiResponse<ProductPriceHistoryPagedResult>>(`/products/${productId}/price-history`, {
       params,

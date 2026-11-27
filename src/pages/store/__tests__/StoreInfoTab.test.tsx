@@ -140,7 +140,11 @@ describe('StoreInfoTab & EditStoreInfoModal', () => {
     vi.spyOn(storeApi, 'getPricingPlans').mockResolvedValueOnce({
       success: true,
       message: '',
-      data: [],
+      data: [
+        { id: 'plan_trial', code: 'TRIAL', name: 'Gói Dùng Thử', monthlyPrice: 0, yearlyPrice: 0, status: 'ACTIVE' },
+        { id: 'plan_standard', code: 'STANDARD', name: 'Gói Thường', monthlyPrice: 120000, yearlyPrice: 1200000, status: 'ACTIVE' },
+        { id: 'plan_pro', code: 'PRO', name: 'Gói Pro (Chuỗi Cửa Hàng)', monthlyPrice: 280000, yearlyPrice: 2800000, status: 'ACTIVE' },
+      ],
     });
 
     render(
@@ -161,7 +165,11 @@ describe('StoreInfoTab & EditStoreInfoModal', () => {
     vi.spyOn(storeApi, 'getPricingPlans').mockResolvedValueOnce({
       success: true,
       message: '',
-      data: [],
+      data: [
+        { id: 'plan_trial', code: 'TRIAL', name: 'Gói Dùng Thử', monthlyPrice: 0, yearlyPrice: 0, status: 'ACTIVE' },
+        { id: 'plan_standard', code: 'STANDARD', name: 'Gói Thường', monthlyPrice: 120000, yearlyPrice: 1200000, status: 'ACTIVE' },
+        { id: 'plan_pro', code: 'PRO', name: 'Gói Pro (Chuỗi Cửa Hàng)', monthlyPrice: 280000, yearlyPrice: 2800000, status: 'ACTIVE' },
+      ],
     });
 
     render(

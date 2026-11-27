@@ -3,7 +3,8 @@ import type { FC, FormEvent, KeyboardEvent } from 'react';
 import { Search, RotateCcw, X, Filter } from 'lucide-react';
 import type { InventoryFilterState, InventoryStockStatus } from '../types/inventory.types';
 import { DEFAULT_INVENTORY_FILTERS } from '../types/inventory.types';
-import { INVENTORY_CATEGORIES, INVENTORY_LOCATIONS } from '../lib/mockInventoryData';
+import { INVENTORY_LOCATIONS } from '../lib/mockInventoryData';
+import { httpClient } from '../../../api/httpClient';
 
 type FieldKey = 'sku' | 'name' | 'branchCode' | 'branchName';
 type TokenMap = Record<FieldKey, string[]>;
@@ -36,16 +37,6 @@ const EMPTY_QUERIES: QueryMap = {
   name: '',
   branchCode: '',
   branchName: '',
-};
-
-const CAT_LABEL: Record<string, string> = {
-  Dairy: 'Sữa',
-  Beverage: 'Đồ uống',
-  Fresh: 'Tươi sống',
-  Frozen: 'Đông lạnh',
-  RTE: 'Ăn liền',
-  Snack: 'Snack',
-  'Personal Care': 'Chăm sóc cá nhân',
 };
 
 interface InventoryFilterBarProps {
@@ -117,7 +108,33 @@ export const InventoryFilterBar: FC<InventoryFilterBarProps> = ({
   const [tokens, setTokens] = useState<TokenMap>(() => tokensFromFilters(applied));
   const [queries, setQueries] = useState<QueryMap>(EMPTY_QUERIES);
   const [category, setCategory] = useState(applied.category || '');
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [location, setLocation] = useState(applied.location || '');
+
+  useEffect(() => {
+    let active = true;
+    httpClient
+      .get('/categories')
+      .then((res) => {
+        if (!active) return;
+        const raw = res.data?.data ?? res.data;
+        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : [];
+        const names = Array.from(
+          new Set(
+            list
+              .map((c: any) => String(c?.name ?? c?.categoryName ?? '').trim())
+              .filter(Boolean)
+          )
+        ) as string[];
+        setCategoryOptions(names);
+      })
+      .catch(() => {
+        if (active) setCategoryOptions([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
   const [stockStatus, setStockStatus] = useState<InventoryFilterState['stockStatus']>(
     applied.stockStatus || ''
   );
@@ -669,9 +686,9 @@ export const InventoryFilterBar: FC<InventoryFilterBarProps> = ({
             style={{ height: 32, minWidth: 140, fontSize: 12.5, fontWeight: 600 }}
           >
             <option value="">Tất cả nhóm</option>
-            {INVENTORY_CATEGORIES.map((c) => (
+            {categoryOptions.map((c) => (
               <option key={c} value={c}>
-                {CAT_LABEL[c] || c}
+                {c}
               </option>
             ))}
           </select>
@@ -712,6 +729,7 @@ export const InventoryFilterBar: FC<InventoryFilterBarProps> = ({
           >
             <option value="">Tất cả trạng thái</option>
             <option value="OK">Đủ hàng</option>
+            <option value="NearExpiry">Cận hạn</option>
             <option value="Low">Sắp hết</option>
             <option value="Out">Hết hàng</option>
           </select>

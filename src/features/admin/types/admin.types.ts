@@ -65,6 +65,7 @@ export interface PlanDistribution {
 }
 
 export interface UrgentAlertTenant {
+  id: string;
   subdomain: string;
   name: string;
   ownerName: string;

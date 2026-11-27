@@ -59,7 +59,7 @@ function mapVoucherToExpenseDto(v: any): ServiceExpenseDto {
     expenseId: v.id || v.voucherCode,
     voucherCode: v.voucherCode || v.id,
     branchId: v.branchId || '',
-    branchName: v.branchId ? `Chi nhánh ${String(v.branchId).substring(0, 8)}` : 'Toàn hệ thống',
+    branchName: v.branchName || (v.branchId ? undefined : 'Toàn hệ thống'),
     category: v.category || 'Other',
     amount: Number(v.amount || 0),
     status: statusStr,
@@ -93,55 +93,64 @@ export const getServiceExpenses = async (
     pageSize: params?.pageSize || 20,
   };
   if (params?.branchId && isGuid(params.branchId)) queryParams.branchId = params.branchId;
-  if (params?.fromDate) queryParams.fromDate = `${params.fromDate}T00:00:00Z`;
-  if (params?.toDate) queryParams.toDate = `${params.toDate}T23:59:59Z`;
+  if (params?.fromDate) queryParams.fromDate = `${params.fromDate}T00:00:00+07:00`;
+  if (params?.toDate) queryParams.toDate = `${params.toDate}T23:59:59+07:00`;
+  if (params?.keyword?.trim()) queryParams.keyword = params.keyword.trim();
+  if (params?.category) queryParams.category = params.category;
+  if (params?.status) queryParams.status = params.status;
+  if (params?.quickStatus && params.quickStatus !== 'ALL') queryParams.quickStatus = params.quickStatus;
 
-  const res = await financeHttpClient.get<ApiResponse<any[]>>('/expenses', {
+  const res = await financeHttpClient.get<ApiResponse<any[]> & { totalItems?: number }>('/expenses', {
     params: queryParams,
   });
 
   if (res.data?.data && Array.isArray(res.data.data)) {
+    const hasServerTotal = typeof res.data.totalItems === 'number';
     let items = res.data.data.map(mapVoucherToExpenseDto);
-    if (params?.keyword) {
-      const q = params.keyword.trim().toLowerCase();
-      items = items.filter(
-        (i) =>
-          (i.voucherCode && i.voucherCode.toLowerCase().includes(q)) ||
-          (i.invoiceNumber && i.invoiceNumber.toLowerCase().includes(q)) ||
-          i.expenseId.toLowerCase().includes(q) ||
-          i.vendorName.toLowerCase().includes(q) ||
-          (i.note && i.note.toLowerCase().includes(q))
-      );
-    }
-    if (params?.category) {
-      const catLabel = EXPENSE_CATEGORY_LABELS[params.category] || params.category;
-      items = items.filter((i) => i.category === params.category || i.category === catLabel);
-    }
-    if (params?.status) {
-      items = items.filter((i) => i.status === params.status);
-    }
-    if (params?.quickStatus && params.quickStatus !== 'ALL') {
-      if (params.quickStatus === 'PENDING_APPROVAL') {
+    if (!hasServerTotal) {
+      if (params?.keyword) {
+        const q = params.keyword.trim().toLowerCase();
         items = items.filter(
           (i) =>
-            i.approvalStatus === 'PendingApproval' ||
-            i.approvalStatus === 'Draft' ||
-            i.approvalStatus === 'Unresolved' ||
-            (i.status === 'Pending' && Boolean(i.isFlaggedAsSuspiciousSplit))
+            (i.voucherCode && i.voucherCode.toLowerCase().includes(q)) ||
+            (i.invoiceNumber && i.invoiceNumber.toLowerCase().includes(q)) ||
+            i.expenseId.toLowerCase().includes(q) ||
+            i.vendorName.toLowerCase().includes(q) ||
+            (i.note && i.note.toLowerCase().includes(q))
         );
-      } else if (params.quickStatus === 'PENDING_PAYMENT') {
-        items = items.filter((i) => i.status === 'Pending');
-      } else if (params.quickStatus === 'PAID') {
-        items = items.filter((i) => i.status === 'Paid');
-      } else if (params.quickStatus === 'SUSPICIOUS') {
-        items = items.filter((i) => Boolean(i.isFlaggedAsSuspiciousSplit));
+      }
+      if (params?.category) {
+        const catLabel =
+          EXPENSE_CATEGORY_LABELS[params.category as keyof typeof EXPENSE_CATEGORY_LABELS] ||
+          params.category;
+        items = items.filter((i) => i.category === params.category || i.category === catLabel);
+      }
+      if (params?.status) {
+        items = items.filter((i) => i.status === params.status);
+      }
+      if (params?.quickStatus && params.quickStatus !== 'ALL') {
+        if (params.quickStatus === 'PENDING_APPROVAL') {
+          items = items.filter(
+            (i) =>
+              i.approvalStatus === 'PendingApproval' ||
+              i.approvalStatus === 'Draft' ||
+              i.approvalStatus === 'Unresolved' ||
+              (i.status === 'Pending' && Boolean(i.isFlaggedAsSuspiciousSplit))
+          );
+        } else if (params.quickStatus === 'PENDING_PAYMENT') {
+          items = items.filter((i) => i.status === 'Pending');
+        } else if (params.quickStatus === 'PAID') {
+          items = items.filter((i) => i.status === 'Paid');
+        } else if (params.quickStatus === 'SUSPICIOUS') {
+          items = items.filter((i) => Boolean(i.isFlaggedAsSuspiciousSplit));
+        }
       }
     }
     return {
       items,
       page: params?.page || 1,
       pageSize: params?.pageSize || 20,
-      totalItems: items.length,
+      totalItems: hasServerTotal ? (res.data.totalItems as number) : items.length,
     };
   }
 
@@ -167,8 +176,8 @@ export const getExpenseSummary = async (
 ): Promise<ExpenseSummaryDto> => {
   const queryParams: Record<string, any> = {};
   if (branchId && isGuid(branchId)) queryParams.branchId = branchId;
-  if (fromDate) queryParams.fromDate = `${fromDate}T00:00:00Z`;
-  if (toDate) queryParams.toDate = `${toDate}T23:59:59Z`;
+  if (fromDate) queryParams.fromDate = `${fromDate}T00:00:00+07:00`;
+  if (toDate) queryParams.toDate = `${toDate}T23:59:59+07:00`;
 
   try {
     const res = await financeHttpClient.get<ApiResponse<any>>('/expenses/summary', {
@@ -181,7 +190,7 @@ export const getExpenseSummary = async (
         totalExpenseThisMonth: Number(s.totalAmount || 0),
         totalPendingAmount: Number(s.pendingApprovalAmount || 0),
         totalPaidAmount: Number(s.paidAmount || 0),
-        overdueCount: 0,
+        overdueCount: Number(s.overdueCount || 0),
         suspiciousAmount: Number(s.suspiciousAmount || 0),
         suspiciousCount: Number(s.suspiciousCount || 0),
       };
@@ -226,6 +235,7 @@ export const createServiceExpense = async (
     sellerTaxCode: data.sellerTaxCode || null,
     evidenceAttachmentUrl: data.attachedBillUrl || null,
     note: data.note || null,
+    expenseDate: data.expenseDate ? `${data.expenseDate}T00:00:00+07:00` : null,
     dueDate: data.dueDate || null,
   };
 
@@ -255,7 +265,7 @@ export const approveServiceExpense = async (
   try {
     const res = await financeHttpClient.post<ApiResponse<any>>(`/expenses/${expenseId}/approve`, {
       expenseId,
-      note: note || 'Phê duyệt phiếu chi vận hành',
+      note: note?.trim() || undefined,
     });
 
     if (res.data?.data) {
@@ -285,25 +295,6 @@ export const payServiceExpense = async (
   const effectiveDisburseNote = [data.approvalNote, data.note]
     .filter(Boolean)
     .join(' | ') || 'Xuất quỹ chi tiền qua hệ thống';
-
-  // Nếu phiếu chi đã được duyệt hoặc chi thất bại trước đó, bỏ qua bước gọi /approve và xuất quỹ trực tiếp
-  const isPreApproved = data.currentStatus === 'Approved' || data.currentStatus === 'PaymentFailed';
-
-  if (!isPreApproved) {
-    try {
-      const approveRes = await financeHttpClient.post<ApiResponse<any>>(`/expenses/${expenseId}/approve`, {
-        expenseId,
-        note: effectiveDisburseNote,
-      });
-
-      if (approveRes.data && approveRes.data.success === false) {
-        throw new Error(approveRes.data.message || 'Lỗi khi phê duyệt phiếu chi');
-      }
-    } catch (approveErr: any) {
-      const errMsg = approveErr?.response?.data?.message || approveErr?.message || 'Lỗi khi phê duyệt phiếu chi';
-      throw new Error(errMsg);
-    }
-  }
 
   // Xác định PaymentSourceType chuẩn enum Backend FinanceAccountType (Till = 1, Safe = 2, Bank = 3)
   let paymentSourceType = data.paymentMethod === 'Cash' ? 1 : 3;
@@ -337,27 +328,32 @@ export const payServiceExpense = async (
     throw new Error('Không tìm thấy tài khoản quỹ (tiền mặt / ngân hàng) khả dụng để xuất quỹ.');
   }
 
-  // Disburse xuất quỹ chi tiền trên Backend (tự động cập nhật Cashbook)
-  const res = await financeHttpClient.post<ApiResponse<any>>(
-    `/expenses/${expenseId}/disburse`,
-    {
-      expenseId,
-      paymentSourceType,
-      paymentSourceAccountId,
-      note: effectiveDisburseNote,
-    },
-    {
-      headers: {
-        'Idempotency-Key': idempotencyKey,
+  // Disburse xuất quỹ chi tiền trên Backend (auto-approves + updates Cashbook atomically)
+  try {
+    const res = await financeHttpClient.post<ApiResponse<any>>(
+      `/expenses/${expenseId}/disburse`,
+      {
+        expenseId,
+        paymentSourceType,
+        paymentSourceAccountId,
+        note: effectiveDisburseNote,
       },
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      }
+    );
+
+    if (res.data?.data) {
+      return mapVoucherToExpenseDto(res.data.data);
     }
-  );
 
-  if (res.data?.data) {
-    return mapVoucherToExpenseDto(res.data.data);
+    throw new Error(res.data?.message || 'Lỗi khi xuất quỹ thanh toán chi phí');
+  } catch (err: any) {
+    const errMsg = err?.response?.data?.message || err?.message || 'Lỗi khi xuất quỹ thanh toán chi phí';
+    throw new Error(errMsg);
   }
-
-  throw new Error(res.data?.message || 'Lỗi khi xuất quỹ thanh toán chi phí');
 };
 
 /**

@@ -1705,9 +1705,54 @@
   transform: rotate(180deg) !important;
 }
 
-@media (max-width: 768px) {
-  .topnav-hamburger { display: flex !important; }
-  .topnav-primary   { display: none; }
+@media (max-width: 1024px) {
+  .topnav-primary {
+    display: block;
+  }
+  .topnav-inner {
+    justify-content: space-between;
+    padding: 0 12px !important;
+    gap: 8px !important;
+  }
+  .topnav-menus-desktop {
+    display: none !important;
+  }
+  .topnav-hamburger {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .so-layout-main {
+    padding: 12px 12px 16px 12px !important;
+  }
+  .topnav-inner {
+    padding: 0 10px !important;
+    gap: 6px !important;
+  }
+  .topnav-brand-logo {
+    height: 24px !important;
+  }
+  .topnav-right-actions {
+    gap: 4px !important;
+    min-width: 0;
+  }
+  .topnav-branch-desktop {
+    max-width: 126px;
+    overflow: hidden;
+  }
+  .topnav-branch-desktop button {
+    max-width: 126px !important;
+    padding: 4px 8px !important;
+    font-size: 11.5px !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topnav-support-btn,
+  .topnav-divider,
+  .topnav-settings-wrap {
+    display: none !important;
+  }
 }
 
 /* ── Filter Toolbar Responsive ── */

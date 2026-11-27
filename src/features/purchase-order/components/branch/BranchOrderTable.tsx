@@ -83,10 +83,16 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
           valA = a.status;
           valB = b.status;
           break;
-        case 'lastUpdated':
-          valA = a.lastUpdated || '';
-          valB = b.lastUpdated || '';
+        case 'lastUpdated': {
+          const toSortKey = (s?: string) => {
+            if (!s) return '';
+            const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(.*)$/);
+            return m ? `${m[3]}-${m[2]}-${m[1]}${m[4]}` : s;
+          };
+          valA = toSortKey(a.lastUpdated);
+          valB = toSortKey(b.lastUpdated);
           break;
+        }
       }
 
       if (valA < valB) return sortDir === 'asc' ? -1 : 1;
@@ -131,14 +137,16 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
 
   const tableColGroup = (
     <colgroup>
-      <col style={{ width: '8%' }} />
-      <col style={{ width: '18%' }} />
-      <col style={{ width: '14%' }} />
-      <col style={{ width: '12%' }} />
-      <col style={{ width: '11%' }} />
-      <col style={{ width: '11%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '13%' }} />
+      <col style={{ width: '15%' }} />
+      <col style={{ width: '9%' }} />
       <col style={{ width: '10%' }} />
-      <col style={{ width: '16%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '13%' }} />
     </colgroup>
   );
 
@@ -218,6 +226,14 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                   <span>Tên CN</span>
                   {sortIcon('name')}
                 </div>
+              </th>
+
+              <th style={thBaseStyle}>
+                <span>Địa chỉ</span>
+              </th>
+
+              <th style={thBaseStyle}>
+                <span>SĐT</span>
               </th>
 
               <th
@@ -364,6 +380,14 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                     </div>
                   </td>
 
+                  <td className="so-list-td--wrap" style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9', fontSize: 11, color: '#475569' }}>
+                    {b.address || '—'}
+                  </td>
+
+                  <td style={{ padding: '5px 6px', borderBottom: '1px solid #f1f5f9', fontSize: 11, color: '#334155', fontFamily: 'var(--font-mono, monospace)' }}>
+                    {(b as { phone?: string; managerPhone?: string }).phone || (b as { managerPhone?: string }).managerPhone || '—'}
+                  </td>
+
                   <td
                     style={{
                       padding: '5px 6px',
@@ -472,8 +496,10 @@ export const BranchOrderTable: FC<BranchOrderTableProps> = ({
                       <button
                         type="button"
                         onClick={() => onOrder(b.id)}
+                        disabled={b.status !== 'active'}
                         className="so-list-action-btn"
-                        title="Tạo ma trận đặt hàng cho chi nhánh này"
+                        style={b.status !== 'active' ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                        title={b.status !== 'active' ? 'Chi nhánh đang tạm ngưng hoạt động' : 'Tạo ma trận đặt hàng cho chi nhánh này'}
                       >
                         <ShoppingCart size={11} />
                         <span>Đặt hàng</span>

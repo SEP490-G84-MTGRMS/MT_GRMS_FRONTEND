@@ -6,6 +6,17 @@ export interface StoreProductUnitPrice {
   isBaseUnit: boolean;
 }
 
+/** Một NCC nguồn nhập của SP tại cửa hàng (khi gộp nhiều NCC vào 1 dòng). */
+export interface StoreProductSupplierSource {
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  costPrice: number;
+  minOrderQuantity: number;
+  isPrimarySupplier?: boolean;
+  deliveryUoM?: string;
+}
+
 export interface StoreProductItem {
   id: string;
   storeId: string;
@@ -18,12 +29,18 @@ export interface StoreProductItem {
   category: string;
   /** Đơn vị nhập (DeliveryUoM / IsPurchaseUnit / BaseUnit) — không phải ĐVT bán lẻ. */
   unit: string;
+  /** ĐVT tồn gốc (Product.BaseUnit) — currentStock được tính theo đơn vị này. */
+  stockUnit?: string;
+  /** 1 ĐVT nhập = bao nhiêu ĐVT tồn (base). */
+  purchaseToStockRate?: number;
   imageUrl?: string;
   retailPrice: number; // Giá bán lẻ niêm yết tại cửa hàng (ĐVT cơ sở)
-  costPrice: number; // Giá vốn từ SupplierProduct
+  costPrice: number; // Giá vốn từ SupplierProduct (NCC rẻ nhất khi nhiều NCC)
+  /** Giá vốn TB tồn (WAC) theo ĐVT cơ sở; ĐVT khác = averageCost × conversionRate. */
+  averageCost?: number;
   currentStock: number; // Tồn kho thực tế (SOH)
   minStockLevel: number; // Định mức tồn tối thiểu / an toàn
-  /** Id NCC của dòng nguồn nhập (1 BranchProduct có thể nhiều dòng / nhiều NCC). */
+  /** Id NCC primary (rẻ nhất) — khi nhiều NCC xem `suppliers`. */
   supplierId?: string;
   primarySupplierCode?: string;
   primarySupplierName: string;
@@ -32,6 +49,10 @@ export interface StoreProductItem {
   hasActiveSupplierSource?: boolean;
   /** SP đang bán tại CN nhưng mất nguồn NCC. */
   lostSupplierSource?: boolean;
+  /** Danh sách NCC nguồn nhập (1 dòng catalog có thể nhiều NCC). */
+  suppliers?: StoreProductSupplierSource[];
+  /** Số NCC — >1 thì UI hiện "N NCC" + hover list. */
+  supplierCount?: number;
   minOrderQuantity: number; // MOQ từ NCC — chỉ xem tại màn này
   status: 'Active' | 'Inactive';
   shelfLocation?: string;
@@ -69,9 +90,15 @@ export interface StoreProductFilterValues {
   stockAlertFilter?: 'ALL' | 'LOW' | 'OUT_OF_STOCK' | 'NORMAL';
 }
 
+export interface AssignStoreProductItem {
+  productId: string;
+  supplierId?: string;
+}
+
 export interface AssignStoreProductInput {
   storeId: string;
   productIds: string[];
+  items?: AssignStoreProductItem[];
   defaultRetailPrice?: number;
   defaultMinStock?: number;
   defaultMinOrderQuantity?: number;
@@ -86,5 +113,7 @@ export interface EditStoreProductInput {
   status?: 'Active' | 'Inactive';
   supplierId?: string;
   shelfLocation?: string;
+  /** Giá đóng khay đ/kg — chỉ khi allowRepack. */
+  processedSellingPricePerKg?: number | null;
 }
 

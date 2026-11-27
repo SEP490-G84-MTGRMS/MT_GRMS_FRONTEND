@@ -365,7 +365,7 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
             }}
           >
             <Zap size={16} />
-            <span>⚡ Chọn nhanh danh mục (6 ô lớn)</span>
+            <span>Chọn nhanh danh mục (6 ô lớn)</span>
           </button>
 
           <button

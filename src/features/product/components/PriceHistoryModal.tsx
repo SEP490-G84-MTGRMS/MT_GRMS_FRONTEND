@@ -7,6 +7,8 @@ import {
   AlertTriangle,
   Building2,
   Globe,
+  Search,
+  RotateCcw,
 } from 'lucide-react';
 import { productApi } from '../api/productApi';
 import type { ProductPriceHistoryDto, ProductUnitResponse } from '../types';
@@ -35,6 +37,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
   const [productUnitId, setProductUnitId] = useState('ALL');
   const [productUnits, setProductUnits] = useState<ProductUnitResponse[]>([]);
   const [scopeFilter, setScopeFilter] = useState<'ALL' | 'MASTER' | 'BRANCH'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [page, setPage] = useState(1);
@@ -49,7 +52,8 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
   useEffect(() => {
     if (isOpen && productId) {
       if (fromDate && toDate && fromDate > toDate) {
-        setError('Ngày bắt đầu không được sau ngày kết thúc.');
+        setLoading(false);
+        setError('Ngày bắt đầu không được lớn hơn ngày kết thúc.');
         setHistoryList([]);
         setTotalItems(0);
         return;
@@ -60,8 +64,9 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
         .getPriceHistory(productId, branchId, {
           productUnitId: productUnitId === 'ALL' ? undefined : productUnitId,
           priceScope: scopeFilter === 'ALL' ? undefined : scopeFilter,
-          fromDate: fromDate ? `${fromDate}T00:00:00` : undefined,
-          toDate: toDate ? `${toDate}T23:59:59.999` : undefined,
+          searchTerm: searchTerm.trim() || undefined,
+          fromDate: fromDate ? new Date(`${fromDate}T00:00:00`).toISOString() : undefined,
+          toDate: toDate ? new Date(`${toDate}T23:59:59.999`).toISOString() : undefined,
           page,
           pageSize,
         })
@@ -78,16 +83,28 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
         }), 250);
       return () => window.clearTimeout(timer);
     }
-  }, [isOpen, productId, branchId, productUnitId, scopeFilter, fromDate, toDate, page, pageSize]);
+  }, [isOpen, productId, branchId, productUnitId, scopeFilter, searchTerm, fromDate, toDate, page, pageSize]);
 
   useEffect(() => {
     setPage(1);
-  }, [productUnitId, scopeFilter, fromDate, toDate, productId, branchId]);
+  }, [productUnitId, scopeFilter, searchTerm, fromDate, toDate, productId, branchId]);
 
   if (!isOpen) return null;
 
   const filteredHistory = historyList;
-  const hasActiveFilters = Boolean(productUnitId !== 'ALL' || scopeFilter !== 'ALL' || fromDate || toDate);
+  const hasActiveFilters = Boolean(
+    productUnitId !== 'ALL' || scopeFilter !== 'ALL' || searchTerm.trim() || fromDate || toDate
+  );
+
+  const handleResetFilters = () => {
+    setProductUnitId('ALL');
+    setScopeFilter('ALL');
+    setSearchTerm('');
+    setFromDate('');
+    setToDate('');
+    setError(null);
+    setPage(1);
+  };
 
   const formatCurrency = (val: number | null | undefined) => {
     if (val === null || val === undefined) return '0 đ';
@@ -97,7 +114,9 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
     try {
-      const d = new Date(dateStr);
+      const trimmed = dateStr.trim();
+      const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(trimmed);
+      const d = new Date(hasTz ? trimmed : `${trimmed}Z`);
       return d.toLocaleString('vi-VN', {
         day: '2-digit',
         month: '2-digit',
@@ -140,8 +159,8 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
       <div
         className="modal-box"
         style={{
-          maxWidth: 880,
-          width: '95%',
+          maxWidth: 1100,
+          width: '96%',
           maxHeight: '86vh',
           display: 'flex',
           flexDirection: 'column',
@@ -262,33 +281,65 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
             backgroundColor: '#ffffff',
           }}
         >
-          {!error && (totalItems > 0 || hasActiveFilters) && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 10, marginBottom: 14 }}>
-              <select
-                aria-label="Đơn vị tính"
-                value={productUnitId}
-                onChange={(e) => setProductUnitId(e.target.value)}
-                style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }}
-              >
-                <option value="ALL">Tất cả đơn vị tính</option>
-                {productUnits.map((unit) => (
-                  <option key={unit.id} value={unit.id}>{unit.unitName}</option>
-                ))}
-              </select>
-              {branchId && <select
-                aria-label="Nguồn thay đổi"
-                value={scopeFilter}
-                onChange={(e) => setScopeFilter(e.target.value as 'ALL' | 'MASTER' | 'BRANCH')}
-                style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }}
-              >
-                <option value="ALL">Tất cả nguồn</option>
-                <option value="MASTER">Giá chung toàn chuỗi</option>
-                <option value="BRANCH">Giá riêng chi nhánh</option>
-              </select>}
-              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} title="Từ ngày" style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }} />
-              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} title="Đến ngày" style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(160px, 1.3fr) repeat(4, minmax(125px, 1fr)) auto', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, color: '#94a3b8', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                aria-label="Tìm kiếm lịch sử giá"
+                placeholder="Tìm người sửa, lý do..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ width: '100%', height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 10px 0 30px', fontSize: 12.5 }}
+              />
             </div>
-          )}
+            <select
+              aria-label="Đơn vị tính"
+              value={productUnitId}
+              onChange={(e) => setProductUnitId(e.target.value)}
+              style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }}
+            >
+              <option value="ALL">Tất cả đơn vị tính</option>
+              {productUnits.map((unit) => (
+                <option key={unit.id} value={unit.id}>{unit.unitName}</option>
+              ))}
+            </select>
+            <select
+              aria-label="Phạm vi giá"
+              value={scopeFilter}
+              onChange={(e) => setScopeFilter(e.target.value as 'ALL' | 'MASTER' | 'BRANCH')}
+              style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }}
+            >
+              <option value="ALL">Tất cả phạm vi</option>
+              <option value="MASTER">MASTER (Toàn chuỗi)</option>
+              <option value="BRANCH">BRANCH (Chi nhánh)</option>
+            </select>
+            <input type="date" aria-label="Từ ngày" value={fromDate} onChange={(e) => setFromDate(e.target.value)} title="Từ ngày" style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }} />
+            <input type="date" aria-label="Đến ngày" value={toDate} onChange={(e) => setToDate(e.target.value)} title="Đến ngày" style={{ height: 36, border: '1px solid #cbd5e1', borderRadius: 7, padding: '0 9px', fontSize: 12.5 }} />
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              disabled={!hasActiveFilters && !error}
+              title="Đặt lại bộ lọc"
+              style={{
+                height: 36,
+                padding: '0 10px',
+                borderRadius: 7,
+                border: '1px solid #cbd5e1',
+                backgroundColor: '#ffffff',
+                color: hasActiveFilters || error ? '#334155' : '#94a3b8',
+                fontSize: 12.5,
+                fontWeight: 600,
+                cursor: hasActiveFilters || error ? 'pointer' : 'not-allowed',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <RotateCcw size={13} /> Đặt lại
+            </button>
+          </div>
           {loading ? (
             <div
               style={{
@@ -389,7 +440,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                         <td style={{ ...tdStyle, fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
                           {formatDate(item.createdAt)}
                         </td>
-                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                        <td style={{ ...tdStyle, maxWidth: 210, whiteSpace: 'normal' }}>
                           {item.priceScope === 'MASTER' ? (
                             <span
                               style={{
@@ -429,7 +480,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                             <div style={{ marginTop: 5, fontSize: 11, color: '#64748b' }}>ĐVT: {item.productUnitName}</div>
                           )}
                         </td>
-                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                        <td style={{ ...tdStyle, maxWidth: 210, whiteSpace: 'normal' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ color: '#94a3b8', textDecoration: 'line-through', fontSize: 12 }}>
                               {formatCurrency(item.oldPrice)}
@@ -452,7 +503,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                                 }}
                               >
                                 <TrendingUp size={12} />
-                                +{diffPercent.toFixed(1)}%
+                                {item.oldPrice > 0 ? `+${diffPercent.toFixed(1)}%` : 'Giá mới'}
                               </span>
                             )}
                             {isDecrease && (
@@ -521,10 +572,10 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                             ...tdStyle,
                             fontSize: 12.5,
                             color: '#475569',
-                            maxWidth: 220,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
+                            minWidth: 160,
+                            maxWidth: 260,
+                            whiteSpace: 'normal',
+                            wordBreak: 'break-word',
                           }}
                           title={item.reason}
                         >

@@ -6,7 +6,7 @@ import { TaxOverviewCard } from '../components/TaxOverviewCard';
 import { TaxDeclarationPreviewModal } from '../components/TaxDeclarationPreviewModal';
 import { AccountingBooksView } from '../components/AccountingBooksView';
 import { taxSnapshotApi } from '../api/taxSnapshotApi';
-import { generateMockSummary } from '../api/mockTaxData';
+import { generateMockSummary } from './mockTaxData';
 import { TaxCalculationMethod, TaxPeriodType, type HouseholdTaxDeclarationPreviewDto } from '../types/taxSnapshot';
 
 const filter = {

@@ -22,6 +22,73 @@ export interface AttendanceConfig {
   earlyLeaveThresholdMinutes: number;
 }
 
+const createDefaultConversionRules = (): WorkHourConversionRule[] => [
+  {
+    id: 'rule-1',
+    type: 'range',
+    fromHours: 1,
+    fromMinutes: 0,
+    toHours: 4,
+    toMinutes: 30,
+    workUnits: 0.5,
+    workUnitsLabel: '0.5 công',
+  },
+  {
+    id: 'rule-2',
+    type: 'gte',
+    fromHours: 4,
+    fromMinutes: 30,
+    workUnits: 1,
+    workUnitsLabel: '1 công',
+  },
+];
+
+/**
+ * Chuẩn hóa danh sách mức quy đổi theo cấu trúc bậc thang:
+ * - Cố định tối thiểu 2 mức cơ bản (Mức 1, Mức 2).
+ * - Các mức 1..(n-1) luôn là dạng khoảng "từ ... đến dưới ...".
+ * - Mức cuối cùng (n) luôn là dạng mở "từ ... trở lên".
+ */
+const normalizeTieredRules = (input: WorkHourConversionRule[]): WorkHourConversionRule[] => {
+  const defaults = createDefaultConversionRules();
+  const base = input.length >= 2 ? input : [...input, ...defaults.slice(input.length)];
+  const result: WorkHourConversionRule[] = [];
+
+  for (let index = 0; index < base.length; index++) {
+    const rule = base[index];
+    const isLast = index === base.length - 1;
+    const fromHours = index === 0 ? (rule.fromHours ?? 0) : (result[index - 1].toHours ?? 0);
+    const fromMinutes = index === 0 ? (rule.fromMinutes ?? 0) : (result[index - 1].toMinutes ?? 0);
+
+    if (isLast) {
+      const { toHours: _th, toMinutes: _tm, ...rest } = rule;
+      result.push({
+        ...rest,
+        type: 'gte',
+        fromHours,
+        fromMinutes,
+      });
+      continue;
+    }
+
+    const fromTotal = fromHours * 60 + fromMinutes;
+    const existingToTotal = (rule.toHours ?? 0) * 60 + (rule.toMinutes ?? 0);
+    const hasValidExistingTo = rule.toHours !== undefined && existingToTotal > fromTotal;
+    const fallbackToTotal = Math.min(24 * 60, fromTotal + 240);
+
+    result.push({
+      ...rule,
+      type: 'range',
+      fromHours,
+      fromMinutes,
+      toHours: hasValidExistingTo ? rule.toHours! : Math.floor(fallbackToTotal / 60),
+      toMinutes: hasValidExistingTo ? (rule.toMinutes ?? 0) : fallbackToTotal % 60,
+    });
+  }
+
+  return result;
+};
+
 const EMPTY_ATTENDANCE_CONFIG: AttendanceConfig = {
   standardDayHours: 0,
   isConvertHoursToDays: false,
@@ -94,16 +161,18 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
         }
       }
 
+      const normalizedRules = normalizeTieredRules(parsedRules);
+
       setCurrentConfig({
         standardDayHours: dto.standardDayHours ?? 0,
         isConvertHoursToDays: dto.isConvertHoursToDays ?? false,
-        conversionRules: parsedRules,
+        conversionRules: normalizedRules,
         enableLateThreshold: dto.enableLateThreshold ?? false,
         lateThresholdMinutes: dto.lateThresholdMinutes ?? 0,
         enableEarlyLeaveThreshold: dto.enableEarlyLeaveThreshold ?? false,
         earlyLeaveThresholdMinutes: dto.earlyLeaveThresholdMinutes ?? 0,
       });
-      setRules(parsedRules);
+      setRules(normalizedRules);
       setIsCustomized(Boolean(dto.isCustomized));
       setTouched({});
       setHasSubmitted(false);
@@ -321,25 +390,71 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
   };
 
   const handleAddRule = () => {
-    const newRule: WorkHourConversionRule = {
-      id: `rule-${Date.now()}`,
-      type: 'gte',
-      fromHours: 8,
-      fromMinutes: 0,
-      workUnits: 1.5,
-      workUnitsLabel: '1.5 công',
-    };
-    setRules((prev) => [...prev, newRule]);
+    setRules((prev) => {
+      const normalized = normalizeTieredRules(prev);
+      const prevLast = normalized[normalized.length - 1];
+      const prevFromTotal = (prevLast.fromHours ?? 0) * 60 + (prevLast.fromMinutes ?? 0);
+
+      // Tính mốc chuyển tiếp [C], [D]... sao cho luôn lớn hơn mốc trước và <= 23:59
+      const nextBoundaryTotal =
+        prevFromTotal < 8 * 60
+          ? 8 * 60
+          : prevFromTotal + 240 < 24 * 60
+            ? prevFromTotal + 240
+            : Math.min(23 * 60 + 59, prevFromTotal + Math.max(1, Math.floor((24 * 60 - prevFromTotal) / 2)));
+
+      const boundaryHours = Math.floor(nextBoundaryTotal / 60);
+      const boundaryMinutes = nextBoundaryTotal % 60;
+      const nextWorkUnits = Math.min(
+        5,
+        Math.round(((Number(prevLast.workUnits) || 1) + 0.5) * 100) / 100
+      );
+
+      const updatedPrevLast: WorkHourConversionRule = {
+        ...prevLast,
+        type: 'range',
+        toHours: boundaryHours,
+        toMinutes: boundaryMinutes,
+      };
+
+      const newLastRule: WorkHourConversionRule = {
+        id: `rule-${Date.now()}-${normalized.length + 1}`,
+        type: 'gte',
+        fromHours: boundaryHours,
+        fromMinutes: boundaryMinutes,
+        workUnits: nextWorkUnits,
+        workUnitsLabel: `${nextWorkUnits} công`,
+      };
+
+      return [...normalized.slice(0, -1), updatedPrevLast, newLastRule];
+    });
     if (!touched.rules) markTouched('rules');
   };
 
   const handleRemoveRule = (id: string) => {
-    setRules((prev) => prev.filter((r) => r.id !== id));
+    setRules((prev) => {
+      const idx = prev.findIndex((r) => r.id === id);
+      if (prev.length <= 2 || idx < 2) return prev;
+      return normalizeTieredRules(prev.filter((r) => r.id !== id));
+    });
     if (!touched.rules) markTouched('rules');
   };
 
   const handleUpdateRule = (id: string, updates: Partial<WorkHourConversionRule>) => {
-    setRules((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+    setRules((prev) => {
+      const idx = prev.findIndex((r) => r.id === id);
+      if (idx === -1) return prev;
+      const next = prev.map((r, i) => (i === idx ? { ...r, ...updates } : r));
+      if ((updates.toHours !== undefined || updates.toMinutes !== undefined) && idx + 1 < next.length) {
+        const updatedCurrent = next[idx];
+        next[idx + 1] = {
+          ...next[idx + 1],
+          fromHours: updatedCurrent.toHours ?? 0,
+          fromMinutes: updatedCurrent.toMinutes ?? 0,
+        };
+      }
+      return next;
+    });
     if (!touched.rules) markTouched('rules');
   };
 
@@ -757,12 +872,16 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                       <input
                         type="checkbox"
                         checked={currentConfig.isConvertHoursToDays}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const checked = e.target.checked;
                           setCurrentConfig((prev) => ({
                             ...prev,
-                            isConvertHoursToDays: e.target.checked,
-                          }))
-                        }
+                            isConvertHoursToDays: checked,
+                          }));
+                          if (checked && rules.length < 2) {
+                            setRules((prev) => normalizeTieredRules(prev));
+                          }
+                        }}
                         style={{
                           width: 16,
                           height: 16,
@@ -788,7 +907,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                   {/* Danh sách các mức quy đổi khi bật checkbox */}
                   {currentConfig.isConvertHoursToDays && (
                     <div style={{ paddingLeft: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {rules.map((rule) => {
+                      {rules.map((rule, index) => {
                         const ruleErrors = getRuleErrors(rule);
                         const shouldShowRuleError = Boolean(touched.rules || hasSubmitted);
 
@@ -804,12 +923,17 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                               flexWrap: 'wrap',
                             }}
                           >
+                            <span style={{ fontWeight: 600, color: '#0F766E', minWidth: 48 }}>
+                              Mức {index + 1}:
+                            </span>
                             <span>Từ</span>
                             <input
                               type="number"
                               min={0}
                               max={24}
                               value={rule.fromHours}
+                              disabled={index >= 1}
+                              aria-label={`Mức ${index + 1} từ giờ`}
                               onChange={(e) =>
                                 handleUpdateRule(rule.id, { fromHours: Number(e.target.value) || 0 })
                               }
@@ -822,6 +946,9 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                 borderRadius: 6,
                                 fontSize: 13,
                                 outline: 'none',
+                                backgroundColor: index >= 1 ? '#F1F5F9' : '#FFFFFF',
+                                color: index >= 1 ? '#64748B' : '#0F172A',
+                                cursor: index >= 1 ? 'not-allowed' : 'text',
                               }}
                             />
                             <span>giờ</span>
@@ -833,6 +960,8 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                   min={0}
                                   max={59}
                                   value={rule.fromMinutes}
+                                  disabled={index >= 1}
+                                  aria-label={`Mức ${index + 1} từ phút`}
                                   onChange={(e) =>
                                     handleUpdateRule(rule.id, {
                                       fromMinutes: Number(e.target.value) || 0,
@@ -847,6 +976,9 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                     borderRadius: 6,
                                     fontSize: 13,
                                     outline: 'none',
+                                    backgroundColor: index >= 1 ? '#F1F5F9' : '#FFFFFF',
+                                    color: index >= 1 ? '#64748B' : '#0F172A',
+                                    cursor: index >= 1 ? 'not-allowed' : 'text',
                                   }}
                                 />
                                 <span>phút</span>
@@ -861,6 +993,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                   min={0}
                                   max={24}
                                   value={rule.toHours ?? 4}
+                                  aria-label={`Mức ${index + 1} đến dưới giờ`}
                                   onChange={(e) =>
                                     handleUpdateRule(rule.id, { toHours: Number(e.target.value) || 0 })
                                   }
@@ -881,6 +1014,7 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                                   min={0}
                                   max={59}
                                   value={rule.toMinutes ?? 30}
+                                  aria-label={`Mức ${index + 1} đến dưới phút`}
                                   onChange={(e) =>
                                     handleUpdateRule(rule.id, { toMinutes: Number(e.target.value) || 0 })
                                   }
@@ -931,24 +1065,27 @@ export const AttendanceConfigModal: React.FC<AttendanceConfigModalProps> = ({
                             />
                             <span style={{ fontWeight: 600, color: '#0F172A' }}>công</span>
 
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveRule(rule.id)}
-                              style={{
-                                marginLeft: 'auto',
-                                border: 'none',
-                                background: 'transparent',
-                                color: '#EF4444',
-                                cursor: 'pointer',
-                                padding: 4,
-                                borderRadius: 4,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                              }}
-                              title="Xóa mức quy đổi"
-                            >
-                              <Trash2 size={15} />
-                            </button>
+                            {index >= 2 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveRule(rule.id)}
+                                style={{
+                                  marginLeft: 'auto',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#EF4444',
+                                  cursor: 'pointer',
+                                  padding: 4,
+                                  borderRadius: 4,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                }}
+                                title={`Xóa Mức ${index + 1}`}
+                                aria-label={`Xóa Mức ${index + 1}`}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
                           </div>
                         );
                       })}

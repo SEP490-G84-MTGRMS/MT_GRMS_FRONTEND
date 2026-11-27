@@ -57,7 +57,7 @@ export const PosCartTable: FC<Props> = ({
               cart.map((item, index) => {
                 const discountPerUnit = Math.max(0, item.unitPrice - item.actualPrice);
                 const lineDiscount = discountPerUnit * item.quantity;
-                const hasFefoDiscount = Boolean(item.batchId && (item.fefoDiscountPercent || 0) > 0);
+                const hasFefoDiscount = Boolean((item.fefoDiscountPercent || 0) > 0);
 
                 return (
                   <tr key={item.id} className="pos-cart-row">
@@ -104,11 +104,16 @@ export const PosCartTable: FC<Props> = ({
                           )}
                         </div>
                       ) : (
-                        <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, color: '#64748b' }}>
+                        <div style={{ marginTop: 4, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 11, color: '#64748b' }}>
                           <span>Phân lô:</span>
                           <span style={{ padding: '1px 6px', borderRadius: 4, background: '#f0fdfa', color: '#0f766e', fontWeight: 700, border: '1px solid #ccfbf1' }}>
                             LÔ-FEFO
                           </span>
+                          {hasFefoDiscount && (
+                            <span style={{ padding: '2px 7px', borderRadius: 999, color: '#b45309', background: '#fef3c7', fontWeight: 700 }}>
+                              Giảm FEFO {item.fefoDiscountPercent}%
+                            </span>
+                          )}
                         </div>
                       )}
                     </td>

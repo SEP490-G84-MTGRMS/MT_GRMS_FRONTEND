@@ -52,9 +52,10 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
         message: res.message,
       });
     } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Không thể kết nối máy chủ để xác minh chữ ký HMAC-SHA256.';
       setVerificationResult({
-        isIntegrityValid: true, // Default to valid in dev/fallback
-        message: '✓ Chữ ký HMAC-SHA256 hợp lệ — Dữ liệu 7 sổ TT152 chưa bị chỉnh sửa sau khi chốt.',
+        isIntegrityValid: false,
+        message: `Không thể xác minh tính toàn vẹn chữ ký: ${errorMessage}`,
       });
     } finally {
       setIsVerifying(false);
@@ -122,8 +123,8 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
           </p>
         </div>
       ) : (
-        <div className="tax-table-wrapper">
-          <table className="tax-table">
+        <div className="tax-table-wrapper" style={{ overflowX: 'auto' }}>
+          <table className="tax-table" style={{ minWidth: 960 }}>
             <thead>
               <tr>
                 <th>Kỳ thuế</th>
@@ -133,8 +134,8 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                 <th style={{ textAlign: 'right' }}>Thuế TNCN</th>
                 <th style={{ textAlign: 'right' }}>Tổng thuế</th>
                 <th>Mã HMAC</th>
-                <th>Trạng thái</th>
-                <th style={{ textAlign: 'right' }}>Thao tác</th>
+                <th style={{ whiteSpace: 'nowrap' }}>Trạng thái</th>
+                <th style={{ textAlign: 'right', minWidth: 215, whiteSpace: 'nowrap' }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -142,7 +143,7 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                 const label = formatTaxPeriodLabel(s.periodType, s.periodNumber ?? (s as any).quarter, s.year);
                 const sealedDate = s.finalizedAtUtc || (s as any).generatedAt || s.submittedAt;
                 const dateStr = sealedDate ? new Date(sealedDate).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
-                const hash = s.auditSignatureHash || (s as any).hmacHash || 'a94f2c8d1e7b043a6c551f88b204d9e17f3a884c';
+                const hash = s.auditSignatureHash || (s as any).hmacHash || '';
 
                 return (
                   <tr key={s.id}>
@@ -176,31 +177,61 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                       </code>
                     </td>
                     <td>
-                      <span
-                        style={{
-                          background: '#ECFDF5',
-                          color: '#065F46',
-                          fontSize: '0.72rem',
-                          fontWeight: 700,
-                          padding: '3px 8px',
-                          borderRadius: 9999,
-                          border: '1px solid #A7F3D0',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
-                      >
-                        <ShieldCheck size={12} color="#059669" />
-                        <span>Đã niêm phong</span>
-                      </span>
+                      {String(s.status ?? '').toLowerCase() === 'superseded' || String(s.status ?? '') === '2' ? (
+                        <span
+                          style={{
+                            background: '#FFFBEB',
+                            color: '#B45309',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: 9999,
+                            border: '1px solid #FDE68A',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <span>Đã thay thế{s.revisionNumber ? ` (Lần ${s.revisionNumber})` : ''}</span>
+                        </span>
+                      ) : (
+                        <span
+                          style={{
+                            background: '#ECFDF5',
+                            color: '#065F46',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: 9999,
+                            border: '1px solid #A7F3D0',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <ShieldCheck size={12} color="#059669" />
+                          <span>Đã niêm phong{s.revisionNumber && s.revisionNumber > 1 ? ` (Lần ${s.revisionNumber})` : ''}</span>
+                        </span>
+                      )}
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'nowrap', gap: 6 }}>
                         <button
                           type="button"
                           onClick={() => handleOpenVerifyModal(s)}
                           className="tax-action-btn"
-                          style={{ color: '#0F766E', fontWeight: 700, fontSize: '0.76rem', padding: '4px 8px' }}
+                          style={{
+                            width: 'auto',
+                            minWidth: 'max-content',
+                            height: 30,
+                            color: '#0F766E',
+                            fontWeight: 700,
+                            fontSize: '0.76rem',
+                            padding: '0 10px',
+                            gap: 5,
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
                           title="Kiểm tra tính toàn vẹn chữ ký số HMAC-SHA256"
                         >
                           <ShieldCheck size={14} />
@@ -291,25 +322,27 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
               ) : (
                 <div className="stack" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div
-                    className={`tax-threshold-alert ${verificationResult?.isIntegrityValid !== false ? 'alert-teal' : 'alert-danger'}`}
+                    className={`tax-threshold-alert ${verificationResult?.isIntegrityValid === true ? 'alert-teal' : 'alert-danger'}`}
                   >
-                    {verificationResult?.isIntegrityValid !== false ? (
+                    {verificationResult?.isIntegrityValid === true ? (
                       <ShieldCheck size={20} className="flex-shrink-0 text-teal" style={{ marginTop: 2 }} />
                     ) : (
                       <ShieldAlert size={20} className="flex-shrink-0 text-red" style={{ marginTop: 2 }} />
                     )}
                     <div>
                       <strong
-                        className={verificationResult?.isIntegrityValid !== false ? 'text-teal' : 'text-red'}
+                        className={verificationResult?.isIntegrityValid === true ? 'text-teal' : 'text-red'}
                         style={{ fontSize: '0.86rem', display: 'block', marginBottom: 2 }}
                       >
-                        {verificationResult?.isIntegrityValid !== false
+                        {verificationResult?.isIntegrityValid === true
                           ? '✓ Chữ ký HMAC-SHA256 hợp lệ'
                           : '⚠️ Phát hiện sai lệch chữ ký số!'}
                       </strong>
                       <p style={{ margin: 0, fontSize: '0.8rem', lineHeight: 1.45 }}>
                         {verificationResult?.message ||
-                          `Dữ liệu 7 sổ TT152 kỳ ${formatTaxPeriodLabel(verifyingSnapshot.periodType, verifyingSnapshot.periodNumber ?? (verifyingSnapshot as any).quarter, verifyingSnapshot.year)} chưa bị chỉnh sửa sau khi chốt.`}
+                          (verificationResult?.isIntegrityValid === true
+                            ? `Dữ liệu 7 sổ TT152 kỳ ${formatTaxPeriodLabel(verifyingSnapshot.periodType, verifyingSnapshot.periodNumber ?? (verifyingSnapshot as any).quarter, verifyingSnapshot.year)} chưa bị chỉnh sửa sau khi chốt.`
+                            : 'Không thể xác minh tính toàn vẹn chữ ký số. Vui lòng thử lại hoặc liên hệ quản trị viên.')}
                       </p>
                     </div>
                   </div>
@@ -357,7 +390,7 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                         <input
                           type="text"
                           readOnly
-                          value={verifyingSnapshot.auditSignatureHash || (verifyingSnapshot as any).hmacHash || 'a94f2c8d1e7b043a6c551f88b204d9e17f3a884c90e12d44b71a6c30e58f219d'}
+                          value={verifyingSnapshot.auditSignatureHash || (verifyingSnapshot as any).hmacHash || 'Chưa có chữ ký HMAC'}
                           style={{
                             flex: 1,
                             fontFamily: 'monospace',
@@ -387,9 +420,9 @@ export const TaxSnapshotsHistoryView: FC<TaxSnapshotsHistoryViewProps> = ({
                       type="button"
                       onClick={() => setVerifyingSnapshot(null)}
                       className="btn-primary-pill"
-                      style={{ background: '#0F766E' }}
+                      style={{ background: verificationResult?.isIntegrityValid === true ? '#0F766E' : '#475569' }}
                     >
-                      Đã xác minh
+                      {verificationResult?.isIntegrityValid === true ? 'Đã xác minh' : 'Đóng'}
                     </button>
                   </div>
                 </div>

@@ -16,8 +16,9 @@ import {
   Camera,
   Store,
 } from 'lucide-react';
-import type { AttendanceRecord, ApprovalRequest, Branch } from '../types';
+import type { AttendanceRecord, Branch } from '../types';
 import { scheduleApi, getShiftColor, type ScheduleResponse } from '../api/scheduleApi';
+import { scheduleApprovalApi } from '../api/scheduleApprovalApi';
 import { shiftConfigApi, type ShiftConfigDto } from '../api/shiftConfigApi';
 import { attendancePolicyApi, type AttendancePolicyDto } from '../api/attendancePolicyApi';
 import { employeeApi } from '../api/employeeApi';
@@ -26,6 +27,7 @@ import { ApprovalRequestsModal } from '../components/approval-requests/ApprovalR
 import { CreateScheduleRequestModal } from '../components/approval-requests/CreateScheduleRequestModal';
 import { ScheduleRequestsHistoryModal } from '../components/approval-requests/ScheduleRequestsHistoryModal';
 import { FaceIdAttendanceModal } from '../components/attendance/FaceIdAttendanceModal';
+import { NotificationModal } from '../../../components/common';
 import { ScheduleRequestType } from '../types/scheduleApprovalTypes';
 import { getVietnamToday, matchesAnyVietnameseSearch } from '../lib/vietnamTime';
 import { useAuthStore } from '../../../stores/useAuthStore';
@@ -38,6 +40,8 @@ interface ShiftRowItem {
   startTime: string;
   endTime: string;
   color: string;
+  ids?: string[];
+  codes?: string[];
 }
 
 const DAY_KEYS: Array<'CN' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6' | 'T7'> = [
@@ -291,8 +295,14 @@ export const AttendancePage: React.FC = () => {
   const [todayMySchedules, setTodayMySchedules] = useState<ScheduleResponse[]>([]);
   const [selfCheckInNotice] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [shifts, setShifts] = useState<ShiftRowItem[]>([]);
-  const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
+  const [pendingAttendanceCount, setPendingAttendanceCount] = useState<number>(0);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    type?: 'success' | 'error' | 'warning' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
 
   // Lắng nghe thay đổi chi nhánh từ StoreOwnerLayout (BranchSelectorDropdown)
   const [activeBranch, setActiveBranch] = useState<{ id: string; name: string } | null>(() => {
@@ -476,31 +486,73 @@ export const AttendancePage: React.FC = () => {
         ? rawSchedulesData.filter((s) => s.branchId === branchParam)
         : rawSchedulesData;
 
-      // Map danh sách ca làm việc
-      const shiftRows: ShiftRowItem[] = (shiftRes.items || []).map((sc) => ({
-        id: sc.id,
-        code: sc.shiftCode,
-        name: sc.shiftName,
-        startTime: sc.startTime ? sc.startTime.substring(0, 5) : '00:00',
-        endTime: sc.endTime ? sc.endTime.substring(0, 5) : '00:00',
-        color: getShiftColor(sc.shiftName || sc.shiftCode),
-      }));
+      // Map & gộp danh sách ca làm việc (tránh duplicate ca cùng tên/khung giờ hoặc khác hoa/thường)
+      const shiftRows: ShiftRowItem[] = [];
+      const mergeOrPushShiftRow = (candidate: {
+        id: string;
+        code?: string;
+        name: string;
+        startTime: string;
+        endTime: string;
+      }) => {
+        const normName = (candidate.name || '').trim().toLowerCase();
+        const normCode = (candidate.code || '').trim().toLowerCase();
+        const existing = shiftRows.find(
+          (row) =>
+            row.id === candidate.id ||
+            row.ids?.includes(candidate.id) ||
+            (normName && row.name.trim().toLowerCase() === normName) ||
+            (normCode && row.codes?.includes(normCode))
+        );
+
+        if (existing) {
+          existing.ids = Array.from(new Set([...(existing.ids || [existing.id]), candidate.id]));
+          if (normCode) {
+            existing.codes = Array.from(new Set([...(existing.codes || []), normCode]));
+          }
+          return;
+        }
+
+        shiftRows.push({
+          id: candidate.id,
+          code: candidate.code,
+          name: candidate.name || 'Ca làm việc',
+          startTime: candidate.startTime,
+          endTime: candidate.endTime,
+          color: getShiftColor(candidate.name || candidate.code),
+          ids: [candidate.id],
+          codes: normCode ? [normCode] : [],
+        });
+      };
+
+      (shiftRes.items || []).forEach((sc) => {
+        if (branchParam) {
+          const belongsToBranch =
+            sc.branchId === branchParam ||
+            (Array.isArray(sc.branchIds) && sc.branchIds.includes(branchParam)) ||
+            (!sc.branchId && (!sc.branchIds || sc.branchIds.length === 0));
+          if (!belongsToBranch) return;
+        }
+        mergeOrPushShiftRow({
+          id: sc.id,
+          code: sc.shiftCode,
+          name: sc.shiftName,
+          startTime: sc.startTime ? sc.startTime.substring(0, 5) : '00:00',
+          endTime: sc.endTime ? sc.endTime.substring(0, 5) : '00:00',
+        });
+      });
 
       // Bổ sung các ca phát sinh từ schedules nếu chưa có trong danh sách cấu hình
-      const existingShiftKeys = new Set(shiftRows.map((s) => s.id));
       rawSchedules.forEach((s) => {
         const key = s.shiftConfigId || s.shiftCode || s.shiftName;
-        if (key && !existingShiftKeys.has(key) && !shiftRows.some((item) => item.name === s.shiftName)) {
-          shiftRows.push({
-            id: key,
-            code: s.shiftCode,
-            name: s.shiftName || 'Ca làm việc',
-            startTime: s.plannedStartTime ? s.plannedStartTime.substring(0, 5) : '00:00',
-            endTime: s.plannedEndTime ? s.plannedEndTime.substring(0, 5) : '00:00',
-            color: getShiftColor(s.shiftName || s.shiftCode),
-          });
-          existingShiftKeys.add(key);
-        }
+        if (!key) return;
+        mergeOrPushShiftRow({
+          id: key,
+          code: s.shiftCode,
+          name: s.shiftName || 'Ca làm việc',
+          startTime: s.plannedStartTime ? s.plannedStartTime.substring(0, 5) : '00:00',
+          endTime: s.plannedEndTime ? s.plannedEndTime.substring(0, 5) : '00:00',
+        });
       });
 
       setShifts(shiftRows);
@@ -529,30 +581,6 @@ export const AttendancePage: React.FC = () => {
         mapScheduleToAttendanceRecord(s, policyMap)
       );
       setRecords(mappedRecords);
-
-      // Map yêu cầu duyệt chấm công
-      const pendingRequests: ApprovalRequest[] = rawSchedules
-        .filter(
-          (s) =>
-            s.approvalStatus === 'Pending' ||
-            (s.approvalStatus as unknown) === 1 ||
-            String(s.approvalStatus).toLowerCase() === 'pending'
-        )
-        .map((s) => ({
-          id: s.id,
-          type: 'attendance',
-          employeeId: s.employeeId,
-          employeeName: s.employeeName || 'Nhân viên',
-          avatarUrl: s.employeeAvatarUrl || undefined,
-          branchName: s.branchName || 'Chi nhánh',
-          title: s.approvalType || 'Yêu cầu duyệt công',
-          description:
-            s.approvalReason ||
-            `Chấm công ca ${s.shiftName} (${s.workDate ? s.workDate.substring(0, 10) : ''})`,
-          createdAt: s.createdAt || new Date().toISOString(),
-          status: 'pending',
-        }));
-      setApprovalRequests(pendingRequests);
     } catch (error: any) {
       console.error('Lỗi khi tải dữ liệu chấm công từ backend:', error);
       setErrorMessage(
@@ -560,15 +588,33 @@ export const AttendancePage: React.FC = () => {
       );
       setRecords([]);
       setShifts([]);
-      setApprovalRequests([]);
     } finally {
       setIsLoading(false);
     }
   }, [weekData.fromDateIso, weekData.toDateIso, activeBranch, isEmployeeRole]);
 
+  // Đồng bộ số lượng phiếu yêu cầu chờ duyệt từ Backend (scheduleApprovalApi)
+  const fetchPendingApprovalCount = useCallback(async () => {
+    if (!isStoreOwnerOrAdmin) {
+      setPendingAttendanceCount(0);
+      return;
+    }
+    try {
+      const branchParam = activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined;
+      const res = await scheduleApprovalApi.getPendingRequests(branchParam);
+      setPendingAttendanceCount(res.total ?? res.items.length);
+    } catch {
+      // Giữ nguyên số đếm hiện tại nếu lỗi mạng tạm thời
+    }
+  }, [activeBranch, isStoreOwnerOrAdmin]);
+
   useEffect(() => {
     fetchAttendanceData();
   }, [fetchAttendanceData]);
+
+  useEffect(() => {
+    fetchPendingApprovalCount();
+  }, [fetchPendingApprovalCount]);
 
   // Client-side filtering by employee name/code or shift name/date/note (không phân biệt dấu/hoa-thường)
   const filteredRecords = useMemo(() => {
@@ -587,7 +633,7 @@ export const AttendancePage: React.FC = () => {
     });
   }, [records, searchEmployee, isEmployeeRole]);
 
-  // Cập nhật trạng thái thủ công từ modal chi tiết
+  // Đồng bộ UI tức thời sau khi AttendanceDetailModal đã lưu API thành công (kèm onSaved={fetchAttendanceData})
   const handleUpdateRecordStatus = (recordId: string, newStatus: AttendanceRecord['status']) => {
     setRecords((prev) =>
       prev.map((r) => (r.id === recordId ? { ...r, status: newStatus } : r))
@@ -596,28 +642,6 @@ export const AttendancePage: React.FC = () => {
       setSelectedRecord((prev) => (prev ? { ...prev, status: newStatus } : null));
     }
   };
-
-  const handleApproveRequests = (ids: string[]) => {
-    setApprovalRequests((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'approved' } : r))
-    );
-    // Đồng bộ lại trạng thái của các record được duyệt
-    setRecords((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'ontime' } : r))
-    );
-    alert(`Đã duyệt ${ids.length} yêu cầu chấm công thành công!`);
-  };
-
-  const handleRejectRequests = (ids: string[]) => {
-    setApprovalRequests((prev) =>
-      prev.map((r) => (ids.includes(r.id) ? { ...r, status: 'rejected' } : r))
-    );
-    alert(`Đã từ chối ${ids.length} yêu cầu!`);
-  };
-
-  const pendingAttendanceCount = approvalRequests.filter(
-    (r) => r.type === 'attendance' && r.status === 'pending'
-  ).length;
 
   const activeCheckedInToday = useMemo(
     () =>
@@ -638,34 +662,18 @@ export const AttendancePage: React.FC = () => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {isEmployeeRole && activeCheckedInToday && (
-            <button
-              type="button"
-              className="emp-btn emp-btn-primary"
-              onClick={() => navigate('/employee/pos')}
-              title="Chuyển sang giao diện Bán hàng POS"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                backgroundColor: '#D97706',
-                borderColor: '#D97706',
-                color: '#FFFFFF',
-                fontWeight: 700,
-                boxShadow: '0 2px 8px rgba(217, 119, 6, 0.35)',
-              }}
-            >
-              <Store size={16} />
-              <span>Vào màn hình Bán hàng POS</span>
-            </button>
-          )}
           {!isStoreOwnerOrAdmin && (
             <button
               type="button"
               className="emp-btn emp-btn-primary"
               onClick={() => {
                 if (!user) {
-                  alert('Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.');
+                  setNotification({
+                    isOpen: true,
+                    type: 'warning',
+                    title: 'Chưa đăng nhập tài khoản',
+                    message: 'Vui lòng đăng nhập tài khoản cá nhân để thực hiện chấm công FaceID.',
+                  });
                   return;
                 }
                 setIsFaceIdModalOpen(true);
@@ -1023,9 +1031,10 @@ export const AttendancePage: React.FC = () => {
                     const dayRecords = filteredRecords.filter((r) => {
                       const matchDay = r.workDateIso ? r.workDateIso === day.dateIso : r.dayOfWeek === day.key;
                       const matchShift =
-                        (r.shiftConfigId && r.shiftConfigId === sh.id) ||
-                        (r.shiftCode && sh.code && r.shiftCode.toLowerCase() === sh.code.toLowerCase()) ||
-                        (r.shiftName && sh.name && r.shiftName.toLowerCase() === sh.name.toLowerCase()) ||
+                        (r.shiftConfigId && (r.shiftConfigId === sh.id || sh.ids?.includes(r.shiftConfigId))) ||
+                        (r.shiftCode && sh.codes?.includes(r.shiftCode.trim().toLowerCase())) ||
+                        (r.shiftCode && sh.code && r.shiftCode.trim().toLowerCase() === sh.code.trim().toLowerCase()) ||
+                        (r.shiftName && sh.name && r.shiftName.trim().toLowerCase() === sh.name.trim().toLowerCase()) ||
                         r.shiftId === sh.id;
                       return matchDay && matchShift;
                     });
@@ -1483,9 +1492,17 @@ export const AttendancePage: React.FC = () => {
       <ApprovalRequestsModal
         isOpen={showApprovalModal}
         onClose={() => setShowApprovalModal(false)}
-        requests={approvalRequests}
-        onApprove={handleApproveRequests}
-        onReject={handleRejectRequests}
+        branchId={activeBranch && activeBranch.id !== 'ALL' ? activeBranch.id : undefined}
+        onSuccess={() => {
+          fetchAttendanceData();
+          fetchPendingApprovalCount();
+          setNotification({
+            isOpen: true,
+            type: 'success',
+            title: 'Đã xử lý yêu cầu',
+            message: 'Trạng thái phiếu yêu cầu đã được cập nhật vào hệ thống.',
+          });
+        }}
       />
 
       {/* Modal Tạo yêu cầu (Xin nghỉ, Đổi ca, Sự cố FaceID, Làm thêm giờ OT) */}
@@ -1530,6 +1547,16 @@ export const AttendancePage: React.FC = () => {
           fetchAttendanceData();
         }}
       />
+
+      {notification && (
+        <NotificationModal
+          isOpen={notification.isOpen}
+          onClose={() => setNotification(null)}
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+        />
+      )}
     </div>
   );
 };

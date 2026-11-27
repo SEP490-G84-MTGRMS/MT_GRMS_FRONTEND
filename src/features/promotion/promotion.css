@@ -1776,7 +1776,7 @@
   flex-direction: column;
   gap: 10px;
   margin-top: 12px;
-  max-height: 280px; /* Hiển thị tầm 4 - 5 bậc trong popup, nhiều hơn sẽ cuộn chuột */
+  max-height: min(480px, 55vh);
   overflow-y: auto;
   padding-right: 6px;
 }
@@ -1819,6 +1819,45 @@
   background-color: var(--blue-subtle, #CCFBF1);
   border-radius: 8px;
   white-space: nowrap;
+}
+
+.promotion-buy-gift-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 110px 140px;
+  align-items: start;
+  gap: 18px 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.promotion-buy-gift-grid > div {
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+.promotion-buy-gift-grid label {
+  white-space: nowrap;
+  font-size: 0.8rem !important;
+  margin-bottom: 8px !important;
+  color: #334155 !important;
+}
+
+.promotion-buy-gift-grid .form-input,
+.promotion-buy-gift-grid .form-select-control {
+  min-height: 42px;
+  width: 100%;
+  font-size: 0.85rem !important;
+}
+
+.promotion-buy-gift-grid > div:nth-child(5) { grid-column: 3; grid-row: 2; }
+.promotion-buy-gift-grid > div:nth-child(6) { grid-column: 2; grid-row: 2; }
+
+@media (max-width: 700px) {
+  .promotion-buy-gift-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .promotion-buy-gift-grid > div:nth-child(1),
+  .promotion-buy-gift-grid > div:nth-child(4) { grid-column: 1 / -1; }
+  .promotion-buy-gift-grid > div:nth-child(5) { grid-column: 2; grid-row: 4; }
+  .promotion-buy-gift-grid > div:nth-child(6) { grid-column: 1; grid-row: 4; }
 }
 
 .btn-adjust-group {

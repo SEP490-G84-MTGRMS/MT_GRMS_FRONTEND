@@ -64,11 +64,15 @@ export const RecordSupplierResponseModal: FC<Props> = ({
       const payload: RecordSupplierResponsePayload = {
         resultType,
         supplierResponseNote: note.trim() || undefined,
-        lines: returnDetail.lines.map((l) => ({
-          lineId: l.id,
-          approvedQty: resultType === 'REJECTED' ? 0 : (lineApproved[l.id] ?? l.requestedQty),
-          rejectionReason: lineReasons[l.id] || undefined,
-        })),
+        lineResponses: returnDetail.lines.map((l) => {
+          const approvedQty = resultType === 'REJECTED' ? 0 : (lineApproved[l.id] ?? l.requestedQty);
+          return {
+            lineId: l.id,
+            approvedQty,
+            rejectedQty: Math.max(0, l.requestedQty - approvedQty),
+            rejectionReason: lineReasons[l.id] || undefined,
+          };
+        }),
       };
       await onSubmit(payload);
       onClose();

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback, type FC } from 'react';
-import { Gift, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
+import { ConfirmDialog } from '../../../components/common';
 import { PromotionFilterBar } from '../components/promotions/PromotionFilterBar';
 import { PromotionTable } from '../components/promotions/PromotionTable';
 import { PromotionModal } from '../components/promotions/PromotionModal';
@@ -11,6 +12,7 @@ import '../promotion.css';
 
 export const PromotionListPage: FC = () => {
   const [promotions, setPromotions] = useState<PromotionItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [dbBranches, setDbBranches] = useState<Array<{ id: string; name: string }>>([]);
   const [filter, setFilter] = useState<PromotionFilterState>({
     searchTerm: '',
@@ -18,15 +20,17 @@ export const PromotionListPage: FC = () => {
     status: 'ALL',
     branch: 'ALL',
   });
+  const [codeFilter, setCodeFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState<PromotionItem | null>(null);
+  const [deleteTargetPromo, setDeleteTargetPromo] = useState<PromotionItem | null>(null);
 
   useEffect(() => {
     employeeApi.getBranches().then((list) => {
       if (Array.isArray(list)) {
         setDbBranches(list.map((b) => ({ id: b.id, name: b.name })));
       }
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Đồng bộ chi nhánh đang chọn từ TopNav (mtgrms_active_branch & event mtgrms:branch-changed)
     const handleGlobalBranchChange = (e: Event) => {
@@ -139,8 +143,8 @@ export const PromotionListPage: FC = () => {
     const tiers = parsedTiers && parsedTiers.length > 0
       ? parsedTiers
       : fallbackTiers.length > 0
-      ? fallbackTiers
-      : [
+        ? fallbackTiers
+        : [
           {
             id: `tier-1`,
             tierLevel: 1,
@@ -152,10 +156,21 @@ export const PromotionListPage: FC = () => {
           },
         ];
 
+    const toLocalDateStr = (raw?: string) => {
+      if (!raw) return '';
+      if (/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)) {
+        const d = new Date(raw);
+        if (!Number.isNaN(d.getTime())) {
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+      }
+      return raw.slice(0, 10);
+    };
+
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const start = dto.startDate ? dto.startDate.slice(0, 10) : '';
-    const end = dto.endDate ? dto.endDate.slice(0, 10) : '';
+    const start = toLocalDateStr(dto.startDate);
+    const end = toLocalDateStr(dto.endDate);
 
     let computedStatus: PromotionStatus = 'ACTIVE';
     if (end && today > end) {
@@ -192,6 +207,7 @@ export const PromotionListPage: FC = () => {
   }, []);
 
   const loadPromotions = useCallback(async () => {
+    setIsLoading(true);
     try {
       const res = await promotionApi.getPromotions({
         searchTerm: filter.searchTerm || undefined,
@@ -203,6 +219,8 @@ export const PromotionListPage: FC = () => {
       }
     } catch (err) {
       console.warn('Lỗi tải danh sách khuyến mãi:', err);
+    } finally {
+      setIsLoading(false);
     }
   }, [filter.searchTerm, filter.type, filter.status, mapDtoToItem]);
 
@@ -226,6 +244,10 @@ export const PromotionListPage: FC = () => {
   // Filtered promotions
   const filteredPromotions = useMemo(() => {
     return promotions.filter((item) => {
+      if (codeFilter.trim()) {
+        const qCode = codeFilter.trim().toLowerCase();
+        if (!item.code.toLowerCase().includes(qCode)) return false;
+      }
       // Search
       if (filter.searchTerm.trim()) {
         const query = filter.searchTerm.toLowerCase();
@@ -269,7 +291,7 @@ export const PromotionListPage: FC = () => {
       }
       return true;
     });
-  }, [promotions, filter, dbBranches, branchMap]);
+  }, [promotions, filter, codeFilter, dbBranches, branchMap]);
 
   // Handlers
   const handleOpenCreate = () => {
@@ -283,56 +305,73 @@ export const PromotionListPage: FC = () => {
   };
 
   const handleToggleStatus = async (id: string) => {
-    try {
-      await promotionApi.togglePromotionStatus(id);
-    } catch {
-      // Ignored for offline/optimistic updates
+    const target = promotions.find((p) => p.id === id);
+    if (!target) return;
+    if (target.status === 'EXPIRED') {
+      showToast('Chương trình đã hết hạn, không thể thay đổi trạng thái.', 'error');
+      return;
     }
-    setPromotions((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const nextActive = !item.isActive;
-          const now = new Date();
-          const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-          let nextStatus: PromotionStatus = 'ACTIVE';
-          if (item.endDate && today > item.endDate) {
-            nextStatus = 'EXPIRED';
-          } else if (!nextActive) {
-            nextStatus = 'PAUSED';
-          } else if (item.startDate && today < item.startDate) {
-            nextStatus = 'UPCOMING';
-          } else {
-            nextStatus = 'ACTIVE';
+    try {
+      const serverActive = await promotionApi.togglePromotionStatus(id);
+      setPromotions((prev) =>
+        prev.map((item) => {
+          if (item.id === id) {
+            const nextActive = typeof serverActive === 'boolean' ? serverActive : !item.isActive;
+            const now = new Date();
+            const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            let nextStatus: PromotionStatus = 'ACTIVE';
+            if (item.endDate && today > item.endDate) {
+              nextStatus = 'EXPIRED';
+            } else if (!nextActive) {
+              nextStatus = 'PAUSED';
+            } else if (item.startDate && today < item.startDate) {
+              nextStatus = 'UPCOMING';
+            } else {
+              nextStatus = 'ACTIVE';
+            }
+            showToast(
+              nextActive
+                ? `Đã kích hoạt chương trình "${item.name}"!`
+                : `Đã tạm dừng chương trình "${item.name}"!`,
+              'info'
+            );
+            return { ...item, isActive: nextActive, status: nextStatus };
           }
-          showToast(
-            nextActive
-              ? `Đã kích hoạt chương trình "${item.name}"!`
-              : `Đã tạm dừng chương trình "${item.name}"!`,
-            'info'
-          );
-          return { ...item, isActive: nextActive, status: nextStatus };
-        }
-        return item;
-      })
-    );
+          return item;
+        })
+      );
+    } catch (err: any) {
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Không thể cập nhật trạng thái chương trình khuyến mãi.';
+      showToast(errMsg, 'error');
+    }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     const promo = promotions.find((p) => p.id === id);
-    if (promo?.status === 'ACTIVE') {
+    if (!promo) return;
+    if (promo.status === 'ACTIVE') {
       showToast('Không thể xóa chương trình đang chạy. Hãy tạm ngưng chương trình trước.', 'error');
       return;
     }
-    if (window.confirm('Bạn có chắc chắn muốn xóa chương trình khuyến mãi này không?')) {
-      try {
-        await promotionApi.deletePromotion(id);
-      } catch {
-        showToast('Không thể xóa chương trình. Vui lòng kiểm tra trạng thái và thử lại.', 'error');
-        return;
-      }
-      setPromotions((prev) => prev.filter((item) => item.id !== id));
-      showToast(`Đã xóa chương trình "${promo?.name || id}" thành công!`, 'warning');
+    setDeleteTargetPromo(promo);
+  };
+
+  const confirmDeletePromo = async () => {
+    if (!deleteTargetPromo) return;
+    const target = deleteTargetPromo;
+    setDeleteTargetPromo(null);
+    try {
+      await promotionApi.deletePromotion(target.id);
+    } catch {
+      showToast('Không thể xóa chương trình. Vui lòng kiểm tra trạng thái và thử lại.', 'error');
+      return;
     }
+    setPromotions((prev) => prev.filter((item) => item.id !== target.id));
+    showToast(`Đã xóa chương trình "${target.name}" thành công!`, 'warning');
   };
 
   const handleSavePromo = async (savedPromo: PromotionItem) => {
@@ -375,6 +414,12 @@ export const PromotionListPage: FC = () => {
         }
       }
 
+      if (savedPromo.type === 'PRODUCT_DISCOUNT') {
+        for (const t of savedPromo.tiers) {
+          if (!t.buyProductId) throw new Error('Phải chọn sản phẩm giảm giá');
+          conditions.push({ productId: t.buyProductId, productName: t.buyProductName, productRole: 'DISCOUNT', minQty: 1, discountValue: t.discountValue, note: t.discountType });
+        }
+      }
       // Serialize tiers into description metadata so all tiers persist across DB reloads
       const tiersJson = JSON.stringify(savedPromo.tiers || []);
       const cleanDesc = (savedPromo.description || '').replace(/\[TIERS_JSON\][\s\S]*?\[\/TIERS_JSON\]/g, '').trim();
@@ -383,8 +428,8 @@ export const PromotionListPage: FC = () => {
       const isStillActive = editingPromo
         ? (savedPromo.isActive ?? (savedPromo.status !== 'PAUSED'))
         : (savedPromo.isActive ?? true);
-      const effectiveStartDate = savedPromo.startDate ? `${savedPromo.startDate}T00:00:00` : new Date().toISOString();
-      const effectiveEndDate = savedPromo.endDate ? `${savedPromo.endDate}T23:59:59` : new Date().toISOString();
+      const effectiveStartDate = savedPromo.startDate ? `${savedPromo.startDate}T00:00:00+07:00` : new Date().toISOString();
+      const effectiveEndDate = savedPromo.endDate ? `${savedPromo.endDate}T23:59:59+07:00` : new Date().toISOString();
 
       if (editingPromo) {
         await promotionApi.updatePromotion(savedPromo.id, {
@@ -453,19 +498,10 @@ export const PromotionListPage: FC = () => {
           }}
         />
       )}
-      {/* Top Header */}
-      <div className="promotion-topbar">
-        <div className="promotion-topbar-title">
-          <div className="promotion-topbar-icon">
-            <Gift className="w-6 h-6" />
-          </div>
-          <div className="promotion-topbar-text">
-            <h1>Quản Lý Khuyến Mãi & Ưu Đãi</h1>
-            <p>Thiết lập chiết khấu đơn hàng, mua X tặng Y và ưu đãi theo chi nhánh</p>
-          </div>
-        </div>
-
-        <div className="promotion-topbar-actions">
+      {/* Compact Standard Header */}
+      <div className="so-list-header" style={{ flexShrink: 0, marginBottom: 12 }}>
+        <h1 className="so-list-title">Quản Lý Khuyến Mãi &amp; Ưu Đãi</h1>
+        <div className="so-list-header-actions">
           <button onClick={handleOpenCreate} className="btn-primary-pill">
             <Plus className="w-4 h-4" />
             <span>Tạo mới chương trình</span>
@@ -479,12 +515,15 @@ export const PromotionListPage: FC = () => {
           filter={filter}
           onFilterChange={setFilter}
           onRefresh={loadPromotions}
+          codeTerm={codeFilter}
+          onCodeTermChange={setCodeFilter}
         />
       </div>
 
       {/* Table */}
       <PromotionTable
         promotions={filteredPromotions}
+        isLoading={isLoading}
         onEdit={handleOpenEdit}
         onToggleStatus={handleToggleStatus}
         onDelete={handleDelete}
@@ -498,6 +537,17 @@ export const PromotionListPage: FC = () => {
         onSave={handleSavePromo}
         editingPromo={editingPromo}
         branches={branchNames}
+      />
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTargetPromo)}
+        title="Xóa chương trình khuyến mãi"
+        message={`Bạn có chắc chắn muốn xóa chương trình "${deleteTargetPromo?.name || ''}" (${deleteTargetPromo?.code || ''})? Hành động này không thể hoàn tác.`}
+        confirmLabel="Xóa chương trình"
+        variant="danger"
+        onConfirm={confirmDeletePromo}
+        onCancel={() => setDeleteTargetPromo(null)}
       />
     </div>
   );

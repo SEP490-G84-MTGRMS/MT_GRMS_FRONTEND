@@ -5,23 +5,31 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { TransferListPage } from '../pages/TransferListPage';
 import { CreateTransferPage } from '../pages/CreateTransferPage';
 import { ReceiveTransferPage } from '../pages/ReceiveTransferPage';
+import { TransferDetailPage } from '../pages/TransferDetailPage';
+import { CreateUrgentTransferRequestPage } from '../pages/CreateUrgentTransferRequestPage';
 import { transferService } from '../services/transferService';
 import type { TransferOrder } from '../types';
 
 // Mock transferService
 vi.mock('../services/transferService', () => ({
+  getTransferErrorMessage: (err: unknown) => (err instanceof Error ? err.message : 'Lỗi'),
   transferService: {
     branches: vi.fn(),
     products: vi.fn(),
     batches: vi.fn(),
     stockBatches: vi.fn(),
+    availableUrgentProducts: vi.fn(),
+    previewUrgentAllocation: vi.fn(),
+    createUrgentRequest: vi.fn(),
     list: vi.fn(),
     get: vi.fn(),
     getById: vi.fn(),
     create: vi.fn(),
+    submit: vi.fn(),
     dispatch: vi.fn(),
     receive: vi.fn(),
     cancel: vi.fn(),
+    returnToSource: vi.fn(),
   },
 }));
 
@@ -152,7 +160,19 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
       expect(screen.getAllByText('Phiếu tạm').length).toBeGreaterThan(0);
     });
 
-    it('TC-INT-01b: Filters transfers by note keyword and resets filters correctly', async () => {
+    it('TC-INT-01b: Filters transfers by note keyword via server search and resets filters correctly', async () => {
+      vi.mocked(transferService.list).mockImplementation(async (params?: Record<string, unknown>) => {
+        const kw = typeof params?.search === 'string' ? params.search.trim().toLowerCase() : '';
+        const filtered = kw
+          ? mockTransfers.filter(
+              (t) =>
+                t.transferCode.toLowerCase().includes(kw) ||
+                (t.note || '').toLowerCase().includes(kw)
+            )
+          : mockTransfers;
+        return { items: filtered, totalItems: filtered.length };
+      });
+
       render(
         <MemoryRouter>
           <TransferListPage />
@@ -171,6 +191,9 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
       fireEvent.click(searchBtn);
 
       await waitFor(() => {
+        expect(transferService.list).toHaveBeenCalledWith(
+          expect.objectContaining({ search: 'mì gói' })
+        );
         expect(screen.queryByText('TRF-20261114-001')).not.toBeInTheDocument();
         expect(screen.getByText('TRF-20261114-002')).toBeInTheDocument();
       });
@@ -244,11 +267,11 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
           unitPrice: 18000,
           amount: 18000,
           hasBatchManagement: true,
-          batches: [{ id: 'b1', batchNumber: 'L01', expiryDate: '2027-01-01', onHand: 100 }],
+          batches: [{ id: 'b1', batchNumber: 'L01', expiryDate: '2027-01-01', onHand: 100, isExpired: false }],
         },
       ]);
       vi.mocked(transferService.batches).mockResolvedValue([
-        { id: 'b1', productId: 'prod-01', batchNumber: 'L01', expiryDate: '2027-01-01', onHand: 100 },
+        { id: 'b1', productId: 'prod-01', batchNumber: 'L01', expiryDate: '2027-01-01', onHand: 100, isExpired: false },
       ]);
 
       render(
@@ -305,6 +328,104 @@ describe('INTEGRATION TEST SUITE – Transfer Management (FE-15)', () => {
           'trf-001',
           [expect.objectContaining({ receivedQty: 29, damagedQty: 1, note: 'Móp khi vận chuyển' })],
           'Kiểm nhận có 1 lon hỏng'
+        );
+      });
+    });
+  });
+
+  // =========================================================================
+  // FLOW 4: TransferDetailPage & CreateUrgentTransferRequestPage (BUG-036/062/063)
+  // =========================================================================
+  describe('4. TransferDetailPage & Urgent Transfer Request Flow', () => {
+    it('TC-INT-05: TransferDetailPage shows error alert and retry button on load failure', async () => {
+      vi.mocked(transferService.get).mockRejectedValueOnce(new Error('Không thể kết nối máy chủ'));
+
+      render(
+        <MemoryRouter initialEntries={['/store-owner/transfers/trf-missing']}>
+          <Routes>
+            <Route path="/store-owner/transfers/:id" element={<TransferDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('Không thể kết nối máy chủ');
+      });
+      expect(screen.getByRole('button', { name: /Quay lại danh sách điều chuyển/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Thử lại/i })).toBeInTheDocument();
+    });
+
+    it('TC-INT-06: CreateUrgentTransferRequestPage calls availableUrgentProducts and sends relatedOrderCode', async () => {
+      vi.mocked(transferService.availableUrgentProducts).mockResolvedValue([
+        {
+          productId: 'prod-01',
+          productCode: 'SP-BIA',
+          productName: 'Bia Heineken Sleek',
+          baseUnit: 'Lon',
+          totalAvailableQuantity: 48,
+        },
+      ]);
+      vi.mocked(transferService.previewUrgentAllocation).mockResolvedValue({
+        toBranchId: 'branch-01',
+        isFullyAllocated: true,
+        totals: [
+          {
+            productId: 'prod-01',
+            productCode: 'SP-BIA',
+            productName: 'Bia Heineken Sleek',
+            requestedQuantity: 1,
+            allocatedQuantity: 1,
+            shortageQuantity: 0,
+            unit: 'Lon',
+          },
+        ],
+        sources: [
+          {
+            fromBranchId: 'branch-02',
+            fromBranchName: 'Chi nhánh Quận 1',
+            items: [
+              {
+                productId: 'prod-01',
+                productCode: 'SP-BIA',
+                productName: 'Bia Heineken Sleek',
+                requestedQuantity: 1,
+                allocatedQuantity: 1,
+                shortageQuantity: 0,
+                unit: 'Lon',
+              },
+            ],
+          },
+        ],
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/employee/transfers/request']}>
+          <Routes>
+            <Route path="/employee/transfers/request" element={<CreateUrgentTransferRequestPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(transferService.availableUrgentProducts).toHaveBeenCalledWith('branch-01');
+      });
+      expect(transferService.products).not.toHaveBeenCalled();
+
+      const searchInput = await screen.findByPlaceholderText('Nhập mã hoặc tên sản phẩm');
+      fireEvent.change(searchInput, { target: { value: 'Bia' } });
+      fireEvent.click(screen.getByText(/Bia Heineken Sleek/));
+
+      const orderInput = screen.getByPlaceholderText(/HD261124001/i);
+      fireEvent.change(orderInput, { target: { value: 'HD261125001' } });
+      fireEvent.click(screen.getByRole('button', { name: /Xem phương án phân bổ/i }));
+
+      await waitFor(() => {
+        expect(transferService.previewUrgentAllocation).toHaveBeenCalledWith(
+          expect.objectContaining({
+            toBranchId: 'branch-01',
+            relatedOrderCode: 'HD261125001',
+            relatedOrderId: undefined,
+          })
         );
       });
     });

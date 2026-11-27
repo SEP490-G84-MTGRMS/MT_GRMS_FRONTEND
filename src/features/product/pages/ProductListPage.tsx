@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { productApi } from '../api/productApi';
 import {
@@ -106,20 +106,15 @@ export const ProductListPage: React.FC = () => {
 
   // RBAC switch (StoreOwner vs Staff) for BR-SEC-01 verification
   const currentUser = useAuthStore((state) => state.user);
+  const isOwnerRole = (role?: string | null) =>
+    role === 'STORE_OWNER' || role === 'ADMIN';
   const initialRole: 'StoreOwner' | 'Cashier' =
-    currentUser?.role === 'STAFF' ? 'Cashier' : 'StoreOwner';
+    isOwnerRole(currentUser?.role) ? 'StoreOwner' : 'Cashier';
   const [userRole, setUserRole] = useState<'StoreOwner' | 'Cashier'>(initialRole);
 
   // Sync role if auth state changes
   useEffect(() => {
-    if (currentUser?.role === 'STAFF') {
-      setUserRole('Cashier');
-    } else if (
-      currentUser?.role === 'ADMIN' ||
-      currentUser?.role === 'STORE_OWNER'
-    ) {
-      setUserRole('StoreOwner');
-    }
+    setUserRole(isOwnerRole(currentUser?.role) ? 'StoreOwner' : 'Cashier');
   }, [currentUser?.role]);
 
   // Filter state (chip-token — layout giống Sản phẩm theo NCC)
@@ -171,27 +166,54 @@ export const ProductListPage: React.FC = () => {
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const searchBits = [
-        ...appliedFilters.skus,
-        ...appliedFilters.names,
-        ...appliedFilters.barcodes,
-      ].filter(Boolean);
       const res = await productApi.getProductsPaged({
         pageIndex,
         pageSize,
-        searchTerm: searchBits[0] || undefined,
+        skus: appliedFilters.skus.length > 0 ? appliedFilters.skus : undefined,
+        names: appliedFilters.names.length > 0 ? appliedFilters.names : undefined,
+        barcodes: appliedFilters.barcodes.length > 0 ? appliedFilters.barcodes : undefined,
         categoryId:
           appliedFilters.categoryId !== 'ALL' ? appliedFilters.categoryId : undefined,
         categoryIds:
           appliedFilters.categoryId !== 'ALL' ? [appliedFilters.categoryId] : undefined,
+        status:
+          appliedFilters.statusFilter !== 'ALL' ? appliedFilters.statusFilter : undefined,
       });
       if (res && res.items) {
         const mapped: ProductItem[] = await Promise.all(
           res.items.map(async (p) => {
+            const rawUnitPrices = (p as any).unitPrices as Array<{
+              id?: string;
+              unitName: string;
+              conversionRate: number;
+              price: number;
+              barcode?: string | null;
+              isBaseUnit?: boolean;
+              isPurchaseUnit?: boolean;
+            }> | undefined;
             let uomConversions: UomConversion[] = (p as any).uomConversions || [];
             let isBaseUnitPurchaseUnit: boolean | undefined = p.isBaseUnitPurchaseUnit;
             let purchaseUnit: string | undefined = p.purchaseUnit ?? undefined;
-            if (uomConversions.length === 0 && p.id) {
+            if (uomConversions.length === 0 && Array.isArray(rawUnitPrices)) {
+              const baseRow = rawUnitPrices.find((u) => u.isBaseUnit);
+              const purchaseRow = rawUnitPrices.find((u) => Boolean(u.isPurchaseUnit));
+              if (purchaseRow) {
+                isBaseUnitPurchaseUnit = Boolean(purchaseRow.isBaseUnit);
+                purchaseUnit = purchaseRow.unitName;
+              } else if (baseRow) {
+                isBaseUnitPurchaseUnit = baseRow.isPurchaseUnit ?? true;
+              }
+              uomConversions = rawUnitPrices
+                .filter((u) => !u.isBaseUnit)
+                .map((u, idx) => ({
+                  id: u.id || `${p.id}-u-${idx}`,
+                  unitName: u.unitName,
+                  conversionRate: u.conversionRate,
+                  price: u.price,
+                  barcode: u.barcode ?? undefined,
+                  isPurchaseUnit: Boolean(u.isPurchaseUnit),
+                }));
+            } else if (uomConversions.length === 0 && !Array.isArray(rawUnitPrices) && p.id) {
               const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
               if (isGuid) {
                 try {
@@ -247,6 +269,7 @@ export const ProductListPage: React.FC = () => {
               taxCategory: (p as any).taxCategory || 'STANDARD_1PCT',
               isFavorite: Boolean(p.isFavorite),
               hasBatches: Boolean(p.hasBatches),
+              nearExpiryThresholdDays: p.nearExpiryThresholdDays ?? null,
               allowRepack: Boolean((p as { allowRepack?: boolean }).allowRepack),
               sellRawByWeight: p.sellRawByWeight ?? true,
               processedSellingPricePerKg:
@@ -325,6 +348,7 @@ export const ProductListPage: React.FC = () => {
         // Cập nhật nhóm hàng qua backend API
         const updatedDto = await categoryApi.updateCategory(id, {
           name,
+          code,
           description,
         });
         setCategories((prev) =>
@@ -411,6 +435,10 @@ export const ProductListPage: React.FC = () => {
           internalNote: data.internalNote,
           isFavorite: data.isFavorite ?? productToEdit.isFavorite,
           hasBatches: data.hasBatches !== undefined ? data.hasBatches : Boolean(productToEdit.hasBatches),
+          nearExpiryThresholdDays:
+            data.nearExpiryThresholdDays !== undefined
+              ? data.nearExpiryThresholdDays
+              : productToEdit.nearExpiryThresholdDays ?? null,
           allowRepack: data.allowRepack !== undefined ? data.allowRepack : Boolean(productToEdit.allowRepack),
           processedSellingPricePerKg:
             data.processedSellingPricePerKg !== undefined
@@ -508,6 +536,7 @@ export const ProductListPage: React.FC = () => {
           isFavorite: data.isFavorite ?? false,
           status: data.status || 'Active',
           hasBatches: data.hasBatches ?? false,
+          nearExpiryThresholdDays: data.nearExpiryThresholdDays ?? null,
           allowRepack: data.allowRepack ?? false,
           processedSellingPricePerKg: data.processedSellingPricePerKg ?? null,
           eligibleForVatReduction: data.eligibleForVatReduction ?? false,
@@ -652,6 +681,7 @@ export const ProductListPage: React.FC = () => {
         internalNote: product.internalNote,
         isFavorite: product.isFavorite ?? false,
         hasBatches: product.hasBatches ?? false,
+        nearExpiryThresholdDays: product.nearExpiryThresholdDays ?? null,
         allowRepack: product.allowRepack ?? false,
         processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
         eligibleForVatReduction: product.eligibleForVatReduction ?? false,
@@ -692,6 +722,7 @@ export const ProductListPage: React.FC = () => {
         internalNote: product.internalNote,
         isFavorite: Boolean(product.isFavorite),
         hasBatches: nextVal,
+        nearExpiryThresholdDays: product.nearExpiryThresholdDays ?? null,
         allowRepack: product.allowRepack ?? false,
         processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
         eligibleForVatReduction: Boolean(product.eligibleForVatReduction),
@@ -736,6 +767,7 @@ export const ProductListPage: React.FC = () => {
         internalNote: product.internalNote,
         isFavorite: product.isFavorite ?? false,
         hasBatches: product.hasBatches ?? false,
+        nearExpiryThresholdDays: product.nearExpiryThresholdDays ?? null,
         allowRepack: product.allowRepack ?? false,
         processedSellingPricePerKg: product.processedSellingPricePerKg ?? null,
         eligibleForVatReduction: product.eligibleForVatReduction ?? false,
@@ -803,14 +835,10 @@ export const ProductListPage: React.FC = () => {
 
 
   const buildExcelApiFilter = () => {
-    const searchBits = [
-      ...appliedFilters.skus,
-      ...appliedFilters.names,
-      ...appliedFilters.barcodes,
-    ].filter(Boolean);
-
     return {
-      searchTerm: searchBits[0] || undefined,
+      skus: appliedFilters.skus.length > 0 ? appliedFilters.skus : undefined,
+      names: appliedFilters.names.length > 0 ? appliedFilters.names : undefined,
+      barcodes: appliedFilters.barcodes.length > 0 ? appliedFilters.barcodes : undefined,
       categoryId: appliedFilters.categoryId !== 'ALL' ? appliedFilters.categoryId : undefined,
       categoryIds: appliedFilters.categoryId !== 'ALL' ? [appliedFilters.categoryId] : undefined,
       status: appliedFilters.statusFilter !== 'ALL' ? appliedFilters.statusFilter : undefined,
@@ -1015,6 +1043,7 @@ export const ProductListPage: React.FC = () => {
             description: excelCell(row, 'Mô tả', 'Mo ta', 'Description') || existing?.description || undefined,
             internalNote: excelCell(row, 'Ghi chú nội bộ', 'Ghi chu noi bo', 'InternalNote') || existing?.internalNote || undefined,
             hasBatches: excelBoolean(excelCell(row, 'Quản lý lô', 'Quan ly lo', 'HasBatches'), existing?.hasBatches ?? false),
+            nearExpiryThresholdDays: existing?.nearExpiryThresholdDays ?? null,
             allowRepack: excelBoolean(excelCell(row, 'Cho phép đóng gói lại', 'AllowRepack'), existing?.allowRepack ?? false),
             processedSellingPricePerKg: excelNumber(
               excelCell(row, 'Giá bán hàng đóng gói/kg', 'ProcessedSellingPricePerKg'),
@@ -1072,11 +1101,6 @@ export const ProductListPage: React.FC = () => {
     } finally {
       setExcelBusy(false);
     }
-  };
-
-  // Barcode Print mock
-  const handlePrintBarcode = () => {
-    showToast('Đang kết nối máy in tem mã vạch Barcode...');
   };
 
   return (
@@ -1165,7 +1189,6 @@ export const ProductListPage: React.FC = () => {
           onExport={handleExport}
           onImport={handleImport}
           excelBusy={excelBusy}
-          onPrintBarcode={handlePrintBarcode}
         />
       </div>
 
@@ -1247,6 +1270,7 @@ export const ProductListPage: React.FC = () => {
       <CategoryModal
         isOpen={isCategoryModalOpen}
         categoryToEdit={categoryToEdit}
+        existingCategories={categories}
         onClose={() => setIsCategoryModalOpen(false)}
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}

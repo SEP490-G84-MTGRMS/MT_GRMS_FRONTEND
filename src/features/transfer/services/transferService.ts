@@ -1,9 +1,17 @@
 import { httpClient } from '../../../api/httpClient';
 import type { TransferOrder, TransferItem } from '../types';
+import { formatDateTimeVN, isBatchExpired } from '../utils/transferDate';
 
 type ApiEnvelope<T> = { data?: T; Data?: T };
 type ApiPage<T> = { items?: T[]; Items?: T[] };
 export type TransferDemandItem = { productId: string; quantity: number; unit: string };
+export type TransferAvailableProduct = {
+  productId: string;
+  productCode: string;
+  productName: string;
+  baseUnit: string;
+  totalAvailableQuantity: number;
+};
 export type TransferAllocationPreview = {
   toBranchId: string;
   isFullyAllocated: boolean;
@@ -52,6 +60,18 @@ export type ApiTransfer = {
 
 const unwrap = <T,>(response: ApiEnvelope<T>): T => (response?.data ?? response?.Data ?? response) as T;
 
+const generateIdempotencyKey = (idempotencyKey?: string): string => {
+  if (idempotencyKey?.trim()) return idempotencyKey.trim();
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+};
+
+const idempotencyConfig = (idempotencyKey?: string) => ({
+  headers: { 'Idempotency-Key': generateIdempotencyKey(idempotencyKey) },
+});
+
 export const toIsoDate = (value?: string): string | undefined => {
   if (!value || !value.trim()) return undefined;
   const trimmed = value.trim();
@@ -68,7 +88,7 @@ export const toIsoDate = (value?: string): string | undefined => {
 
 export const getTransferErrorMessage = (error: unknown): string => {
   if (typeof error !== 'object' || error === null) {
-    return error instanceof Error ? error.message : 'Không thể tạo phiếu chuyển.';
+    return error instanceof Error ? error.message : 'Không thể xử lý yêu cầu điều chuyển.';
   }
 
   const response = (error as { response?: { data?: unknown } }).response;
@@ -89,7 +109,7 @@ export const getTransferErrorMessage = (error: unknown): string => {
     }
   }
 
-  return error instanceof Error ? error.message : 'Không thể tạo phiếu chuyển.';
+  return error instanceof Error ? error.message : 'Không thể xử lý yêu cầu điều chuyển.';
 };
 
 export const mapTransfer = (dto: ApiTransfer): TransferOrder => ({
@@ -100,8 +120,13 @@ export const mapTransfer = (dto: ApiTransfer): TransferOrder => ({
   toBranchId: dto.toBranchId,
   toBranchName: dto.toBranchName,
   createdBy: dto.createdBy,
-  transferDate: new Date(dto.createdAt).toLocaleString('vi-VN'),
-  receiveDate: dto.receivedAt ? new Date(dto.receivedAt).toLocaleString('vi-VN') : undefined,
+  transferDate: formatDateTimeVN(dto.createdAt, dto.createdAt),
+  dispatchedAt: dto.dispatchedAt,
+  receiveDate: dto.completionResult === 'Returned'
+    ? undefined
+    : dto.receivedAt
+      ? formatDateTimeVN(dto.receivedAt)
+      : undefined,
   expectedDeliveryDate: dto.expectedDeliveryDate,
   status: dto.status as TransferOrder['status'],
   completionResult: dto.completionResult as TransferOrder['completionResult'],
@@ -157,12 +182,12 @@ export const transferService = {
     const list = Array.isArray(page) ? page : (page?.items ?? page?.Items ?? []);
     return list
       .map((product) => {
-      const id = String(product.productId ?? product.id ?? '');
+        const id = String(product.productId ?? product.id ?? '');
         const stock = Number(product.currentStock ?? product.quantityOnHand ?? 0);
         const code = String(product.sku ?? product.productCode ?? product.code ?? '');
         const name = String(product.name ?? product.productName ?? '');
-        const unit = String(product.unit ?? product.baseUnit ?? product.unitName ?? 'Cái');
-        const price = Number(product.retailPrice ?? product.unitPrice ?? product.price ?? 0);
+        const unit = String(product.stockUnit ?? product.baseUnit ?? product.unit ?? product.unitName ?? 'Cái');
+        const price = Number(product.landedCostPerUnit ?? product.averageCost ?? product.costPrice ?? product.retailPrice ?? product.unitPrice ?? product.price ?? 0);
         const batches = Array.isArray(product.batches) ? (product.batches as Array<Record<string, unknown>>) : [];
         return {
           id,
@@ -176,12 +201,16 @@ export const transferService = {
           unitPrice: price,
           amount: price,
           hasBatchManagement: Boolean(product.hasBatches ?? (batches.length > 0)),
-          batches: batches.map((batch, index) => ({
-            id: String(batch.id ?? index),
-            batchNumber: String(batch.batchCode ?? batch.batchNumber ?? ''),
-            expiryDate: String(batch.expiryDate ?? ''),
-            onHand: Number(batch.availableQuantity ?? batch.quantityOnHand ?? 0),
-          })),
+          batches: batches.map((batch, index) => {
+            const expiryDate = String(batch.expiryDate ?? '');
+            return {
+              id: String(batch.id ?? index),
+              batchNumber: String(batch.batchCode ?? batch.batchNumber ?? ''),
+              expiryDate,
+              onHand: Number(batch.availableQuantity ?? batch.quantityOnHand ?? 0),
+              isExpired: isBatchExpired(expiryDate),
+            };
+          }),
         } satisfies TransferItem;
       })
       .filter((product) => product.productId);
@@ -197,17 +226,34 @@ export const transferService = {
       : (data as ApiPage<{ productId: string; batchCode?: string; expiryDate?: string; availableQuantity: number }>)?.items ??
         (data as ApiPage<{ productId: string; batchCode?: string; expiryDate?: string; availableQuantity: number }>)?.Items ??
         [];
-    return list.map((batch, index) => ({
-      id: `${batch.productId}-${index}`,
-      productId: batch.productId,
-      batchNumber: batch.batchCode ?? '',
-      expiryDate: batch.expiryDate ?? '',
-      onHand: batch.availableQuantity,
-    }));
+    return list.map((batch, index) => {
+      const expiryDate = batch.expiryDate ?? '';
+      return {
+        id: `${batch.productId}-${index}`,
+        productId: batch.productId,
+        batchNumber: batch.batchCode ?? '',
+        expiryDate,
+        onHand: batch.availableQuantity,
+        isExpired: isBatchExpired(expiryDate),
+      };
+    });
   },
 
   async stockBatches(branchId: string) {
     return this.batches(branchId);
+  },
+
+  async availableUrgentProducts(toBranchId?: string): Promise<TransferAvailableProduct[]> {
+    const response = await httpClient.get<ApiEnvelope<TransferAvailableProduct[]>>('/transfer-requests/available-products', {
+      params: toBranchId ? { toBranchId } : undefined,
+    });
+    const data = unwrap(response.data);
+    const list = Array.isArray(data)
+      ? data
+      : (data as ApiPage<TransferAvailableProduct>)?.items ??
+        (data as ApiPage<TransferAvailableProduct>)?.Items ??
+        [];
+    return list;
   },
 
   async list(params: Record<string, unknown> = {}) {
@@ -239,64 +285,108 @@ export const transferService = {
     return this.get(id);
   },
 
-  async create(input: { fromBranchId: string; toBranchId: string; note?: string; origin?: 'OwnerAllocation' | 'StaffUrgentRequest'; priority?: 'Normal' | 'Urgent'; relatedOrderId?: string; items: TransferItem[] }) {
-    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>('/transfers', {
-      ...input,
-      dispatchNow: false,
-      origin: input.origin ?? 'OwnerAllocation',
-      priority: input.priority ?? 'Normal',
-      items: input.items.map((item) => ({
-        productId: item.productId,
-        quantity: item.sentQty,
-        unit: item.unitName?.trim() || 'Cái',
-        batchCode: item.batchNumber?.trim() || undefined,
-        expiryDate: toIsoDate(item.expiryDate),
-        unitPrice: item.unitPrice,
-      })),
-    });
+  async create(
+    input: {
+      fromBranchId: string;
+      toBranchId: string;
+      note?: string;
+      origin?: 'OwnerAllocation' | 'StaffUrgentRequest';
+      priority?: 'Normal' | 'Urgent';
+      relatedOrderId?: string;
+      submitImmediately?: boolean;
+      items: TransferItem[];
+    },
+    idempotencyKey?: string
+  ) {
+    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(
+      '/transfers',
+      {
+        ...input,
+        dispatchNow: false,
+        submitImmediately: Boolean(input.submitImmediately),
+        origin: input.origin ?? 'OwnerAllocation',
+        priority: input.priority ?? 'Normal',
+        items: input.items.map((item) => ({
+          productId: item.productId,
+          quantity: item.sentQty,
+          unit: item.unitName?.trim() || 'Cái',
+          batchCode: item.batchNumber?.trim() || undefined,
+          expiryDate: toIsoDate(item.expiryDate),
+          unitPrice: item.unitPrice,
+        })),
+      },
+      idempotencyConfig(idempotencyKey)
+    );
     return mapTransfer(unwrap(response.data));
   },
 
-  async submit(id: string) {
-    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(`/transfers/${id}/submit`);
+  async submit(id: string, idempotencyKey?: string) {
+    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(
+      `/transfers/${id}/submit`,
+      undefined,
+      idempotencyConfig(idempotencyKey)
+    );
     return mapTransfer(unwrap(response.data));
   },
 
-  async dispatch(id: string) {
-    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(`/transfers/${id}/dispatch`);
+  async dispatch(id: string, idempotencyKey?: string) {
+    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(
+      `/transfers/${id}/dispatch`,
+      undefined,
+      idempotencyConfig(idempotencyKey)
+    );
     return mapTransfer(unwrap(response.data));
   },
 
-  async receive(id: string, items: TransferItem[], note?: string) {
-    const response = await httpClient.put<ApiEnvelope<ApiTransfer>>(`/transfers/${id}/receive`, {
-      note,
-      items: items.map((item) => ({
-        detailId: item.id,
-        receivedQuantity: item.receivedQty ?? item.sentQty,
-        damagedQuantity: item.damagedQty ?? 0,
-        discrepancyReason: item.note?.trim() || ((item.damagedQty ?? 0) > 0 ? note?.trim() : undefined),
-      })),
-    });
+  async receive(id: string, items: TransferItem[], note?: string, idempotencyKey?: string) {
+    const response = await httpClient.put<ApiEnvelope<ApiTransfer>>(
+      `/transfers/${id}/receive`,
+      {
+        note,
+        items: items.map((item) => ({
+          detailId: item.id,
+          receivedQuantity: item.receivedQty ?? item.sentQty,
+          damagedQuantity: item.damagedQty ?? 0,
+          discrepancyReason: item.note?.trim() || ((item.damagedQty ?? 0) > 0 || (item.receivedQty ?? item.sentQty) < item.sentQty ? note?.trim() : undefined),
+        })),
+      },
+      idempotencyConfig(idempotencyKey)
+    );
     return mapTransfer(unwrap(response.data));
   },
 
-  async cancel(id: string, reason: string) {
-    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(`/transfers/${id}/cancel`, { reason });
+  async cancel(id: string, reason: string, idempotencyKey?: string) {
+    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(
+      `/transfers/${id}/cancel`,
+      { reason },
+      idempotencyConfig(idempotencyKey)
+    );
     return mapTransfer(unwrap(response.data));
   },
 
-  async returnToSource(id: string, reason: string) {
-    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(`/transfers/${id}/return`, { reason });
+  async returnToSource(id: string, reason: string, idempotencyKey?: string) {
+    const response = await httpClient.post<ApiEnvelope<ApiTransfer>>(
+      `/transfers/${id}/return`,
+      { reason },
+      idempotencyConfig(idempotencyKey)
+    );
     return mapTransfer(unwrap(response.data));
   },
 
-  async previewUrgentAllocation(input: { toBranchId: string; requiredAt?: string; relatedOrderId?: string; note?: string; items: TransferDemandItem[] }) {
+  async previewUrgentAllocation(input: { toBranchId: string; requiredAt?: string; relatedOrderId?: string; relatedOrderCode?: string; note?: string; items: TransferDemandItem[] }) {
     const response = await httpClient.post<ApiEnvelope<TransferAllocationPreview>>('/transfer-requests/allocation-preview', input);
     return unwrap(response.data);
   },
 
-  async createUrgentRequest(input: { toBranchId: string; requiredAt?: string; relatedOrderId?: string; note?: string; items: TransferDemandItem[] }) {
-    const response = await httpClient.post<ApiEnvelope<{ id: string; requestCode: string; transfers: ApiTransfer[] }>>('/transfer-requests', input);
+  async createUrgentRequest(
+    input: { toBranchId: string; requiredAt?: string; relatedOrderId?: string; relatedOrderCode?: string; note?: string; items: TransferDemandItem[] },
+    idempotencyKey?: string
+  ) {
+    const response = await httpClient.post<ApiEnvelope<{ id: string; requestCode: string; transfers: ApiTransfer[] }>>(
+      '/transfer-requests',
+      input,
+      idempotencyConfig(idempotencyKey)
+    );
     return unwrap(response.data);
   },
 };

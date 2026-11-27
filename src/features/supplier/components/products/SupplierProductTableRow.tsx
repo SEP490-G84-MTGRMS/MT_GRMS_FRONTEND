@@ -41,20 +41,14 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
       className="so-list-row"
       style={{
         borderBottom: '1px solid #f1f5f9',
-        backgroundColor: item.isMasterProductActive === false ? '#f8fafc' : '#ffffff',
-        opacity: item.status === 'Inactive' || item.isMasterProductActive === false ? 0.7 : 1,
+        backgroundColor: '#ffffff',
+        opacity: item.status === 'Inactive' ? 0.7 : 1,
       }}
-      title={
-        item.isMasterProductActive === false
-          ? 'Sản phẩm master đang Ngừng KD — vẫn giữ liên kết NCC, không cho đặt hàng mới'
-          : undefined
-      }
       onMouseEnter={(e) => {
         e.currentTarget.style.backgroundColor = '#f1f5f9';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor =
-          item.isMasterProductActive === false ? '#f8fafc' : '#ffffff';
+        e.currentTarget.style.backgroundColor = '#ffffff';
       }}
     >
       {/* 1. STT */}
@@ -128,11 +122,6 @@ export const SupplierProductTableRow: FC<SupplierProductTableRowProps> = ({
         <div className="so-list-name" title={item.name}>
           {item.name}
         </div>
-        {item.isMasterProductActive === false ? (
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: '#b45309', marginTop: 2 }}>
-            Master: Ngừng KD
-          </div>
-        ) : null}
       </td>
 
       {/* 5. Mã NCC */}

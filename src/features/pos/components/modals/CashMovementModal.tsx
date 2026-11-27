@@ -24,8 +24,8 @@ export const CashMovementModal: FC<Props> = ({
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
   const [movementType, setMovementType] = useState<'IN' | 'OUT'>('OUT');
   const [category, setCategory] = useState<number>(MANUAL_CASH_MOVEMENT_CATEGORY.EXPENSE);
-  const [amount, setAmount] = useState<number>(100000);
-  const [reason, setReason] = useState<string>('Mua giấy in nhiệt k80');
+  const [amount, setAmount] = useState<number>(0);
+  const [reason, setReason] = useState<string>('');
   const [threshold, setThreshold] = useState<number>(200000);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export const CashMovementModal: FC<Props> = ({
     // Refresh danh sách phiếu
     posShiftApi.getShiftById(shift.id).then((refreshed) => {
       if (refreshed) setMovementsList(refreshed.cashMovements || []);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [isOpen, shift.id]);
 
   if (!isOpen) return null;
@@ -82,6 +82,8 @@ export const CashMovementModal: FC<Props> = ({
       });
 
       onMovementAdded();
+      setAmount(0);
+      setReason('');
       // Reload danh sách
       const refreshed = await posShiftApi.getShiftById(shift.id);
       if (refreshed) setMovementsList(refreshed.cashMovements || []);
@@ -323,10 +325,10 @@ export const CashMovementModal: FC<Props> = ({
                 {isLoading
                   ? 'Đang xử lý...'
                   : isExceedThreshold
-                  ? 'Gửi Yêu Cầu Phê Duyệt'
-                  : movementType === 'IN'
-                  ? 'Xác Nhận Nạp Két'
-                  : 'Xác Nhận Xuất Quỹ'}
+                    ? 'Gửi Yêu Cầu Phê Duyệt'
+                    : movementType === 'IN'
+                      ? 'Xác Nhận Nạp Két'
+                      : 'Xác Nhận Xuất Quỹ'}
               </button>
             </div>
           </form>
@@ -375,7 +377,12 @@ export const CashMovementModal: FC<Props> = ({
                           <span style={{ fontWeight: 600, fontSize: 13 }}>{m.reason}</span>
                         </div>
                         <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 4 }}>
-                          {new Date(m.occurredAtUtc).toLocaleTimeString('vi-VN')} • Tạo bởi: {m.createdByName || 'Thu ngân'}
+                          {(() => {
+                            const raw = (m.occurredAtUtc || '').trim();
+                            const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw);
+                            const dt = new Date(hasTz ? raw : `${raw}Z`);
+                            return Number.isNaN(dt.getTime()) ? raw : dt.toLocaleTimeString('vi-VN');
+                          })()} • Tạo bởi: {m.createdByName || 'Thu ngân'}
                           {isCashDraw && (
                             <span style={{ marginLeft: 8, color: m.isConfirmedByOwner ? '#10b981' : '#f59e0b' }}>
                               [{m.isConfirmedByOwner ? 'Chủ đã nhận tiền' : 'Chờ chủ xác nhận nhận tiền'}]

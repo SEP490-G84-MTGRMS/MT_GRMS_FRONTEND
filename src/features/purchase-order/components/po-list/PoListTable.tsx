@@ -59,7 +59,7 @@ const resolveDisplayStatus = (
 ): { label: string; bg: string; color: string; border: string } => {
   const grn = (order.activeGoodsReceiptStatus || '').toUpperCase();
   const byStatus: Record<string, { label: string; bg: string; color: string; border: string }> = {
-    PENDING_APPROVAL: { label: 'Chờ duyệt', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
+    PENDING_APPROVAL: { label: 'Chờ nhập', bg: '#fff7ed', color: '#c2410c', border: '#fed7aa' },
     APPROVED: { label: 'Đã duyệt', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
     DISPATCHED: { label: 'Đã gửi', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
     SENT: { label: 'Đã gửi', bg: '#fffbeb', color: '#b45309', border: '#fde68a' },
@@ -190,14 +190,26 @@ export const PoListTable: FC<PoListTableProps> = ({
           valA = a.supplierName.toLowerCase();
           valB = b.supplierName.toLowerCase();
           break;
-        case 'lastUpdated':
-          valA = a.lastUpdated;
-          valB = b.lastUpdated;
+        case 'lastUpdated': {
+          const toIso = (s?: string) => {
+            if (!s) return '';
+            const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(.*)$/);
+            return m ? `${m[3]}-${m[2]}-${m[1]}${m[4]}` : s;
+          };
+          valA = toIso(a.lastUpdated);
+          valB = toIso(b.lastUpdated);
           break;
-        case 'expectedDelivery':
-          valA = a.expectedDelivery;
-          valB = b.expectedDelivery;
+        }
+        case 'expectedDelivery': {
+          const toIso = (s?: string) => {
+            if (!s) return '';
+            const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(.*)$/);
+            return m ? `${m[3]}-${m[2]}-${m[1]}${m[4]}` : s;
+          };
+          valA = toIso(a.expectedDelivery);
+          valB = toIso(b.expectedDelivery);
           break;
+        }
         case 'itemCount':
           valA = a.itemCount;
           valB = b.itemCount;
@@ -628,7 +640,10 @@ export const PoListTable: FC<PoListTableProps> = ({
                           order.status === 'PENDING_APPROVAL' ||
                           order.status === 'DISPATCHED' ||
                           order.status === 'APPROVED') &&
-                          onEditOrder && (
+                          onEditOrder &&
+                          !isExchangePo(order) &&
+                          order.activeGoodsReceiptStatus !== 'DRAFT' &&
+                          order.activeGoodsReceiptStatus !== 'COMPLETED' && (
                           <button
                             type="button"
                             onClick={(e) => {

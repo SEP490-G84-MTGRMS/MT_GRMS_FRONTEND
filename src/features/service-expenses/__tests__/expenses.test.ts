@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as expenseApi from '../api/expenseApi';
+import { cashbookService } from '../../cashbook/services/cashbookService';
 import { financeHttpClient } from '../../../api/financeHttpClient';
 
 describe('FE-07 Service Expenses API & Workflow Tests', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(cashbookService, 'getCashAccounts').mockResolvedValue([{
+      id: 'cash-account', accountName: 'Quỹ chi nhánh', accountType: 'CASH', branchId: 'branch-1',
+      branchName: 'Chi nhánh 1', currentBalance: 25000000, initialBalance: 25000000, isActive: true, currency: 'VND',
+    }]);
   });
 
   describe('Happy Cases', () => {
@@ -115,7 +120,6 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
 
     it('TC-EXP-04: should disburse payment and return updated paid voucher', async () => {
       vi.spyOn(financeHttpClient, 'post')
-        .mockResolvedValueOnce({ data: { success: true } } as any) // approve
         .mockResolvedValueOnce({
           data: {
             success: true,
@@ -128,7 +132,7 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
               category: 'Tiền điện',
             },
           },
-        } as any); // disburse
+        } as any); // atomic disburse (auto-approves on BE)
 
       const paid = await expenseApi.payServiceExpense('01a1a64c-4421-7751-9c42-e5a5f4a00295', {
         paymentMethod: 'Cash',
@@ -250,13 +254,12 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
 
     it('TC-EXP-06: should throw error when disburse fails due to insufficient balance', async () => {
       vi.spyOn(financeHttpClient, 'post')
-        .mockResolvedValueOnce({ data: { success: true } } as any) // approve
         .mockResolvedValueOnce({
           data: {
             success: false,
             message: 'Tài khoản không đủ số dư để chi tiền',
           },
-        } as any); // disburse
+        } as any); // atomic disburse
 
       await expect(
         expenseApi.payServiceExpense('01a1a64c-4421-7751-9c42-e5a5f4a00295', {
@@ -406,6 +409,25 @@ describe('FE-07 Service Expenses API & Workflow Tests', () => {
       expect(result.items[1].dueDate).toBe('2026-11-25');
       expect(result.items[2].dueDate).toBe('');
       expect(result.items[2].expenseDate).toBe('2026-11-01');
+    });
+
+    it('TC-EXP-12: should not inject fallback note on approveServiceExpense and should send +07:00 date bounds', async () => {
+      const postSpy = vi.spyOn(financeHttpClient, 'post').mockResolvedValueOnce({
+        data: { success: true, data: { id: 'exp-1', voucherCode: 'EXP-1', status: 'Approved', amount: 100000 } },
+      } as any);
+      await expenseApi.approveServiceExpense('exp-1');
+      expect(postSpy).toHaveBeenCalledWith('/expenses/exp-1/approve', { expenseId: 'exp-1', note: undefined });
+
+      const getSpy = vi.spyOn(financeHttpClient, 'get').mockResolvedValueOnce({
+        data: { success: true, data: [], totalItems: 0 },
+      } as any);
+      await expenseApi.getServiceExpenses({ fromDate: '2026-11-01', toDate: '2026-11-30' });
+      expect(getSpy).toHaveBeenCalledWith('/expenses', {
+        params: expect.objectContaining({
+          fromDate: '2026-11-01T00:00:00+07:00',
+          toDate: '2026-11-30T23:59:59+07:00',
+        }),
+      });
     });
   });
 });

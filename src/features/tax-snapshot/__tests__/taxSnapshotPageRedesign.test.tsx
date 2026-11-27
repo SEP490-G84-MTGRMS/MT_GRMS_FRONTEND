@@ -73,6 +73,17 @@ beforeEach(() => {
 });
 
 describe('TaxSnapshotPage redesign navigation', () => {
+  it('shows an actionable failure and stops loading when the summary failed', () => {
+    const state = vi.mocked(useTaxSnapshots)();
+    vi.mocked(useTaxSnapshots).mockReturnValue({ ...state, summary: undefined, summaryError: new Error('Máy chủ đang bảo trì.') });
+    render(<TaxSnapshotPage />, { wrapper: MemoryRouter });
+    expect(screen.getByText('Máy chủ đang bảo trì.')).toBeInTheDocument();
+    expect(screen.queryByText(/Đang tổng hợp doanh thu/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Đang tổng hợp số liệu tờ khai/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Chốt kỳ sổ Quý/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(state.refetchSummary).toHaveBeenCalledOnce();
+  });
   it('keeps exactly two main tabs and moves secondary views into the action menu', () => {
     render(<TaxSnapshotPage />, { wrapper: MemoryRouter });
 

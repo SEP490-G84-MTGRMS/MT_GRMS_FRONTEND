@@ -5,7 +5,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { SUBSCRIPTION_PLANS, type SubscriptionPlanItem } from "../storeData";
+import { type SubscriptionPlanItem } from "../storeData";
 import { storeApi, type BackendPricingPlanResponse } from "../api/storeApi";
 
 interface SubscriptionPricingCardsProps {
@@ -14,6 +14,68 @@ interface SubscriptionPricingCardsProps {
   onBuyStaffAddon?: () => void;
   hasStaffAddon?: boolean;
   trialState?: 'ELIGIBLE' | 'ACTIVE' | 'EXPIRED' | 'PAID' | 'REVIEW_REQUIRED' | null;
+}
+
+function buildDynamicPlanFeatures(
+  backend: BackendPricingPlanResponse,
+  code: string,
+): string[] {
+  const isTrial = code === "TRIAL" || code.includes("TRIAL");
+  if (isTrial && !backend.quotas && !backend.features) {
+    return [
+      "1 tài khoản chủ cửa hàng quản trị",
+      "Mở khóa sẵn Quản lý nhân viên (Trải nghiệm)",
+      "Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu",
+      "Quy đổi Thùng sang Lon 1 chạm",
+      "Quét mã vạch bán hàng & kiểm kho",
+      "Giải pháp thanh toán Napas VietQR tự động",
+      "Không tự động gia hạn sau khi hết hạn",
+    ];
+  }
+
+  const items: string[] = [];
+  if (backend.description && backend.description.trim()) {
+    items.push(backend.description.trim());
+  }
+
+  const q = backend.quotas;
+  if (q) {
+    if (q.maxBranches === -1) {
+      items.push("Không giới hạn chi nhánh kinh doanh");
+    } else if (q.maxBranches === 1) {
+      items.push("1 chi nhánh kiêm kho hàng");
+    } else if (q.maxBranches > 1) {
+      items.push(`Tối đa ${q.maxBranches} chi nhánh kiêm kho hàng`);
+    }
+
+    if (q.maxEmployees === -1 || q.maxEmployees >= 100) {
+      items.push("Đã bao gồm Quản lý nhân viên (Không giới hạn tài khoản)");
+    } else if (q.maxEmployees === 1 && code === "STANDARD") {
+      items.push("1 tài khoản chủ cửa hàng (Tùy chọn mua thêm Quản lý nhân viên +30k/tháng)");
+    } else if (q.maxEmployees > 0) {
+      items.push(`Tối đa ${q.maxEmployees} tài khoản nhân sự`);
+    }
+
+    if (q.maxStorageGb > 0) {
+      items.push(`${q.maxStorageGb} GB dung lượng lưu trữ ảnh/tệp`);
+    }
+  }
+
+  const f = backend.features;
+  if (f) {
+    if (f.fefoExpiryAlert) items.push("Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu");
+    if (f.multiUnitConversion) items.push("Quy đổi đơn vị tính Thùng - Lốc - Lon 1 chạm");
+    if (f.barcodeScanning) items.push("Quét mã vạch bán hàng & kiểm kho");
+    if (f.vietQrDynamic) items.push("Thanh toán Napas VietQR động tự động");
+    if (f.debtZaloBook) items.push("Sổ nợ khách hàng & đối soát nhắc nợ Zalo");
+    if (f.financialReporting) items.push("Báo cáo doanh thu & lãi lỗ P&L chuyên sâu");
+  }
+
+  if (items.length === 0) {
+    items.push("Đầy đủ nghiệp vụ bán lẻ tạp hóa theo cấu hình gói");
+  }
+
+  return items;
 }
 
 export const mapBackendPlanToCardItem = (
@@ -25,82 +87,48 @@ export const mapBackendPlanToCardItem = (
   const isTrial = code === "TRIAL" || code.includes("TRIAL");
   const isPro = code === "PRO";
 
-  let name = "Gói Thường (Cửa Hàng Độc Lập)";
-  let monthlyPrice = 99000;
-  let yearlyPrice = 99000 * 12;
-  let tagline = "Dành cho tiệm tạp hóa, siêu thị mini độc lập.";
-  let branchNote = "1 chi nhánh kiêm kho hàng";
-  let feats: string[] = [];
+  const fallbackName = isTrial
+    ? "Gói Dùng Thử (Trải Nghiệm)"
+    : isPro
+      ? "Gói Pro (Chuỗi Cửa Hàng)"
+      : code === "STANDARD"
+        ? "Gói Thường (Cửa Hàng Độc Lập)"
+        : code;
+
+  const name = backend.name?.trim() || fallbackName;
+  const monthlyPrice = isTrial ? 0 : Math.max(0, Number(backend.monthlyPrice) || 0);
+  const yearlyPrice = isTrial
+    ? 0
+    : Math.max(0, Number(backend.yearlyPrice) || monthlyPrice * 12);
+  const tagline = backend.description || "";
+  const maxBranches = backend.quotas?.maxBranches;
+  const branchNote = isTrial
+    ? ""
+    : maxBranches === -1
+      ? "Không giới hạn chi nhánh"
+      : maxBranches && maxBranches > 1
+        ? `Mặc định sẵn ${maxBranches} chi nhánh`
+        : "1 chi nhánh kiêm kho hàng";
+
+  const feats = buildDynamicPlanFeatures(backend, code);
+
   let themeColor = "#10B981";
   let badgeBg = "#ECFDF5";
-  let buttonBg = "#E2E8F0";
-  let buttonText = "#0F172A";
+  let buttonBg = "var(--blue-primary)";
+  let buttonText = "#FFFFFF";
   let highlight = false;
 
   if (isTrial) {
-    name = "Gói Dùng Thử (Trải Nghiệm)";
-    monthlyPrice = 0;
-    yearlyPrice = 0;
-    tagline = "";
-    branchNote = "";
-    feats = [
-      "1 tài khoản chủ cửa hàng quản trị",
-      "Mở khóa sẵn Quản lý nhân viên (Trải nghiệm)",
-      "Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu",
-      "Quy đổi Thùng sang Lon 1 chạm",
-      "Quét mã vạch bán hàng & kiểm kho",
-      "Giải pháp thanh toán Napas VietQR tự động",
-      "Không tự động gia hạn sau khi hết hạn",
-    ];
     themeColor = "#64748B";
     badgeBg = "#F1F5F9";
     buttonBg = "#F1F5F9";
     buttonText = "#334155";
-    highlight = false;
   } else if (isPro) {
-    name = "Gói Pro (Chuỗi Cửa Hàng)";
-    monthlyPrice = Number(backend.monthlyPrice) || 249000;
-    yearlyPrice = Number(backend.yearlyPrice) || monthlyPrice * 12;
-    tagline =
-      backend.description ||
-      "Dành cho chuỗi siêu thị bán lẻ, chuyên môn hóa quy trình và điều chuyển kho chuỗi.";
-    branchNote = "Mặc định sẵn 2 chi nhánh (Mua thêm: +80k/chi nhánh/tháng)";
-    feats = [
-      "Mặc định sẵn 2 chi nhánh kiêm kho hàng",
-      "Đã bao gồm sẵn Quản lý nhân viên (Không giới hạn tài khoản)",
-      "Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu",
-      "Điều chuyển hàng hóa giữa các chi nhánh chuỗi",
-      "Báo cáo doanh thu & P&L đa chi nhánh",
-      "Giải pháp thanh toán Napas VietQR tự động",
-      "Hỗ trợ ưu tiên qua tổng đài 1900 6522",
-    ];
     themeColor = "var(--blue-primary)";
     badgeBg = "#EBF5FF";
     buttonBg = "var(--blue-primary)";
     buttonText = "#FFFFFF";
     highlight = true;
-  } else {
-    // STANDARD
-    name = "Gói Thường (Cửa Hàng Độc Lập)";
-    monthlyPrice = Number(backend.monthlyPrice) || 99000;
-    yearlyPrice = Number(backend.yearlyPrice) || monthlyPrice * 12;
-    tagline =
-      backend.description || "Dành cho tiệm tạp hóa, siêu thị mini độc lập.";
-    branchNote = "1 chi nhánh kiêm kho hàng";
-    feats = [
-      "1 tài khoản chủ cửa hàng quản trị",
-      "Tùy chọn: Mua thêm Quản lý & Phân quyền nhân viên (+30k/tháng)",
-      "Quản lý tồn kho theo Lô & Hạn sử dụng FEFO 3 mức màu",
-      "Quy đổi Thùng sang Lon 1 chạm",
-      "Quét mã vạch bán hàng & kiểm kho",
-      "Giải pháp thanh toán Napas VietQR tự động",
-      "Không hỗ trợ quản lý chuỗi đa chi nhánh",
-    ];
-    themeColor = "#10B981";
-    badgeBg = "#ECFDF5";
-    buttonBg = "#E2E8F0";
-    buttonText = "#0F172A";
-    highlight = false;
   }
 
   return {
@@ -128,8 +156,7 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
   hasStaffAddon,
   trialState,
 }) => {
-  const [plans, setPlans] =
-    useState<SubscriptionPlanItem[]>(SUBSCRIPTION_PLANS);
+  const [plans, setPlans] = useState<SubscriptionPlanItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -139,62 +166,35 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
     try {
       const res = await storeApi.getPricingPlans();
       if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        // Lấy 3 gói cước chính thức: TRIAL (trái) -> STANDARD (giữa) -> PRO (phải)
-        const officialData = res.data.filter((p) => {
-          const c = (p.code || p.id || "").toUpperCase();
-          return c === "TRIAL" || c === "STANDARD" || c === "PRO";
-        });
+        const activeData = res.data.filter(
+          (p) => (p.status || "ACTIVE").toUpperCase() === "ACTIVE",
+        );
 
-        if (officialData.length > 0) {
-          // Sắp xếp thứ tự: TRIAL (1) -> STANDARD (2) -> PRO (3)
-          const orderMap: Record<string, number> = {
-            TRIAL: 1,
-            STANDARD: 2,
-            PRO: 3,
-          };
-          officialData.sort((a, b) => {
+        if (activeData.length > 0) {
+          activeData.sort((a, b) => {
             const codeA = (a.code || a.id || "").toUpperCase();
             const codeB = (b.code || b.id || "").toUpperCase();
-            return (orderMap[codeA] || 99) - (orderMap[codeB] || 99);
+            if (codeA === "TRIAL" && codeB !== "TRIAL") return -1;
+            if (codeB === "TRIAL" && codeA !== "TRIAL") return 1;
+            return (Number(a.monthlyPrice) || 0) - (Number(b.monthlyPrice) || 0);
           });
 
-          // Nếu API chưa trả về gói TRIAL thì bổ sung gói TRIAL vào đầu danh sách
-          const hasTrial = officialData.some(
-            (p) => (p.code || p.id || "").toUpperCase() === "TRIAL",
-          );
-          let allPlansData = officialData;
-          if (!hasTrial) {
-            allPlansData = [
-              {
-                id: "plan_trial",
-                code: "TRIAL",
-                name: "Gói Dùng Thử (Trải Nghiệm)",
-                description:
-                  "Trải nghiệm toàn diện các tính năng cao cấp của MT-GRMS hoàn toàn miễn phí trong 3 ngày.",
-                monthlyPrice: 0,
-                yearlyPrice: 0,
-                status: "ACTIVE",
-              },
-              ...officialData,
-            ];
-          }
-
-          const mappedPlans = allPlansData.map((backendPlan, idx) =>
+          const mappedPlans = activeData.map((backendPlan, idx) =>
             mapBackendPlanToCardItem(backendPlan, currentPlanName, idx),
           );
           setPlans(mappedPlans);
         } else {
-          setPlans(SUBSCRIPTION_PLANS);
+          setPlans([]);
+          setLoadError("Hiện chưa có gói dịch vụ nào khả dụng từ hệ thống.");
         }
       } else {
-        setPlans(SUBSCRIPTION_PLANS);
+        setPlans([]);
+        setLoadError("Không thể tải danh sách gói dịch vụ từ máy chủ.");
       }
     } catch (err: unknown) {
-      console.warn(
-        "Không thể kết nối API gói cước, sử dụng danh sách gói chuẩn cục bộ:",
-        err,
-      );
-      setPlans(SUBSCRIPTION_PLANS);
+      console.warn("Không thể kết nối API gói cước:", err);
+      setPlans([]);
+      setLoadError("Không thể kết nối máy chủ để tải bảng giá gói dịch vụ. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
@@ -347,27 +347,57 @@ export const SubscriptionPricingCards: FC<SubscriptionPricingCardsProps> = ({
     );
   }
 
+  const normalizedCurrentPlan = (currentPlanName || "").trim().toLowerCase();
+  const isUnselectedPlan =
+    trialState === "ELIGIBLE" ||
+    !normalizedCurrentPlan ||
+    normalizedCurrentPlan.includes("chưa kích hoạt") ||
+    normalizedCurrentPlan.includes("chưa chọn");
+
+  const exactMatchedPlan = !isUnselectedPlan
+    ? plans.find(
+        (p) =>
+          p.code.toLowerCase() === normalizedCurrentPlan ||
+          p.name.trim().toLowerCase() === normalizedCurrentPlan,
+      )
+    : undefined;
+
+  const matchedCurrentPlan = !isUnselectedPlan
+    ? exactMatchedPlan ??
+      plans.find(
+        (p) =>
+          p.name.toLowerCase().includes(normalizedCurrentPlan) ||
+          normalizedCurrentPlan.includes(p.name.toLowerCase()) ||
+          (p.code.toUpperCase() === "PRO" &&
+            (/\bpro\b/i.test(normalizedCurrentPlan) ||
+              normalizedCurrentPlan.includes("chuyên nghiệp"))) ||
+          (p.code.toUpperCase() === "STANDARD" &&
+            (normalizedCurrentPlan.includes("standard") ||
+              normalizedCurrentPlan.includes("thường") ||
+              normalizedCurrentPlan.includes("cơ bản"))) ||
+          (p.code.toUpperCase() === "TRIAL" &&
+            (normalizedCurrentPlan.includes("trial") ||
+              normalizedCurrentPlan.includes("dùng thử"))),
+      )
+    : undefined;
+
+  const isCurrentPro =
+    !isUnselectedPlan &&
+    (matchedCurrentPlan
+      ? matchedCurrentPlan.code.toUpperCase() === "PRO"
+      : /\bpro\b/i.test(normalizedCurrentPlan) ||
+        normalizedCurrentPlan.includes("chuyên nghiệp"));
+
   return (
     <div className="pricing-cards-grid">
       {plans.map((plan) => {
-        const normalizedCurrentPlan = (currentPlanName || "").trim().toLowerCase();
-        const isUnselectedPlan =
-          trialState === "ELIGIBLE" ||
-          !normalizedCurrentPlan ||
-          normalizedCurrentPlan.includes("chưa kích hoạt") ||
-          normalizedCurrentPlan.includes("chưa chọn");
-        const isCurrentPro =
-          !isUnselectedPlan &&
-          (normalizedCurrentPlan.includes("pro") ||
-            normalizedCurrentPlan.includes("chuyên nghiệp"));
-        const isCurrentPlan = !isUnselectedPlan
-          ? plan.name.toLowerCase().includes(normalizedCurrentPlan) ||
-            normalizedCurrentPlan.includes(plan.name.toLowerCase()) ||
-            normalizedCurrentPlan.toUpperCase().includes(plan.code.toUpperCase())
-          : false;
+        const isCurrentPlan = Boolean(
+          matchedCurrentPlan && matchedCurrentPlan.id === plan.id,
+        );
         const isActiveCurrentPlan = isCurrentPlan && trialState !== "EXPIRED";
         const isExpiredCurrentPlan = isCurrentPlan && trialState === "EXPIRED";
-        const isDowngradeBlocked = isCurrentPro && plan.code.toUpperCase() !== "PRO";
+        const isDowngradeBlocked =
+          isCurrentPro && plan.code.toUpperCase() === "STANDARD";
         const isTrialDisabled =
           isCurrentPro || Boolean(trialState && trialState !== "ELIGIBLE");
 

@@ -52,10 +52,11 @@
 .owner-dash-secondary-link { margin-top: 10px; }
 .owner-dash-list-title { display: flex; align-items: center; gap: 7px; margin: 20px 0 8px; font-size: 12px; font-weight: 800; }
 .owner-dash-empty { display: grid; place-items: center; min-height: 130px; color: #718096; font-size: 13px; text-align: center; }
-.owner-dash-issue-list > div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #eef2f5; font-size: 12px; }
+.owner-dash-issue-list > div { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 9px 0; border-bottom: 1px solid #eef2f5; font-size: 12px; min-width: 0; }
 .owner-dash-issue-list > div:last-child { border: 0; }
+.owner-dash-issue-list a { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 .owner-dash-issue-list small { display: block; margin-top: 3px; color: #718096; }
-.owner-dash-issue-list b { color: #0f766e; text-align: right; font-size: 11px; }
+.owner-dash-issue-list b { color: #0f766e; text-align: right; font-size: 11px; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
 .owner-dash-people { display: flex; flex-direction: column; align-items: center; padding: 14px 0 6px; text-align: center; }
 .owner-dash-people-icon { width: 48px; height: 48px; border-radius: 16px; }
 .owner-dash-people strong { margin-top: 12px; font-family: 'JetBrains Mono', monospace; font-size: 30px; }

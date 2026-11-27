@@ -64,7 +64,7 @@ export const PoDetailDrawer: FC<PoDetailDrawerProps> = ({
               border: '1px solid #fed7aa',
             }}
           >
-            🟠 Chờ duyệt
+            🟠 Chờ nhập
           </span>
         );
       case 'APPROVED':

@@ -19,8 +19,6 @@ import {
   ChevronRight,
   Wallet,
   FileText,
-  CreditCard,
-  Boxes,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { authService } from "../../features/auth/authService";
@@ -129,7 +127,7 @@ const NAV_GROUPS: NavGroup[] = [
         ],
       },
       {
-        title: "Kho & Hạn dùng (FEFO)",
+        title: "Kho & Hạn dùng",
         items: [
           {
             label: "Tồn kho cửa hàng",
@@ -191,15 +189,15 @@ const NAV_GROUPS: NavGroup[] = [
             to: "/store-owner/purchase-orders/dispatch-hub",
           },
           {
-            label: "Danh sách đơn mua hàng (PO)",
+            label: "Danh sách đơn mua hàng",
             to: "/store-owner/purchase-orders/list",
           },
           {
-            label: "Phiếu nhập kho (GRN) & Lịch nhận",
+            label: "Phiếu nhập kho & Lịch nhận",
             to: "/store-owner/goods-receipts",
           },
           {
-            label: "Trả hàng nhà cung cấp (RTV)",
+            label: "Trả hàng nhà cung cấp",
             to: "/store-owner/supplier-returns",
           },
         ],
@@ -1188,6 +1186,7 @@ export const AppTopNav: FC = () => {
         aria-label="Điều hướng chính"
       >
         <div
+          className="topnav-inner"
           style={{
             display: "flex",
             alignItems: "center",
@@ -1214,6 +1213,7 @@ export const AppTopNav: FC = () => {
             }}
           >
             <img
+              className="topnav-brand-logo"
               src="/logo/thviet_logo_white.png"
               alt="THViet - Quản Lý Tạp Hóa Việt"
               style={{ height: 38, width: "auto", objectFit: "contain" }}
@@ -1222,13 +1222,15 @@ export const AppTopNav: FC = () => {
 
           {/* Menus List */}
           <div
+            className="topnav-menus-desktop"
             style={{
               display: "flex",
               alignItems: "stretch",
               height: 50,
               gap: 2,
               overflowX: "auto",
-              scrollbarWidth: "none",
+              scrollbarWidth: "thin",
+              minWidth: 0,
               flex: 1,
             }}
           >
@@ -1252,7 +1254,7 @@ export const AppTopNav: FC = () => {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 7,
-                      padding: "0 14px",
+                      padding: "0 clamp(6px, calc((100vw - 1240px) / 50), 14px)",
                       height: "100%",
                       textDecoration: "none",
                       fontSize: 13.5,
@@ -1320,7 +1322,7 @@ export const AppTopNav: FC = () => {
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 7,
-                      padding: "0 14px",
+                      padding: "0 clamp(6px, calc((100vw - 1240px) / 50), 14px)",
                       height: "100%",
                       background: "none",
                       border: "none",
@@ -1389,6 +1391,7 @@ export const AppTopNav: FC = () => {
 
           {/* Right actions: Chọn chi nhánh + Hỗ trợ + Góp ý + Divider + Thông báo + Cài đặt + Profile */}
           <div
+            className="topnav-right-actions"
             style={{
               display: "flex",
               alignItems: "center",
@@ -1397,12 +1400,17 @@ export const AppTopNav: FC = () => {
               flexShrink: 0,
             }}
           >
-            {/* 0. Dropdown chọn chi nhánh */}
-            <BranchSelectorDropdown />
+            {/* 0. Dropdown chọn chi nhánh (chỉ Store Owner) */}
+            {!isEmployee && (
+              <div className="topnav-branch-desktop">
+                <BranchSelectorDropdown />
+              </div>
+            )}
 
             {/* 1. Hỗ trợ */}
             <button
               type="button"
+              className="topnav-support-btn"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -1437,6 +1445,7 @@ export const AppTopNav: FC = () => {
 
             {/* 2. Divider */}
             <div
+              className="topnav-divider"
               style={{
                 width: 1,
                 height: 18,
@@ -1452,6 +1461,7 @@ export const AppTopNav: FC = () => {
 
             {/* 5. Settings Gear icon with Interactive Dropdown */}
             <div
+              className="topnav-settings-wrap"
               style={{ position: "relative" }}
               ref={settingsMenuRef}
               onMouseEnter={handleSettingsEnter}
@@ -1547,81 +1557,7 @@ export const AppTopNav: FC = () => {
                     </div>
 
                     <div style={{ padding: "8px 0" }}>
-                      {/* Mục 1: Cấu hình VietQR & SePay */}
-                      <Link
-                        to="/store-owner/subscriptions?tab=finance-accounts"
-                        onClick={() => setSettingsMenuOpen(false)}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 12,
-                          padding: "10px 16px",
-                          textDecoration: "none",
-                          color: "inherit",
-                          transition: "background-color 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#ecfdf5";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 8,
-                            backgroundColor: "#ccfbf1",
-                            color: "#0f766e",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            marginTop: 1,
-                          }}
-                        >
-                          <CreditCard size={18} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 13.5,
-                                fontWeight: 700,
-                                color: "#065f46",
-                              }}
-                            >
-                              Tài khoản & Két quỹ
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "#64748b",
-                              marginTop: 2,
-                            }}
-                          >
-                            Ngân hàng, SePay và két theo chi nhánh
-                          </div>
-                        </div>
-                      </Link>
-
-                      <div
-                        style={{
-                          height: 1,
-                          backgroundColor: "#f1f5f9",
-                          margin: "6px 16px",
-                        }}
-                      />
-
-                      {/* Mục 2: Hạn mức & Duyệt chi két POS */}
+                      {/* Mục 1: Hạn mức & Duyệt chi két POS */}
                       <Link
                         to="/store-owner/pos-cash-control"
                         onClick={() => setSettingsMenuOpen(false)}
@@ -1675,66 +1611,6 @@ export const AppTopNav: FC = () => {
                             }}
                           >
                             Hạn mức chi quầy &amp; duyệt phiếu két thu ngân
-                          </div>
-                        </div>
-                      </Link>
-
-                      <div style={{ height: 1, backgroundColor: "#f1f5f9", margin: "6px 16px" }} />
-
-                      {/* Mục 3: Gói dịch vụ MT-GRMS */}
-                      <Link
-                        to="/store-owner/subscriptions"
-                        onClick={() => setSettingsMenuOpen(false)}
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 12,
-                          padding: "10px 16px",
-                          textDecoration: "none",
-                          color: "inherit",
-                          transition: "background-color 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#eff6ff";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 8,
-                            backgroundColor: "#dbeafe",
-                            color: "#1d4ed8",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            marginTop: 1,
-                          }}
-                        >
-                          <Boxes size={18} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div
-                            style={{
-                              fontSize: 13.5,
-                              fontWeight: 700,
-                              color: "#1e3a8a",
-                            }}
-                          >
-                            Gói dịch vụ MT-GRMS
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "#64748b",
-                              marginTop: 2,
-                            }}
-                          >
-                            Gói dịch vụ & Gia hạn phần mềm
                           </div>
                         </div>
                       </Link>
@@ -2055,6 +1931,8 @@ export const AppTopNav: FC = () => {
             }}
             className="topnav-hamburger"
             title="Menu"
+            aria-label="Mở menu điều hướng"
+            aria-expanded={mobileOpen}
           >
             <MenuIcon size={16} />
           </button>
@@ -2112,6 +1990,9 @@ export const AppTopNav: FC = () => {
                 }}
               >
                 Quản lý Chuỗi Tạp Hóa
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <BranchSelectorDropdown />
               </div>
             </div>
             {visibleNavGroups.map((group) => (

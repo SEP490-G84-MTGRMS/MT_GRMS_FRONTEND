@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { mockSnapshotsList } from '../api/mockTaxData';
+import { mockSnapshotsList } from './mockTaxData';
 import { taxSnapshotApi } from '../api/taxSnapshotApi';
 import { TaxSnapshotDetailDrawer } from '../components/TaxSnapshotDetailDrawer';
 

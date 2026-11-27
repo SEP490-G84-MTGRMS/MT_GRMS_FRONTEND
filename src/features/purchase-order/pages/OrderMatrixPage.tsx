@@ -30,6 +30,7 @@ import {
 import { AdminToast, type ToastState } from '../../admin/components';
 import { purchaseOrderApi } from '../api/purchaseOrderApi';
 import { storeProductApi } from '../../product/api/storeProductApi';
+import { employeeApi } from '../../employee/api/employeeApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
 import { productRowKey } from '../lib/matrixRowKey';
 import '../purchase-order.css';
@@ -341,10 +342,11 @@ function buildEmptyCellMap(
 }
 
 export interface OrderMatrixPageProps {
+  /** @deprecated Bỏ — role lấy từ user đăng nhập. Giữ prop để không gãy import cũ. */
   forcedRole?: 'STORE_OWNER' | 'STAFF' | 'EMPLOYEE';
 }
 
-export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
+export const OrderMatrixPage: FC<OrderMatrixPageProps> = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -452,24 +454,19 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
   // State: Toast
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  // Role State: Xác định quyền thao tác Store Owner vs Staff
-  // Ưu tiên: 1. forcedRole từ Route, 2. param ?role=, 3. userRole trong AuthStore
-  const roleParam = searchParams.get('role');
+  // Role theo user đăng nhập (không hardcode / forcedRole / ?role=)
   const userRole = useAuthStore((s) => s.user?.role);
-  const isStoreOwner = useMemo(() => {
-    if (forcedRole === 'STORE_OWNER') return true;
-    if (forcedRole === 'STAFF' || forcedRole === 'EMPLOYEE') return false;
-    if (roleParam === 'employee' || roleParam === 'staff') return false;
-    if (roleParam === 'owner' || roleParam === 'store_owner') return true;
-    return userRole === 'STORE_OWNER' || userRole === 'ADMIN';
-  }, [forcedRole, roleParam, userRole]);
+  const isStoreOwner = useMemo(
+    () => userRole === 'STORE_OWNER' || userRole === 'ADMIN',
+    [userRole]
+  );
 
   const showToast = (message: string, type: ToastState['type'] = 'success') => {
     setToast({ id: Date.now().toString(), message, type });
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Nạp danh sách chi nhánh thật (không dùng mock DC1 / BR-01)
+  // Nạp chi nhánh: Store Owner = toàn bộ; Staff = chỉ CN đang quản lý
   useEffect(() => {
     let isMounted = true;
     const norm = (id: string) => id.trim().toLowerCase();
@@ -477,45 +474,66 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       try {
         const summaries = await storeProductApi.getStoreSummaries();
         if (!isMounted) return;
-        const realBranches = (summaries || [])
+        let realBranches = (summaries || [])
           .filter((b) => GUID_RE.test(b.id))
           .map((b) => ({ id: b.id, code: b.code, name: b.name }));
-        setBranches(realBranches);
 
         const authUser = useAuthStore.getState().user;
-        const employeeBranchId = !isStoreOwner ? (authUser?.branchId || '') : '';
+        let managedIds: string[] = [];
 
-        // Ưu tiên branch từ URL (màn /branches → Đặt hàng?branchId=...) — không ghi đè sang CN khác
+        if (!isStoreOwner) {
+          try {
+            const profile = await employeeApi.getMyProfile();
+            managedIds = (profile?.workingBranchIds || []).filter((id) => GUID_RE.test(id));
+          } catch {
+            managedIds = [];
+          }
+          if (managedIds.length === 0 && authUser?.branchId && GUID_RE.test(authUser.branchId)) {
+            managedIds = [authUser.branchId];
+          }
+          const allowed = new Set(managedIds.map(norm));
+          realBranches = realBranches.filter((b) => allowed.has(norm(b.id)));
+          // Profile có CN nhưng summaries thiếu → vẫn cho nhập trên CN đó
+          for (const id of managedIds) {
+            if (!realBranches.some((b) => norm(b.id) === norm(id))) {
+              realBranches.push({ id, code: 'CN', name: 'Chi nhánh của tôi' });
+            }
+          }
+        }
+
+        if (!isMounted) return;
+        setBranches(realBranches);
+
+        // URL branch chỉ dùng nếu thuộc danh sách được phép
         const urlBranchRaw =
-          employeeBranchId ||
           searchParams.get('branchId') ||
           searchParams.get('branch') ||
           searchParams.get('storeId') ||
           '';
         const urlBranch = GUID_RE.test(urlBranchRaw) ? urlBranchRaw : '';
+        const urlAllowed =
+          urlBranch && realBranches.some((b) => norm(b.id) === norm(urlBranch))
+            ? realBranches.find((b) => norm(b.id) === norm(urlBranch))!.id
+            : '';
 
-        if (urlBranch) {
-          const matched = realBranches.find((b) => norm(b.id) === norm(urlBranch));
-          const resolvedId = matched?.id || urlBranch;
-          setSelectedBranchId(resolvedId);
-          // Nếu CN từ URL chưa có trong summaries (lệch API), vẫn giữ id để matrix load đúng branch
-          if (!matched) {
-            setBranches((prev) =>
-              prev.some((b) => norm(b.id) === norm(resolvedId))
-                ? prev
-                : [{ id: resolvedId, code: 'CN', name: 'Chi nhánh đã chọn' }, ...prev]
-            );
-          }
+        if (urlAllowed) {
+          setSelectedBranchId(urlAllowed);
           return;
         }
 
-        // Không có branch trên URL → chọn mặc định 1 lần (không cướp selection đang chọn)
+        // Staff 1 CN → khóa luôn CN đó; Owner → mặc định CN có SP / đầu list
         setSelectedBranchId((prev) => {
           if (prev && realBranches.some((b) => norm(b.id) === norm(prev))) {
             return prev;
           }
+          if (!isStoreOwner && realBranches.length === 1) {
+            return realBranches[0].id;
+          }
           const withProducts = (summaries || []).find(
-            (b) => GUID_RE.test(b.id) && (b.totalProducts || 0) > 0
+            (b) =>
+              GUID_RE.test(b.id) &&
+              (b.totalProducts || 0) > 0 &&
+              realBranches.some((rb) => norm(rb.id) === norm(b.id))
           );
           return withProducts?.id || realBranches[0]?.id || prev || '';
         });
@@ -741,13 +759,19 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
       // 2. isOwnerAdjusted = false.
       // 3. finalQuantity = employeeQuantity (mới nhất).
       // 4. Không được xóa employeeQuantity.
+      // 5. modifiedBy giữ 'store_owner' + modifiedAt để saveDraft luôn sync việc gỡ chốt
+      //    (kể cả khi employeeQty = 0 — nếu đổi thành 'employee' ô sẽ bị bỏ khỏi payload).
+      const empQty = Number(currentCell.employeeQty);
+      const restoredQty = Number.isFinite(empQty) && empQty > 0 ? empQty : 0;
       const updatedCell: MatrixCellData = {
         ...currentCell,
+        employeeQty: restoredQty,
         storeQty: null,
         isOwnerAdjusted: false,
         isOwnerOverridden: false,
-        finalQty: currentCell.employeeQty,
-        modifiedBy: 'employee',
+        finalQty: restoredQty,
+        modifiedBy: 'store_owner',
+        modifiedAt: new Date().toISOString(),
       };
 
       prodMap[dateKey] = updatedCell;
@@ -762,7 +786,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     let count = 0;
     Object.values(cellMap).forEach((prodMap) => {
       Object.values(prodMap).forEach((cell) => {
-        if (cell.isOwnerAdjusted || cell.isOwnerOverridden || (cell.storeQty !== null && cell.storeQty !== undefined)) {
+        if (cell.storeQty !== null && cell.storeQty !== undefined) {
           count++;
         }
       });
@@ -1469,19 +1493,6 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
     }
   };
 
-  const handleSwitchScreen = () => {
-    const params = new URLSearchParams(searchParams);
-    if (selectedBranchId) params.set('branchId', selectedBranchId);
-    if (selectedSupplierId && selectedSupplierId !== 'ALL') params.set('supplier', selectedSupplierId);
-
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    if (isStoreOwner) {
-      navigate(`/store-owner/purchase-orders/employee-matrix${qs}`);
-    } else {
-      navigate(`/store-owner/purchase-orders/create-matrix${qs}`);
-    }
-  };
-
   return (
     <div className="po-matrix-container">
       {/* Toast Notification */}
@@ -1508,19 +1519,13 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
             ? '👑 Tạo Đơn Mua Hàng'
             : '👤 Đặt Hàng Theo Ma Trận (Nhân Viên Đề Xuất)'
         }
-        onSwitchScreen={handleSwitchScreen}
-        switchScreenLabel={
-          isStoreOwner
-            ? '👉 Sang Màn Nhân Viên Đặt Hàng'
-            : '👉 Sang Màn Chủ Cửa Hàng Duyệt'
-        }
       />
 
       {/* 2. Unified Filter + Action Bar (2 rows) */}
       <OrderMatrixFilterBar
         branches={branches}
         selectedBranchId={selectedBranchId}
-        hideBranchSelect={!isStoreOwner}
+        hideBranchSelect={!isStoreOwner && branches.length <= 1}
         fixedBranchLabel={branches.find((b) => b.id === selectedBranchId)?.name}
         onSelectBranch={(id) => {
           setSelectedBranchId(id);
@@ -1531,7 +1536,7 @@ export const OrderMatrixPage: FC<OrderMatrixPageProps> = ({ forcedRole }) => {
           setCellMap({});
           setIsDirty(false);
           // Đồng bộ URL để quay lại / reload vẫn đúng CN (và khớp luồng từ màn branches)
-          if (isStoreOwner && GUID_RE.test(id)) {
+          if (GUID_RE.test(id)) {
             const next = new URLSearchParams(searchParams);
             next.set('branchId', id);
             navigate(

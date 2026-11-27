@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, BarChart3, AlertTriangle, Clock } from 'lucide-react';
 import { posShiftApi } from '../../api/posShiftApi';
 import type { ShiftDetailResponse, ShiftCashMovementDto } from '../../types/posShift.types';
+import { ConfirmDialog } from '../../../../components/common';
 
 interface Props {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 const DENOMINATIONS = [500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000];
+const DISCREPANCY_REASON_THRESHOLD = 1000;
 
 export const CloseShiftModal: FC<Props> = ({
   isOpen,
@@ -51,6 +53,9 @@ export const CloseShiftModal: FC<Props> = ({
   const [plannedEndTime, setPlannedEndTime] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [pendingCancelMovementId, setPendingCancelMovementId] = useState<string | null>(null);
 
   // Danh sách phiếu và trạng thái chờ duyệt
   const [movements, setMovements] = useState<ShiftCashMovementDto[]>(shift.cashMovements || []);
@@ -252,6 +257,8 @@ export const CloseShiftModal: FC<Props> = ({
   if (!isOpen) return null;
 
   const discrepancy = actualCashCounted - expectedCash;
+  const requiresDiscrepancyReason = Math.abs(discrepancy) >= DISCREPANCY_REASON_THRESHOLD;
+  const isMinorDiscrepancy = discrepancy !== 0 && !requiresDiscrepancyReason;
 
   // Kiểm tra phiếu pending
   const pendingMovements = movements.filter((m) => m.status === 'PendingApproval' || m.status === 2);
@@ -275,13 +282,21 @@ export const CloseShiftModal: FC<Props> = ({
     }));
   };
 
-  const handleCancelPendingMovement = async (id: string) => {
-    if (!window.confirm('Hủy yêu cầu chi này để mở khóa chốt ca?')) return;
+  const handleCancelPendingMovement = (id: string) => {
+    setPendingCancelMovementId(id);
+  };
+
+  const confirmCancelPendingMovement = async () => {
+    if (!pendingCancelMovementId) return;
+    const id = pendingCancelMovementId;
+    setPendingCancelMovementId(null);
+    setErrorMsg(null);
     try {
       await posShiftApi.cancelCashMovement(id);
       await refreshMovements();
+      setInfoMsg('Đã hủy yêu cầu chi đang chờ duyệt.');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể hủy yêu cầu chi');
+      setErrorMsg(err.response?.data?.message || 'Không thể hủy yêu cầu chi');
     }
   };
 
@@ -295,10 +310,11 @@ export const CloseShiftModal: FC<Props> = ({
     }
     setIsLoading(true);
     setErrorMsg(null);
+    setInfoMsg(null);
     try {
       const updated = await posShiftApi.startClosingShift(shift.id, { notes: notes.trim() || undefined });
       setCurrentShiftData(updated);
-      alert('Đã chuyển sang trạng thái kiểm đếm chốt ca (Closing). Toàn bộ quầy POS thuộc chi nhánh đã tạm thời khóa bán hàng để bảo toàn tiền két.');
+      setInfoMsg('Đã chuyển sang trạng thái kiểm đếm chốt ca (Closing). Toàn bộ quầy POS thuộc chi nhánh đã tạm thời khóa bán hàng để bảo toàn tiền két.');
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi bắt đầu chốt ca');
     } finally {
@@ -306,18 +322,23 @@ export const CloseShiftModal: FC<Props> = ({
     }
   };
 
-  const handleCancelClosing = async () => {
+  const handleCancelClosing = () => {
     if (notes.trim().length > 500) {
       setErrorMsg('Ghi chú tối đa 500 ký tự.');
       return;
     }
-    if (!window.confirm('Bạn có chắc muốn hủy chốt ca và mở lại quầy cho các thu ngân tiếp tục bán hàng?')) return;
+    setShowCancelConfirm(true);
+  };
+
+  const confirmCancelClosing = async () => {
+    setShowCancelConfirm(false);
     setIsLoading(true);
     setErrorMsg(null);
+    setInfoMsg(null);
     try {
       const updated = await posShiftApi.cancelClosingShift(shift.id, { reason: notes.trim() || 'Thu ngân mở lại quầy' });
       setCurrentShiftData(updated);
-      alert('Đã hủy chốt ca. Quầy POS của chi nhánh đã được mở lại để tiếp tục bán hàng.');
+      setInfoMsg('Đã hủy chốt ca. Quầy POS của chi nhánh đã được mở lại để tiếp tục bán hàng.');
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi hủy chốt ca');
     } finally {
@@ -358,8 +379,8 @@ export const CloseShiftModal: FC<Props> = ({
       return;
     }
 
-    if (discrepancy !== 0 && !discrepancyReason.trim()) {
-      setErrorMsg('Vui lòng nhập lý do chênh lệch tiền trong két.');
+    if (requiresDiscrepancyReason && !discrepancyReason.trim()) {
+      setErrorMsg('Vui lòng nhập lý do chênh lệch tiền trong két (từ 1.000đ trở lên).');
       return;
     }
 
@@ -460,6 +481,11 @@ export const CloseShiftModal: FC<Props> = ({
             {errorMsg && (
               <div style={{ padding: '8px 12px', borderRadius: 6, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 13, border: '1px solid #fecaca' }}>
                 {errorMsg}
+              </div>
+            )}
+            {infoMsg && (
+              <div style={{ padding: '8px 12px', borderRadius: 6, backgroundColor: '#f0fdfa', color: '#0f766e', fontSize: 13, border: '1px solid #99f6e4' }}>
+                {infoMsg}
               </div>
             )}
 
@@ -687,7 +713,7 @@ export const CloseShiftModal: FC<Props> = ({
                           type="number"
                           min={0}
                           max={Number.MAX_SAFE_INTEGER}
-                          step={1000}
+                          step={1}
                           value={quickCashAmount === 0 ? '' : quickCashAmount}
                           onChange={(e) => setQuickCashAmount(Math.max(0, parseInt(e.target.value, 10) || 0))}
                           placeholder="Nhập tổng số tiền thực đếm..."
@@ -842,21 +868,27 @@ export const CloseShiftModal: FC<Props> = ({
                         padding: '3px 8px',
                         borderRadius: 6,
                         fontSize: 12.5,
-                        backgroundColor: discrepancy === 0 ? '#ecfdf5' : discrepancy > 0 ? '#eff6ff' : '#fef2f2',
-                        color: discrepancy === 0 ? '#059669' : discrepancy > 0 ? '#2563eb' : '#dc2626',
-                        border: discrepancy === 0 ? '1px solid #a7f3d0' : discrepancy > 0 ? '1px solid #bfdbfe' : '1px solid #fecaca',
+                        backgroundColor: !requiresDiscrepancyReason ? '#ecfdf5' : discrepancy > 0 ? '#eff6ff' : '#fef2f2',
+                        color: !requiresDiscrepancyReason ? '#059669' : discrepancy > 0 ? '#2563eb' : '#dc2626',
+                        border: !requiresDiscrepancyReason ? '1px solid #a7f3d0' : discrepancy > 0 ? '1px solid #bfdbfe' : '1px solid #fecaca',
                       }}
                     >
                       {discrepancy > 0 ? `+${discrepancy.toLocaleString('vi-VN')}` : discrepancy.toLocaleString('vi-VN')} đ
-                      {discrepancy === 0 ? ' (Khớp 100%)' : discrepancy > 0 ? ' (Thừa)' : ' (Thiếu)'}
+                      {discrepancy === 0
+                        ? ' (Khớp 100%)'
+                        : isMinorDiscrepancy
+                          ? ' (Lệch nhỏ < 1.000đ)'
+                          : discrepancy > 0
+                            ? ' (Thừa)'
+                            : ' (Thiếu)'}
                     </span>
                   </div>
 
-                  {discrepancy !== 0 && (
+                  {requiresDiscrepancyReason && (
                     <div style={{ marginTop: 4 }}>
                       <label className="modal-label" style={{ fontSize: 12, color: '#dc2626' }}>
                         Lý do chênh lệch (*)
-                        {!discrepancyReason.trim() && <span style={{ fontSize: 11, fontWeight: 500, color: '#dc2626' }}> — Bắt buộc nhập giải trình</span>}
+                        {!discrepancyReason.trim() && <span style={{ fontSize: 11, fontWeight: 500, color: '#dc2626' }}> — Bắt buộc nhập giải trình (lệch ≥ 1.000đ)</span>}
                       </label>
                       <textarea
                         value={discrepancyReason}
@@ -885,7 +917,7 @@ export const CloseShiftModal: FC<Props> = ({
                         type="number"
                         min={0}
                         max={Number.MAX_SAFE_INTEGER}
-                        step={1000}
+                        step={1}
                         value={retainedFloat}
                         onChange={(e) => setRetainedFloat(Math.max(0, parseInt(e.target.value, 10) || 0))}
                         className="modal-input font-bold"
@@ -899,7 +931,7 @@ export const CloseShiftModal: FC<Props> = ({
                         type="number"
                         min={0}
                         max={Number.MAX_SAFE_INTEGER}
-                        step={1000}
+                        step={1}
                         value={droppedToSafe}
                         onChange={(e) => setDroppedToSafe(Math.max(0, parseInt(e.target.value, 10) || 0))}
                         className="modal-input font-bold"
@@ -1070,18 +1102,18 @@ export const CloseShiftModal: FC<Props> = ({
 
             <button
               type="submit"
-              disabled={!isShiftClosing || isLoading || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim())}
+              disabled={!isShiftClosing || isLoading || hasPending || !isAllocationValid || (requiresDiscrepancyReason && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim())}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
                 padding: '8px 22px',
                 borderRadius: 6,
-                backgroundColor: !isShiftClosing || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) ? '#94a3b8' : '#0f766e',
+                backgroundColor: !isShiftClosing || hasPending || !isAllocationValid || (requiresDiscrepancyReason && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) ? '#94a3b8' : '#0f766e',
                 color: '#ffffff',
                 border: 'none',
                 fontWeight: 600,
-                cursor: !isShiftClosing || hasPending || !isAllocationValid || (discrepancy !== 0 && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) || isLoading ? 'not-allowed' : 'pointer',
+                cursor: !isShiftClosing || hasPending || !isAllocationValid || (requiresDiscrepancyReason && !discrepancyReason.trim()) || (isEarlyOrLate && !earlyOrLateReason.trim()) || isLoading ? 'not-allowed' : 'pointer',
               }}
             >
               <CheckCircle size={16} />
@@ -1090,6 +1122,26 @@ export const CloseShiftModal: FC<Props> = ({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        isOpen={showCancelConfirm}
+        title="Hủy chốt ca & mở lại quầy bán"
+        message="Bạn có chắc muốn hủy trạng thái kiểm đếm chốt ca và mở lại quầy cho các thu ngân tiếp tục bán hàng?"
+        confirmLabel="Xác nhận mở lại quầy"
+        cancelLabel="Quay lại"
+        variant="warning"
+        onConfirm={confirmCancelClosing}
+        onCancel={() => setShowCancelConfirm(false)}
+      />
+      <ConfirmDialog
+        isOpen={Boolean(pendingCancelMovementId)}
+        title="Hủy yêu cầu chi chờ duyệt"
+        message="Hủy yêu cầu chi này để mở khóa chốt ca?"
+        confirmLabel="Hủy yêu cầu chi"
+        cancelLabel="Quay lại"
+        variant="danger"
+        onConfirm={confirmCancelPendingMovement}
+        onCancel={() => setPendingCancelMovementId(null)}
+      />
     </div>
   );
 };

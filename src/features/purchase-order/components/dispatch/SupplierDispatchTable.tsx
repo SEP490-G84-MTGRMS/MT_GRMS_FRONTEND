@@ -230,11 +230,9 @@ export const SupplierDispatchTable: FC<SupplierDispatchTableProps> = ({
                         style={{
                           fontWeight: 700,
                           color: isDispatched ? '#64748b' : '#0f172a',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          whiteSpace: 'normal',
+                          wordBreak: 'break-word',
                           display: 'block',
-                          maxWidth: 240,
                         }}
                         title={supplier.name}
                       >

@@ -27,6 +27,8 @@ export interface ProductResponse {
   description?: string | null;
   internalNote?: string | null;
   hasBatches: boolean;
+  /** Số ngày trước HSD tính cận hạn. Null = mặc định 30. */
+  nearExpiryThresholdDays?: number | null;
   isFavorite: boolean;
   taxCategory?: string;
   eligibleForVatReduction?: boolean;
@@ -43,6 +45,9 @@ export interface ProductResponse {
 
 export interface ProductQueryFilter {
   searchTerm?: string;
+  skus?: string[];
+  names?: string[];
+  barcodes?: string[];
   categoryId?: string;
   categoryIds?: string[];
   status?: string;
@@ -145,6 +150,7 @@ export interface ProductCreatePayload {
   description?: string | null;
   internalNote?: string | null;
   hasBatches?: boolean;
+  nearExpiryThresholdDays?: number | null;
   allowRepack?: boolean;
   processedSellingPricePerKg?: number | null;
   isFavorite?: boolean;
@@ -169,6 +175,7 @@ export interface ProductUpdatePayload {
   description?: string | null;
   internalNote?: string | null;
   hasBatches?: boolean;
+  nearExpiryThresholdDays?: number | null;
   allowRepack?: boolean;
   processedSellingPricePerKg?: number | null;
   isFavorite?: boolean;
@@ -220,6 +227,7 @@ export interface ProductItem {
   committed: number;
   isFavorite?: boolean;
   hasBatches?: boolean;
+  nearExpiryThresholdDays?: number | null;
   allowRepack?: boolean;
   sellRawByWeight?: boolean;
   processedSellingPricePerKg?: number | null;
@@ -284,6 +292,7 @@ export interface ProductPriceHistoryQuery {
   priceScope?: 'MASTER' | 'BRANCH';
   fromDate?: string;
   toDate?: string;
+  searchTerm?: string;
   page?: number;
   pageSize?: number;
 }

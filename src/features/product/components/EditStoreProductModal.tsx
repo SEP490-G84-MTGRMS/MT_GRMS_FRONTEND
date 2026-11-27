@@ -6,8 +6,7 @@ import type {
   EditStoreProductInput,
   StoreProductUnitPrice,
 } from '../types/storeProduct.types';
-import { X, Save, AlertTriangle, Loader2, AlertCircle, History } from 'lucide-react';
-import { PriceHistoryModal } from './PriceHistoryModal';
+import { X, Save, AlertTriangle, Loader2, AlertCircle } from 'lucide-react';
 import '../../supplier/supplier.css';
 
 interface EditStoreProductModalProps {
@@ -22,6 +21,7 @@ interface EditStoreProductModalProps {
 interface FieldErrors {
   retailPrice?: string;
   minOrderQuantity?: string;
+  processedSellingPrice?: string;
 }
 
 /** Nhãn hẹp sát ô | Ô rộng | Nhãn | Ô rộng */
@@ -106,13 +106,13 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
   const [minOrderQuantityStr, setMinOrderQuantityStr] = useState<string>('');
   const [unitPriceDrafts, setUnitPriceDrafts] = useState<StoreProductUnitPrice[]>([]);
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [processedSellingPrice, setProcessedSellingPrice] = useState<number>(0);
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState<boolean>(false);
-  const [showPriceHistory, setShowPriceHistory] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen && product) {
@@ -130,18 +130,22 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
             ];
       setUnitPriceDrafts(units);
       setStatus(product.status ?? 'Active');
+      const initialProcessed =
+        product.processedSellingPricePerKg && product.processedSellingPricePerKg > 0
+          ? product.processedSellingPricePerKg
+          : product.retailPrice ?? 0;
+      setProcessedSellingPrice(initialProcessed);
       setFieldErrors({});
       setFormError('');
       setIsSaving(false);
       setShowUnsavedConfirm(false);
-      setShowPriceHistory(false);
     } else if (!isOpen) {
       setMinOrderQuantityStr('');
       setUnitPriceDrafts([]);
+      setProcessedSellingPrice(0);
       setFieldErrors({});
       setFormError('');
       setShowUnsavedConfirm(false);
-      setShowPriceHistory(false);
     }
   }, [isOpen, product]);
 
@@ -158,6 +162,22 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
     const base = unitPriceDrafts.find((u) => u.isBaseUnit) || unitPriceDrafts[0];
     return base?.price ?? 0;
   }, [unitPriceDrafts]);
+
+  /** WAC theo ĐVT cơ sở; ĐVT khác = base × conversionRate. */
+  const averageCostBase = useMemo(() => {
+    if (!product) return 0;
+    const wac = Number(product.averageCost ?? 0);
+    if (wac > 0) return wac;
+    return Number(product.costPrice ?? 0) || 0;
+  }, [product]);
+
+  const unitAvgCost = useCallback(
+    (u: StoreProductUnitPrice) => {
+      const rate = Number(u.conversionRate) > 0 ? Number(u.conversionRate) : 1;
+      return Math.round(averageCostBase * rate);
+    },
+    [averageCostBase]
+  );
 
   const isDirty = useMemo(() => {
     if (!product) return false;
@@ -179,8 +199,14 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
         const init = initialUnits[i];
         return !init || u.price !== init.price || u.unitName !== init.unitName;
       });
-    return statusChanged || unitsChanged;
-  }, [product, status, unitPriceDrafts]);
+    const initialProcessed =
+      product.processedSellingPricePerKg && product.processedSellingPricePerKg > 0
+        ? product.processedSellingPricePerKg
+        : product.retailPrice ?? 0;
+    const processedChanged =
+      Boolean(product.allowRepack) && processedSellingPrice !== initialProcessed;
+    return statusChanged || unitsChanged || processedChanged;
+  }, [product, status, unitPriceDrafts, processedSellingPrice]);
 
   const handleUnitPriceChange = (index: number, raw: string) => {
     const num = Number(raw);
@@ -228,6 +254,20 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
       errors.retailPrice = 'Giá bán phải lớn hơn 0.';
     } else if (baseUnitPrice > 1_000_000_000) {
       errors.retailPrice = 'Giá bán vượt quá giới hạn.';
+    } else {
+      const invalidUnit = unitPriceDrafts.find(
+        (u) => !Number.isFinite(u.price) || u.price <= 0 || u.price > 1_000_000_000
+      );
+      if (invalidUnit) {
+        errors.retailPrice = `Giá bán của đơn vị "${invalidUnit.unitName}" phải lớn hơn 0 và không vượt quá 1 tỷ đ.`;
+      }
+    }
+    if (product.allowRepack) {
+      if (!Number.isFinite(processedSellingPrice) || processedSellingPrice <= 0) {
+        errors.processedSellingPrice = 'Giá khi đóng khay (đ/kg) phải lớn hơn 0.';
+      } else if (processedSellingPrice > 1_000_000_000) {
+        errors.processedSellingPrice = 'Giá đóng khay vượt quá giới hạn.';
+      }
     }
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -246,6 +286,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
         retailPrice: baseUnitPrice,
         status,
         unitPrices: unitPriceDrafts,
+        processedSellingPricePerKg: product.allowRepack ? processedSellingPrice : undefined,
       };
 
       await onSave(product.storeId, product.productId, payload);
@@ -316,29 +357,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
               </h2>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => setShowPriceHistory(true)}
-                disabled={isSaving}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  height: 32,
-                  padding: '0 10px',
-                  borderRadius: 7,
-                  border: '1px solid #ddd6fe',
-                  backgroundColor: '#f5f3ff',
-                  color: '#6d28d9',
-                  cursor: isSaving ? 'not-allowed' : 'pointer',
-                  fontSize: 12,
-                  fontWeight: 600,
-                }}
-                title="Xem lịch sử thay đổi giá"
-              >
-                <History size={14} />
-                <span>Lịch sử giá</span>
-              </button>
               <button
                 type="button"
                 id="btnCloseEditProductModalX"
@@ -468,12 +486,13 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                   <input id="inputProductUnit" type="text" readOnly value={product.unit} style={readOnlyInput} />
                 </FieldPair>
 
-                <FieldPair label="Giá vốn" htmlFor="inputCostPrice">
+                <FieldPair label="Giá vốn TB" htmlFor="inputAverageCost">
                   <input
-                    id="inputCostPrice"
+                    id="inputAverageCost"
                     type="text"
                     readOnly
-                    value={`${fmt(product.costPrice)} đ`}
+                    title="Giá vốn trung bình tồn (WAC) theo ĐVT cơ sở — tham chiếu khi chỉnh giá bán"
+                    value={`${fmt(averageCostBase)} đ`}
                     style={readOnlyInput}
                   />
                 </FieldPair>
@@ -483,7 +502,7 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputCurrentStock"
                     type="text"
                     readOnly
-                    value={`${product.currentStock} ${product.unit}`}
+                    value={`${product.currentStock} ${product.stockUnit || product.unit}`}
                     style={readOnlyInput}
                   />
                 </FieldPair>
@@ -506,7 +525,11 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputSupplierCode"
                     type="text"
                     readOnly
-                    value={product.primarySupplierCode || ''}
+                    value={
+                      product.suppliers && product.suppliers.length > 1
+                        ? product.suppliers.map((s) => s.supplierCode).filter(Boolean).join(', ')
+                        : product.primarySupplierCode || ''
+                    }
                     style={readOnlyInput}
                   />
                 </FieldPair>
@@ -516,7 +539,11 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                     id="inputSupplierName"
                     type="text"
                     readOnly
-                    value={product.primarySupplierName || ''}
+                    value={
+                      product.suppliers && product.suppliers.length > 1
+                        ? product.suppliers.map((s) => s.supplierName).filter(Boolean).join(', ')
+                        : product.primarySupplierName || ''
+                    }
                     style={readOnlyInput}
                   />
                 </FieldPair>
@@ -586,37 +613,169 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
                 {unitPriceDrafts.length > 0 && (
                   <>
                     <GridDivider />
-                    {unitPriceDrafts.map((u, idx) => (
-                      <FieldPair
-                        key={`${u.unitName}-${idx}`}
-                        label={`Giá ${u.unitName}`}
-                        htmlFor={`unitPrice-${idx}`}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                            <input
-                              id={`unitPrice-${idx}`}
-                              type="number"
-                              min={0}
-                              step={100}
-                              value={u.price}
-                              onChange={(e) => handleUnitPriceChange(idx, e.target.value)}
+                    {unitPriceDrafts.map((u, idx) => {
+                      const avgForUnit = unitAvgCost(u);
+                      const belowAvg =
+                        avgForUnit > 0 && Number(u.price) > 0 && Number(u.price) < avgForUnit;
+                      return (
+                        <FieldPair
+                          key={`${u.unitName}-${idx}`}
+                          label={`Giá ${u.unitName}`}
+                          htmlFor={`unitPrice-${idx}`}
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                              <input
+                                id={`unitPrice-${idx}`}
+                                type="number"
+                                min={0}
+                                step={100}
+                                value={u.price}
+                                onChange={(e) => handleUnitPriceChange(idx, e.target.value)}
+                                style={{
+                                  ...inputBase,
+                                  borderColor:
+                                    fieldErrors.retailPrice && u.isBaseUnit
+                                      ? '#ef4444'
+                                      : belowAvg
+                                        ? '#f59e0b'
+                                        : '#cbd5e1',
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  color: '#64748b',
+                                  fontWeight: 600,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                đ
+                              </span>
+                            </div>
+                            <div
                               style={{
-                                ...inputBase,
-                                borderColor:
-                                  fieldErrors.retailPrice && u.isBaseUnit ? '#ef4444' : '#cbd5e1',
+                                fontSize: 11.5,
+                                color: '#64748b',
+                                fontWeight: 500,
+                                lineHeight: 1.35,
                               }}
-                            />
-                            <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, flexShrink: 0 }}>
-                              đ
-                            </span>
+                              title="Giá vốn trung bình tồn quy đổi theo ĐVT này"
+                            >
+                              Vốn TB {u.unitName}: {fmt(avgForUnit)} đ
+                            </div>
+                            {belowAvg ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: 11.5,
+                                  color: '#b45309',
+                                  fontWeight: 600,
+                                  lineHeight: 1.35,
+                                }}
+                              >
+                                <AlertTriangle size={12} style={{ flexShrink: 0 }} />
+                                <span>Giá bán dưới giá vốn TB — có thể lỗ</span>
+                              </div>
+                            ) : null}
+                            {fieldErrors.retailPrice && u.isBaseUnit && (
+                              <div style={{ fontSize: 12, color: '#ef4444' }}>
+                                {fieldErrors.retailPrice}
+                              </div>
+                            )}
                           </div>
-                          {fieldErrors.retailPrice && u.isBaseUnit && (
-                            <div style={{ fontSize: 12, color: '#ef4444' }}>{fieldErrors.retailPrice}</div>
-                          )}
-                        </div>
-                      </FieldPair>
-                    ))}
+                        </FieldPair>
+                      );
+                    })}
+                    {product.allowRepack ? (
+                      <>
+                        <GridDivider />
+                        <FieldPair
+                          label="Giá đóng khay"
+                          htmlFor="inputProcessedSellingPrice"
+                          wide
+                        >
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                              <input
+                                id="inputProcessedSellingPrice"
+                                type="number"
+                                min={0}
+                                step={100}
+                                value={processedSellingPrice}
+                                onChange={(e) => {
+                                  const num = Number(e.target.value);
+                                  setProcessedSellingPrice(Number.isFinite(num) ? num : 0);
+                                  if (fieldErrors.processedSellingPrice) {
+                                    setFieldErrors((prev) => ({
+                                      ...prev,
+                                      processedSellingPrice: undefined,
+                                    }));
+                                  }
+                                }}
+                                style={{
+                                  ...inputBase,
+                                  borderColor: fieldErrors.processedSellingPrice
+                                    ? '#ef4444'
+                                    : averageCostBase > 0 &&
+                                        processedSellingPrice > 0 &&
+                                        processedSellingPrice < averageCostBase
+                                      ? '#f59e0b'
+                                      : '#cbd5e1',
+                                }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: 12,
+                                  color: '#64748b',
+                                  fontWeight: 600,
+                                  flexShrink: 0,
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                đ/kg
+                              </span>
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 11.5,
+                                color: '#64748b',
+                                fontWeight: 500,
+                                lineHeight: 1.35,
+                              }}
+                            >
+                              Vốn TB /kg: {fmt(averageCostBase)} đ — ví dụ khay 0,5 kg →{' '}
+                              {fmt(Math.round((0.5 * processedSellingPrice) / 100) * 100)} đ
+                            </div>
+                            {averageCostBase > 0 &&
+                            processedSellingPrice > 0 &&
+                            processedSellingPrice < averageCostBase ? (
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: 11.5,
+                                  color: '#b45309',
+                                  fontWeight: 600,
+                                  lineHeight: 1.35,
+                                }}
+                              >
+                                <AlertTriangle size={12} style={{ flexShrink: 0 }} />
+                                <span>Giá đóng khay dưới giá vốn TB — có thể lỗ</span>
+                              </div>
+                            ) : null}
+                            {fieldErrors.processedSellingPrice ? (
+                              <div style={{ fontSize: 12, color: '#ef4444' }}>
+                                {fieldErrors.processedSellingPrice}
+                              </div>
+                            ) : null}
+                          </div>
+                        </FieldPair>
+                      </>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -756,17 +915,6 @@ export const EditStoreProductModal: FC<EditStoreProductModalProps> = ({
             </div>
           </div>
         </div>
-      )}
-
-      {showPriceHistory && product && (
-        <PriceHistoryModal
-          isOpen={showPriceHistory}
-          onClose={() => setShowPriceHistory(false)}
-          productId={product.productId}
-          productName={product.name}
-          branchId={product.storeId}
-          branchName={product.storeName}
-        />
       )}
 
     </>

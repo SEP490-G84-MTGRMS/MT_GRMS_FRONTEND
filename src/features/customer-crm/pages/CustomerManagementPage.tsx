@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { FC } from 'react';
 import { Users, Plus, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { AdminToast, type ToastState } from '../../admin/components';
-import { employeeApi } from '../../employee/api/employeeApi';
+import { useAuthStore } from '../../../stores/useAuthStore';
 import { useCustomerCrm } from '../hooks/useCustomerCrm';
 import { CustomerFilterBar } from '../components/CustomerFilterBar';
 import { CustomerTable } from '../components/CustomerTable';
@@ -17,6 +17,7 @@ import '../../../styles/so-list-page.css';
 import '../customer-crm.css';
 
 export const CustomerManagementPage: FC = () => {
+  const canManageDebt = useAuthStore((state) => state.user?.role === 'STORE_OWNER');
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSearch = searchParams.get('search') || searchParams.get('keyword') || '';
   const {
@@ -55,51 +56,40 @@ export const CustomerManagementPage: FC = () => {
     collectDebtMutation,
   } = useCustomerCrm();
 
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
-  const [selectedBranch, setSelectedBranch] = useState<string>('ALL');
   const [sortOrder, setSortOrder] = useState<string>('name_asc');
   const [timeRange, setTimeRange] = useState<string>('ALL');
   const [isExporting, setIsExporting] = useState(false);
 
-  // Load branch list for filter
-  useEffect(() => {
-    let isMounted = true;
-    employeeApi
-      .getBranches()
-      .then((list) => {
-        if (isMounted && list && list.length > 0) {
-          setBranches(list);
-        }
-      })
-      .catch((err) => console.warn('Could not load branches in CustomerCRM:', err));
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const prevUrlSearchRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (urlSearch) {
-      setSearchTerm(urlSearch);
+    if (prevUrlSearchRef.current === urlSearch) {
+      return;
     }
+    prevUrlSearchRef.current = urlSearch;
+    setSearchTerm(urlSearch);
   }, [urlSearch, setSearchTerm]);
 
-  const handleSearchChange = (term: string) => {
-    setSearchTerm(term);
-    setCurrentPage(1);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (term) {
-          next.set('search', term);
-        } else {
-          next.delete('search');
-          next.delete('keyword');
-        }
-        return next;
-      },
-      { replace: true }
-    );
-  };
+  const handleSearchChange = useCallback(
+    (term: string) => {
+      setSearchTerm(term);
+      setCurrentPage(1);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (term) {
+            next.set('search', term);
+          } else {
+            next.delete('search');
+            next.delete('keyword');
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchTerm, setCurrentPage, setSearchParams]
+  );
 
   const [ledgerCustomer, setLedgerCustomer] = useState<any>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -157,11 +147,6 @@ export const CustomerManagementPage: FC = () => {
     setCurrentPage(1);
   };
 
-  const handleBranchChange = (branch: string) => {
-    setSelectedBranch(branch);
-    setCurrentPage(1);
-  };
-
   const handleSortOrderChange = (sort: string) => {
     setSortOrder(sort);
     setCurrentPage(1);
@@ -185,11 +170,6 @@ export const CustomerManagementPage: FC = () => {
   // Filter & sort customers
   const processedCustomers = useMemo(() => {
     let result = [...customers];
-
-    // Filter by branch
-    if (selectedBranch && selectedBranch !== 'ALL') {
-      result = result.filter((c) => !c.branchId || c.branchId === selectedBranch);
-    }
 
     // Filter by time range if specified
     if (timeRange !== 'ALL') {
@@ -227,13 +207,12 @@ export const CustomerManagementPage: FC = () => {
     });
 
     return result;
-  }, [customers, sortOrder, timeRange, selectedBranch]);
+  }, [customers, sortOrder, timeRange]);
 
   const handleResetAllFilters = () => {
     handleSearchChange('');
     setSelectedTier('ALL');
     setSelectedDebtStatus('ALL');
-    setSelectedBranch('ALL');
     setSortOrder('name_asc');
     setTimeRange('ALL');
     setCurrentPage(1);
@@ -250,12 +229,18 @@ export const CustomerManagementPage: FC = () => {
         return;
       }
 
+      const escapeCsvCell = (raw: string | number | null | undefined): string => {
+        const str = String(raw ?? '');
+        const neutralized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+        return `"${neutralized.replace(/"/g, '""')}"`;
+      };
+
       const headers = [
         'Mã Khách Hàng',
         'Họ và Tên',
         'Số Điện Thoại',
-        'Mã Số Thuế',
-        'Công Ty',
+        'Hạng Thành Viên',
+        'Email',
         'Công Nợ Hiện Tại (đ)',
         'Điểm Tích Lũy',
         'Trạng Thái',
@@ -266,14 +251,14 @@ export const CustomerManagementPage: FC = () => {
       for (const c of processedCustomers) {
         const code = c.customerCode || c.id.slice(0, 8).toUpperCase();
         const row = [
-          `"${code.replace(/"/g, '""')}"`,
-          `"${(c.fullName || '').replace(/"/g, '""')}"`,
-          `"${(c.phoneNumber || '').replace(/"/g, '""')}"`,
-          `"${(c.taxCode || '').replace(/"/g, '""')}"`,
-          `"${(c.companyName || '').replace(/"/g, '""')}"`,
+          escapeCsvCell(code),
+          escapeCsvCell(c.fullName || ''),
+          escapeCsvCell(c.phoneNumber || ''),
+          escapeCsvCell(c.membershipTier || 'Standard'),
+          escapeCsvCell(c.email || ''),
           Math.max(0, Number(c.currentDebtAR) || 0),
           c.loyaltyPoints || 0,
-          `"${c.status === 'Active' ? 'Hoạt động' : 'Tạm ngừng'}"`,
+          escapeCsvCell(c.status === 'Active' ? 'Hoạt động' : 'Tạm ngừng'),
         ];
         csvRows.push(row.join(','));
       }
@@ -372,7 +357,7 @@ export const CustomerManagementPage: FC = () => {
             title="Thêm mới khách hàng"
           >
             <Plus size={14} />
-            <span>+ Thêm khách hàng</span>
+            <span>Thêm khách hàng</span>
           </button>
         </div>
       </div>
@@ -385,9 +370,6 @@ export const CustomerManagementPage: FC = () => {
         onTierChange={handleTierChange}
         selectedDebtStatus={selectedDebtStatus}
         onDebtStatusChange={handleDebtStatusChange}
-        selectedBranch={selectedBranch}
-        onBranchChange={handleBranchChange}
-        branches={branches}
         sortOrder={sortOrder}
         onSortOrderChange={handleSortOrderChange}
         timeRange={timeRange}
@@ -403,8 +385,8 @@ export const CustomerManagementPage: FC = () => {
         isLoading={isLoading}
         onSelect={handleSelectCustomer}
         onEdit={handleOpenEditModal}
-        onCollect={handleOpenCollectModal}
-        onViewLedger={(c) => setLedgerCustomer(c)}
+        onCollect={canManageDebt ? handleOpenCollectModal : undefined}
+        onViewLedger={canManageDebt ? setLedgerCustomer : undefined}
         currentPage={currentPage}
         pageSize={pageSize}
         onPageChange={setCurrentPage}
@@ -416,8 +398,8 @@ export const CustomerManagementPage: FC = () => {
         customer={selectedCustomer}
         onClose={handleCloseDrawer}
         onOpenEdit={handleOpenEditModal}
-        onOpenCollect={handleOpenCollectModal}
-        onViewLedger={(c) => setLedgerCustomer(c)}
+        onOpenCollect={canManageDebt ? handleOpenCollectModal : undefined}
+        onViewLedger={canManageDebt ? setLedgerCustomer : undefined}
       />
 
       {/* ── 5. Create / Edit Modal ── */}
@@ -427,11 +409,12 @@ export const CustomerManagementPage: FC = () => {
         onSubmit={handleFormSubmit}
         initialData={editingCustomer}
         isSubmitting={createMutation.isPending || updateMutation.isPending}
+        canAssignTier={canManageDebt}
       />
 
       {/* ── 6. Collect Debt Modal (VietQR & Cash) ── */}
       <DebtCollectionModal
-        isOpen={Boolean(collectingCustomer)}
+        isOpen={canManageDebt && Boolean(collectingCustomer)}
         onClose={() => setCollectingCustomer(null)}
         customer={collectingCustomer}
         onConfirm={handleCollectDebtConfirm}
@@ -440,7 +423,7 @@ export const CustomerManagementPage: FC = () => {
 
       {/* ── 7. Customer Debt Ledger Drawer ── */}
       <CustomerDebtLedgerDrawer
-        isOpen={Boolean(ledgerCustomer)}
+        isOpen={canManageDebt && Boolean(ledgerCustomer)}
         customer={ledgerCustomer}
         onClose={() => setLedgerCustomer(null)}
         onOpenCollect={handleOpenCollectModal}

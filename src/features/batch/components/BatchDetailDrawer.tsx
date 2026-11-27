@@ -5,7 +5,6 @@ import {
   Calendar,
   Building2,
   ClipboardCheck,
-  Tag,
 } from 'lucide-react';
 import type { BatchItem } from '../types/batch.types';
 
@@ -14,7 +13,6 @@ interface BatchDetailDrawerProps {
   batch: BatchItem | null;
   onClose: () => void;
   onUpdateLocation: (batchId: string, newLocation: string) => void;
-  onDiscountClick: (batch: BatchItem) => void;
   onWriteOffClick: (batch: BatchItem) => void;
   onViewGrn: (grnNo: string) => void;
   onStocktakeClick?: (batch: BatchItem) => void;
@@ -75,7 +73,6 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
   batch,
   onClose,
   onUpdateLocation: _onUpdateLocation,
-  onDiscountClick,
   onWriteOffClick: _onWriteOffClick,
   onViewGrn,
   onStocktakeClick,
@@ -87,25 +84,25 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
       case 'Expired':
         return (
           <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, backgroundColor: '#ffe4e6', color: '#be123c', border: '1px solid #fecdd3' }}>
-            ☠️ Expired (Quá hạn)
+            Quá hạn
           </span>
         );
       case 'Critical':
         return (
           <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
-            🚨 Critical (Khẩn cấp)
+            Khẩn cấp
           </span>
         );
       case 'Warning':
         return (
           <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, backgroundColor: '#dbeafe', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-            ⚠️ Warning (Cận date)
+            Cận hạn
           </span>
         );
       case 'Normal':
         return (
           <span style={{ padding: '4px 10px', borderRadius: 12, fontSize: 12, fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0' }}>
-            ✅ Normal (An toàn)
+            An toàn
           </span>
         );
     }
@@ -391,31 +388,6 @@ export const BatchDetailDrawer: FC<BatchDetailDrawerProps> = ({
               <FileText size={13} />
               <span>Xem GRN gốc: {batch.originalGrnNo}</span>
             </button>
-
-            {batch.status !== 'Expired' && (
-              <button
-                type="button"
-                onClick={() => onDiscountClick(batch)}
-                style={{
-                  height: 32,
-                  padding: '0 12px',
-                  borderRadius: 6,
-                  border: '1px solid #bfdbfe',
-                  backgroundColor: '#eff6ff',
-                  color: '#1d4ed8',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                }}
-                title="Áp dụng giảm giá FEFO kích cầu xả hàng cận date"
-              >
-                <Tag size={13} />
-                <span>Giảm giá FEFO</span>
-              </button>
-            )}
 
             {onStocktakeClick && (
               <button

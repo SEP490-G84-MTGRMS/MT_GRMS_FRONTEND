@@ -63,6 +63,7 @@ const mapBranchProductToPos = (p: any): Product => {
     basePrice: p.retailPrice ?? p.basePrice ?? p.sellingPrice ?? 0,
     costPrice: p.costPrice || 0,
     quantityOnHand: Number(p.currentStock ?? p.quantityOnHand ?? 0),
+    fefoDiscountPercent: Number(p.autoFefoDiscountPercent ?? 0),
     unitPrices,
   };
 };
@@ -162,6 +163,7 @@ export interface OrderItemResponse {
   batchCode?: string;
   batchId?: string | null;
   stockAllocations?: Array<{ branchStockId: string; batchCode?: string; quantityBase: number; returnedBase: number; costPerBase?: number }>;
+  conversionRate?: number;
   isGift?: boolean;
   promotionId?: string | null;
 }

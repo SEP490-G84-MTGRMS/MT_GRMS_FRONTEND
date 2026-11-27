@@ -249,6 +249,7 @@ describe('transferService', () => {
             batchNumber: 'BG-001',
             expiryDate: '2027-06-01',
             onHand: 30,
+            isExpired: false,
           },
         ],
       });
@@ -312,6 +313,7 @@ describe('transferService', () => {
         batchNumber: 'L01-2026',
         expiryDate: '2026-12-31',
         onHand: 50,
+        isExpired: false,
       });
       expect(batches[1]).toEqual({
         id: 'prod-102-1',
@@ -319,6 +321,7 @@ describe('transferService', () => {
         batchNumber: 'L02-2026',
         expiryDate: '2027-05-15',
         onHand: 100,
+        isExpired: false,
       });
     });
 
@@ -606,24 +609,31 @@ describe('transferService', () => {
         items: inputItems,
       });
 
-      expect(httpClient.post).toHaveBeenCalledWith('/transfers', {
-        fromBranchId: 'branch-1',
-        toBranchId: 'branch-2',
-        dispatchNow: false,
-        origin: 'OwnerAllocation',
-        priority: 'Normal',
-        note: 'Chuyển hàng gấp',
-        items: [
-          {
-            productId: 'prod-01',
-            quantity: 5,
-            unit: 'Thùng',
-            batchCode: 'LOT-OMACHI-01',
-            expiryDate: '2026-12-31T00:00:00Z',
-            unitPrice: 200000,
-          },
-        ],
-      });
+      expect(httpClient.post).toHaveBeenCalledWith(
+        '/transfers',
+        {
+          fromBranchId: 'branch-1',
+          toBranchId: 'branch-2',
+          dispatchNow: false,
+          submitImmediately: false,
+          origin: 'OwnerAllocation',
+          priority: 'Normal',
+          note: 'Chuyển hàng gấp',
+          items: [
+            {
+              productId: 'prod-01',
+              quantity: 5,
+              unit: 'Thùng',
+              batchCode: 'LOT-OMACHI-01',
+              expiryDate: '2026-12-31T00:00:00Z',
+              unitPrice: 200000,
+            },
+          ],
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        })
+      );
 
       expect(result.id).toBe('trf-created-1');
       expect(result.status).toBe('InTransit');
@@ -665,7 +675,13 @@ describe('transferService', () => {
 
       const result = await transferService.dispatch('trf-001');
 
-      expect(httpClient.post).toHaveBeenCalledWith('/transfers/trf-001/dispatch');
+      expect(httpClient.post).toHaveBeenCalledWith(
+        '/transfers/trf-001/dispatch',
+        undefined,
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        })
+      );
       expect(result.id).toBe('trf-001');
       expect(result.status).toBe('InTransit');
     });
@@ -732,17 +748,23 @@ describe('transferService', () => {
 
       const result = await transferService.receive('trf-001', receiveItems, 'Vỡ 1 chai');
 
-      expect(httpClient.put).toHaveBeenCalledWith('/transfers/trf-001/receive', {
-        note: 'Vỡ 1 chai',
-        items: [
-          {
-            detailId: 'detail-line-1',
-            receivedQuantity: 9,
-            damagedQuantity: 1,
-            discrepancyReason: 'Thiếu 1 chai do vỡ khi vận chuyển',
-          },
-        ],
-      });
+      expect(httpClient.put).toHaveBeenCalledWith(
+        '/transfers/trf-001/receive',
+        {
+          note: 'Vỡ 1 chai',
+          items: [
+            {
+              detailId: 'detail-line-1',
+              receivedQuantity: 9,
+              damagedQuantity: 1,
+              discrepancyReason: 'Thiếu 1 chai do vỡ khi vận chuyển',
+            },
+          ],
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        })
+      );
 
       expect(result.status).toBe('Completed');
       expect(result.items[0].receivedQty).toBe(9);
@@ -787,17 +809,23 @@ describe('transferService', () => {
 
       await transferService.receive('trf-002', itemsWithoutReceivedQty);
 
-      expect(httpClient.put).toHaveBeenCalledWith('/transfers/trf-002/receive', {
-        note: undefined,
-        items: [
-          {
-            detailId: 'detail-line-2',
-            receivedQuantity: 4,
-            damagedQuantity: 0,
-            discrepancyReason: undefined,
-          },
-        ],
-      });
+      expect(httpClient.put).toHaveBeenCalledWith(
+        '/transfers/trf-002/receive',
+        {
+          note: undefined,
+          items: [
+            {
+              detailId: 'detail-line-2',
+              receivedQuantity: 4,
+              damagedQuantity: 0,
+              discrepancyReason: undefined,
+            },
+          ],
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        })
+      );
     });
 
     it('dùng ghi chú chung làm lý do dự phòng khi dòng hàng hỏng chưa có lý do riêng', async () => {
@@ -817,13 +845,19 @@ describe('transferService', () => {
 
       await transferService.receive('trf-001', damagedWithoutLineReason, 'Móp khi vận chuyển');
 
-      expect(httpClient.put).toHaveBeenCalledWith('/transfers/trf-001/receive', {
-        note: 'Móp khi vận chuyển',
-        items: [expect.objectContaining({
-          damagedQuantity: 1,
-          discrepancyReason: 'Móp khi vận chuyển',
-        })],
-      });
+      expect(httpClient.put).toHaveBeenCalledWith(
+        '/transfers/trf-001/receive',
+        {
+          note: 'Móp khi vận chuyển',
+          items: [expect.objectContaining({
+            damagedQuantity: 1,
+            discrepancyReason: 'Móp khi vận chuyển',
+          })],
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        })
+      );
     });
 
     it('propagate lỗi khi nhận hàng thất bại', async () => {
@@ -857,9 +891,15 @@ describe('transferService', () => {
 
       const result = await transferService.cancel('trf-001', 'Xe gặp sự cố không thể giao hàng');
 
-      expect(httpClient.post).toHaveBeenCalledWith('/transfers/trf-001/cancel', {
-        reason: 'Xe gặp sự cố không thể giao hàng',
-      });
+      expect(httpClient.post).toHaveBeenCalledWith(
+        '/transfers/trf-001/cancel',
+        {
+          reason: 'Xe gặp sự cố không thể giao hàng',
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Idempotency-Key': expect.any(String) }),
+        })
+      );
       expect(result.id).toBe('trf-001');
       expect(result.status).toBe('Cancelled');
       expect(result.cancelReason).toBe('Xe gặp sự cố không thể giao hàng');

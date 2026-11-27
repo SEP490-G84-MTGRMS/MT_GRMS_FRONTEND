@@ -331,17 +331,11 @@ export const CreateScheduleRequestModal: React.FC<CreateScheduleRequestModalProp
       if (approvedRequests.some((r) => r.requestType === ScheduleRequestType.CheckInIncident)) {
         return 'Sự cố Check-in đã được duyệt';
       }
-      if (selectedSchedule.checkInTime && selectedSchedule.checkInMethod !== 'INCIDENT_PENDING') {
-        return 'Ca đã được ghi nhận giờ vào';
-      }
     }
 
     if (optType === ScheduleRequestType.CheckOutIncident) {
       if (approvedRequests.some((r) => r.requestType === ScheduleRequestType.CheckOutIncident)) {
         return 'Sự cố Check-out đã được duyệt';
-      }
-      if (selectedSchedule.checkOutTime && selectedSchedule.checkOutMethod !== 'INCIDENT_PENDING') {
-        return 'Ca đã được ghi nhận giờ ra';
       }
     }
 

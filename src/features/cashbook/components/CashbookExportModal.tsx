@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
+import { Download, Printer, FileSpreadsheet, X } from 'lucide-react';
 import type { LedgerTransaction, CashAccount } from '../types/cashbook.types';
 import { cashbookService } from '../services/cashbookService';
 
@@ -59,26 +60,32 @@ export const CashbookExportModal: FC<CashbookExportModalProps> = ({
               type="button"
               className={`pill-filter-btn ${activeTab === 'csv' ? 'active' : ''}`}
               onClick={() => setActiveTab('csv')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             >
-              📥 Xuất File Excel (CSV)
+              <Download size={14} />
+              <span>Xuất File Excel (CSV)</span>
             </button>
             <button
               type="button"
               className={`pill-filter-btn ${activeTab === 'print' ? 'active' : ''}`}
               onClick={() => setActiveTab('print')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
             >
-              🖨️ Xem Trước & In A4
+              <Printer size={14} />
+              <span>Xem Trước &amp; In A4</span>
             </button>
           </div>
-          <button type="button" className="cb-modal-close-btn" onClick={onClose}>
-            ✕
+          <button type="button" className="cb-modal-close-btn" onClick={onClose} aria-label="Đóng">
+            <X size={18} />
           </button>
         </div>
 
         <div className="cb-modal-body">
           {activeTab === 'csv' ? (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <div style={{ fontSize: '42px', marginBottom: '12px' }}>📊</div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 14, backgroundColor: '#f0fdfa', color: '#0f766e', marginBottom: 12 }}>
+                <FileSpreadsheet size={30} />
+              </div>
               <h3 style={{ margin: '0 0 8px', fontSize: '16px', color: 'var(--text-main)' }}>
                 Xuất {transactions.length} dòng dữ liệu Sổ quỹ
               </h3>
@@ -86,8 +93,14 @@ export const CashbookExportModal: FC<CashbookExportModalProps> = ({
                 File CSV được mã hóa UTF-8 BOM chuẩn Kế toán, mở trực tiếp trên Microsoft Excel
                 không bị lỗi phông chữ tiếng Việt.
               </p>
-              <button type="button" className="cb-btn cb-btn-primary" onClick={handleDownloadCSV}>
-                ⬇️ Tải Xuống File .CSV Ngay
+              <button
+                type="button"
+                className="cb-btn cb-btn-primary"
+                onClick={handleDownloadCSV}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <Download size={15} />
+                <span>Tải Xuống File .CSV Ngay</span>
               </button>
             </div>
           ) : (
@@ -146,13 +159,13 @@ export const CashbookExportModal: FC<CashbookExportModalProps> = ({
                         {tx.counterpartyName} - {tx.description}
                       </td>
                       <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                        {tx.transactionType === 'RECEIPT'
-                          ? tx.amount.toLocaleString('vi-VN')
+                        {tx.transactionType === 'RECEIPT' || (tx.transactionType === 'ADJUSTMENT' && tx.amount > 0)
+                          ? Math.abs(tx.amount).toLocaleString('vi-VN')
                           : '-'}
                       </td>
                       <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                        {tx.transactionType === 'PAYMENT'
-                          ? tx.amount.toLocaleString('vi-VN')
+                        {tx.transactionType === 'PAYMENT' || (tx.transactionType === 'ADJUSTMENT' && tx.amount < 0)
+                          ? Math.abs(tx.amount).toLocaleString('vi-VN')
                           : '-'}
                       </td>
                       <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 'bold' }}>
@@ -197,8 +210,14 @@ export const CashbookExportModal: FC<CashbookExportModalProps> = ({
             Đóng
           </button>
           {activeTab === 'print' && (
-            <button type="button" className="cb-btn cb-btn-primary" onClick={handlePrint}>
-              🖨️ In Khổ A4 Ngay
+            <button
+              type="button"
+              className="cb-btn cb-btn-primary"
+              onClick={handlePrint}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Printer size={15} />
+              <span>In Khổ A4 Ngay</span>
             </button>
           )}
         </div>

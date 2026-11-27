@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Search, Check, Save } from 'lucide-react';
 import type { BatchItem } from '../types';
+import { formatDateVN, isBatchExpired } from '../utils/transferDate';
 
 interface SelectBatchModalProps {
   isOpen: boolean;
@@ -20,22 +21,29 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const sourceBatches = batches;
+  const sourceBatches = batches.map((b) => ({
+    ...b,
+    isExpired: Boolean(b.isExpired || isBatchExpired(b.expiryDate)),
+  }));
 
-  // Selected batch and quantities map
-  const [chosenBatchId, setChosenBatchId] = useState<string>(
-    sourceBatches.find((b) => b.batchNumber === selectedBatchNumber)?.id || sourceBatches[0]?.id || ''
-  );
+  const defaultBatch =
+    sourceBatches.find((b) => b.batchNumber === selectedBatchNumber && !b.isExpired) ||
+    sourceBatches.find((b) => !b.isExpired && b.onHand > 0) ||
+    sourceBatches[0];
+
+  const [chosenBatchId, setChosenBatchId] = useState<string>(defaultBatch?.id || '');
 
   const [quantities, setQuantities] = useState<Record<string, number>>({
-    ...(sourceBatches[0] ? { [sourceBatches[0].id]: 1 } : {}),
+    ...(defaultBatch && !defaultBatch.isExpired ? { [defaultBatch.id]: Math.min(1, defaultBatch.onHand) } : {}),
   });
 
   if (!isOpen) return null;
 
+  const normalizedSearch = searchTerm.trim().toLowerCase();
   const filteredBatches = sourceBatches.filter((b) =>
-    b.batchNumber.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||
-    b.expiryDate.toLowerCase().includes(searchTerm.trim().toLowerCase())
+    b.batchNumber.toLowerCase().includes(normalizedSearch) ||
+    b.expiryDate.toLowerCase().includes(normalizedSearch) ||
+    formatDateVN(b.expiryDate, '').toLowerCase().includes(normalizedSearch)
   );
 
   const handleUpdateBatchQty = (batchId: string, val: number) => {
@@ -46,12 +54,13 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
     setChosenBatchId(batchId);
   };
 
+  const activeBatch = sourceBatches.find((b) => b.id === chosenBatchId);
+
   const handleConfirm = () => {
-    const active = sourceBatches.find((b) => b.id === chosenBatchId);
-    if (!active || active.isExpired) return;
-    const qty = quantities[active.id] || 0;
-    if (qty <= 0 || qty > active.onHand) return;
-    onSelectBatch(active, qty);
+    if (!activeBatch || activeBatch.isExpired) return;
+    const qty = quantities[activeBatch.id] || 0;
+    if (qty <= 0 || qty > activeBatch.onHand) return;
+    onSelectBatch(activeBatch, qty);
     onClose();
   };
 
@@ -108,7 +117,7 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
               type="text"
               className="filter-input"
               style={{ paddingLeft: 32, borderRadius: 6, fontSize: 13 }}
-              placeholder="🔍 Tìm lô, hạn sử dụng"
+              placeholder="Tìm lô, hạn sử dụng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -127,8 +136,9 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
           >
             {filteredBatches.map((b) => {
               const isSelected = b.id === chosenBatchId;
-              const isExpired = b.isExpired;
+              const isExpired = Boolean(b.isExpired);
               const qty = quantities[b.id] ?? 0;
+              const formattedExpiry = formatDateVN(b.expiryDate, 'Không HSD');
 
               return (
                 <div
@@ -136,6 +146,10 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
                   onClick={() => {
                     if (!isExpired) {
                       setChosenBatchId(b.id);
+                      setQuantities((prev) => ({
+                        ...prev,
+                        [b.id]: prev[b.id] && prev[b.id] > 0 ? prev[b.id] : Math.min(1, b.onHand),
+                      }));
                     }
                   }}
                   style={{
@@ -158,7 +172,7 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
                         color: isExpired ? '#ef4444' : isSelected ? '#1d4ed8' : '#0f172a',
                       }}
                     >
-                      {b.batchNumber} - {b.expiryDate} - Tồn: {b.onHand}
+                      {b.batchNumber || '(Không mã lô)'} - HSD: {formattedExpiry} - Tồn: {b.onHand}
                     </span>
 
                     {isExpired && (
@@ -230,7 +244,12 @@ export const SelectBatchModal: React.FC<SelectBatchModalProps> = ({
             type="button"
             className="btn-primary-teal"
             onClick={handleConfirm}
-            disabled={!chosenBatchId || (quantities[chosenBatchId] ?? 0) <= 0 || (quantities[chosenBatchId] ?? 0) > (sourceBatches.find((batch) => batch.id === chosenBatchId)?.onHand ?? 0)}
+            disabled={
+              !activeBatch ||
+              Boolean(activeBatch.isExpired) ||
+              (quantities[activeBatch.id] ?? 0) <= 0 ||
+              (quantities[activeBatch.id] ?? 0) > activeBatch.onHand
+            }
             style={{ padding: '5px 16px', borderRadius: 4, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 6 }}
           >
             <Save size={14} /> Lưu

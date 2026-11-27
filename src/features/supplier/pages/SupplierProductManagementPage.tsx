@@ -108,7 +108,10 @@ export const SupplierProductManagementPage: FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch supplier products based on applied filters & pagination
+  // Fetch supplier products based on applied filters & pagination (avoid double fetch on suppliers load — SP-06)
+  const suppliersRef = useRef(suppliers);
+  suppliersRef.current = suppliers;
+
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -116,7 +119,7 @@ export const SupplierProductManagementPage: FC = () => {
         appliedFilters.supplierId,
         {
           ...appliedFilters,
-          suppliers,
+          suppliers: suppliersRef.current,
         }
       );
       setProducts(res.items);
@@ -126,7 +129,7 @@ export const SupplierProductManagementPage: FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [appliedFilters, suppliers]);
+  }, [appliedFilters]);
 
   useEffect(() => {
     fetchProducts();
