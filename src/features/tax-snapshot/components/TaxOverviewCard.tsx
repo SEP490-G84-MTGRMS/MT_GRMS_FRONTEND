@@ -73,8 +73,15 @@ export const TaxOverviewCard: FC<Props> = ({ summary, isLoading }) => {
       </button>
       {expanded && (
         <div className="tax-overview-explanation">
-          {summary.thresholdExceededNote || summary.netVsGrossThresholdWarning ||
-            'Ngưỡng được theo dõi theo doanh thu lũy kế trong năm. Số liệu thuế là ước tính và cần được đối chiếu trước khi lập hồ sơ.'}
+          <div>
+            {summary.thresholdExceededNote || summary.netVsGrossThresholdWarning ||
+              'Ngưỡng miễn thuế 1 tỷ đồng/năm (NĐ 68/2026 & NĐ 141/2026/NĐ-CP) theo doanh thu lũy kế năm. Số liệu hệ thống chỉ mang tính chất tính toán tham khảo; chủ hộ cần tự đối soát chứng từ và chịu trách nhiệm pháp lý khi kê khai với cơ quan thuế.'}
+          </div>
+          {summary.eInvoiceRegistrationDeadlineLocal && (
+            <div style={{ marginTop: 6, color: '#991B1B', fontWeight: 700 }}>
+              ⚠️ Hạn đăng ký HĐĐT từ máy tính tiền (30 ngày theo NĐ 254/2026 &amp; TT 91/2026): {formatDate(summary.eInvoiceRegistrationDeadlineLocal)}
+            </div>
+          )}
         </div>
       )}
 

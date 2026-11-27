@@ -51,6 +51,10 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
     let isMounted = true;
     setErrorMessage(null);
     setApprovalReason('');
+    // Điều 6 NĐ 68/2026: tự chọn Chuyển khoản NH cho khoản chi >= 5 triệu được trừ thuế
+    setPaymentMethod(
+      (item?.amount ?? 0) >= 5_000_000 && item?.isTaxDeductible !== false ? 'BankTransfer' : 'Cash'
+    );
     setIsLoadingAccounts(true);
     cashbookService
       .getCashAccounts()
@@ -108,6 +112,8 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
   const isApprovalReasonMissing = Boolean(
     item?.isFlaggedAsSuspiciousSplit && !approvalReason.trim()
   );
+  const isCashOver5MTaxRisk =
+    paymentMethod === 'Cash' && (item?.amount || 0) >= 5_000_000 && Boolean(item?.isTaxDeductible);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,6 +319,23 @@ export const PayExpenseModal: FC<PayExpenseModalProps> = ({
                 </button>
               </div>
             </div>
+
+            {isCashOver5MTaxRisk && (
+              <div
+                role="alert"
+                style={{
+                  padding: '10px 14px',
+                  background: '#FEF2F2',
+                  borderRadius: '12px',
+                  border: '1px solid #FCA5A5',
+                  color: '#991B1B',
+                  fontSize: '0.78rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong>⚠️ Cảnh báo Điều 6 NĐ 68/2026:</strong> Khoản chi <strong>{formatCurrency(item.amount)}</strong> (≥ 5.000.000 đ) nếu xuất bằng <strong>Tiền mặt</strong> sẽ tự động bị loại khỏi chi phí được trừ thuế TNCN. Vui lòng chọn <strong>Chuyển khoản NH</strong> để giữ quyền khấu trừ.
+              </div>
+            )}
 
                         {/* Cash Account Selector */}
             {createCashBookEntry && (

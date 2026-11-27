@@ -104,14 +104,16 @@ describe('Phase 0: Finance Mathematical & Reconciliation Tests (Gate 0)', () => 
     expect(opexSum).toBe(pnl.operatingExpenses);
   });
 
-  it('Equation 8: Household Tax calculation on 1,417,500,000 VND YTD matches 6,262,500 VND', () => {
+  it('Equation 8: Household Tax calculation on 1,417,500,000 VND YTD (2026 law: VAT on TOTAL + PIT on excess with 30% NĐ 398 reduction)', () => {
     const ytdRevenue = 1_417_500_000;
     const taxResult = calculateHouseholdTax(ytdRevenue, defaultTaxConfig);
 
     expect(taxResult.isOverThreshold).toBe(true);
     expect(taxResult.excessRevenue).toBe(417_500_000);
-    expect(taxResult.vatAmount).toBe(4_175_000); // 1% of 417.5M
-    expect(taxResult.pitAmount).toBe(2_087_500); // 0.5% of 417.5M
-    expect(taxResult.totalTaxAmount).toBe(6_262_500);
+    expect(taxResult.vatAmount).toBe(14_175_000); // 1% of TOTAL 1,417.5M (NĐ 68/2026)
+    expect(taxResult.pitBeforeReduction).toBe(2_087_500); // 0.5% of 417.5M excess
+    expect(taxResult.pitReductionAmount).toBe(626_250); // 30% reduction (NĐ 398/2026)
+    expect(taxResult.pitAmount).toBe(1_461_250);
+    expect(taxResult.totalTaxAmount).toBe(15_636_250);
   });
 });

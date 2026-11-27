@@ -28,7 +28,39 @@ const TAX_BLACKLIST_KEYWORDS = [
 ];
 
 /**
- * Checks whether an expense item matches the non-deductible tax blacklist
+ * Checks whether an expense represents Store Owner or household family salary/compensation
+ * (non-deductible per Art. 6(2)(c) Decree 68/2026, except mandatory insurance contributions).
+ */
+export function isExpenseOwnerOrFamilySalary(
+  category?: string,
+  vendorName?: string,
+  note?: string
+): boolean {
+  const combined = `${category || ''} ${vendorName || ''} ${note || ''}`.toLowerCase();
+  if (
+    combined.includes('bảo hiểm bắt buộc') ||
+    combined.includes('bhxh') ||
+    combined.includes('bhyt') ||
+    combined.includes('bhtn')
+  ) {
+    return false;
+  }
+  const hasSalary =
+    combined.includes('lương') ||
+    combined.includes('thù lao') ||
+    combined.includes('tiền công') ||
+    combined.includes('salary');
+  const hasOwner =
+    combined.includes('chủ hộ') ||
+    combined.includes('chủ tiệm') ||
+    combined.includes('chủ cửa hàng') ||
+    combined.includes('thành viên hộ') ||
+    combined.includes('owner');
+  return hasSalary && hasOwner;
+}
+
+/**
+ * Checks whether an expense item matches the non-deductible tax blacklist or owner salary exclusion
  */
 export function isExpenseTaxBlacklisted(
   category?: string,
@@ -36,7 +68,10 @@ export function isExpenseTaxBlacklisted(
   note?: string
 ): boolean {
   const combined = `${category || ''} ${vendorName || ''} ${note || ''}`.toLowerCase();
-  return TAX_BLACKLIST_KEYWORDS.some((kw) => combined.includes(kw));
+  return (
+    TAX_BLACKLIST_KEYWORDS.some((kw) => combined.includes(kw)) ||
+    isExpenseOwnerOrFamilySalary(category, vendorName, note)
+  );
 }
 
 /**
@@ -228,7 +263,8 @@ export const createServiceExpense = async (
     beneficiaryName: data.vendorName,
     category: categoryLabel,
     amount: data.amount,
-    paymentSourceType: 1, // FinanceAccountType.Till = 1
+    // Điều 6 NĐ 68/2026: khoản chi >= 5 triệu mặc định định tuyến qua Ngân hàng (Bank = 3) để giữ quyền khấu trừ đến lúc xuất quỹ
+    paymentSourceType: data.amount >= 5_000_000 ? 3 : 1,
     paymentSourceAccountId: null,
     isTaxDeductible,
     invoiceNumber: data.invoiceNumber || null,

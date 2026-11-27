@@ -10,12 +10,14 @@ interface TaxRateConfigModalProps {
     customPitRate?: number | null;
     vatReductionPercentage?: number | null;
     applyVatReduction2026?: boolean;
+    applyPitReduction?: boolean;
   };
   onSave: (rates: {
     customVatRate?: number | null;
     customPitRate?: number | null;
     vatReductionPercentage?: number | null;
     applyVatReduction2026?: boolean;
+    applyPitReduction?: boolean;
   }) => void;
   onResetToDefault: () => void;
 }
@@ -31,6 +33,7 @@ export const TaxRateConfigModal: React.FC<TaxRateConfigModalProps> = ({
   const [vatRate, setVatRate] = useState<string>('1.0');
   const [isVatReduced, setIsVatReduced] = useState<boolean>(false);
   const [vatReductionPct, setVatReductionPct] = useState<string>('20');
+  const [isPitReduced, setIsPitReduced] = useState<boolean>(true);
   const [pitRate, setPitRate] = useState<string>('0.5');
   useDialogFocusTrap(isOpen, dialogRef, onClose);
 
@@ -48,6 +51,7 @@ export const TaxRateConfigModal: React.FC<TaxRateConfigModalProps> = ({
           ? String(currentRates.vatReductionPercentage)
           : '20'
       );
+      setIsPitReduced(currentRates.applyPitReduction !== false);
       setPitRate(
         currentRates.customPitRate != null
           ? String(currentRates.customPitRate)
@@ -78,6 +82,7 @@ export const TaxRateConfigModal: React.FC<TaxRateConfigModalProps> = ({
       customPitRate: isPitCustom ? parsedPit : undefined,
       vatReductionPercentage: isReductionCustom ? parsedReductionPct : undefined,
       applyVatReduction2026: isVatReduced,
+      applyPitReduction: isPitReduced,
     });
     onClose();
   };
@@ -86,6 +91,7 @@ export const TaxRateConfigModal: React.FC<TaxRateConfigModalProps> = ({
     setVatRate('1.0');
     setIsVatReduced(false);
     setVatReductionPct('20');
+    setIsPitReduced(true);
     setPitRate('0.5');
     onResetToDefault();
     onClose();
@@ -220,7 +226,7 @@ export const TaxRateConfigModal: React.FC<TaxRateConfigModalProps> = ({
                   2. Chính sách giảm thuế GTGT (Nghị quyết 204/2025/QH15)
                 </strong>
                 <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#64748B' }}>
-                  Áp dụng giảm tỷ lệ thuế GTGT cho nhóm hàng hóa tiêu dùng đủ điều kiện
+                  Áp dụng giảm tỷ lệ thuế GTGT trong thời hạn hiệu lực của cấu hình chính sách (mặc định đến 31/12/2026; cập nhật VatReductionDeadlineUtc trong appsettings.json nếu gia hạn).
                 </p>
               </div>
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
@@ -325,8 +331,42 @@ export const TaxRateConfigModal: React.FC<TaxRateConfigModalProps> = ({
               </span>
             </div>
             <p style={{ margin: '2px 0 0 0', fontSize: '0.74rem', color: '#64748B' }}>
-              Chỉ tính trên phần doanh thu lũy kế vượt ngưỡng 1 tỷ VNĐ (theo NĐ 141/2026/NĐ-CP).
+              Chỉ tính trên phần doanh thu lũy kế vượt ngưỡng 1 tỷ VNĐ (theo NĐ 68/2026 &amp; NĐ 141/2026/NĐ-CP).
             </p>
+          </div>
+
+          {/* Form Group 4: PIT 30% Reduction (Res. 43/2026 & Decree 398/2026) */}
+          <div
+            style={{
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: '#FFFBEB',
+              border: '1px solid #FDE68A',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div>
+              <strong style={{ fontSize: '0.84rem', color: '#92400E' }}>
+                4. Giảm 30% thuế TNCN (NQ 43/2026 &amp; NĐ 398/2026)
+              </strong>
+              <p style={{ margin: '2px 0 0 0', fontSize: '0.76rem', color: '#B45309' }}>
+                Áp dụng năm 2026–2027 cho hộ kinh doanh có doanh thu năm ≤ 10 tỷ đồng (không áp dụng cho GTGT).
+              </p>
+            </div>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }}>
+              <input
+                type="checkbox"
+                checked={isPitReduced}
+                onChange={(e) => setIsPitReduced(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: '#D97706', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isPitReduced ? '#B45309' : '#64748B' }}>
+                {isPitReduced ? 'Đang bật' : 'Tắt'}
+              </span>
+            </label>
           </div>
         </div>
 

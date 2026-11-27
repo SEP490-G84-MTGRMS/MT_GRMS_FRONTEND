@@ -75,6 +75,17 @@ export interface VatBreakdown {
   effectiveVatRate: number;
 }
 
+export interface RiskyGoodsReceiptDto {
+  id: string;
+  code: string;
+  receivedAtUtc: string;
+  supplierName: string;
+  grandTotal: number;
+  paymentMethod: string;
+  invoiceNo?: string | null;
+  riskReason: string;
+}
+
 /**
  * Filter Parameters for Tax Summary Calculation
  */
@@ -89,12 +100,13 @@ export interface HouseholdTaxFilterDto {
   tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
   applyVatReduction2026?: boolean;
   vatReductionPercentage?: number | null;
+  applyPitReduction?: boolean | null;
   reducedVatRevenueInPeriod?: number;
   standardVatRevenueInPeriod?: number;
   customVatRate?: number | null;
   customPitRate?: number | null;
   priorDeclaredPitTaxOverride?: number;
-  vatOption?: 'PRUDENT_YTD' | 'QUARTER_ONLY';
+  vatOption?: 'PRUDENT_YTD';
 }
 
 /**
@@ -147,8 +159,10 @@ export interface HouseholdTaxSummaryDto {
 
   isThresholdCrossedMidYear?: boolean;
   thresholdExceededNote?: string;
+  eInvoiceRegistrationDeadlineLocal?: string | null;
 
-  // Cảnh báo tiến trình ngưỡng 3 tỷ VNĐ (Điểm d Khoản 5 Điều 4 Nghị định 68/2026/NĐ-CP)
+  // Cảnh báo tiến trình ngưỡng chuyển đổi phương pháp (3 tỷ năm 2026, 10 tỷ từ 2027)
+  effectiveMethodSwitchThreshold?: number;
   isApproaching3BThreshold?: boolean;
   isExceeding3BThreshold?: boolean;
   is3BCrossedMidYear?: boolean;
@@ -169,30 +183,48 @@ export interface HouseholdTaxSummaryDto {
   originalVatRate?: number | null;
   vatReductionPercentage?: number | null;
   isVatReduced: boolean;
+  isVatReductionPolicyActive?: boolean;
   vatTaxableRevenue: number;
   vatAmount: number;
   customVatRate?: number | null;
   customPitRate?: number | null;
   vatBreakdown?: VatBreakdown;
 
-  // PIT
+  // PIT & 30% Reduction (Res. 43/2026 & Decree 398/2026)
   pitRate: number;
   pitTaxableRevenue: number;
+  pitBeforeReduction?: number;
+  pitReductionPercentage?: number;
+  pitReductionAmount?: number;
+  isPitReduced?: boolean;
+  requiresPitReductionAdjustmentForm03?: boolean;
+  pitReductionFormCode?: string | null;
   pitAmount: number;
 
-  // Declaration-based YTD Fields
+  // Declaration-based YTD & Compliance Fields (Art. 6 & Art. 10 Clause 2 Decree 68/2026)
   isCogsEstimated?: boolean;
+  estimatedCogsWarningAmount?: number;
   cogsAmount?: number;
   opexAmount?: number;
   deductibleExpensesInPeriod: number;
   ytdRevenue: number;
   ytdExpenses: number;
   taxableIncomeYtd: number;
+  taxDueYtdBeforeReduction?: number;
+  pitReductionYtd?: number;
   taxDueYtd: number;
   priorDeclaredPitTax: number;
   overpaidTaxCarry: number;
   taxableIncomeDeclaration: number;
   declarationPitAmount: number;
+  isProvisionalPitPeriod?: boolean;
+  annualSettlementPitRate?: number;
+  estimatedAnnualSettlementPit?: number;
+  excludedCashExpensesAmount?: number;
+  excludedCashExpensesCount?: number;
+  excludedOwnerSalaryAmount?: number;
+  excludedOwnerSalaryCount?: number;
+  riskyGoodsReceipts?: RiskyGoodsReceiptDto[];
 
   totalTaxAmount: number;
 
@@ -248,6 +280,14 @@ export interface HouseholdTaxDeclarationPreviewDto {
   lines: TaxDeclarationLineDto[];
   totalVatAmount: number;
   totalPitAmount: number;
+  pitBeforeReduction?: number;
+  pitReductionPercentage?: number;
+  pitReductionAmount?: number;
+  isPitReduced?: boolean;
+  pitReductionFormCode?: string | null;
+  pitReductionNote?: string | null;
+  isProvisionalPitPeriod?: boolean;
+  estimatedAnnualSettlementPit?: number;
   totalTaxAmount: number;
   requiresBusinessActivityAppendix: boolean;
   appendixCode: string;
@@ -301,6 +341,7 @@ export interface CreateTaxSnapshotRequest {
   tier2Method?: 'REVENUE_EXCESS' | 'PROFIT_15';
   applyVatReduction2026: boolean;
   vatReductionPercentage?: number | null;
+  applyPitReduction?: boolean | null;
   customVatRate?: number | null;
   customPitRate?: number | null;
   confirmEstimatedCogsResponsible?: boolean;

@@ -21,6 +21,7 @@ import {
 import { MoneyInput } from '../../../components/common/MoneyInput';
 import { formatMoney } from '../../finance/utils/formatters';
 import { readFileAsDataUrl } from '../../../utils/imageFile';
+import { isExpenseOwnerOrFamilySalary, isExpenseTaxBlacklisted } from '../api/expenseApi';
 
 interface CreateExpenseModalProps {
   isOpen: boolean;
@@ -293,6 +294,10 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
   };
 
   const parsedAmount = Number(formData.amount) || 0;
+  const categoryLabelForCheck = EXPENSE_CATEGORY_LABELS[formData.category] || formData.category;
+  const isOwnerSalaryBlocked = isExpenseOwnerOrFamilySalary(categoryLabelForCheck, formData.vendorName, formData.note);
+  const isBlacklistBlocked = isExpenseTaxBlacklisted(categoryLabelForCheck, formData.vendorName, formData.note);
+  const isCashlessRequiredNotice = parsedAmount >= 5_000_000 && formData.isTaxDeductible && !isBlacklistBlocked;
   const isFormValid = Boolean(formData.category && parsedAmount > 0 && formData.vendorName);
 
   return (
@@ -690,11 +695,11 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                   )}
                 </div>
 
-                {/* Tax Classification & Invoice Info (Một sổ hai góc nhìn - TT152) */}
+                {/* Tax Classification & Invoice Info (Một sổ hai góc nhìn - Điều 6 NĐ 68/2026) */}
                 <div
                   style={{
-                    background: formData.isTaxDeductible ? '#F0FDFA' : '#FFFBEB',
-                    border: formData.isTaxDeductible ? '1px solid #CCFBF1' : '1px solid #FDE68A',
+                    background: !isBlacklistBlocked && formData.isTaxDeductible ? '#F0FDFA' : '#FFFBEB',
+                    border: !isBlacklistBlocked && formData.isTaxDeductible ? '1px solid #CCFBF1' : '1px solid #FDE68A',
                     borderRadius: '12px',
                     padding: '12px 14px',
                     marginBottom: '14px',
@@ -707,22 +712,44 @@ export const CreateExpenseModal: FC<CreateExpenseModalProps> = ({
                       gap: '8px',
                       fontSize: '0.82rem',
                       fontWeight: 700,
-                      color: formData.isTaxDeductible ? '#115E59' : '#92400E',
-                      cursor: 'pointer',
+                      color: !isBlacklistBlocked && formData.isTaxDeductible ? '#115E59' : '#92400E',
+                      cursor: isBlacklistBlocked ? 'not-allowed' : 'pointer',
                     }}
                   >
                     <input
                       type="checkbox"
-                      checked={formData.isTaxDeductible}
+                      checked={!isBlacklistBlocked && formData.isTaxDeductible}
+                      disabled={isBlacklistBlocked}
                       onChange={(e) => handleChange('isTaxDeductible', e.target.checked)}
                     />
                     <span>
-                      {formData.isTaxDeductible
+                      {isOwnerSalaryBlocked
+                        ? 'Không được trừ thuế — Tiền lương/thù lao chủ hộ hoặc thành viên (Điểm c K2 Đ6 NĐ 68/2026)'
+                        : isBlacklistBlocked
+                        ? 'Khoản chi nội bộ / Không hợp lệ trừ thuế (Blacklist tự động loại)'
+                        : formData.isTaxDeductible
                         ? 'Chi phí hợp lệ được trừ thuế (Có hóa đơn/chứng từ SXKD)'
                         : 'Khoản chi nội bộ / Không hợp lệ trừ thuế (Blacklist)'}
                     </span>
                   </label>
-                  {formData.isTaxDeductible && (
+                  {isCashlessRequiredNotice && (
+                    <div
+                      role="alert"
+                      style={{
+                        marginTop: '8px',
+                        padding: '8px 10px',
+                        borderRadius: '8px',
+                        background: '#FEF2F2',
+                        border: '1px solid #FCA5A5',
+                        color: '#991B1B',
+                        fontSize: '0.76rem',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      <strong>⚠️ Lưu ý Điều 6 NĐ 68/2026 (≥ 5.000.000 đ):</strong> Khoản chi từ 5 triệu đồng trở lên bắt buộc phải thanh toán <strong>không dùng tiền mặt (Chuyển khoản NH)</strong> khi xuất quỹ và có đủ hóa đơn mới được trừ thuế TNCN.
+                    </div>
+                  )}
+                  {!isBlacklistBlocked && formData.isTaxDeductible && (
                     <div
                       style={{
                         display: 'grid',

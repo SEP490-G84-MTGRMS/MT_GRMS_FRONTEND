@@ -76,7 +76,7 @@ describe('Phase 8: Blacklist & Business Logic Audit (Gate 4)', () => {
       expect(calculateDaysOverdue('2026-11-05')).toBe(0);
     });
 
-    it('should calculate Household Tax according to Decree 141/2026 with 1B threshold', () => {
+    it('should calculate Household Tax according to Decree 68/2026, 141/2026 & 398/2026 with 1B threshold', () => {
       expect(TAX_CONFIG_HKD_2026.thresholdRevenue).toBe(1_000_000_000);
 
       // Below 1 billion: 0 tax
@@ -84,12 +84,15 @@ describe('Phase 8: Blacklist & Business Logic Audit (Gate 4)', () => {
       expect(resBelow.isOverThreshold).toBe(false);
       expect(resBelow.totalTaxAmount).toBe(0);
 
-      // Above 1 billion: tax on excess
+      // Above 1 billion: VAT on TOTAL (1% * 1.2B = 12M), PIT on EXCESS (0.5% * 200M = 1M) reduced 30% (NĐ 398) = 700,000 => Total = 12,700,000
       const resAbove = calculateHouseholdTax(1_200_000_000);
       expect(resAbove.isOverThreshold).toBe(true);
       expect(resAbove.excessRevenue).toBe(200_000_000);
-      // VAT 1% = 2,000,000; PIT 0.5% = 1,000,000 => Total = 3,000,000
-      expect(resAbove.totalTaxAmount).toBe(3_000_000);
+      expect(resAbove.vatAmount).toBe(12_000_000);
+      expect(resAbove.pitBeforeReduction).toBe(1_000_000);
+      expect(resAbove.pitReductionAmount).toBe(300_000);
+      expect(resAbove.pitAmount).toBe(700_000);
+      expect(resAbove.totalTaxAmount).toBe(12_700_000);
     });
 
     it('should verify customer credit limits and over-limit detection', () => {
