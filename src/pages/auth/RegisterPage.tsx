@@ -19,6 +19,7 @@ import { authService } from "../../features/auth/authService";
 import { getRegistrationPasswordStrength, validateRegistration, type RegistrationValidationError } from "../../features/auth/authValidation";
 import { AdminToast, type ToastState } from "../../features/admin/components/common/AdminToast";
 import { RegistrationOtpModal } from "../../features/auth/components/RegistrationOtpModal";
+import { AuthPolicyModal, type AuthPolicyDocType } from "../../features/auth/components/AuthPolicyModal";
 import { useAuthStore } from "../../stores/useAuthStore";
 
 export const isTrialRegistrationIntent = (intent: string | null) => intent === "trial";
@@ -37,6 +38,7 @@ export const RegisterPage: FC = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [policyModal, setPolicyModal] = useState<AuthPolicyDocType | null>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -521,8 +523,32 @@ export const RegisterPage: FC = () => {
             />
             <span style={{ fontSize: "12px", lineHeight: 1.45 }}>
               Tôi đồng ý với{" "}
-              <span className="auth-link-text">Điều khoản sử dụng</span> và{" "}
-              <span className="auth-link-text">Chính sách bảo mật</span>.
+              <button
+                type="button"
+                className="auth-link-text"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setPolicyModal("terms");
+                }}
+                style={{ background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer" }}
+              >
+                Điều khoản sử dụng
+              </button>{" "}
+              và{" "}
+              <button
+                type="button"
+                className="auth-link-text"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setPolicyModal("privacy");
+                }}
+                style={{ background: "none", border: "none", padding: 0, font: "inherit", cursor: "pointer" }}
+              >
+                Chính sách bảo mật
+              </button>
+              .
             </span>
           </label>
         </div>
@@ -559,6 +585,15 @@ export const RegisterPage: FC = () => {
         onClose={() => setIsOtpModalOpen(false)}
         onVerify={handleVerifyOtpAndCreateStore}
         onResend={handleResendRegistrationOtp}
+      />
+
+      <AuthPolicyModal
+        docType={policyModal}
+        onClose={() => setPolicyModal(null)}
+        onAccept={() => {
+          setAgreeTerms(true);
+          clearFieldError("agreeTerms");
+        }}
       />
 
       <div className="auth-bottom-switch-link">

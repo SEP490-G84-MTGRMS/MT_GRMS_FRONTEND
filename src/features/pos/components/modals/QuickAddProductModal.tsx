@@ -159,7 +159,7 @@ export const QuickAddProductModal: FC<Props> = ({ isOpen, onClose, onSaveAndAddT
             Bỏ qua
           </button>
           <button type="button" className="pos-btn-primary" onClick={handleSubmit}>
-            <b>✓ Lưu hàng hóa & Thêm vào giỏ</b>
+            <b>Lưu hàng hóa & Thêm vào giỏ</b>
           </button>
         </div>
       </div>

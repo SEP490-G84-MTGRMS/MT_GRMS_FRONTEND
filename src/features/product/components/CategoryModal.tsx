@@ -5,6 +5,7 @@ import type { Category } from '../types';
 interface CategoryModalProps {
   isOpen: boolean;
   categoryToEdit?: Category | null;
+  existingCategories?: Category[];
   onClose: () => void;
   onSave: (name: string, id?: string, code?: string, description?: string) => Promise<void> | void;
   onDelete?: (id: string) => Promise<void> | void;
@@ -13,6 +14,7 @@ interface CategoryModalProps {
 export const CategoryModal: React.FC<CategoryModalProps> = ({
   isOpen,
   categoryToEdit,
+  existingCategories = [],
   onClose,
   onSave,
   onDelete,
@@ -23,6 +25,8 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
   const [touched, setTouched] = useState<{ name?: boolean; code?: boolean; description?: boolean }>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [serverNameError, setServerNameError] = useState('');
+  const [serverCodeError, setServerCodeError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -33,6 +37,8 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setTouched({});
       setShowDeleteConfirm(false);
       setErrorMsg('');
+      setServerNameError('');
+      setServerCodeError('');
       setIsSubmitting(false);
     } else {
       setName('');
@@ -41,6 +47,8 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setTouched({});
       setShowDeleteConfirm(false);
       setErrorMsg('');
+      setServerNameError('');
+      setServerCodeError('');
       setIsSubmitting(false);
     }
   }, [categoryToEdit, isOpen]);
@@ -48,31 +56,62 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
   if (!isOpen) return null;
 
   const trimmedName = name.trim();
+  const isDuplicateName =
+    trimmedName !== '' &&
+    existingCategories.some(
+      (c) =>
+        c.id !== categoryToEdit?.id &&
+        (c.name || '').trim().toLowerCase() === trimmedName.toLowerCase()
+    );
   const nameError =
     touched.name && !trimmedName
       ? 'Vui lòng nhập tên nhóm hàng.'
       : trimmedName.length > 100
       ? 'Tên nhóm hàng không được vượt quá 100 ký tự.'
-      : '';
+      : isDuplicateName
+      ? `Nhóm hàng với tên "${trimmedName}" đã tồn tại trong hệ thống.`
+      : serverNameError;
 
   const trimmedCode = code.trim().toUpperCase();
+  const isDuplicateCode =
+    trimmedCode !== '' &&
+    existingCategories.some(
+      (c) =>
+        c.id !== categoryToEdit?.id &&
+        (c.code || '').trim().toUpperCase() === trimmedCode
+    );
   const codeError =
-    !categoryToEdit && code !== ''
+    code !== ''
       ? trimmedCode.length > 30
         ? 'Mã nhóm hàng không được vượt quá 30 ký tự.'
         : /\s/.test(code) || !/^[A-Z0-9_-]+$/.test(trimmedCode)
         ? 'Mã nhóm hàng chỉ gồm chữ cái không dấu, số, gạch ngang (-) hoặc gạch dưới (_).'
-        : ''
-      : '';
+        : isDuplicateCode
+        ? `Mã nhóm hàng "${trimmedCode}" đã tồn tại trong hệ thống.`
+        : serverCodeError
+      : serverCodeError;
 
   const descError =
     description.trim().length > 500
       ? 'Mô tả nhóm hàng không được vượt quá 500 ký tự.'
       : '';
 
+  const extractApiError = (err: any, fallback: string) => {
+    const apiData = err?.response?.data;
+    const errorCode: string | undefined = apiData?.errorCode;
+    const message: string =
+      apiData?.message ||
+      (Array.isArray(apiData?.errors) && apiData.errors.length > 0 ? apiData.errors.join(', ') : '') ||
+      err?.message ||
+      fallback;
+    return { errorCode, message };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ name: true, code: true, description: true });
+    setServerNameError('');
+    setServerCodeError('');
     if (!trimmedName) {
       setErrorMsg('Vui lòng nhập tên nhóm hàng.');
       return;
@@ -81,10 +120,18 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       setErrorMsg('Tên nhóm hàng không được vượt quá 100 ký tự.');
       return;
     }
+    if (isDuplicateName) {
+      setErrorMsg(`Nhóm hàng với tên "${trimmedName}" đã tồn tại trong hệ thống.`);
+      return;
+    }
 
-    if (!categoryToEdit && code !== '') {
+    if (code !== '') {
       if (trimmedCode.length > 30 || /\s/.test(code) || !/^[A-Z0-9_-]+$/.test(trimmedCode)) {
         setErrorMsg('Mã nhóm hàng chỉ gồm chữ cái không dấu, số, gạch ngang/dưới và tối đa 30 ký tự.');
+        return;
+      }
+      if (isDuplicateCode) {
+        setErrorMsg(`Mã nhóm hàng "${trimmedCode}" đã tồn tại trong hệ thống.`);
         return;
       }
     }
@@ -106,7 +153,18 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       );
       onClose();
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Có lỗi xảy ra khi lưu nhóm hàng.');
+      const { errorCode, message } = extractApiError(err, 'Có lỗi xảy ra khi lưu nhóm hàng.');
+      if (errorCode === 'CATEGORY_CODE_EXISTS') {
+        const msg = message || `Mã nhóm hàng "${trimmedCode}" đã tồn tại trong hệ thống.`;
+        setServerCodeError(msg);
+        setErrorMsg(msg);
+      } else if (errorCode === 'CATEGORY_NAME_EXISTS') {
+        const msg = message || `Nhóm hàng với tên "${trimmedName}" đã tồn tại trong hệ thống.`;
+        setServerNameError(msg);
+        setErrorMsg(msg);
+      } else {
+        setErrorMsg(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -126,7 +184,8 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
       await onDelete(categoryToEdit.id);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Không thể xóa nhóm hàng.');
+      const { message } = extractApiError(err, 'Không thể xóa nhóm hàng.');
+      setErrorMsg(message);
       setShowDeleteConfirm(false);
     } finally {
       setIsSubmitting(false);
@@ -205,6 +264,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                     onChange={(e) => {
                       setName(e.target.value);
                       setTouched((prev) => ({ ...prev, name: true }));
+                      setServerNameError('');
                       setErrorMsg('');
                     }}
                     onBlur={() => setTouched((prev) => ({ ...prev, name: true }))}
@@ -224,11 +284,9 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                     <label style={{ fontWeight: 600, fontSize: 13.5, color: '#334155' }}>
                       Mã nhóm hàng {categoryToEdit ? '' : <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}>(Tự sinh nếu để trống)</span>}
                     </label>
-                    {!categoryToEdit && (
-                      <span style={{ fontSize: 11.5, color: code.length > 30 ? '#dc2626' : '#94a3b8' }}>
-                        {code.length}/30
-                      </span>
-                    )}
+                    <span style={{ fontSize: 11.5, color: code.length > 30 ? '#dc2626' : '#94a3b8' }}>
+                      {code.length}/30
+                    </span>
                   </div>
                   <input
                     type="text"
@@ -245,10 +303,10 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
                     onChange={(e) => {
                       setCode(e.target.value.toUpperCase());
                       setTouched((prev) => ({ ...prev, code: true }));
+                      setServerCodeError('');
                       setErrorMsg('');
                     }}
                     onBlur={() => setTouched((prev) => ({ ...prev, code: true }))}
-                    disabled={Boolean(categoryToEdit)}
                   />
                   {codeError && (
                     <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>

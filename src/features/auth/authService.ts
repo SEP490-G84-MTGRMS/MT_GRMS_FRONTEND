@@ -12,6 +12,8 @@ import {
   type SendRegistrationOtpPayload,
   type SendRegistrationOtpResult,
   type ResetPasswordPayload,
+  type ChangePasswordPayload,
+  type UpdateProfilePayload,
   type UserProfile,
 } from './authTypes';
 
@@ -89,6 +91,13 @@ export const mapAuthProblemMessage = (
     EMAIL_UNAVAILABLE: 'Hệ thống gửi email OTP tạm thời gián đoạn. Vui lòng thử lại sau.',
     IDEMPOTENCY_PAYLOAD_MISMATCH: 'Thông tin đăng ký đã thay đổi so với lần gửi trước. Vui lòng thử lại.',
     IDEMPOTENCY_IN_PROGRESS: 'Yêu cầu đăng ký đang được xử lý. Vui lòng chờ trong giây lát.',
+    CURRENT_PASSWORD_REQUIRED: 'Vui lòng nhập mật khẩu hiện tại.',
+    INVALID_CURRENT_PASSWORD: 'Mật khẩu hiện tại không chính xác.',
+    PASSWORD_SAME_AS_OLD: 'Mật khẩu mới không được trùng với mật khẩu hiện tại.',
+    WEAK_PASSWORD: 'Mật khẩu mới phải có 8–64 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt và không có khoảng trắng.',
+    INVALID_FULL_NAME: 'Họ và tên phải có từ 2 đến 100 ký tự.',
+    INVALID_PHONE: 'Số điện thoại phải gồm 10 chữ số hợp lệ tại Việt Nam.',
+    PHONE_EXISTS: 'Số điện thoại này đã được sử dụng bởi một tài khoản khác.',
   };
   return map[normalized] || fallbackMessage || 'Không thể hoàn tất yêu cầu. Vui lòng thử lại.';
 };
@@ -251,6 +260,81 @@ export const authService = {
   async confirmTwoFactorChallenge(challengeToken: string, otpCode: string) {
     const response = await httpClient.post<any>('/auth/me/2fa/confirm', { challengeToken, otpCode });
     return response.data?.data || response.data;
+  },
+
+  async changePassword(payload: ChangePasswordPayload): Promise<{ message: string; user?: UserProfile }> {
+    try {
+      const response = await httpClient.post<any>('/auth/me/change-password', payload);
+      const unwrap = unwrapLogin(response.data);
+      const message =
+        response.data?.message ||
+        'Đổi mật khẩu thành công. Các phiên đăng nhập cũ trên thiết bị khác đã được thu hồi.';
+      return {
+        message,
+        user: unwrap?.user,
+      };
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+
+      const data = err.response?.data;
+      const status =
+        err.response?.status ??
+        data?.statusCode ??
+        data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
+
+      const errorCode =
+        data?.code ??
+        data?.errorCode ??
+        (status === 400 ? 'BAD_REQUEST' : 'CHANGE_PASSWORD_FAILED');
+
+      const rawMessage =
+        data?.detail ??
+        data?.message ??
+        data?.title ??
+        (status === 0
+          ? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.'
+          : 'Không thể đổi mật khẩu. Vui lòng thử lại.');
+
+      const message = mapAuthProblemMessage(errorCode, rawMessage);
+      throw new ApiError(status, message, errorCode, data, err.response);
+    }
+  },
+
+  async updateProfile(payload: UpdateProfilePayload): Promise<UserProfile> {
+    try {
+      const response = await httpClient.put<any>('/auth/me/profile', payload);
+      const unwrap = unwrapLogin(response.data);
+      if (!unwrap?.user) {
+        throw new Error('Dữ liệu phản hồi hồ sơ không hợp lệ.');
+      }
+      return unwrap.user;
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+      const data = err.response?.data;
+      const status =
+        err.response?.status ??
+        data?.statusCode ??
+        data?.status ??
+        (err.code === 'ERR_NETWORK' ? 0 : 500);
+      const errorCode =
+        data?.code ??
+        data?.errorCode ??
+        (status === 400 ? 'BAD_REQUEST' : 'UPDATE_PROFILE_FAILED');
+      const rawMessage =
+        data?.detail ??
+        data?.message ??
+        data?.title ??
+        (status === 0
+          ? 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra lại đường truyền.'
+          : 'Không thể cập nhật hồ sơ cá nhân. Vui lòng thử lại.');
+      const message = mapAuthProblemMessage(errorCode, rawMessage);
+      throw new ApiError(status, message, errorCode, data, err.response);
+    }
   },
 
   /**

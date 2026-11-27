@@ -64,6 +64,7 @@ export interface ShiftDetailResponse {
   openingDiscrepancy: number;
   totalCashIn: number;
   totalCashOut: number;
+  totalCashSales?: number;
   totalBankRevenue: number;
   totalOrdersCount: number;
   expectedCash: number;
@@ -130,6 +131,7 @@ export interface ZReportResponse {
   cashSales: number;
   totalCashIn: number;
   totalCashOut: number;
+  totalCashSales?: number;
   totalBankRevenue: number;
   totalOrdersCount: number;
   expectedCashInTill: number;

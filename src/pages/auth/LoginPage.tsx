@@ -21,6 +21,7 @@ export const LoginPage: FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectUrl = searchParams.get("redirect");
+  const isSessionExpired = searchParams.get("expired") === "1";
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [phoneOrEmail, setPhoneOrEmail] = useState("");
@@ -31,7 +32,7 @@ export const LoginPage: FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sessionExpiredNotice] = useState<string | null>(
-    redirectUrl
+    isSessionExpired
       ? "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại để tiếp tục."
       : null,
   );
@@ -47,12 +48,32 @@ export const LoginPage: FC = () => {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isResendingOtp, setIsResendingOtp] = useState(false);
 
+  const isAllowedRedirectForUser = (
+    target: string | null,
+    user: { isAdmin?: boolean; role: string },
+  ): target is string => {
+    if (!target) return false;
+    if (!target.startsWith("/") || target.startsWith("//") || target.startsWith("/\\")) {
+      return false;
+    }
+    if (target.startsWith("/auth") || target === "/login" || target === "/register") {
+      return false;
+    }
+    const isAdminUser = Boolean(user.isAdmin || user.role === "ADMIN");
+    if (target.startsWith("/admin")) {
+      return isAdminUser;
+    }
+    if (isAdminUser && (target.startsWith("/store-owner") || target.startsWith("/employee") || target.startsWith("/pos"))) {
+      return false;
+    }
+    if (user.role === "STAFF" && target.startsWith("/store-owner")) {
+      return false;
+    }
+    return true;
+  };
+
   const navigateByRole = (user: { isAdmin?: boolean; role: string }) => {
-    if (
-      redirectUrl &&
-      !redirectUrl.startsWith("/auth") &&
-      redirectUrl !== "/login"
-    ) {
+    if (isAllowedRedirectForUser(redirectUrl, user)) {
       navigate(redirectUrl, { replace: true });
       return;
     }

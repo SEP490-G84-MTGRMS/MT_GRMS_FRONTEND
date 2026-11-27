@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { Lock, AlertCircle, CheckCircle, X, CreditCard, Banknote, TrendingUp, BarChart3, AlertTriangle, Clock } from 'lucide-react';
 import { posShiftApi } from '../../api/posShiftApi';
 import type { ShiftDetailResponse, ShiftCashMovementDto } from '../../types/posShift.types';
+import { ConfirmDialog } from '../../../../components/common';
 
 interface Props {
   isOpen: boolean;
@@ -51,6 +52,9 @@ export const CloseShiftModal: FC<Props> = ({
   const [plannedEndTime, setPlannedEndTime] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [pendingCancelMovementId, setPendingCancelMovementId] = useState<string | null>(null);
 
   // Danh sách phiếu và trạng thái chờ duyệt
   const [movements, setMovements] = useState<ShiftCashMovementDto[]>(shift.cashMovements || []);
@@ -275,13 +279,21 @@ export const CloseShiftModal: FC<Props> = ({
     }));
   };
 
-  const handleCancelPendingMovement = async (id: string) => {
-    if (!window.confirm('Hủy yêu cầu chi này để mở khóa chốt ca?')) return;
+  const handleCancelPendingMovement = (id: string) => {
+    setPendingCancelMovementId(id);
+  };
+
+  const confirmCancelPendingMovement = async () => {
+    if (!pendingCancelMovementId) return;
+    const id = pendingCancelMovementId;
+    setPendingCancelMovementId(null);
+    setErrorMsg(null);
     try {
       await posShiftApi.cancelCashMovement(id);
       await refreshMovements();
+      setInfoMsg('Đã hủy yêu cầu chi đang chờ duyệt.');
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Không thể hủy yêu cầu chi');
+      setErrorMsg(err.response?.data?.message || 'Không thể hủy yêu cầu chi');
     }
   };
 
@@ -295,10 +307,11 @@ export const CloseShiftModal: FC<Props> = ({
     }
     setIsLoading(true);
     setErrorMsg(null);
+    setInfoMsg(null);
     try {
       const updated = await posShiftApi.startClosingShift(shift.id, { notes: notes.trim() || undefined });
       setCurrentShiftData(updated);
-      alert('Đã chuyển sang trạng thái kiểm đếm chốt ca (Closing). Toàn bộ quầy POS thuộc chi nhánh đã tạm thời khóa bán hàng để bảo toàn tiền két.');
+      setInfoMsg('Đã chuyển sang trạng thái kiểm đếm chốt ca (Closing). Toàn bộ quầy POS thuộc chi nhánh đã tạm thời khóa bán hàng để bảo toàn tiền két.');
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi bắt đầu chốt ca');
     } finally {
@@ -306,18 +319,23 @@ export const CloseShiftModal: FC<Props> = ({
     }
   };
 
-  const handleCancelClosing = async () => {
+  const handleCancelClosing = () => {
     if (notes.trim().length > 500) {
       setErrorMsg('Ghi chú tối đa 500 ký tự.');
       return;
     }
-    if (!window.confirm('Bạn có chắc muốn hủy chốt ca và mở lại quầy cho các thu ngân tiếp tục bán hàng?')) return;
+    setShowCancelConfirm(true);
+  };
+
+  const confirmCancelClosing = async () => {
+    setShowCancelConfirm(false);
     setIsLoading(true);
     setErrorMsg(null);
+    setInfoMsg(null);
     try {
       const updated = await posShiftApi.cancelClosingShift(shift.id, { reason: notes.trim() || 'Thu ngân mở lại quầy' });
       setCurrentShiftData(updated);
-      alert('Đã hủy chốt ca. Quầy POS của chi nhánh đã được mở lại để tiếp tục bán hàng.');
+      setInfoMsg('Đã hủy chốt ca. Quầy POS của chi nhánh đã được mở lại để tiếp tục bán hàng.');
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.message || 'Lỗi khi hủy chốt ca');
     } finally {
@@ -460,6 +478,11 @@ export const CloseShiftModal: FC<Props> = ({
             {errorMsg && (
               <div style={{ padding: '8px 12px', borderRadius: 6, backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: 13, border: '1px solid #fecaca' }}>
                 {errorMsg}
+              </div>
+            )}
+            {infoMsg && (
+              <div style={{ padding: '8px 12px', borderRadius: 6, backgroundColor: '#f0fdfa', color: '#0f766e', fontSize: 13, border: '1px solid #99f6e4' }}>
+                {infoMsg}
               </div>
             )}
 
@@ -1090,6 +1113,26 @@ export const CloseShiftModal: FC<Props> = ({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        isOpen={showCancelConfirm}
+        title="Hủy chốt ca & mở lại quầy bán"
+        message="Bạn có chắc muốn hủy trạng thái kiểm đếm chốt ca và mở lại quầy cho các thu ngân tiếp tục bán hàng?"
+        confirmLabel="Xác nhận mở lại quầy"
+        cancelLabel="Quay lại"
+        variant="warning"
+        onConfirm={confirmCancelClosing}
+        onCancel={() => setShowCancelConfirm(false)}
+      />
+      <ConfirmDialog
+        isOpen={Boolean(pendingCancelMovementId)}
+        title="Hủy yêu cầu chi chờ duyệt"
+        message="Hủy yêu cầu chi này để mở khóa chốt ca?"
+        confirmLabel="Hủy yêu cầu chi"
+        cancelLabel="Quay lại"
+        variant="danger"
+        onConfirm={confirmCancelPendingMovement}
+        onCancel={() => setPendingCancelMovementId(null)}
+      />
     </div>
   );
 };

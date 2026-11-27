@@ -24,7 +24,8 @@ export interface PlanTenantSummary {
   activeBranches: number;
   activeEmployees: number;
   joinedDate: string;
-  expiryDate: string;
+  expiryDate?: string | null;
+  status?: string;
 }
 
 export interface SubscriptionPlan {

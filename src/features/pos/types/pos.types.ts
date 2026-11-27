@@ -35,6 +35,8 @@ export class ProductDTO {
     batchId?: string;
   expiryDate?: string;
   shelfLocation?: string;
+  /** Phần trăm giảm giá cận date FEFO đang hiệu lực cho lô bán tự động ưu tiên đầu tiên. */
+  fefoDiscountPercent?: number;
   unitPrices?: Array<{
     unitId?: string;
     unitName: string;
@@ -118,6 +120,7 @@ export class OrderTabDTO {
   couponCode: string = '';
   couponDiscount: number = 0;
   usePoints: boolean = false;
+  pointsToRedeem?: number;
   note: string = '';
   paymentMethod: 'cash' | 'vietqr' | 'debt' = 'cash';
   cashTendered: number = 0;

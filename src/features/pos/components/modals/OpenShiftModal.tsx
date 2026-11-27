@@ -314,7 +314,7 @@ export const OpenShiftModal: FC<Props> = ({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0f766e', fontSize: 13, fontWeight: 700 }}>
                   <Banknote size={17} />
-                  <span>Kế thừa tiền bàn giao ca trước (A_expected):</span>
+                  <span>Kế thừa tiền bàn giao ca trước:</span>
                 </div>
                 <div
                   style={{
@@ -343,7 +343,7 @@ export const OpenShiftModal: FC<Props> = ({
                     marginBottom: 6,
                   }}
                 >
-                  Tiền mặt thực tế trong két khi mở ca (A) (*):
+                  Tiền mặt thực tế trong két khi mở ca (*):
                 </label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
@@ -435,7 +435,7 @@ export const OpenShiftModal: FC<Props> = ({
                 }}
               >
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: '#134e4a' }}>
-                  Chênh lệch đầu ca (A - A_expected):
+                  Chênh lệch đầu ca:
                 </span>
                 <span
                   style={{
@@ -450,7 +450,7 @@ export const OpenShiftModal: FC<Props> = ({
                   }}
                 >
                   {discrepancy === 0 ? (
-                    '✓ Khớp 100% (0 đ)'
+                    'Khớp 100% (0 đ)'
                   ) : discrepancy > 0 ? (
                     `+${discrepancy.toLocaleString('vi-VN')} đ (Thừa tiền)`
                   ) : (

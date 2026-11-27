@@ -28,7 +28,13 @@ export function mapBackendPlanToFrontend(dto: BackendPlanDto): SubscriptionPlan 
       barcodeScanning: true,
       financialReporting: false,
     },
-    tenants: dto.tenants || [],
+    tenants: (dto.tenants || []).map((t) => ({
+      ...t,
+      expiryDate: t.expiryDate
+        ? new Date(t.expiryDate).toLocaleDateString('vi-VN')
+        : 'Chưa giới hạn',
+      status: t.status || 'ACTIVE',
+    })),
     createdAt: dto.createdAt || new Date().toISOString(),
     updatedAt: dto.updatedAt || dto.createdAt || new Date().toISOString(),
   };

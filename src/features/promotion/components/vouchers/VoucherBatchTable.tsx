@@ -1,10 +1,9 @@
-import { useState, type FC, Fragment } from 'react';
+import { useState, useEffect, type FC, Fragment } from 'react';
 import {
   ChevronDown,
   ChevronRight,
   Copy,
   PlusCircle,
-  Calendar,
   Ticket,
   Percent,
   Check,
@@ -20,12 +19,13 @@ import type {
   VoucherCodeStatus,
   VoucherCodeItem,
 } from '../../types/promotion.types';
-import { TablePagination } from '../../../../components/common';
+import { TablePagination, SortableHeader, useTableSort } from '../../../../components/common';
 import { promotionApi } from '../../api/promotionApi';
 import { VoucherPrintModal } from './VoucherPrintModal';
 
 interface VoucherBatchTableProps {
   batches: VoucherBatchItem[];
+  codesRefreshSignal?: { batchId: string; version: number } | null;
   onOpenGenerateCodes: (batch: VoucherBatchItem) => void;
   onToggleBatchStatus: (batchId: string) => void;
   onEdit: (batch: VoucherBatchItem) => void;
@@ -34,6 +34,7 @@ interface VoucherBatchTableProps {
 
 export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   batches,
+  codesRefreshSignal,
   onOpenGenerateCodes,
   onToggleBatchStatus,
   onEdit,
@@ -75,6 +76,19 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
     setPrintModalState((prev) => ({ ...prev, isOpen: false }));
   };
 
+  const formatUsedAtLocal = (raw?: string): string | undefined => {
+    if (!raw) return undefined;
+    const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw) ? raw : `${raw}Z`;
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) return raw.slice(0, 16).replace('T', ' ');
+    const dd = String(parsed.getDate()).padStart(2, '0');
+    const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+    const yyyy = parsed.getFullYear();
+    const hh = String(parsed.getHours()).padStart(2, '0');
+    const min = String(parsed.getMinutes()).padStart(2, '0');
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+  };
+
   const fetchCodesForBatch = async (batchId: string) => {
     setLoadingCodesMap((prev) => ({ ...prev, [batchId]: true }));
     try {
@@ -87,7 +101,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
           customerName: dto.customerName,
           customerPhone: dto.customerPhone,
           orderCode: dto.orderCode,
-          usedAt: dto.usedAt?.slice(0, 16).replace('T', ' '),
+          usedAt: formatUsedAtLocal(dto.usedAt),
           createdAt: dto.createdAt?.slice(0, 10),
         }));
         setBatchCodesMap((prev) => ({ ...prev, [batchId]: mapped }));
@@ -99,7 +113,18 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
     }
   };
 
-  const paginatedBatches = batches.slice(
+  const { sort, handleSort, sortedItems } = useTableSort(batches, {
+    batchCode: (b) => b.batchCode,
+    name: (b) => b.name,
+    discountValue: (b) => b.discountValue,
+    usedQuantity: (b) => b.usedQuantity,
+    totalQuantity: (b) => b.totalQuantity,
+    startDate: (b) => b.startDate,
+    endDate: (b) => b.endDate,
+    status: (b) => b.status,
+  });
+
+  const paginatedBatches = sortedItems.slice(
     (currentPage - 1) * pageSize,
     currentPage * pageSize
   );
@@ -113,6 +138,12 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
       return next;
     });
   };
+
+  useEffect(() => {
+    if (codesRefreshSignal?.batchId) {
+      fetchCodesForBatch(codesRefreshSignal.batchId);
+    }
+  }, [codesRefreshSignal]);
 
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -200,42 +231,49 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
   return (
     <div className="so-list-table-card so-list-table-card--wrap promotion-card" style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
       <div className="table-responsive" style={{ width: '100%', flex: '1 1 auto', minHeight: 0, overflowX: 'auto', overflowY: 'auto' }}>
-        <table className="so-list-table promotion-table" style={{ minWidth: 1450, width: '100%', tableLayout: 'fixed' }}>
+        <table className="so-list-table promotion-table" style={{ minWidth: 1410, width: '100%', tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: 44 }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 220 }} />
-            <col style={{ width: 130 }} />
-            <col style={{ width: 165 }} />
-            <col style={{ width: 140 }} />
-            <col style={{ width: 165 }} />
-            <col style={{ width: 180 }} />
-            <col style={{ width: 250 }} />
+            <col style={{ width: 36 }} />
+            <col style={{ width: 116 }} />
+            <col />
+            <col style={{ width: 145 }} />
+            <col style={{ width: 168 }} />
+            <col style={{ width: 82 }} />
+            <col style={{ width: 94 }} />
+            <col style={{ width: 108 }} />
+            <col style={{ width: 108 }} />
+            <col style={{ width: 166 }} />
+            <col style={{ width: 208 }} />
           </colgroup>
           <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: '#f8fafc' }}>
             <tr>
-              <th style={{ ...thStyle, width: 44, padding: '8px 8px', textAlign: 'center' }}></th>
-              <th style={{ ...thStyle, width: 110 }}>Mã đợt</th>
-              <th style={{ ...thStyle, width: 220 }}>Tên đợt Voucher / Coupon</th>
-              <th style={{ ...thStyle, width: 130 }}>Loại ưu đãi</th>
-              <th style={{ ...thStyle, width: 165 }}>Điều kiện áp dụng</th>
-              <th style={{ ...thStyle, width: 140 }}>Đã dùng / Phát hành</th>
-              <th style={{ ...thStyle, width: 165 }}>Thời gian hiệu lực</th>
-              <th style={{ ...thStyle, width: 180 }}>Trạng thái</th>
-              <th style={{ ...thStyle, width: 250, textAlign: 'right', paddingRight: 16 }}>Thao tác</th>
+              <th style={{ ...thStyle, width: 36, padding: '8px 6px', textAlign: 'center' }}></th>
+              <th style={{ ...thStyle, width: 116 }}><SortableHeader label="Mã đợt" active={sort.key === 'batchCode'} direction={sort.direction} onClick={() => handleSort('batchCode')} /></th>
+              <th style={{ ...thStyle }}><SortableHeader label="Tên đợt Voucher" active={sort.key === 'name'} direction={sort.direction} onClick={() => handleSort('name')} /></th>
+              <th style={{ ...thStyle, width: 145 }}><SortableHeader label="Loại ưu đãi" active={sort.key === 'discountValue'} direction={sort.direction} onClick={() => handleSort('discountValue')} /></th>
+              <th style={{ ...thStyle, width: 168 }}>Điều kiện áp dụng</th>
+              <th style={{ ...thStyle, width: 82, textAlign: 'right' }}><SortableHeader label="Đã dùng" align="right" active={sort.key === 'usedQuantity'} direction={sort.direction} onClick={() => handleSort('usedQuantity')} /></th>
+              <th style={{ ...thStyle, width: 94, textAlign: 'right' }}><SortableHeader label="Phát hành" align="right" active={sort.key === 'totalQuantity'} direction={sort.direction} onClick={() => handleSort('totalQuantity')} /></th>
+              <th style={{ ...thStyle, width: 108, whiteSpace: 'nowrap' }}><SortableHeader label="Bắt đầu" active={sort.key === 'startDate'} direction={sort.direction} onClick={() => handleSort('startDate')} /></th>
+              <th style={{ ...thStyle, width: 108, whiteSpace: 'nowrap' }}><SortableHeader label="Hết hạn" active={sort.key === 'endDate'} direction={sort.direction} onClick={() => handleSort('endDate')} /></th>
+              <th style={{ ...thStyle, width: 166 }}><SortableHeader label="Trạng thái" active={sort.key === 'status'} direction={sort.direction} onClick={() => handleSort('status')} /></th>
+              <th style={{ ...thStyle, width: 208, textAlign: 'right', paddingRight: 14 }}>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {batches.length === 0 ? (
               <tr>
-                <td colSpan={9} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
+                <td colSpan={11} style={{ textAlign: 'center', padding: '40px 16px', color: '#64748b' }}>
                   Không tìm thấy đợt voucher nào phù hợp.
                 </td>
               </tr>
             ) : (
               paginatedBatches.map((batch) => {
                 const isExpanded = expandedId === batch.id;
-                const usagePercent = Math.round((batch.usedQuantity / batch.totalQuantity) * 100);
+                const usagePercent =
+                  batch.totalQuantity > 0
+                    ? Math.min(100, Math.round((batch.usedQuantity / batch.totalQuantity) * 100))
+                    : 0;
                 const cleanDescription = batch.description
                   ? batch.description.replace(/\[CONFIG_JSON\][\s\S]*?\[\/CONFIG_JSON\]/g, '').trim()
                   : '';
@@ -316,64 +354,53 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
                       <td className="so-list-td">
                         <div className="voucher-conditions" style={{ whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
                           <div>
-                            Đơn tối thiểu: <strong>{batch.minOrderValue.toLocaleString('vi-VN')} đ</strong>
+                            Đơn tối thiểu: <strong style={{ whiteSpace: 'nowrap' }}>{batch.minOrderValue.toLocaleString('vi-VN')} đ</strong>
                           </div>
                           {batch.maxDiscount && (
                             <div style={{ color: '#64748b' }}>
-                              Giảm tối đa: {batch.maxDiscount.toLocaleString('vi-VN')} đ
+                              Giảm tối đa: <span style={{ whiteSpace: 'nowrap' }}>{batch.maxDiscount.toLocaleString('vi-VN')} đ</span>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="so-list-td">
-                        <div className="voucher-usage-container">
-                          <div className="voucher-usage-text">
-                            <span>{batch.usedQuantity} / {batch.totalQuantity}</span>
-                            <span style={{ color: '#0F766E' }}>{usagePercent}%</span>
-                          </div>
-                          <div className="voucher-progress-track">
-                            <div
-                              className="voucher-progress-fill"
-                              style={{ width: `${Math.min(100, usagePercent)}%` }}
-                            />
-                          </div>
-                        </div>
+                      <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                        <span style={{ fontWeight: 700, color: '#0f172a' }}>{batch.usedQuantity}</span>
+                        <span style={{ display: 'block', fontSize: 11, color: '#0F766E' }}>{usagePercent}%</span>
                       </td>
-                      <td className="so-list-td">
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12 }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
-                            <Calendar size={12} style={{ color: '#0f766e', flexShrink: 0 }} />
-                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Từ:</span>
-                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{batch.startDate}</span>
-                          </div>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#334155' }}>
-                            <span style={{ width: 12, display: 'inline-block', flexShrink: 0 }} />
-                            <span style={{ color: '#64748b', fontSize: 11, minWidth: 24 }}>Đến:</span>
-                            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 }}>{batch.endDate}</span>
-                          </div>
-                        </div>
+                      <td className="so-list-td" style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: '#334155' }}>
+                        {batch.totalQuantity}
                       </td>
-                      <td className="so-list-td" style={{ overflow: 'hidden', padding: '8px 10px', boxSizing: 'border-box' }}>
+                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
+                        {batch.startDate ? batch.startDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1') : '—'}
+                      </td>
+                      <td className="so-list-td" style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12, fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>
+                        {batch.endDate ? batch.endDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1') : '—'}
+                      </td>
+                      <td className="so-list-td" style={{ overflow: 'hidden', padding: '8px 12px 8px 10px', boxSizing: 'border-box' }}>
                         <div className="promo-status-cell" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
-                          <div
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={batch.status === 'ACTIVE'}
+                            aria-label={batch.status === 'ACTIVE' ? `Tạm dừng đợt ${batch.batchCode}` : `Kích hoạt đợt ${batch.batchCode}`}
                             className="switch-container"
                             onClick={() => onToggleBatchStatus(batch.id)}
                             title={batch.status === 'ACTIVE' ? 'Tạm dừng đợt phát hành' : 'Kích hoạt đợt'}
-                            style={{ flexShrink: 0 }}
+                            style={{ flexShrink: 0, border: 'none', background: 'transparent', padding: 0 }}
                           >
-                            <div className={`switch-track ${batch.status === 'ACTIVE' ? 'switch-active' : ''}`}>
-                              <div className="switch-thumb" />
-                            </div>
-                          </div>
+                            <span className={`switch-track ${batch.status === 'ACTIVE' ? 'switch-active' : ''}`}>
+                              <span className="switch-thumb" />
+                            </span>
+                          </button>
                           {renderBatchStatus(batch.status)}
                         </div>
                       </td>
-                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden', padding: '8px 14px', boxSizing: 'border-box' }}>
-                        <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'nowrap', maxWidth: '100%' }}>
+                      <td className="so-list-td so-list-td--actions" style={{ textAlign: 'right', overflow: 'hidden', padding: '8px 14px 8px 12px', boxSizing: 'border-box' }}>
+                        <div className="table-actions" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end', flexWrap: 'nowrap', maxWidth: '100%' }}>
                           <button
                             onClick={() => onOpenGenerateCodes(batch)}
                             className="btn-secondary-pill"
-                            style={{ padding: '3px 8px', fontSize: '11.5px', height: 28, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                            style={{ padding: '3px 7px', fontSize: '11.5px', height: 28, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
                             title="Phát hành thêm mã cho đợt này"
                           >
                             <PlusCircle size={13} color="#0F766E" />
@@ -407,7 +434,7 @@ export const VoucherBatchTable: FC<VoucherBatchTableProps> = ({
 
                       return (
                         <tr>
-                          <td colSpan={9} style={{ padding: 0 }}>
+                          <td colSpan={11} style={{ padding: 0 }}>
                             <div className="accordion-wrapper">
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                                 <div className="accordion-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -131,13 +131,13 @@ export const CategoryListPage: React.FC = () => {
     description?: string
   ) => {
     if (id) {
-      await categoryApi.updateCategory(id, { name, description });
+      const updated = await categoryApi.updateCategory(id, { name, code, description });
       setNotificationModal({
         isOpen: true,
         type: 'success',
         title: 'Cập nhật nhóm hàng thành công',
-        message: `Nhóm hàng "${name}" đã được cập nhật thông tin mới.`,
-        itemCode: code,
+        message: `Nhóm hàng "${updated.name || name}" đã được cập nhật thông tin mới.`,
+        itemCode: updated.code || updated.categoryCode || code,
       });
     } else {
       const created = await categoryApi.createCategory({ name, code, description });
@@ -610,6 +610,7 @@ export const CategoryListPage: React.FC = () => {
       <CategoryModal
         isOpen={isCategoryModalOpen}
         categoryToEdit={categoryToEdit}
+        existingCategories={categories}
         onClose={() => setIsCategoryModalOpen(false)}
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}

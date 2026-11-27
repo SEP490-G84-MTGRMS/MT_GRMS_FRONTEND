@@ -11,17 +11,35 @@ export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
   storeInfo,
   onNavigateBranches,
 }) => {
+  const days = storeInfo.daysRemaining;
+  const expiryBadgeStyle =
+    days <= 7
+      ? {
+          backgroundColor: '#FFF0F0',
+          color: '#FF3B30',
+          border: '1px solid #FFD6D6',
+        }
+      : days <= 15
+        ? {
+            backgroundColor: '#FFF8EB',
+            color: '#FF9500',
+            border: '1px solid #FFE8CC',
+          }
+        : {
+            backgroundColor: '#E8F9EE',
+            color: '#008738',
+            border: '1px solid #BBF7D0',
+          };
+
   return (
     <div className="store-top-status-bar">
-      {/* 1. Gói hiện tại */}
       <div className="store-status-col">
         <span className="store-status-label">Gói hiện tại</span>
         <div className="store-status-value">
-          <span className="store-badge-trial">{storeInfo.currentPlan}</span>
+          <span className="store-badge-trial">{storeInfo.currentPlan || 'Chưa kích hoạt'}</span>
         </div>
       </div>
 
-      {/* 2. Số chi nhánh */}
       <div
         className="store-status-col"
         onClick={onNavigateBranches}
@@ -36,18 +54,29 @@ export const StoreTopStatusBar: FC<StoreTopStatusBarProps> = ({
         </div>
       </div>
 
-      {/* 3. Tên cửa hàng */}
       <div className="store-status-col">
         <span className="store-status-label">Tên cửa hàng</span>
-        <div className="store-status-value">{storeInfo.name}</div>
+        <div className="store-status-value">{storeInfo.name || '—'}</div>
       </div>
 
-      {/* 4. Hạn sử dụng còn */}
       <div className="store-status-col">
         <span className="store-status-label">Hạn sử dụng còn</span>
         <div className="store-status-value">
-          <span className="store-badge-warning-red">
-            {storeInfo.daysRemaining} ngày
+          <span
+            className={days <= 7 ? 'store-badge-warning-red' : undefined}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '3px 12px',
+              borderRadius: 9999,
+              fontSize: 12.5,
+              fontWeight: 700,
+              fontFamily: 'var(--font-mono)',
+              fontVariantNumeric: 'tabular-nums',
+              ...expiryBadgeStyle,
+            }}
+          >
+            {days} ngày
           </span>
         </div>
       </div>

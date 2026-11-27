@@ -75,6 +75,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'VIETQR'>('CASH');
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Khuyến mãi tự động cho Đơn đặt trước (KHÔNG áp dụng mã Voucher dùng 1 lần - REQ-ORD-PRE-01)
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
@@ -132,7 +133,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
           setAppliedPromoLabels((res.appliedPromotions || []).filter((p) => !p.startsWith('Voucher [')));
           setGiftItems(res.giftItems || []);
         })
-        .catch(() => {});
+        .catch(() => { });
     }, 300);
 
     return () => {
@@ -284,31 +285,32 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    setErrorMsg(null);
     const normalizedPhone = customerPhone.trim().replace(/[\s().-]/g, '');
     const selectedCustomer = customerList.find(customer => customer.id === selectedCustomerId);
     if (!selectedCustomer || selectedCustomer.phone.replace(/[\s().-]/g, '') !== normalizedPhone) {
-      alert('Vui lòng chọn khách hàng định danh từ danh sách gợi ý.');
+      setErrorMsg('Vui lòng chọn khách hàng định danh từ danh sách gợi ý.');
       return;
     }
     if (!/^\+?\d{9,15}$/.test(normalizedPhone) || customerName.trim().length < 2 || customerName.trim().length > 100) {
-      alert('Thông tin tên hoặc số điện thoại khách hàng không hợp lệ.');
+      setErrorMsg('Thông tin tên hoặc số điện thoại khách hàng không hợp lệ.');
       return;
     }
     const pickupTime = new Date(expectedDate).getTime();
     if (!Number.isFinite(pickupTime) || pickupTime <= Date.now()) {
-      alert('Thời gian hẹn nhận hàng phải sau thời điểm hiện tại.');
+      setErrorMsg('Thời gian hẹn nhận hàng phải sau thời điểm hiện tại.');
       return;
     }
     if (!Number.isSafeInteger(depositAmount) || depositAmount < 0 || !Number.isFinite(totalAmount)) {
-      alert('Tiền cọc phải là số nguyên không âm và tổng tiền phải hợp lệ.');
+      setErrorMsg('Tiền cọc phải là số nguyên không âm và tổng tiền phải hợp lệ.');
       return;
     }
     if (note.trim().length > 500) {
-      alert('Ghi chú tối đa 500 ký tự.');
+      setErrorMsg('Ghi chú tối đa 500 ký tự.');
       return;
     }
     if (orderItems.length === 0) {
-      alert('Vui lòng chọn ít nhất 1 mặt hàng cần đặt trước!');
+      setErrorMsg('Vui lòng chọn ít nhất 1 mặt hàng cần đặt trước!');
       return;
     }
 
@@ -316,7 +318,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
     const productBaseQtyMap = new Map<string, { totalBaseQty: number; name: string; quantityOnHand: number; baseUnit: string }>();
     for (const item of orderItems) {
       if (!Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.conversionRate) || item.conversionRate <= 0 || !Number.isFinite(item.unitPrice) || item.unitPrice < 0) {
-        alert(`Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng không hợp lệ (phải > 0). Vui lòng nhập lại số lượng!`);
+        setErrorMsg(`Sản phẩm "${item.product.name}" (${item.unitName}) có số lượng không hợp lệ (phải > 0). Vui lòng nhập lại số lượng!`);
         return;
       }
       const existing = productBaseQtyMap.get(item.product.id) || {
@@ -331,7 +333,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
     for (const [, info] of productBaseQtyMap) {
       if (info.totalBaseQty > info.quantityOnHand) {
-        alert(
+        setErrorMsg(
           `Tổng số lượng quy đổi của sản phẩm "${info.name}" (${info.totalBaseQty} ${info.baseUnit}) vượt quá tồn kho khả dụng (${info.quantityOnHand} ${info.baseUnit})! Vui lòng giảm số lượng.`
         );
         return;
@@ -340,17 +342,17 @@ export const CreatePreOrderModal: React.FC<Props> = ({
 
     // Kiểm tra số điện thoại khách hàng
     if (!customerPhone.trim()) {
-      alert('Vui lòng nhập số điện thoại khách hàng!');
+      setErrorMsg('Vui lòng nhập số điện thoại khách hàng!');
       return;
     }
 
     if (depositAmount < minDeposit) {
-      alert(`Tiền đặt cọc tối thiểu phải bằng 10% tổng tiền đơn hàng (${minDeposit.toLocaleString('vi-VN')} đ)!`);
+      setErrorMsg(`Tiền đặt cọc tối thiểu phải bằng 10% tổng tiền đơn hàng (${minDeposit.toLocaleString('vi-VN')} đ)!`);
       return;
     }
 
     if (depositAmount > totalAmount) {
-      alert(`Tiền đặt cọc không được vượt quá tổng giá trị đơn hàng (${totalAmount.toLocaleString('vi-VN')} đ)!`);
+      setErrorMsg(`Tiền đặt cọc không được vượt quá tổng giá trị đơn hàng (${totalAmount.toLocaleString('vi-VN')} đ)!`);
       return;
     }
 
@@ -383,7 +385,10 @@ export const CreatePreOrderModal: React.FC<Props> = ({
         customerId: selectedCustomerId,
         customerName: customerName.trim() || 'Khách lẻ',
         customerPhone: normalizedPhone,
-        expectedPickupDate: expectedDate,
+        expectedPickupDate:
+          expectedDate && !/(?:Z|[+-]\d{2}:?\d{2})$/i.test(expectedDate)
+            ? `${expectedDate.length === 16 ? `${expectedDate}:00` : expectedDate}+07:00`
+            : expectedDate,
         items: [...paidPayloadItems, ...giftPayloadItems],
         depositAmount,
         paymentMethod,
@@ -394,7 +399,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
       });
       onClose();
     } catch (e: any) {
-      alert(`Lỗi khi tạo đơn đặt trước: ${e?.message || 'Không thể kết nối máy chủ'}`);
+      setErrorMsg(`Lỗi khi tạo đơn đặt trước: ${e?.response?.data?.message || e?.message || 'Không thể kết nối máy chủ'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -409,6 +414,12 @@ export const CreatePreOrderModal: React.FC<Props> = ({
         </div>
 
         <div className="pos-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', padding: '16px' }}>
+          {errorMsg && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 12px', marginBottom: 12, borderRadius: 6, backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: 12.5, fontWeight: 500 }}>
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{errorMsg}</span>
+            </div>
+          )}
           {/* Thông tin chi nhánh hiển thị gọn gàng */}
           <div style={{ fontSize: 12.5, color: '#64748b', marginBottom: 14 }}>
             Chi nhánh tiếp nhận: <b style={{ color: '#0f766e' }}>{branchName}</b>
@@ -883,7 +894,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
                 </div>
                 {giftItems.map((g, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#166534' }}>
-                    <span>✦ {g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})</span>
+                    <span>{g.productName} (x{g.quantity}{g.unitName ? ` ${g.unitName}` : ''})</span>
                     <b>0 đ</b>
                   </div>
                 ))}
@@ -981,7 +992,7 @@ export const CreatePreOrderModal: React.FC<Props> = ({
             disabled={isSubmitting || orderItems.length === 0}
             style={{ padding: '8px 18px', fontSize: 13.5 }}
           >
-            {isSubmitting ? 'Đang tạo đơn...' : '✓ Xác Nhận Tạo Đơn'}
+            {isSubmitting ? 'Đang tạo đơn...' : 'Xác Nhận Tạo Đơn'}
           </button>
         </div>
       </div>

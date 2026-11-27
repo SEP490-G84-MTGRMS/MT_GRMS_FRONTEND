@@ -130,8 +130,19 @@ export const ForgotPasswordPage: FC = () => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (newPassword.length < 8) {
-      setErrorMessage("Mật khẩu mới phải có tối thiểu 8 ký tự.");
+    const hasStrongPassword =
+      newPassword.length >= 8 &&
+      newPassword.length <= 64 &&
+      !/\s/.test(newPassword) &&
+      /[A-Z]/.test(newPassword) &&
+      /[a-z]/.test(newPassword) &&
+      /[0-9]/.test(newPassword) &&
+      /[^A-Za-z0-9]/.test(newPassword);
+
+    if (!hasStrongPassword) {
+      setErrorMessage(
+        "Mật khẩu mới phải có 8–64 ký tự, gồm chữ hoa, chữ thường, số, ký tự đặc biệt và không có khoảng trắng.",
+      );
       return;
     }
 
@@ -324,11 +335,12 @@ export const ForgotPasswordPage: FC = () => {
               <input
                 id="otp-input"
                 type="text"
+                inputMode="numeric"
                 className="auth-styled-input auth-otp-input"
                 placeholder="VD: 123456"
                 maxLength={6}
                 value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 disabled={isLoading}
                 autoFocus
                 required

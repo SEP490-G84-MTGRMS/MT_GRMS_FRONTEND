@@ -310,13 +310,13 @@ export const OwnerShiftModeModal: React.FC<OwnerShiftModeModalProps> = ({
                   )}
                 </div>
                 <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
-                  Tự giữ / Cất két sắt
+                  Bán ngoài ca · Két sắt
                 </h4>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>
                   Bán riêng không gắn ca
                 </div>
                 <p style={{ margin: 0, fontSize: '12.5px', color: '#64748b', lineHeight: 1.5 }}>
-                  Tiền mặt bạn tự giữ hoặc cất thẳng vào két sắt. Ngăn kéo quầy của nhân viên giữ nguyên độc lập, nhân viên không phải kiểm đếm tiền này.
+                  Tiền mặt được ghi vào két sắt chi nhánh. Vui lòng cất tiền vào két sắt.
                 </p>
               </div>
 
