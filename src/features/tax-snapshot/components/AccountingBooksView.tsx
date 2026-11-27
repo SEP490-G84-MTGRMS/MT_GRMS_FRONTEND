@@ -238,8 +238,8 @@ export const AccountingBooksView: FC<Props> = ({ summary, year, periodType, peri
       code: 'S3a',
       name: 'Sổ theo dõi tình hình thực hiện nghĩa vụ thuế với NSNN',
       templateCode: 'Mẫu số S3a-HKD',
-      label: 'S3a (Thuế khác)',
-      desc: 'Theo dõi phát sinh và nộp các loại thuế (GTGT, TNCN, TTĐB, BVMT, Môn bài)',
+      label: 'S3a (Nghĩa vụ thuế)',
+      desc: 'Theo dõi phát sinh và nộp các loại thuế vào NSNN (GTGT, TNCN, TTĐB, BVMT; Lệ phí môn bài đã bãi bỏ từ 01/01/2026)',
     },
   ], [summary?.householdGroup, isDeclaration]);
 

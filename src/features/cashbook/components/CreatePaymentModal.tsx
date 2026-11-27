@@ -285,8 +285,8 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
                     <option value={`Quý 2/${currentYear}`}>Thuế Quý 2/{currentYear} (Kê khai theo quý)</option>
                     <option value={`Quý 3/${currentYear}`}>Thuế Quý 3/{currentYear} (Kê khai theo quý)</option>
                     <option value={`Quý 4/${currentYear}`}>Thuế Quý 4/{currentYear} (Kê khai theo quý)</option>
-                    <option value={`Năm ${currentYear}`}>Lệ phí Môn bài năm {currentYear}</option>
-                    <option value="Thuế khoán / Khác">Thuế khoán / Truy thu khác</option>
+                    <option value={`Quyết toán năm ${currentYear}`}>Quyết toán thuế TNCN năm {currentYear} (Hạn 31/03 năm sau)</option>
+                    <option value="Truy thu / Nợ cũ">Truy thu / Nợ thuế các năm trước (≤ 2025)</option>
                   </select>
                 </div>
 
@@ -312,7 +312,15 @@ export const CreatePaymentModal: FC<CreatePaymentModalProps> = ({
               <div className="cb-form-group">
                 <label className="cb-form-label">Số hoặc mã chứng từ *</label>
                 <input className="cb-form-input" value={taxReferenceDocId} maxLength={100} onChange={(e) => setTaxReferenceDocId(e.target.value)} placeholder="Ví dụ: HD-000123" />
-                <p className="cb-field-hint"><Info size={13} /> Bắt buộc để ghi nhận chi phí được trừ.</p>
+                <p className="cb-field-hint"><Info size={13} /> Bắt buộc để ghi nhận chi phí được trừ theo Điều 6 NĐ 68/2026.</p>
+                {parsedAmount >= 5_000_000 && selectedAccount && selectedAccount.accountType !== 'BANK' && (
+                  <div className="cb-overdraft-alert" role="alert" style={{ marginTop: 8 }}>
+                    <span>⚠️</span>
+                    <div>
+                      <strong>Cảnh báo Điều 6 NĐ 68/2026:</strong> Khoản chi từ 5.000.000 đ trở lên thanh toán bằng tiền mặt sẽ <strong>KHÔNG được trừ</strong> khi tính thuế TNCN. Vui lòng chuyển sang <strong>Tài khoản Ngân hàng</strong> để đảm bảo chứng từ không dùng tiền mặt.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -54,8 +54,8 @@ export const ThresholdRuler: React.FC<ThresholdRulerProps> = ({
           </span>
           <span className={isOver1B ? 'text-red fw-600' : 'text-orange fw-600'}>
             {isOver1B
-              ? `Đã vượt ngưỡng 1 tỷ — bắt buộc trọn bộ 7 sổ kế toán TT152`
-              : `Còn ${formatMoney(rem)} trước ngưỡng chuyển đổi thuế/sổ nâng cao`}
+              ? 'Đã vượt ngưỡng 1 tỷ — kê khai thuế GTGT/TNCN & hóa đơn điện tử từ máy tính tiền'
+              : `Còn ${formatMoney(rem)} trong ngưỡng miễn thuế 1 tỷ đồng/năm`}
           </span>
         </div>
 
@@ -75,8 +75,8 @@ export const ThresholdRuler: React.FC<ThresholdRulerProps> = ({
           </div>
           <div className="threshold-labels">
             <span>0 đ</span>
-            <span>500.000.000 đ (Ngưỡng sổ cơ bản)</span>
-            <span className="fw-700 text-red">1.000.000.000 đ (Ngưỡng nâng cao)</span>
+            <span>500.000.000 đ (50% ngưỡng)</span>
+            <span className="fw-700 text-red">1.000.000.000 đ (Ngưỡng miễn thuế NĐ 68/2026)</span>
           </div>
         </div>
 
@@ -86,10 +86,10 @@ export const ThresholdRuler: React.FC<ThresholdRulerProps> = ({
             <AlertTriangle size={18} className="flex-shrink-0 text-red" style={{ marginTop: 2 }} />
             <div>
               <strong className="text-red" style={{ fontSize: '0.88rem', display: 'block', marginBottom: 2 }}>
-                ⚠️ Cảnh báo trên 1 tỷ đồng: Cần hoàn tất trọn bộ 7 sổ kế toán mẫu TT152
+                ⚠️ Đã vượt ngưỡng 1 tỷ đồng: Kê khai Mẫu 01/CNKD, lập sổ TT 152 & đăng ký HĐĐT máy tính tiền
               </strong>
               <p style={{ margin: 0, fontSize: '0.82rem', color: '#991B1B', lineHeight: 1.5 }}>
-                Doanh thu lũy kế năm đã vượt mốc 1.000.000.000 đ theo quy định mới nhất của Bộ Tài Chính. Hộ kinh doanh bắt buộc lập và hoàn tất trọn bộ 7 sổ kế toán mẫu Thông tư 152/2025/TT-BTC (gồm S1a/S2a, S2b, S2c, S2d, S2e, S3a) và kê khai thuế đầy đủ.
+                Theo NĐ 68/2026/NĐ-CP và TT 152/2025/TT-BTC: Hộ nộp thuế theo <strong>tỷ lệ % doanh thu</strong> lập sổ <strong>S2a-HKD</strong>; hộ nộp theo <strong>thu nhập tính thuế (Kê khai)</strong> lập bộ 5 sổ <strong>S2b, S2c, S2d, S2e, S3a-HKD</strong>. Đồng thời bắt buộc đăng ký sử dụng <strong>hóa đơn điện tử khởi tạo từ máy tính tiền trong vòng 30 ngày</strong> kể từ ngày cuối kỳ vượt ngưỡng (NĐ 254/2026/NĐ-CP &amp; TT 91/2026/TT-BTC).
               </p>
             </div>
           </div>
@@ -98,10 +98,10 @@ export const ThresholdRuler: React.FC<ThresholdRulerProps> = ({
             <Info size={18} className="flex-shrink-0 text-teal" style={{ marginTop: 2 }} />
             <div>
               <strong className="text-teal" style={{ fontSize: '0.88rem', display: 'block', marginBottom: 2 }}>
-                ✓ Doanh thu dưới 1 tỷ đồng: Tờ khai 01/CNKD & Sổ S2c-HKD
+                ✓ Doanh thu ≤ 1 tỷ đồng (Nhóm 1 — Miễn thuế): Mẫu 01/TKN-CNKD &amp; Sổ S1a-HKD
               </strong>
               <p style={{ margin: 0, fontSize: '0.82rem', color: '#0F766E', lineHeight: 1.5 }}>
-                Doanh thu lũy kế hiện tại nằm dưới ngưỡng 1.000.000.000 đ. Hộ kinh doanh được áp dụng chế độ quản lý thuế và kế toán đơn giản: Nộp <strong>Tờ khai 01/CNKD</strong> và theo dõi chi phí tại <strong>Sổ S2c-HKD</strong>.
+                Hộ kinh doanh thuộc diện miễn thuế GTGT và TNCN theo NĐ 68/2026/NĐ-CP. Chỉ cần ghi chép doanh thu bán hàng tại <strong>Sổ S1a-HKD</strong> (Thông tư 152/2025/TT-BTC) và nộp <strong>Thông báo doanh thu thực tế năm (Mẫu 01/TKN-CNKD)</strong> chậm nhất ngày <strong>31/01 năm sau</strong>.
               </p>
             </div>
           </div>

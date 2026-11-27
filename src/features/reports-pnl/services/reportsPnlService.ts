@@ -50,6 +50,7 @@ export interface StoredTaxRates {
   customPitRate?: number | null;
   vatReductionPercentage?: number | null;
   applyVatReduction2026?: boolean;
+  applyPitReduction?: boolean;
 }
 
 export interface PnlTaxRateConfig {
@@ -57,7 +58,10 @@ export interface PnlTaxRateConfig {
   customPitRate: number;
   applyVatReduction2026: boolean;
   vatReductionPercentage: number;
+  applyPitReduction: boolean;
+  pitReductionPercentage: number;
   effectiveVatRate: number;
+  effectivePitRate: number;
   effectiveTotalRatePct: number;
 }
 
@@ -105,13 +109,14 @@ export function clearStoredTaxRates(): void {
 }
 
 /**
- * Resolves effective tax rates for household business (HKD).
- * Default rates: VAT 1.0%, PIT 0.5% (Total 1.5%).
- * When applyVatReduction2026 is true (Resolution 204/2025/QH15 & Decree 141/2026/ND-CP),
- * VAT is reduced by vatReductionPercentage (default 20%), yielding effective VAT 0.8% and total 1.3%.
+ * Resolves effective tax rates for household business (HKD) under 2026-2027 law.
+ * Default rates: VAT 1.0%, PIT 0.5%.
+ * - Resolution 204/2025/QH15 (20% VAT reduction -> 0.8%) expires 31/12/2026; automatically disabled for periodYear >= 2027.
+ * - Resolution 43/2026/QH16 & Decree 398/2026/ND-CP (30% PIT reduction) applies in 2026-2027 for revenue <= 10B VND.
+ * @param periodYear - Optional tax year to enforce policy validity windows.
  * @returns Fully computed effective tax configuration.
  */
-export function getTaxRateConfig(): PnlTaxRateConfig {
+export function getTaxRateConfig(periodYear?: number): PnlTaxRateConfig {
   const stored = loadStoredTaxRates();
   const customVatRate =
     typeof stored.customVatRate === 'number' && !isNaN(stored.customVatRate)
@@ -121,24 +126,64 @@ export function getTaxRateConfig(): PnlTaxRateConfig {
     typeof stored.customPitRate === 'number' && !isNaN(stored.customPitRate)
       ? stored.customPitRate
       : 0.5;
-  const applyVatReduction2026 = Boolean(stored.applyVatReduction2026);
+  const isVatReductionWindowActive = periodYear == null || periodYear <= 2026;
+  const applyVatReduction2026 = Boolean(stored.applyVatReduction2026) && isVatReductionWindowActive;
   const vatReductionPercentage =
     typeof stored.vatReductionPercentage === 'number' && !isNaN(stored.vatReductionPercentage)
       ? stored.vatReductionPercentage
       : 20;
 
+  const isPitReductionWindowActive = periodYear == null || (periodYear >= 2026 && periodYear <= 2027);
+  const applyPitReduction = stored.applyPitReduction !== false && isPitReductionWindowActive;
+  const pitReductionPercentage = applyPitReduction ? 30 : 0;
+
   const effectiveVatRate = applyVatReduction2026
     ? Math.round(customVatRate * (1 - vatReductionPercentage / 100) * 10000) / 10000
     : customVatRate;
-  const effectiveTotalRatePct = Math.round((effectiveVatRate + customPitRate) * 10000) / 10000;
+  const effectivePitRate = applyPitReduction
+    ? Math.round(customPitRate * (1 - pitReductionPercentage / 100) * 10000) / 10000
+    : customPitRate;
+  const effectiveTotalRatePct = Math.round((effectiveVatRate + effectivePitRate) * 10000) / 10000;
 
   return {
     customVatRate,
     customPitRate,
     applyVatReduction2026,
     vatReductionPercentage,
+    applyPitReduction,
+    pitReductionPercentage,
     effectiveVatRate,
+    effectivePitRate,
     effectiveTotalRatePct,
+  };
+}
+
+/**
+ * Estimates retail household VAT and PIT for P&L reporting under Decree 68/2026 & Decree 398/2026:
+ * - Revenue <= 1B VND: Exempt (0 VAT, 0 PIT)
+ * - Revenue > 1B VND: VAT on TOTAL revenue; PIT on EXCESS over 1B VND; 30% PIT reduction when <= 10B VND.
+ */
+export function calculatePnlEstimatedHouseholdTax(
+  netRevenue: number,
+  taxConfig: PnlTaxRateConfig = getTaxRateConfig()
+): { vatAmount: number; pitAmount: number; totalTaxAmount: number; isExempt: boolean; isPitReduced: boolean } {
+  const exemptionThreshold = 1_000_000_000;
+  const pitReductionMaxRevenue = 10_000_000_000;
+  if (netRevenue <= exemptionThreshold) {
+    return { vatAmount: 0, pitAmount: 0, totalTaxAmount: 0, isExempt: true, isPitReduced: false };
+  }
+  const vatAmount = Math.round(netRevenue * (taxConfig.effectiveVatRate / 100));
+  const excess = Math.max(0, netRevenue - exemptionThreshold);
+  const pitBeforeReduction = Math.round(excess * (taxConfig.customPitRate / 100));
+  const isPitReduced = taxConfig.applyPitReduction && netRevenue <= pitReductionMaxRevenue && taxConfig.pitReductionPercentage > 0;
+  const pitReduction = isPitReduced ? Math.round(pitBeforeReduction * (taxConfig.pitReductionPercentage / 100)) : 0;
+  const pitAmount = Math.max(0, pitBeforeReduction - pitReduction);
+  return {
+    vatAmount,
+    pitAmount,
+    totalTaxAmount: vatAmount + pitAmount,
+    isExempt: false,
+    isPitReduced,
   };
 }
 
@@ -315,34 +360,43 @@ export function buildPnlStatementTree(
       id: 'sec-4-tax',
       code: 'VI',
       title: taxConfig.applyVatReduction2026
-        ? `VI. NGHĨA VỤ THUẾ HỘ KINH DOANH (THÔNG TƯ 40 & NĐ 141/2026/NĐ-CP GIẢM ${taxConfig.vatReductionPercentage}% VAT)`
-        : 'VI. NGHĨA VỤ THUẾ HỘ KINH DOANH (THÔNG TƯ 40 & TT 152/2025/TT-BTC)',
+        ? `VI. NGHĨA VỤ THUẾ HỘ KINH DOANH (NĐ 68/2026, NĐ 398/2026 & NQ 204 GIẢM ${taxConfig.vatReductionPercentage}% VAT)`
+        : 'VI. NGHĨA VỤ THUẾ HỘ KINH DOANH (NĐ 68/2026, NĐ 398/2026 & TT 152/2025/TT-BTC)',
       level: 1,
       amount: kpi.estimatedTaxAmount,
-      percentageOfNetRevenue: rev > 0 ? taxConfig.effectiveTotalRatePct : 0,
+      percentageOfNetRevenue: calculateMarginPct(kpi.estimatedTaxAmount, rev),
       isNegative: true,
-      children: [
-        {
-          id: 'item-4-1',
-          code: '4.1',
-          title: taxConfig.applyVatReduction2026
-            ? `Thuế Giá trị gia tăng (VAT ${taxConfig.effectiveVatRate % 1 === 0 ? taxConfig.effectiveVatRate.toFixed(1) : taxConfig.effectiveVatRate}% phân phối hàng hóa - đã giảm ${taxConfig.vatReductionPercentage}%)`
-            : `Thuế Giá trị gia tăng (VAT ${taxConfig.effectiveVatRate % 1 === 0 ? taxConfig.effectiveVatRate.toFixed(1) : taxConfig.effectiveVatRate}% phân phối hàng hóa)`,
-          level: 2,
-          amount: Math.round(rev * (taxConfig.effectiveVatRate / 100)),
-          percentageOfNetRevenue: rev > 0 ? taxConfig.effectiveVatRate : 0,
-          isNegative: true,
-        },
-        {
-          id: 'item-4-2',
-          code: '4.2',
-          title: `Thuế Thu nhập cá nhân (PIT ${taxConfig.customPitRate % 1 === 0 ? taxConfig.customPitRate.toFixed(1) : taxConfig.customPitRate}% hộ kinh doanh)`,
-          level: 2,
-          amount: Math.round(rev * (taxConfig.customPitRate / 100)),
-          percentageOfNetRevenue: rev > 0 ? taxConfig.customPitRate : 0,
-          isNegative: true,
-        },
-      ],
+      children: (() => {
+        const estimated = calculatePnlEstimatedHouseholdTax(rev, taxConfig);
+        return [
+          {
+            id: 'item-4-1',
+            code: '4.1',
+            title: estimated.isExempt
+              ? 'Thuế Giá trị gia tăng (Miễn thuế — Doanh thu ≤ 1 tỷ)'
+              : taxConfig.applyVatReduction2026
+                ? `Thuế Giá trị gia tăng (VAT ${taxConfig.effectiveVatRate % 1 === 0 ? taxConfig.effectiveVatRate.toFixed(1) : taxConfig.effectiveVatRate}% toàn bộ DT - đã giảm ${taxConfig.vatReductionPercentage}%)`
+                : `Thuế Giá trị gia tăng (VAT ${taxConfig.effectiveVatRate % 1 === 0 ? taxConfig.effectiveVatRate.toFixed(1) : taxConfig.effectiveVatRate}% trên toàn bộ doanh thu)`,
+            level: 2 as const,
+            amount: estimated.vatAmount,
+            percentageOfNetRevenue: calculateMarginPct(estimated.vatAmount, rev),
+            isNegative: true,
+          },
+          {
+            id: 'item-4-2',
+            code: '4.2',
+            title: estimated.isExempt
+              ? 'Thuế Thu nhập cá nhân (Miễn thuế — Doanh thu ≤ 1 tỷ)'
+              : estimated.isPitReduced
+                ? `Thuế Thu nhập cá nhân (PIT ${taxConfig.customPitRate % 1 === 0 ? taxConfig.customPitRate.toFixed(1) : taxConfig.customPitRate}% phần vượt 1 tỷ - giảm ${taxConfig.pitReductionPercentage}% NĐ 398)`
+                : `Thuế Thu nhập cá nhân (PIT ${taxConfig.customPitRate % 1 === 0 ? taxConfig.customPitRate.toFixed(1) : taxConfig.customPitRate}% trên phần doanh thu vượt 1 tỷ)`,
+            level: 2 as const,
+            amount: estimated.pitAmount,
+            percentageOfNetRevenue: calculateMarginPct(estimated.pitAmount, rev),
+            isNegative: true,
+          },
+        ];
+      })(),
     },
     {
       id: 'total-final-net-profit',
@@ -625,8 +679,9 @@ export const reportsPnlService = {
             cogsComparison,
           };
 
+          const periodYear = params.startDate ? new Date(params.startDate).getFullYear() : new Date().getFullYear();
           const rawCategories = s.operatingExpenses?.categories || [];
-          const pnlTree = buildPnlStatementTree(liveKpiSummary, rawCategories, getTaxRateConfig());
+          const pnlTree = buildPnlStatementTree(liveKpiSummary, rawCategories, getTaxRateConfig(periodYear));
           const expenseBreakdown = buildLiveExpenseBreakdown(rawCategories, operatingExpenses, shrinkageLoss);
 
           let trendData: PnlTrendPoint[] = [];
@@ -707,8 +762,9 @@ export const reportsPnlService = {
     const totalOrders = Math.round(netRevenue / 285000);
     const averageOrderValue = totalOrders > 0 ? Math.round(netRevenue / totalOrders) : 0;
 
-    const taxConfig = getTaxRateConfig();
-    const estimatedTaxAmount = Math.round(netRevenue * (taxConfig.effectiveTotalRatePct / 100));
+    const testPeriodYear = params.startDate ? new Date(params.startDate).getFullYear() : 2026;
+    const taxConfig = getTaxRateConfig(testPeriodYear);
+    const estimatedTaxAmount = calculatePnlEstimatedHouseholdTax(netRevenue, taxConfig).totalTaxAmount;
     const netProfitAfterTax = netProfit - estimatedTaxAmount;
     const netProfitAfterTaxMarginPct = calculateMarginPct(netProfitAfterTax, netRevenue);
 

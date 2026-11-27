@@ -15,6 +15,7 @@ interface StoredTaxRates {
   customPitRate?: number | null;
   vatReductionPercentage?: number | null;
   applyVatReduction2026?: boolean;
+  applyPitReduction?: boolean;
 }
 
 const loadStoredTaxRates = (): StoredTaxRates => {
@@ -54,6 +55,7 @@ export function useTaxSnapshots(initialYear: number = 2026) {
     branchId: undefined,
     calculationMethod: TaxCalculationMethod.RevenuePercentage,
     applyVatReduction2026: storedRates.applyVatReduction2026 ?? false,
+    applyPitReduction: storedRates.applyPitReduction ?? true,
     customVatRate: storedRates.customVatRate,
     customPitRate: storedRates.customPitRate,
     vatReductionPercentage: storedRates.vatReductionPercentage,
@@ -150,6 +152,7 @@ export function useTaxSnapshots(initialYear: number = 2026) {
       customPitRate?: number | null;
       vatReductionPercentage?: number | null;
       applyVatReduction2026?: boolean;
+      applyPitReduction?: boolean;
     }) => {
       saveStoredTaxRates(rates);
       setFilterParams((prev) => ({
@@ -168,6 +171,7 @@ export function useTaxSnapshots(initialYear: number = 2026) {
       customPitRate: undefined,
       vatReductionPercentage: undefined,
       applyVatReduction2026: false,
+      applyPitReduction: true,
     }));
   }, []);
 

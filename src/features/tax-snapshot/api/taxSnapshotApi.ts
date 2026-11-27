@@ -86,6 +86,7 @@ export const taxSnapshotApi = {
           tier2Method: filter.tier2Method,
           applyVatReduction: filter.applyVatReduction2026,
           vatReductionPercentage: filter.vatReductionPercentage,
+          applyPitReduction: filter.applyPitReduction,
           customVatRate: filter.customVatRate,
           customPitRate: filter.customPitRate,
         },
@@ -113,6 +114,7 @@ export const taxSnapshotApi = {
           tier2Method: filter.tier2Method,
           applyVatReduction: filter.applyVatReduction2026,
           vatReductionPercentage: filter.vatReductionPercentage,
+          applyPitReduction: filter.applyPitReduction,
           customVatRate: filter.customVatRate,
           customPitRate: filter.customPitRate,
         },
@@ -186,6 +188,7 @@ export const taxSnapshotApi = {
       securityPin: req.pin, // Đồng bộ trường PIN sang SecurityPin của Backend
       applyVatReduction2026: Boolean(req.applyVatReduction2026),
       vatReductionPercentage: req.vatReductionPercentage ?? null,
+      applyPitReduction: req.applyPitReduction ?? null,
       customVatRate: req.customVatRate ?? null,
       customPitRate: req.customPitRate ?? null,
       confirmEstimatedCogsResponsible: Boolean(req.confirmEstimatedCogsResponsible),
