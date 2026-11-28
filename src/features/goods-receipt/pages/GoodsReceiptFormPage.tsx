@@ -815,6 +815,39 @@ export const GoodsReceiptFormPage: FC<{ defaultRole?: UserRole }> = ({
             onPaymentTermChange={setPaymentTerm}
             onPaymentMethodChange={setPaymentMethod}
           />
+          {(() => {
+            const totalGrnValue = items.reduce((sum, it) => sum + (Number(it.lineTotal) || 0), 0);
+            const isCashOver5M = totalGrnValue >= 5_000_000 && paymentMethod === 'Cash';
+            const isMissingInvoice = totalGrnValue > 0 && !invoiceNo.trim();
+            if (!isCashOver5M && !isMissingInvoice) return null;
+            return (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 6,
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  backgroundColor: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  color: '#991B1B',
+                  fontSize: '0.8rem',
+                  lineHeight: 1.45,
+                }}
+              >
+                <strong>⚠️ Cảnh báo tuân thủ thuế (Điều 6 NĐ 68/2026):</strong>{' '}
+                {isCashOver5M && (
+                  <span>
+                    Phiếu nhập có tổng giá trị <strong>{totalGrnValue.toLocaleString('vi-VN')} đ</strong> (≥ 5.000.000 đ) đang chọn thanh toán <strong>Tiền mặt</strong> — có rủi ro bị loại khỏi chi phí được trừ nếu không có chứng từ thanh toán không dùng tiền mặt (Chuyển khoản / Công nợ thanh toán qua ngân hàng).{' '}
+                  </span>
+                )}
+                {isMissingInvoice && (
+                  <span>
+                    Chưa nhập <strong>Số hóa đơn đầu vào (InvoiceNo)</strong> — phiếu nhập sẽ được đưa vào danh sách cảnh báo thiếu chứng từ ở phân hệ Thuế.
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         <GrnProductEntryTable

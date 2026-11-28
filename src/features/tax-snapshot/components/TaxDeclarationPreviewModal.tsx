@@ -40,7 +40,8 @@ export const TaxDeclarationPreviewModal: FC<Props> = ({ isOpen, filter, onClose 
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `ToKhai_01_CNKD_${preview.year}_${preview.periodNumber}.xml`;
+      const prefix = preview.formCode === '01/TKN-CNKD' ? 'ToKhai_01_TKN_CNKD' : 'ToKhai_01_CNKD';
+      anchor.download = `${prefix}_${preview.year}_${preview.periodNumber}.xml`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (reason: unknown) {
@@ -55,7 +56,7 @@ export const TaxDeclarationPreviewModal: FC<Props> = ({ isOpen, filter, onClose 
       <section ref={dialogRef} className="tax-declaration-preview-modal" role="dialog" aria-modal="true" aria-labelledby="declaration-preview-title">
         <header className="tax-declaration-preview-toolbar no-print">
           <div>
-            <strong id="declaration-preview-title">Xem trước Mẫu 01/CNKD</strong>
+            <strong id="declaration-preview-title">Xem trước Mẫu {preview?.formCode || '01/CNKD'}</strong>
             <span>{preview?.isFinalized ? 'Bản đã chốt' : 'Bản tạm tính'}</span>
           </div>
           <div>
@@ -117,6 +118,34 @@ export const TaxDeclarationPreviewModal: FC<Props> = ({ isOpen, filter, onClose 
                       <tbody><tr><td>Sản xuất, kinh doanh hàng hóa, cung cấp dịch vụ</td><td>{formatMoney(preview.appendixRevenue)}</td><td>{formatMoney(preview.appendixCogs)}</td><td>{formatMoney(preview.appendixOpex)}</td><td>{formatMoney(preview.appendixTaxableIncome)}</td></tr></tbody>
                     </table>
                   </div>
+                </section>
+              )}
+              {(preview.pitReductionFormCode || preview.pitReductionNote) && (
+                <section className="tax-form-appendix" style={{ marginTop: 12 }}>
+                  <h3>ƯU ĐÃI GIẢM THUẾ TNCN — {preview.pitReductionFormCode || 'NĐ 398/2026/NĐ-CP'}</h3>
+                  <p>{preview.pitReductionNote}</p>
+                  {preview.isPitReduced && (preview.pitReductionAmount ?? 0) > 0 && (
+                    <div className="tax-table-wrapper">
+                      <table className="tax-form-table">
+                        <thead>
+                          <tr>
+                            <th>Thuế TNCN trước giảm</th>
+                            <th>Tỷ lệ giảm (NQ 43/2026)</th>
+                            <th>Số thuế TNCN được giảm</th>
+                            <th>Thuế TNCN phải nộp</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>{formatMoney(preview.pitBeforeReduction ?? preview.totalPitAmount)}</td>
+                            <td>{preview.pitReductionPercentage ?? 30}%</td>
+                            <td>- {formatMoney(preview.pitReductionAmount ?? 0)}</td>
+                            <td><strong>{formatMoney(preview.totalPitAmount)}</strong></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </section>
               )}
               <p className="tax-form-notice">{preview.dataNotice}</p>

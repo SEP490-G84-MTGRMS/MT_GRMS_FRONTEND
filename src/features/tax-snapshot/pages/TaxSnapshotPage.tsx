@@ -557,6 +557,7 @@ export const TaxSnapshotPage: FC = () => {
           summary={summary}
           calculationMethod={filterParams.calculationMethod}
           applyVatReduction={Boolean(filterParams.applyVatReduction2026)}
+          applyPitReduction={filterParams.applyPitReduction}
           customVatRate={filterParams.customVatRate}
           customPitRate={filterParams.customPitRate}
           vatReductionPercentage={filterParams.vatReductionPercentage}
@@ -592,6 +593,7 @@ export const TaxSnapshotPage: FC = () => {
           customPitRate: filterParams.customPitRate,
           vatReductionPercentage: filterParams.vatReductionPercentage,
           applyVatReduction2026: filterParams.applyVatReduction2026,
+          applyPitReduction: filterParams.applyPitReduction ?? true,
         }}
         onSave={(rates) => {
           updateTaxRates(rates);

@@ -7,6 +7,7 @@ import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap';
 interface CreateTaxSnapshotModalProps {
   isOpen: boolean; onClose: () => void; summary?: HouseholdTaxSummaryDto;
   calculationMethod: TaxCalculationMethod; applyVatReduction: boolean;
+  applyPitReduction?: boolean | null;
   customVatRate?: number | null; customPitRate?: number | null; vatReductionPercentage?: number | null;
   existingFinalizedSnapshot?: HouseholdTaxSnapshotDto | null;
   onOpenPinModal?: (tab?: 'change' | 'reset') => void;
@@ -15,7 +16,7 @@ interface CreateTaxSnapshotModalProps {
 
 const steps = ['Kiểm tra số liệu', 'Xác thực', 'Xác nhận chốt sổ'];
 
-export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({ isOpen, onClose, summary, calculationMethod, applyVatReduction, customVatRate, customPitRate, vatReductionPercentage, existingFinalizedSnapshot, onOpenPinModal, onSubmit }) => {
+export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({ isOpen, onClose, summary, calculationMethod, applyVatReduction, applyPitReduction, customVatRate, customPitRate, vatReductionPercentage, existingFinalizedSnapshot, onOpenPinModal, onSubmit }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [pin, setPin] = useState('');
@@ -47,7 +48,7 @@ export const CreateTaxSnapshotModal: React.FC<CreateTaxSnapshotModalProps> = ({ 
     if (stepOneInvalid) { setSubmitError('Vui lòng xác nhận và nhập lý do thay thế bản chốt cũ.'); setStep(1); return; }
     setIsSubmitting(true); setSubmitError(null);
     try {
-      const result = await onSubmit({ year: summary.year, periodType: summary.periodType, periodNumber: summary.periodNumber, branchId: summary.branchId, calculationMethod, tier2Method: summary.tier2Method, applyVatReduction2026: applyVatReduction, customVatRate, customPitRate, vatReductionPercentage, confirmEstimatedCogsResponsible: isConfirmed, estimatedCogsConfirmationStatement: summary.isCogsEstimated ? 'Chủ hộ xác nhận chịu trách nhiệm pháp lý đối với giá vốn ước tính tạm thời.' : undefined, pin, notes: notes.trim() || undefined, allowSupersedeExisting: allowSupersede, rectificationReason: rectificationReason.trim() || undefined });
+      const result = await onSubmit({ year: summary.year, periodType: summary.periodType, periodNumber: summary.periodNumber, branchId: summary.branchId, calculationMethod, tier2Method: summary.tier2Method, applyVatReduction2026: applyVatReduction, applyPitReduction, customVatRate, customPitRate, vatReductionPercentage, confirmEstimatedCogsResponsible: isConfirmed, estimatedCogsConfirmationStatement: summary.isCogsEstimated ? 'Chủ hộ xác nhận tiếp tục chốt kỳ với phần giá vốn có chứng từ hợp lệ theo Điều 6 NĐ 68/2026.' : undefined, pin, notes: notes.trim() || undefined, allowSupersedeExisting: allowSupersede, rectificationReason: rectificationReason.trim() || undefined });
       if (!result?.id) throw new Error('Máy chủ chưa xác nhận bản chốt kỳ. Vui lòng kiểm tra lịch sử trước khi thử lại.');
       setSealedSnapshot(result);
     } catch (error: any) {

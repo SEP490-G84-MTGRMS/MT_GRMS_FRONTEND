@@ -12,12 +12,18 @@ export interface TaxConfig {
   pitRate: number;
   /**
    * Base for VAT calculation:
-   * - 'EXCESS': VAT is calculated strictly on the revenue exceeding the threshold.
-   * - 'TOTAL': VAT is calculated on entire revenue once threshold is exceeded.
+   * - 'TOTAL': VAT is calculated on entire revenue once threshold is exceeded (Decree 68/2026 & Decree 141/2026).
+   * - 'EXCESS': Legacy override (not compliant with 2026 law).
    */
   vatBase: 'EXCESS' | 'TOTAL';
   /** Base for PIT calculation: strictly on excess revenue */
   pitBase: 'EXCESS';
+  /** Apply 30% PIT reduction (Res. 43/2026/QH16 & Decree 398/2026/ND-CP) for revenue <= 10B in 2026-2027 */
+  applyPitReduction?: boolean;
+  /** PIT reduction ratio (Default: 0.3 = 30%) */
+  pitReductionRate?: number;
+  /** Maximum annual revenue eligible for 30% PIT reduction (Default: 10,000,000,000 VND) */
+  pitReductionMaxRevenue?: number;
   /** Legal reference label */
   legalBasis: string;
 }
@@ -26,9 +32,12 @@ export const defaultTaxConfig: TaxConfig = {
   threshold: 1_000_000_000,
   vatRate: 0.01,
   pitRate: 0.005,
-  vatBase: 'EXCESS',
+  vatBase: 'TOTAL',
   pitBase: 'EXCESS',
-  legalBasis: 'Quy định quản lý thuế hộ kinh doanh cá thể hiện hành',
+  applyPitReduction: true,
+  pitReductionRate: 0.3,
+  pitReductionMaxRevenue: 10_000_000_000,
+  legalBasis: 'NĐ 68/2026/NĐ-CP, NĐ 141/2026/NĐ-CP & NĐ 398/2026/NĐ-CP',
 };
 
 export const TAX_CONFIG_HKD_2026 = {
@@ -36,6 +45,8 @@ export const TAX_CONFIG_HKD_2026 = {
   warningThresholdRevenue: 850_000_000,
   vatRate: defaultTaxConfig.vatRate,
   pitRate: defaultTaxConfig.pitRate,
+  pitReductionRate: defaultTaxConfig.pitReductionRate ?? 0.3,
+  pitReductionMaxRevenue: defaultTaxConfig.pitReductionMaxRevenue ?? 10_000_000_000,
   legalBasis: defaultTaxConfig.legalBasis,
 };
 
@@ -45,6 +56,9 @@ export interface TaxCalculationResult {
   isOverThreshold: boolean;
   excessRevenue: number;
   vatAmount: number;
+  pitBeforeReduction: number;
+  pitReductionAmount: number;
+  isPitReduced: boolean;
   pitAmount: number;
   totalTaxAmount: number;
   vatBaseDescription: string;
@@ -52,7 +66,8 @@ export interface TaxCalculationResult {
 }
 
 /**
- * Calculates VAT, PIT, and total taxes dynamically according to the TaxConfig.
+ * Calculates VAT, PIT (including 30% reduction per Res. 43/2026 & Decree 398/2026),
+ * and total taxes dynamically according to the TaxConfig.
  */
 export function calculateHouseholdTax(
   ytdRevenue: number,
@@ -61,12 +76,17 @@ export function calculateHouseholdTax(
   const isOverThreshold = ytdRevenue > config.threshold;
   const excessRevenue = isOverThreshold ? ytdRevenue - config.threshold : 0;
 
-  // Calculate VAT
+  // Calculate VAT (TOTAL revenue once > 1B per Decree 68/2026)
   const vatTaxableAmount = config.vatBase === 'TOTAL' && isOverThreshold ? ytdRevenue : excessRevenue;
   const vatAmount = Math.round(vatTaxableAmount * config.vatRate);
 
-  // Calculate PIT (always on excess revenue)
-  const pitAmount = Math.round(excessRevenue * config.pitRate);
+  // Calculate PIT (excess over 1B + 30% reduction when <= 10B)
+  const pitBeforeReduction = Math.round(excessRevenue * config.pitRate);
+  const maxReductionRev = config.pitReductionMaxRevenue ?? 10_000_000_000;
+  const reductionRate = config.pitReductionRate ?? 0.3;
+  const isPitReduced = Boolean(config.applyPitReduction) && isOverThreshold && ytdRevenue <= maxReductionRev && reductionRate > 0;
+  const pitReductionAmount = isPitReduced ? Math.round(pitBeforeReduction * reductionRate) : 0;
+  const pitAmount = Math.max(0, pitBeforeReduction - pitReductionAmount);
 
   const totalTaxAmount = vatAmount + pitAmount;
 
@@ -76,13 +96,18 @@ export function calculateHouseholdTax(
     isOverThreshold,
     excessRevenue,
     vatAmount,
+    pitBeforeReduction,
+    pitReductionAmount,
+    isPitReduced,
     pitAmount,
     totalTaxAmount,
     vatBaseDescription:
       config.vatBase === 'TOTAL'
         ? `${(config.vatRate * 100).toFixed(1)}% trên toàn bộ doanh thu`
         : `${(config.vatRate * 100).toFixed(1)}% trên phần vượt 1 tỷ`,
-    pitBaseDescription: `${(config.pitRate * 100).toFixed(1)}% trên phần vượt 1 tỷ`,
+    pitBaseDescription: isPitReduced
+      ? `${(config.pitRate * 100).toFixed(1)}% trên phần vượt 1 tỷ (đã giảm ${Math.round(reductionRate * 100)}% theo NĐ 398/2026)`
+      : `${(config.pitRate * 100).toFixed(1)}% trên phần vượt 1 tỷ`,
   };
 }
 
@@ -119,19 +144,21 @@ export function adjustToNextBusinessDay(date: Date): { adjustedDate: Date; isRol
 }
 
 /**
- * Returns legally accurate filing and payment deadlines based on period type.
+ * Returns legally accurate filing and payment deadlines based on period type (Art. 8 Decree 68/2026).
  * Under Vietnamese Tax Administration Law, if the statutory deadline falls on a weekend
  * (Saturday or Sunday), it rolls over to the next business day (Monday).
- * - Quarter filing deadline: Last day of the month following the quarter (e.g. Q3 -> Oct 31, if Sat -> Nov 02)
+ * - Quarter filing deadline: Q1 Apr 30, Q2 Jul 31, Q3 Oct 31 (2026 -> Mon Nov 02), Q4 Jan 31 next year
  * - Month filing deadline: 20th of the following month
- * - Year filing deadline: Last day of the 3rd month following the calendar year (March 31)
+ * - Year filing deadline: Jan 31 next year (Group 1 revenue notice 01/TKN-CNKD),
+ *   or Mar 31 next year when isAnnualPitSettlement = true (DeclarationBased annual PIT settlement).
  */
 export function getTaxFilingDeadline(
   periodType: number,
   periodNumber: number,
-  year: number = 2026
+  year: number = 2026,
+  isAnnualPitSettlement: boolean = false,
+  currentDate: Date = new Date()
 ): TaxDeadlineInfo {
-  const currentDate = new Date('2026-10-27T00:00:00Z');
   let statutoryDeadline = new Date(year, 9, 31); // Default Q3 Oct 31
 
   if (periodType === 2) {
@@ -144,8 +171,10 @@ export function getTaxFilingDeadline(
     // Month: 20th of next month
     statutoryDeadline = new Date(year, periodNumber, 20);
   } else if (periodType === 3) {
-    // Year: March 31 of next year
-    statutoryDeadline = new Date(year + 1, 2, 31);
+    // Year: Jan 31 (Group 1 01/TKN-CNKD) or Mar 31 (DeclarationBased annual PIT settlement)
+    statutoryDeadline = isAnnualPitSettlement
+      ? new Date(year + 1, 2, 31)
+      : new Date(year + 1, 0, 31);
   }
 
   const origDay = String(statutoryDeadline.getDate()).padStart(2, '0');
