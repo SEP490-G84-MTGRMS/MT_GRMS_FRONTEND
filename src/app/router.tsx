@@ -9,7 +9,6 @@ import { AdminLayout } from '../layouts/AdminLayout';
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
 import { StoreOwnerDashboardPage } from '../features/store-owner-dashboard/pages/StoreOwnerDashboardPage';
 import { TenantManagementPage } from '../pages/admin/TenantManagementPage';
-import { MasterCatalogPage } from '../pages/admin/MasterCatalogPage';
 // 1. Supplier Feature
 import {
   SupplierListPage,
@@ -103,7 +102,6 @@ import { SubscriptionPlanCreatePage } from '../pages/admin/SubscriptionPlanCreat
 import { SubscriptionPlanEditPage } from '../pages/admin/SubscriptionPlanEditPage';
 import { TenantDetailPage } from '../pages/admin/TenantDetailPage';
 import { AuditLogPage } from '../pages/admin/AuditLogPage';
-import { AdminSettingsPage } from '../pages/admin/AdminSettingsPage';
 import { LoginPage, RegisterPage, ForgotPasswordPage } from '../pages/auth';
 
 // 11. Accounting & Finance Features: Overview, P&L, Cashbook & Tax Snapshots
@@ -148,7 +146,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'master-catalog',
-        element: <MasterCatalogPage />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       // ─── Chuyển hướng các nghiệp vụ bán lẻ cửa hàng sang /store-owner ───
       {
@@ -209,7 +207,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'settings',
-        element: <AdminSettingsPage />,
+        element: <Navigate to="/admin/dashboard" replace />,
       },
       {
         path: 'invoices',

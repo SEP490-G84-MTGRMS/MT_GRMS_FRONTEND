@@ -8,8 +8,6 @@ import {
   ChevronUp,
   ShieldCheck,
   Activity,
-  Sliders,
-  Package,
 } from "lucide-react";
 import {
   DashboardIcon,
@@ -171,17 +169,6 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({
         </NavLink>
 
         <NavLink
-          to="/admin/master-catalog"
-          title="Cấu hình dữ liệu khởi tạo cửa hàng mới"
-          className={({ isActive }) =>
-            `admin-nav-item ${isActive ? "active" : ""}`
-          }
-        >
-          <Package size={19} />
-          <span className="admin-nav-label">Dữ liệu khởi tạo</span>
-        </NavLink>
-
-        <NavLink
           to="/admin/subscriptions"
           title="Gói dịch vụ & Biểu phí SaaS"
           className={({ isActive }) =>
@@ -191,7 +178,6 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({
           <Layers size={19} />
           <span className="admin-nav-label">Gói dịch vụ SaaS</span>
         </NavLink>
-
 
         <NavLink
           to="/admin/audit-logs"
@@ -204,18 +190,7 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({
           <span className="admin-nav-label">Nhật ký & Tác vụ</span>
         </NavLink>
 
-        <NavLink
-          to="/admin/settings"
-          title="Cấu hình Nền tảng Toàn cục"
-          className={({ isActive }) =>
-            `admin-nav-item ${isActive ? "active" : ""}`
-          }
-        >
-          <Sliders size={19} />
-          <span className="admin-nav-label">Cấu hình Nền tảng</span>
-        </NavLink>
-
-        <div className="admin-nav-section-title" style={{ marginTop: 14 }}>
+        {/* <div className="admin-nav-section-title" style={{ marginTop: 14 }}>
           Cửa hàng & Tiện ích
         </div>
 
@@ -227,7 +202,7 @@ export const AdminSidebar: FC<AdminSidebarProps> = ({
         >
           <ExternalLink size={18} />
           <span className="admin-nav-label">Vào Tiệm Tạp Hóa</span>
-        </Link>
+        </Link> */}
       </nav>
 
       {/* Footer: User Account (Interactive Clickable) & Actions */}

@@ -90,7 +90,7 @@ export const AdminDashboardPage = () => {
       <section className="admin-dash-card"><div className="admin-dash-section-heading"><h2>Mạng lưới điểm bán</h2></div>
         {[["Chuỗi hoạt động", overview?.activeTenants], ["Điểm bán đang hoạt động", overview?.totalBranches], ["Trung bình điểm bán / khách thuê", overview?.averageBranches], ["Tỷ lệ chuỗi hoạt động (%)", overview?.activePercentage], ["Điểm bán mới trong kỳ", overview?.newBranches]].map(([label,value]) => <div className="admin-dash-metric" key={label}><span>{label}</span><strong>{value ?? "—"}</strong></div>)}
       </section>
-      <section className="admin-dash-card"><div className="admin-dash-section-heading"><h2>Giám sát hệ thống</h2><Link to="/admin/settings">Thiết lập SaaS</Link></div><p className="admin-dash-card-caption">Chưa có dữ liệu giám sát tác vụ từ máy chủ.</p></section>
+      <section className="admin-dash-card"><div className="admin-dash-section-heading"><h2>Giám sát hệ thống</h2></div><p className="admin-dash-card-caption">Chưa có dữ liệu giám sát tác vụ từ máy chủ.</p></section>
     </div>
     <section className="admin-dash-card"><div className="admin-dash-section-heading"><h2>Khách hàng cần chú ý</h2></div>
       <div style={{overflowX:"auto"}}><table className="admin-alert-table"><thead><tr><th>Cửa hàng</th><th>Gói dịch vụ</th><th>Tình trạng</th><th>Thời hạn</th></tr></thead><tbody>{alerts.map(a => <tr key={a.id || a.subdomain}><td><Link to={"/admin/tenants/" + encodeURIComponent(a.id || a.subdomain)}>{a.name}</Link></td><td>{a.planText}</td><td>{a.statusText}</td><td>{a.expiryNotice}</td></tr>)}</tbody></table></div>
