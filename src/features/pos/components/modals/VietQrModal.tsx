@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { FC } from 'react';
 import {
   QrCode,
@@ -10,11 +10,20 @@ import {
   Clock,
   ShieldCheck,
   AlertTriangle,
+  Volume2,
+  VolumeX,
   X
 } from 'lucide-react';
 import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { useAuthStore } from '../../../../stores/useAuthStore';
 import { httpClient } from '../../../../api/httpClient';
+import {
+  announcePaymentReceived,
+  isPaymentVoiceEnabled,
+  setPaymentVoiceEnabled,
+  subscribePaymentVoiceSetting,
+  unlockPaymentAudio,
+} from '../../utils/paymentVoiceAlert';
 
 function resolveHubUrl(): string {
   const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
@@ -58,13 +67,46 @@ export const VietQrModal: FC<Props> = ({
   const [isSuccessPaid, setIsSuccessPaid] = useState(false);
   const [copiedContent, setCopiedContent] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isConfigLoading, setIsConfigLoading] = useState(false);
+  const [isConfigLoading, setIsConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
   const [partialPayment, setPartialPayment] = useState<{
     paidAmount: number;
     remainingAmount: number;
   } | null>(null);
   const [qrTemplate, setQrTemplate] = useState<'qr_only' | 'compact2'>('qr_only');
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState<boolean>(() => isPaymentVoiceEnabled());
+
+  const onConfirmAndPrintRef = useRef(onConfirmAndPrint);
+  const hasTriggeredConfirmRef = useRef(false);
+  const confirmTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    onConfirmAndPrintRef.current = onConfirmAndPrint;
+  }, [onConfirmAndPrint]);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimeoutRef.current !== null) {
+        window.clearTimeout(confirmTimeoutRef.current);
+        confirmTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const scheduleConfirmAndPrint = useCallback(() => {
+    if (hasTriggeredConfirmRef.current) return;
+    hasTriggeredConfirmRef.current = true;
+    setIsSuccessPaid(true);
+    if (confirmTimeoutRef.current !== null) {
+      window.clearTimeout(confirmTimeoutRef.current);
+    }
+    confirmTimeoutRef.current = window.setTimeout(() => {
+      confirmTimeoutRef.current = null;
+      onConfirmAndPrintRef.current();
+    }, 1000);
+  }, []);
+
+  useEffect(() => subscribePaymentVoiceSetting(setIsVoiceEnabled), []);
 
   // Đọc cấu hình ngân hàng công khai của cửa hàng (Zero-Plaintext: Không chứa API Key)
   const [bankCode, setBankCode] = useState('');
@@ -75,6 +117,12 @@ export const VietQrModal: FC<Props> = ({
   useEffect(() => {
     if (!isOpen) return;
 
+    unlockPaymentAudio();
+    hasTriggeredConfirmRef.current = false;
+    if (confirmTimeoutRef.current !== null) {
+      window.clearTimeout(confirmTimeoutRef.current);
+      confirmTimeoutRef.current = null;
+    }
     setCountdown(expiresAtMs ? Math.max(0, Math.ceil((expiresAtMs - Date.now()) / 1000)) : 300);
     setIsSuccessPaid(false);
     setIsChecking(false);
@@ -135,6 +183,7 @@ export const VietQrModal: FC<Props> = ({
       amountIn?: number;
       totalPaid?: number;
       remaining?: number;
+      finalAmount?: number;
     }) => {
       if (!data) return;
       const incomingCode = String(data.orderCode || '').toUpperCase();
@@ -142,14 +191,27 @@ export const VietQrModal: FC<Props> = ({
       if (incomingCode !== currentCode && !incomingCode.includes(currentCode) && !currentCode.includes(incomingCode)) return;
 
       if (data.isFullPayment) {
-        setIsSuccessPaid(true);
-        setTimeout(() => {
-          onConfirmAndPrint();
-        }, 1000);
+        announcePaymentReceived({
+          orderCode: data.orderCode || orderCode,
+          amountReceived: data.amountIn,
+          totalPaid: data.totalPaid || data.finalAmount || amount,
+          remainingAmount: 0,
+          isFullPayment: true,
+        });
+        scheduleConfirmAndPrint();
       } else {
+        const paidSoFar = data.totalPaid || data.amountIn || 0;
+        const remainingAmt = data.remaining || 0;
+        announcePaymentReceived({
+          orderCode: data.orderCode || orderCode,
+          amountReceived: data.amountIn,
+          totalPaid: paidSoFar,
+          remainingAmount: remainingAmt,
+          isFullPayment: false,
+        });
         setPartialPayment({
-          paidAmount: data.totalPaid || data.amountIn || 0,
-          remainingAmount: data.remaining || 0,
+          paidAmount: paidSoFar,
+          remainingAmount: remainingAmt,
         });
       }
     });
@@ -164,7 +226,7 @@ export const VietQrModal: FC<Props> = ({
       connection.invoke('LeaveOrderGroup', orderCode).catch(() => { });
       void connection.stop();
     };
-  }, [isOpen, orderCode, onConfirmAndPrint]);
+  }, [isOpen, orderCode, amount, scheduleConfirmAndPrint]);
 
   // LỚP 6: Tự động Polling kiểm tra trạng thái gạch nợ mỗi 2.5 giây khi đang mở QR (Dự phòng mạng)
   useEffect(() => {
@@ -174,14 +236,25 @@ export const VietQrModal: FC<Props> = ({
       try {
         const res = await httpClient.get(`/payments/check-order/${encodeURIComponent(orderCode)}`);
         if (res.data?.isPaid) {
-          setIsSuccessPaid(true);
-          setTimeout(() => {
-            onConfirmAndPrint();
-          }, 1000);
+          announcePaymentReceived({
+            orderCode,
+            totalPaid: res.data.finalAmount || res.data.depositAmount || amount,
+            remainingAmount: 0,
+            isFullPayment: true,
+          });
+          scheduleConfirmAndPrint();
         } else if (res.data?.paymentStatus === 'PARTIALLY_PAID') {
+          const paidSoFar = res.data.depositAmount || 0;
+          const remainingAmt = res.data.remainingAmount || 0;
+          announcePaymentReceived({
+            orderCode,
+            totalPaid: paidSoFar,
+            remainingAmount: remainingAmt,
+            isFullPayment: false,
+          });
           setPartialPayment({
-            paidAmount: res.data.depositAmount || 0,
-            remainingAmount: res.data.remainingAmount || 0,
+            paidAmount: paidSoFar,
+            remainingAmount: remainingAmt,
           });
         }
       } catch {
@@ -190,7 +263,7 @@ export const VietQrModal: FC<Props> = ({
     }, 2500);
 
     return () => clearInterval(pollTimer);
-  }, [isOpen, isSuccessPaid, orderCode, onConfirmAndPrint, isConfigLoading, configError]);
+  }, [isOpen, isSuccessPaid, orderCode, amount, scheduleConfirmAndPrint, isConfigLoading, configError]);
 
   // Bộ đếm ngược đồng bộ theo mốc hết hạn thực tế (không reset lại 5 phút khi đóng/mở lại hoặc chuyển tab)
   useEffect(() => {
@@ -242,27 +315,42 @@ export const VietQrModal: FC<Props> = ({
     ? partialPayment.remainingAmount
     : amount;
 
-  // Link mã VietQR động chuẩn Napas 247
-  const qrUrl = `https://img.vietqr.io/image/${bankCode}-${bankAccountNumber}-${qrTemplate}.png?amount=${currentPayAmount}&addInfo=${encodeURIComponent(
-    transferContent
-  )}&accountName=${encodeURIComponent(bankAccountName)}`;
+  // Link mã VietQR động chuẩn Napas 247 (chỉ tạo khi đã có đủ bankCode và số tài khoản)
+  const qrUrl =
+    bankCode && bankAccountNumber
+      ? `https://img.vietqr.io/image/${bankCode}-${bankAccountNumber}-${qrTemplate}.png?amount=${currentPayAmount}&addInfo=${encodeURIComponent(
+          transferContent
+        )}&accountName=${encodeURIComponent(bankAccountName)}`
+      : '';
 
   // Thao tác kiểm tra thanh toán ngay
   const handleCheckPayment = async () => {
+    unlockPaymentAudio();
     setIsChecking(true);
     try {
       const res = await httpClient.get(`/payments/check-order/${encodeURIComponent(orderCode)}`);
       if (res.data?.isPaid) {
-        setIsSuccessPaid(true);
-        setTimeout(() => {
-          onConfirmAndPrint();
-        }, 1000);
+        announcePaymentReceived({
+          orderCode,
+          totalPaid: res.data.finalAmount || res.data.depositAmount || amount,
+          remainingAmount: 0,
+          isFullPayment: true,
+        });
+        scheduleConfirmAndPrint();
         return;
       }
       if (res.data?.paymentStatus === 'PARTIALLY_PAID') {
+        const paidSoFar = res.data.depositAmount || 0;
+        const remainingAmt = res.data.remainingAmount || 0;
+        announcePaymentReceived({
+          orderCode,
+          totalPaid: paidSoFar,
+          remainingAmount: remainingAmt,
+          isFullPayment: false,
+        });
         setPartialPayment({
-          paidAmount: res.data.depositAmount || 0,
-          remainingAmount: res.data.remainingAmount || 0,
+          paidAmount: paidSoFar,
+          remainingAmount: remainingAmt,
         });
       }
     } catch {
@@ -330,6 +418,35 @@ export const VietQrModal: FC<Props> = ({
               <Clock size={13} />
               <span>{timerText}</span>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isVoiceEnabled;
+                setPaymentVoiceEnabled(next);
+                setIsVoiceEnabled(next);
+                if (next) unlockPaymentAudio();
+              }}
+              title={
+                isVoiceEnabled
+                  ? 'Đang bật loa đọc số tiền chuyển khoản (Bấm để tắt)'
+                  : 'Đang tắt loa đọc số tiền chuyển khoản (Bấm để bật)'
+              }
+              aria-label={isVoiceEnabled ? 'Tắt loa thông báo' : 'Bật loa thông báo'}
+              style={{
+                width: 30,
+                height: 30,
+                background: isVoiceEnabled ? '#f0fdfa' : '#ffffff',
+                border: isVoiceEnabled ? '1px solid #99f6e4' : '1px solid #cbd5e1',
+                borderRadius: 6,
+                color: isVoiceEnabled ? '#0f766e' : '#94a3b8',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {isVoiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+            </button>
             <button
               type="button"
               onClick={onClose}
@@ -522,18 +639,20 @@ export const VietQrModal: FC<Props> = ({
                     overflow: 'hidden',
                   }}
                 >
-                  <img
-                    src={qrUrl}
-                    alt={`VietQR Napas 247 - ${amount} VND`}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                    }}
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
-                    }}
-                  />
+                  {qrUrl ? (
+                    <img
+                      src={qrUrl}
+                      alt={`VietQR Napas 247 - ${amount} VND`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  ) : null}
                 </div>
 
                 {/* Số tiền đậm bên dưới QR giống mẫu */}
@@ -698,7 +817,11 @@ export const VietQrModal: FC<Props> = ({
             </button>
             <button
               type="button"
-              onClick={onConfirmAndPrint}
+              onClick={() => {
+                if (hasTriggeredConfirmRef.current) return;
+                hasTriggeredConfirmRef.current = true;
+                onConfirmAndPrintRef.current();
+              }}
               style={{
                 padding: '7px 14px',
                 backgroundColor: '#0f766e',
