@@ -41,7 +41,10 @@ export const posShiftApi = {
       const res = await httpClient.get('/pos/shifts/current', {
         params: { branchId, tillId },
       });
-      return res.data?.data || res.data || null;
+      if (res.data && typeof res.data === 'object' && 'data' in res.data) {
+        return res.data.data ?? null;
+      }
+      return res.data || null;
     } catch (err: any) {
       if (err.response?.status === 404 || err.response?.data?.code === 'NO_ACTIVE_SHIFT') {
         return null;
