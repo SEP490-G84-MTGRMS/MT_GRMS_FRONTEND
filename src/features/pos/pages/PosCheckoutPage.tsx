@@ -33,6 +33,8 @@ import { promotionApi, type LoyaltyConfigDto, type CartGiftItemDto } from '../..
 import { employeeApi } from '../../employee/api/employeeApi';
 import { repackApi, type PackageScanDto } from '../../batch/api/repackApi';
 import { useAuthStore } from '../../../stores/useAuthStore';
+import { unlockPaymentAudio } from '../utils/paymentVoiceAlert';
+import { usePosPaymentVoiceListener } from '../hooks/usePosPaymentVoiceListener';
 import '../pos.css';
 
 const getPosStorageScope = (tenantId: string, userId: string) => `${tenantId}_${userId || 'anonymous'}`;
@@ -450,6 +452,14 @@ export const PosCheckoutPage: FC = () => {
     }
     setPendingPaymentOrdersByTab((prev) => ({ ...prev, [currentTab.id]: order }));
   };
+
+  usePosPaymentVoiceListener({
+    pendingOrdersByTab: pendingPaymentOrdersByTab,
+    tabs,
+    activeBranchId: activeBranch.id,
+    openModalOrderCode: isVietQrOpen ? pendingPaymentOrder?.orderCode : undefined,
+    onNotify: showToast,
+  });
 
   // Danh mục lọc được lấy từ sản phẩm kinh doanh tại chi nhánh đang chọn.
   const branchCategories = useMemo(() => {
@@ -1388,6 +1398,7 @@ export const PosCheckoutPage: FC = () => {
 
   // Tạo đơn giữ hàng chờ thanh toán (PendingPayment) trước khi mở mã QR chuyển khoản
   const handleStartVietQrPayment = async () => {
+    unlockPaymentAudio();
     if (!isStoreOwner && !currentShift) {
       showToast('Quầy hiện chưa có ca làm việc nào đang mở. Vui lòng mở ca làm việc trước khi thanh toán!', 'warning');
       setIsOpenShiftModalOpen(true);

@@ -112,8 +112,10 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
   // Chốt doanh thu bán lẻ cuối ngày của Chủ cửa hàng (tách riêng Đơn Chủ tự bán & Duyệt ca theo Ngày nghiệp vụ)
   const [ownerUnsettled, setOwnerUnsettled] = useState<OwnerUnsettledSummaryResponse | null>(null);
   const [isOwnerEodModalOpen, setIsOwnerEodModalOpen] = useState(Boolean(dailyClosing));
+  const [isConfirmCloseDayOpen, setIsConfirmCloseDayOpen] = useState(false);
   const closeDailyClosing = () => {
     if (isSettlingOwnerEod) return;
+    setIsConfirmCloseDayOpen(false);
     dailyClosing?.onClose();
     setIsOwnerEodModalOpen(false);
   };
@@ -464,6 +466,12 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
       return;
     }
 
+    // Nếu không còn ca chờ duyệt bàn giao -> mở hộp thoại xác nhận khóa sổ ngày trước khi chốt cứng
+    if (pendingShiftsForBusinessDate.length === 0) {
+      setIsConfirmCloseDayOpen(true);
+      return;
+    }
+
     setIsSettlingOwnerEod(true);
     try {
       let approvedShiftsCount = 0;
@@ -488,8 +496,19 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
         ));
         await fetchShiftHistory();
         showToast(`Đã xác nhận bàn giao ${approvedShiftsCount} ca. Vui lòng kiểm tra số liệu tạm tính rồi bấm Khóa sổ ngày.`, 'success');
-        return;
       }
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi xác nhận bàn giao ca trong ngày.', 'error');
+    } finally {
+      setIsSettlingOwnerEod(false);
+    }
+  };
+
+  const handleConfirmCloseBusinessDay = async () => {
+    if (!businessDayPreview || isSettlingOwnerEod) return;
+    setIsConfirmCloseDayOpen(false);
+    setIsSettlingOwnerEod(true);
+    try {
       const closing = await posShiftApi.closeBusinessDay({
         branchId: selectedBranchId,
         businessDate: eodBusinessDate,
@@ -501,7 +520,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
       });
       dailyClosing?.onChange();
       showToast(
-        `Đã duyệt ${approvedShiftsCount} ca và khóa sổ ngày ${eodBusinessDate}. Mã chốt ngày: ${closing.referenceCode}.`,
+        `Đã khóa sổ ngày ${eodBusinessDate}. Mã chốt ngày: ${closing.referenceCode}.`,
         'success'
       );
       setBusinessDayHistory(await posShiftApi.getBusinessDayHistory(selectedBranchId, eodBusinessDate));
@@ -523,7 +542,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
           // Fall through to the original server error when refresh also fails.
         }
       }
-      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi duyệt khóa sổ ca trong ngày.', 'error');
+      showToast(err?.response?.data?.message || err?.message || 'Lỗi khi khóa sổ ngày nghiệp vụ.', 'error');
     } finally {
       setIsSettlingOwnerEod(false);
     }
@@ -1471,7 +1490,7 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 1000,
+              zIndex: 9999,
               padding: 16,
             }}
           >
@@ -2116,6 +2135,106 @@ export const PosShiftPage: FC<PosShiftPageProps> = ({ dailyClosing }) => {
             </div>
           </div>
         )}
+
+        {/* ─── 5B. HỘP THOẠI XÁC NHẬN KHÓA SỔ NGÀY NGHIỆP VỤ ─── */}
+        {isConfirmCloseDayOpen && businessDayPreview && (() => {
+          const countableFunds = businessDayPreview.funds.filter((f) => f.requiresPhysicalCount);
+          const totalExpected = countableFunds.reduce((sum, f) => sum + (f.expectedCash || 0), 0);
+          const totalActual = countableFunds.reduce((sum, f) => sum + (Number(businessDayFundCounts[f.fundId]) || 0), 0);
+          const diff = totalActual - totalExpected;
+          return (
+            <div
+              className="pos-modal-overlay"
+              style={{ zIndex: 10050 }}
+              onClick={(e) => e.target === e.currentTarget && !isSettlingOwnerEod && setIsConfirmCloseDayOpen(false)}
+            >
+              <div className="pos-modal-dialog" style={{ maxWidth: 480, padding: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingBottom: 12, borderBottom: '1px solid #E2E8F0' }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#FEF3C7', color: '#B45309', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0F172A' }}>
+                      Xác nhận khóa sổ ngày {eodBusinessDate}
+                    </h3>
+                    <div style={{ fontSize: 12.5, color: '#64748B', marginTop: 2 }}>
+                      Chi nhánh: <b>{dailyClosing?.branchName || selectedBranchName || 'Chi nhánh đang chọn'}</b>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isSettlingOwnerEod}
+                    onClick={() => setIsConfirmCloseDayOpen(false)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B' }}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
+                  <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', lineHeight: 1.5 }}>
+                    Sau khi khóa sổ, chi nhánh này sẽ <b>không thể mở ca mới, bán hàng, đặt trước hay đổi trả</b> trong ngày nghiệp vụ <b>{eodBusinessDate}</b> (cho đến 06:00 sáng hôm sau) và <b>không thể mở lại</b>.
+                  </div>
+
+                  {countableFunds.length > 0 && (
+                    <div style={{ padding: '10px 12px', borderRadius: 8, backgroundColor: '#F8FAFC', border: '1px solid #CBD5E1', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontWeight: 700, color: '#334155', fontSize: 12.5 }}>Đối chiếu tiền mặt kiểm đếm</div>
+                      {countableFunds.map((fund) => {
+                        const actual = Number(businessDayFundCounts[fund.fundId]) || 0;
+                        const fundDiff = actual - (fund.expectedCash || 0);
+                        return (
+                          <div key={fund.fundId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                            <span style={{ color: '#475569' }}>{fund.fundName}</span>
+                            <span style={{ fontWeight: 700, color: '#0F172A' }}>
+                              {formatVND(actual)}{' '}
+                              <span style={{ fontWeight: 600, color: fundDiff === 0 ? '#059669' : '#DC2626' }}>
+                                ({fundDiff === 0 ? 'Khớp sổ' : `${fundDiff > 0 ? '+' : ''}${formatVND(fundDiff)}`})
+                              </span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                      <div style={{ borderTop: '1px dashed #CBD5E1', paddingTop: 6, marginTop: 2, display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                        <span style={{ color: '#334155', fontWeight: 700 }}>Tổng chênh lệch két:</span>
+                        <strong style={{ color: diff === 0 ? '#059669' : '#DC2626' }}>
+                          {diff > 0 ? `+${formatVND(diff)}` : formatVND(diff)}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+                    <button
+                      type="button"
+                      className="pos-btn-secondary"
+                      disabled={isSettlingOwnerEod}
+                      onClick={() => setIsConfirmCloseDayOpen(false)}
+                    >
+                      Quay lại
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSettlingOwnerEod}
+                      onClick={handleConfirmCloseBusinessDay}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: 6,
+                        border: 'none',
+                        backgroundColor: '#D97706',
+                        color: '#FFFFFF',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: isSettlingOwnerEod ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {isSettlingOwnerEod ? 'Đang khóa sổ...' : 'Xác nhận khóa sổ ngày'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
 
         {/* ─── 6. MODAL BUỘC ĐÓNG CA (FORCE CLOSE) DÀNH CHO CHỦ CỬA HÀNG KHI NHÂN VIÊN QUÊN CHỐT CA ─── */}
